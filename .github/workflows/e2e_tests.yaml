@@ -38,7 +38,7 @@ jobs:
               # use_as_library_client: true
               # library_client_config_path: <path-to-llama-stack-run.yaml-file>
               url: http://llama-stack:8321
-              api_key: xyzzy
+              api_key: ${{ env.OPENAI_API_KEY }}
             user_data_collection:
               feedback_disabled: false
               feedback_storage: "/tmp/data/feedback"
@@ -173,7 +173,7 @@ jobs:
             scoring_fns: []
             server:
               auth: null
-              host: null
+              host: 0.0.0.0
               port: 8321
               quota: null
               tls_cafile: null
