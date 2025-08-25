@@ -35,7 +35,7 @@ def before_scenario(context: Context, scenario: Scenario) -> None:
 def after_scenario(context: Context, scenario: Scenario) -> None:
     """Run after each scenario is run."""
     # Restore Llama Stack connection if it was disrupted
-    if hasattr(context, "llama_stack_was_running") and context.llama_stack_was_running:
+    if context.llama_stack_was_running:
         try:
             # Start the llama-stack container again
             subprocess.run(
