@@ -105,6 +105,7 @@ jobs:
               - agents
               - datasetio
               - eval
+              - files
               - inference
               - post_training
               - safety
@@ -125,6 +126,14 @@ jobs:
               namespace: null
               type: sqlite
             providers:
+              files:
+              - config:
+                  storage_dir: /tmp/llama-stack-files
+                  metadata_store:
+                    type: sqlite
+                    db_path: .llama/distributions/ollama/files_metadata.db
+                provider_id: localfs
+                provider_type: inline::localfs
               agents:
               - config:
                   persistence_store:
@@ -199,6 +208,9 @@ jobs:
                 - provider_id: model-context-protocol
                   provider_type: remote::model-context-protocol
                   config: {}
+                - provider_id: rag-runtime
+                  provider_type: inline::rag-runtime
+                  config: {}
               vector_io:
               - config:
                   kvstore:
@@ -224,6 +236,10 @@ jobs:
                 provider_id: openai
                 model_type: llm
                 provider_model_id: gpt-4o-mini
+            
+            tool_groups:
+              - toolgroup_id: builtin::rag
+                provider_id: rag-runtime
 
       - name: list files
         run: |

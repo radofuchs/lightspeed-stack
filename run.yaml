@@ -5,6 +5,7 @@ apis:
   - agents
   - datasetio
   - eval
+  - files
   - inference
   - post_training
   - safety
@@ -25,6 +26,14 @@ metadata_store:
   namespace: null
   type: sqlite
 providers:
+  files:
+  - config:
+      storage_dir: /tmp/llama-stack-files
+      metadata_store:
+        type: sqlite
+        db_path: .llama/distributions/ollama/files_metadata.db
+    provider_id: localfs
+    provider_type: inline::localfs
   agents:
   - config:
       persistence_store:
