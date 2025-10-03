@@ -91,161 +91,66 @@ jobs:
             authentication:
               module: "noop"
 
-      - uses: 1arp/create-a-file-action@0.4.5
-        env: 
-            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        with:
-          path: '.'
-          isAbsolutePath: false
-          file: 'run.yaml'
-          content: |
-            version: '2'
-            image_name: simplest-llamastack-app
-            apis:
-              - agents
-              - datasetio
-              - eval
-              - files
-              - inference
-              - post_training
-              - safety
-              - scoring
-              - telemetry
-              - tool_runtime
-              - vector_io
-            benchmarks: []
-            container_image: null
-            datasets: []
-            external_providers_dir: null
-            inference_store:
-              db_path: /app-root/.llama/distributions/ollama/inference_store.db
-              type: sqlite
-            logging: null
-            metadata_store:
-              db_path: /app-root/.llama/distributions/ollama/registry.db
-              namespace: null
-              type: sqlite
-            providers:
-              files:
-              - config:
-                  storage_dir: /tmp/llama-stack-files
-                  metadata_store:
-                    type: sqlite
-                    db_path: /app-root/.llama/distributions/ollama/files_metadata.db
-                provider_id: localfs
-                provider_type: inline::localfs
-              agents:
-              - config:
-                  persistence_store:
-                    db_path: /app-root/.llama/distributions/ollama/agents_store.db
-                    namespace: null
-                    type: sqlite
-                  responses_store:
-                    db_path: /app-root/.llama/distributions/ollama/responses_store.db
-                    type: sqlite
-                provider_id: meta-reference
-                provider_type: inline::meta-reference
-              datasetio:
-              - config:
-                  kvstore:
-                    db_path: /app-root/.llama/distributions/ollama/huggingface_datasetio.db
-                    namespace: null
-                    type: sqlite
-                provider_id: huggingface
-                provider_type: remote::huggingface
-              - config:
-                  kvstore:
-                    db_path: /app-root/.llama/distributions/ollama/localfs_datasetio.db
-                    namespace: null
-                    type: sqlite
-                provider_id: localfs
-                provider_type: inline::localfs
-              eval:
-              - config:
-                  kvstore:
-                    db_path: /app-root/.llama/distributions/ollama/meta_reference_eval.db
-                    namespace: null
-                    type: sqlite
-                provider_id: meta-reference
-                provider_type: inline::meta-reference
-              inference:
-                - provider_id: openai
-                  provider_type: remote::openai
-                  config:
-                    api_key: ${{ env.OPENAI_API_KEY }}
-              post_training:
-              - config:
-                  checkpoint_format: huggingface
-                  device: cpu
-                  distributed_backend: null
-                  dpo_output_dir: '.'
-                provider_id: huggingface
-                provider_type: inline::huggingface-gpu
-              safety:
-              - config:
-                  excluded_categories: []
-                provider_id: llama-guard
-                provider_type: inline::llama-guard
-              scoring:
-              - config: {}
-                provider_id: basic
-                provider_type: inline::basic
-              - config: {}
-                provider_id: llm-as-judge
-                provider_type: inline::llm-as-judge
-              - config:
-                  openai_api_key: '******'
-                provider_id: braintrust
-                provider_type: inline::braintrust
-              telemetry:
-              - config:
-                  service_name: 'lightspeed-stack'
-                  sinks: sqlite
-                  sqlite_db_path: /app-root/.llama/distributions/ollama/trace_store.db
-                provider_id: meta-reference
-                provider_type: inline::meta-reference
-              tool_runtime:
-                - provider_id: model-context-protocol
-                  provider_type: remote::model-context-protocol
-                  config: {}
-                - provider_id: rag-runtime
-                  provider_type: inline::rag-runtime
-                  config: {}
-              vector_io:
-              - config:
-                  kvstore:
-                    db_path: /app-root/.llama/distributions/ollama/faiss_store.db
-                    namespace: null
-                    type: sqlite
-                provider_id: faiss
-                provider_type: inline::faiss
-            scoring_fns: []
-            server:
-              auth: null
-              host: null
-              port: 8321
-              quota: null
-              tls_cafile: null
-              tls_certfile: null
-              tls_keyfile: null
-            shields: []
-            vector_dbs: []
-
-            models:
-              - model_id: gpt-4o-mini
-                provider_id: openai
-                model_type: llm
-                provider_model_id: gpt-4o-mini
-            
-            tool_groups:
-              - toolgroup_id: builtin::rag
-                provider_id: rag-runtime
+      - name: Select and configure run.yaml
+        run: |
+          # Set configuration directory and environment
+          CONFIG_DIR="config"
+          ENVIRONMENT="${MATRIX_ENV:-ci}"  # Default to 'ci' if not specified
+          
+          echo "🔍 Looking for configuration files in $CONFIG_DIR/"
+          
+          # List available configurations
+          if [ -d "$CONFIG_DIR" ]; then
+            echo "Available configurations:"
+            ls -la "$CONFIG_DIR"/*.yaml 2>/dev/null || echo "No YAML files found in $CONFIG_DIR/"
+          fi
+          
+          # Determine which config file to use
+          CONFIG_FILE="${CONFIG_DIR}/run-${ENVIRONMENT}.yaml"
+          
+          echo "🎯 Looking for: $CONFIG_FILE"
+          
+          if [ -f "$CONFIG_FILE" ]; then
+            echo "✅ Found specific config: $CONFIG_FILE"
+            cp "$CONFIG_FILE" run-ci.yaml
+          elif [ -f "$CONFIG_DIR/run.yaml" ]; then
+            echo "⚙️  Using default config: $CONFIG_DIR/run.yaml"
+            cp "$CONFIG_DIR/run.yaml" run-ci.yaml
+          elif [ -f "run.yaml" ]; then
+            echo "🔄 Falling back to root run.yaml"
+            cp run.yaml run-ci.yaml
+          else
+            echo "❌ No configuration file found!"
+            exit 1
+          fi
+          
+          # Update paths for container environment (relative -> absolute)
+          sed -i 's|db_path: \.llama/distributions|db_path: /app-root/.llama/distributions|g' run-ci.yaml
+          sed -i 's|db_path: tmp/|db_path: /app-root/.llama/distributions/|g' run-ci.yaml
+          
+          # Set OpenAI API key for container
+          sed -i "s|api_key: \${env\.OPENAI_API_KEY}|api_key: $OPENAI_API_KEY|g" run-ci.yaml
+          
+          echo "✅ Created run-ci.yaml for $ENVIRONMENT environment"
+          echo "📝 Configuration summary:"
+          echo "   Source: $(basename "$CONFIG_FILE")"
+          echo "   Key model count: $(grep -c "model_id:" run-ci.yaml)"
+          echo "   Providers: $(grep -c "provider_id:" run-ci.yaml)"
 
       - name: list files
         run: |
-          ls
-          cat lightspeed-stack.yaml
-          cat run.yaml
+          echo "=== Configuration Summary ==="
+          echo "Source config: configs/run-$CONFIG_ENVIRONMENT.yaml"
+          echo "Final file: run-ci.yaml"
+          echo "Container mount: /app-root/run.yaml"
+          echo ""
+          echo "=== Final Configuration Preview ==="
+          echo "Providers: $(grep -c "provider_id:" run-ci.yaml)"
+          echo "Models: $(grep -c "model_id:" run-ci.yaml)"
+          echo "Database paths (first 3):"
+          grep "db_path:" run-ci.yaml | head -3
+          echo ""
+          echo "✅ Ready for container deployment"
 
       - name: Run service manually
         env: 
@@ -289,6 +194,17 @@ jobs:
 
           echo "Running comprehensive e2e test suite..."
           make test-e2e
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Test failure logs ==="
+          echo "=== llama-stack logs ==="
+          docker compose logs llama-stack
+          
+          echo ""
+          echo "=== lightspeed-stack logs ==="
+          docker compose logs lightspeed-stack
 
       - name: Show logs on failure
         if: failure()

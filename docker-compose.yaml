@@ -7,7 +7,7 @@ services:
     ports:
       - "8321:8321"  # Expose llama-stack on 8321 (adjust if needed)
     volumes:
-      - ./run.yaml:/app-root/run.yaml:Z
+      - ./run-ci.yaml:/app-root/run.yaml:Z
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     networks:
