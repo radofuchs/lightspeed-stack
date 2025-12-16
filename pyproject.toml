@@ -163,7 +163,7 @@ llslibdev = [
     "trl>=0.18.2",
     "peft>=0.15.2",
     # Other
-    "autoevals>=0.0.129",
+    # "autoevals>=0.0.129",  # Excluded: polyleven dependency has no aarch64 wheel
     "fire>=0.7.0",
     "opentelemetry-instrumentation>=0.55b0",
     "blobfile>=3.0.0",
