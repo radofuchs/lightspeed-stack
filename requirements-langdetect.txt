@@ -1,0 +1,4 @@
+# Packages that only have Python 2 wheels and need to be built from source
+# These are prefetched separately without allow_binary to get source distributions
+langdetect==1.0.9
+
