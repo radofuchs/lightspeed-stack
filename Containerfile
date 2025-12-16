@@ -30,10 +30,8 @@ COPY ${LSC_SOURCE_DIR}/pyproject.toml ${LSC_SOURCE_DIR}/LICENSE ${LSC_SOURCE_DIR
 # cachi2.env has these env vars:
 # PIP_FIND_LINKS=/cachi2/output/deps/pip
 # PIP_NO_INDEX=true
-# Note: --no-build-isolation is needed for packages like langdetect that only have
-# Python 2 wheels and must be built from source distribution (sdist)
 RUN if [ -f /cachi2/cachi2.env ]; then \
-    . /cachi2/cachi2.env && uv venv --seed --no-index --find-links ${PIP_FIND_LINKS} && . .venv/bin/activate && pip install --no-index --no-build-isolation --find-links ${PIP_FIND_LINKS} -r requirements.$(uname -m).txt -r requirements.torch.txt; \
+    . /cachi2/cachi2.env && uv venv --seed --no-index --find-links ${PIP_FIND_LINKS} && . .venv/bin/activate && pip install --no-index --find-links ${PIP_FIND_LINKS} -r requirements.$(uname -m).txt -r requirements.torch.txt; \
     else \
     uv sync --locked --no-dev --group llslibdev; \
     fi
