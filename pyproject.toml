@@ -137,7 +137,7 @@ llslibdev = [
     # API eval: inline::meta-reference
     "tree_sitter>=0.24.0",
     "pythainlp>=3.0.10",
-    # "langdetect>=1.0.9",  # Excluded: only has Python 2 wheel, breaks hermetic builds
+    "langdetect>=1.0.9",
     "emoji>=2.1.0",
     "nltk>=3.8.1",
     # API inference: inline::sentence-transformers
@@ -163,7 +163,7 @@ llslibdev = [
     "trl>=0.18.2",
     "peft>=0.15.2",
     # Other
-    # "autoevals>=0.0.129",  # Excluded: polyleven dependency has no aarch64 wheel
+    "autoevals>=0.0.129",
     "fire>=0.7.0",
     "opentelemetry-instrumentation>=0.55b0",
     "blobfile>=3.0.0",
