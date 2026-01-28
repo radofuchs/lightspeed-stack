@@ -17,7 +17,7 @@ def create_quota_limiter(
     name: str, initial_quota: int, quota_limit: int
 ) -> UserQuotaLimiter:
     """Create new quota limiter instance."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.sqlite = SQLiteDatabaseConfiguration(
         db_path=":memory:",
     )
