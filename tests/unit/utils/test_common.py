@@ -29,14 +29,30 @@ async def test_register_mcp_servers_empty_list(mocker: MockerFixture) -> None:
     # Create configuration with empty MCP servers
     config = Configuration(
         name="test",
-        service=ServiceConfiguration(),
-        llama_stack=LlamaStackConfiguration(
-            use_as_library_client=False, url="http://localhost:8321"
+        service=ServiceConfiguration(
+            host="localhost",
+            port=1234,
+            base_url=None,
+            auth_enabled=True,
+            workers=10,
+            color_log=True,
+            access_log=True,
         ),
-        user_data_collection=UserDataCollection(feedback_enabled=False),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=False,
+            url="http://localhost:8321",
+            library_client_config_path=None,
+            api_key=None,
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False,
+            feedback_storage=None,
+            transcripts_enabled=False,
+            transcripts_storage=None,
+        ),
         mcp_servers=[],
         customization=None,
-    )
+    )  # pyright: ignore[reportCallIssue]
     # Call the function
     await register_mcp_servers_async(mock_logger, config)
 
@@ -67,18 +83,36 @@ async def test_register_mcp_servers_single_server_not_registered(
 
     # Create configuration with one MCP server
     mcp_server = ModelContextProtocolServer(
-        name="new-server", url="http://localhost:8080"
+        name="new-server",
+        url="http://localhost:8080",
+        provider_id="model-context-protocol",
     )
     config = Configuration(
         name="test",
-        service=ServiceConfiguration(),
-        llama_stack=LlamaStackConfiguration(
-            use_as_library_client=False, url="http://localhost:8321"
+        service=ServiceConfiguration(
+            host="localhost",
+            port=1234,
+            base_url=None,
+            auth_enabled=True,
+            workers=10,
+            color_log=True,
+            access_log=True,
         ),
-        user_data_collection=UserDataCollection(feedback_enabled=False),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=False,
+            url="http://localhost:8321",
+            library_client_config_path=None,
+            api_key=None,
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False,
+            feedback_storage=None,
+            transcripts_enabled=False,
+            transcripts_storage=None,
+        ),
         mcp_servers=[mcp_server],
         customization=None,
-    )
+    )  # pyright: ignore[reportCallIssue]
 
     # Call the function
     await register_mcp_servers_async(mock_logger, config)
@@ -113,18 +147,34 @@ async def test_register_mcp_servers_single_server_already_registered(
 
     # Create configuration with MCP server that matches existing toolgroup
     mcp_server = ModelContextProtocolServer(
-        name="existing-server", url="http://localhost:8080"
+        name="existing-server", url="http://localhost:8080", provider_id="qwe"
     )
     config = Configuration(
         name="test",
-        service=ServiceConfiguration(),
-        llama_stack=LlamaStackConfiguration(
-            use_as_library_client=False, url="http://localhost:8321"
+        service=ServiceConfiguration(
+            host="localhost",
+            port=1234,
+            base_url=None,
+            auth_enabled=True,
+            workers=10,
+            color_log=True,
+            access_log=True,
         ),
-        user_data_collection=UserDataCollection(feedback_enabled=False),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=False,
+            url="http://localhost:8321",
+            library_client_config_path=None,
+            api_key=None,
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False,
+            feedback_storage=None,
+            transcripts_enabled=False,
+            transcripts_storage=None,
+        ),
         mcp_servers=[mcp_server],
         customization=None,
-    )
+    )  # pyright: ignore[reportCallIssue]
 
     # Call the function
     await register_mcp_servers_async(mock_logger, config)
@@ -156,8 +206,14 @@ async def test_register_mcp_servers_multiple_servers_mixed_registration(
 
     # Create configuration with multiple MCP servers
     mcp_servers = [
-        ModelContextProtocolServer(name="existing-server", url="http://localhost:8080"),
-        ModelContextProtocolServer(name="new-server", url="http://localhost:8081"),
+        ModelContextProtocolServer(
+            name="existing-server",
+            url="http://localhost:8080",
+        ),  # pyright: ignore[reportCallIssue]
+        ModelContextProtocolServer(
+            name="new-server",
+            url="http://localhost:8081",
+        ),  # pyright: ignore[reportCallIssue]
         ModelContextProtocolServer(
             name="another-new-server",
             provider_id="custom-provider",
@@ -166,14 +222,30 @@ async def test_register_mcp_servers_multiple_servers_mixed_registration(
     ]
     config = Configuration(
         name="test",
-        service=ServiceConfiguration(),
-        llama_stack=LlamaStackConfiguration(
-            use_as_library_client=False, url="http://localhost:8321"
+        service=ServiceConfiguration(
+            host="localhost",
+            port=1234,
+            base_url=None,
+            auth_enabled=True,
+            workers=10,
+            color_log=True,
+            access_log=True,
         ),
-        user_data_collection=UserDataCollection(feedback_enabled=False),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=False,
+            url="http://localhost:8321",
+            library_client_config_path=None,
+            api_key=None,
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False,
+            feedback_storage=None,
+            transcripts_enabled=False,
+            transcripts_storage=None,
+        ),
         mcp_servers=mcp_servers,
         customization=None,
-    )
+    )  # pyright: ignore[reportCallIssue]
 
     # Call the function
     await register_mcp_servers_async(mock_logger, config)
@@ -220,14 +292,30 @@ async def test_register_mcp_servers_with_custom_provider(mocker: MockerFixture) 
     )
     config = Configuration(
         name="test",
-        service=ServiceConfiguration(),
-        llama_stack=LlamaStackConfiguration(
-            use_as_library_client=False, url="http://localhost:8321"
+        service=ServiceConfiguration(
+            host="localhost",
+            port=1234,
+            base_url=None,
+            auth_enabled=True,
+            workers=10,
+            color_log=True,
+            access_log=True,
         ),
-        user_data_collection=UserDataCollection(feedback_enabled=False),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=False,
+            url="http://localhost:8321",
+            library_client_config_path=None,
+            api_key=None,
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False,
+            feedback_storage=None,
+            transcripts_enabled=False,
+            transcripts_storage=None,
+        ),
         mcp_servers=[mcp_server],
         customization=None,
-    )
+    )  # pyright: ignore[reportCallIssue]
 
     # Call the function
     await register_mcp_servers_async(mock_logger, config)
@@ -271,18 +359,33 @@ async def test_register_mcp_servers_async_with_library_client(
     # Create configuration with library client enabled
     mcp_server = ModelContextProtocolServer(
         name="test-server", url="http://localhost:8080"
-    )
+    )  # pyright: ignore[reportCallIssue]
     config = Configuration(
         name="test",
-        service=ServiceConfiguration(),
+        service=ServiceConfiguration(
+            host="localhost",
+            port=1234,
+            base_url=None,
+            auth_enabled=True,
+            workers=10,
+            color_log=True,
+            access_log=True,
+        ),
         llama_stack=LlamaStackConfiguration(
             use_as_library_client=True,
             library_client_config_path="tests/configuration/run.yaml",
+            url=None,
+            api_key=None,
         ),
-        user_data_collection=UserDataCollection(feedback_enabled=False),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False,
+            feedback_storage=None,
+            transcripts_enabled=False,
+            transcripts_storage=None,
+        ),
         mcp_servers=[mcp_server],
         customization=None,
-    )
+    )  # pyright: ignore[reportCallIssue]
 
     # Call the async function
     await register_mcp_servers_async(mock_logger, config)
