@@ -3200,6 +3200,8 @@ system info) and returns an LLM-generated response.
 
 Args:
     infer_request: The inference request containing question and context.
+    request: The FastAPI request object for accessing headers and state.
+    background_tasks: FastAPI background tasks for async Splunk event sending.
     auth: Authentication tuple from the configured auth provider.
 
 Returns:
@@ -4184,7 +4186,7 @@ BYOK (Bring Your Own Knowledge) RAG configuration.
 | rag_type | string | Type of RAG database. |
 | embedding_model | string | Embedding model identification |
 | embedding_dimension | integer | Dimensionality of embedding vectors. |
-| vector_db_id | string | Vector DB identification. |
+| vector_db_id | string | Vector database identification. |
 | db_path | string | Path to RAG database. |
 
 

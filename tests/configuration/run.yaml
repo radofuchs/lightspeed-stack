@@ -9,61 +9,54 @@ apis:
   - post_training
   - safety
   - scoring
-  - telemetry
   - tool_runtime
   - vector_io
 benchmarks: []
 container_image: null
 datasets: []
 external_providers_dir: null
-inference_store:
-  db_path: .llama/distributions/ollama/inference_store.db
-  type: sqlite
 logging: null
-metadata_store:
-  db_path: .llama/distributions/ollama/registry.db
-  namespace: null
-  type: sqlite
 providers:
   agents:
-  - config:
-      persistence_store:
-        db_path: .llama/distributions/ollama/agents_store.db
-        namespace: null
-        type: sqlite
-      responses_store:
-        db_path: .llama/distributions/ollama/responses_store.db
-        type: sqlite
-    provider_id: meta-reference
+  - provider_id: meta-reference
     provider_type: inline::meta-reference
+    config:
+      persistence:
+        agent_state:
+          namespace: agents_state
+          backend: kv_default
+        responses:
+          table_name: agents_responses
+          backend: sql_default
   datasetio:
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/huggingface_datasetio.db
-        namespace: null
-        type: sqlite
-    provider_id: huggingface
+  - provider_id: huggingface
     provider_type: remote::huggingface
-  - config:
+    config:
       kvstore:
-        db_path: .llama/distributions/ollama/localfs_datasetio.db
-        namespace: null
-        type: sqlite
-    provider_id: localfs
+        namespace: huggingface_datasetio
+        backend: kv_default
+  - provider_id: localfs
     provider_type: inline::localfs
-  eval:
-  - config:
+    config:
       kvstore:
-        db_path: .llama/distributions/ollama/meta_reference_eval.db
-        namespace: null
-        type: sqlite
-    provider_id: meta-reference
+        namespace: localfs_datasetio
+        backend: kv_default
+  eval:
+  - provider_id: meta-reference
     provider_type: inline::meta-reference
+    config:
+      kvstore:
+        namespace: eval_store
+        backend: kv_default
   inference:
-    - provider_id: openai
-      provider_type: remote::openai
-      config:
-        api_key: ${env.OPENAI_API_KEY}
+  - provider_id: openai
+    provider_type: remote::openai
+    config:
+      api_key: ${env.OPENAI_API_KEY}
+      allowed_models: ["gpt-4-turbo"]
+  - provider_id: sentence-transformers
+    provider_type: inline::sentence-transformers
+    config: {}
   post_training:
   - config:
       checkpoint_format: huggingface
@@ -95,15 +88,17 @@ providers:
     provider_id: meta-reference
     provider_type: inline::meta-reference
   tool_runtime:
-    - provider_id: model-context-protocol
-      provider_type: remote::model-context-protocol
-      config: {}
+  - provider_id: rag-runtime
+    provider_type: inline::rag-runtime
+    config: {}
+  - provider_id: model-context-protocol
+    provider_type: remote::model-context-protocol
+    config: {}
   vector_io:
   - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/faiss_store.db
-        namespace: null
-        type: sqlite
+      persistence:
+        namespace: vector_io::faiss
+        backend: kv_default
     provider_id: faiss
     provider_type: inline::faiss
 scoring_fns: []
@@ -115,11 +110,41 @@ server:
   tls_cafile: null
   tls_certfile: null
   tls_keyfile: null
-shields: []
-vector_dbs: []
-
-models:
-  - model_id: gpt-4-turbo
-    provider_id: openai
-    model_type: llm
-    provider_model_id: gpt-4-turbo
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: ${env.KV_STORE_PATH:=~/.llama/storage/kv_store.db}
+    sql_default:
+      type: sql_sqlite
+      db_path: ${env.SQL_STORE_PATH:=~/.llama/storage/sql_store.db}
+  stores:
+    metadata:
+      namespace: registry
+      backend: kv_default
+    inference:
+      table_name: inference_store
+      backend: sql_default
+    conversations:
+      table_name: openai_conversations
+      backend: sql_default
+    prompts:
+      namespace: prompts
+      backend: kv_default
+registered_resources:
+  models: []
+  shields: []
+  vector_stores: []
+  datasets: []
+  scoring_fns: []
+  benchmarks: []
+  tool_groups:
+  - toolgroup_id: builtin::rag
+    provider_id: rag-runtime
+telemetry:
+  enabled: true
+vector_stores:
+  default_provider_id: faiss
+  default_embedding_model:
+    provider_id: sentence-transformers
+    model_id: nomic-ai/nomic-embed-text-v1.5

@@ -3664,7 +3664,7 @@
                     "rlsapi-v1"
                 ],
                 "summary": "Infer Endpoint",
-                "description": "Handle rlsapi v1 /infer requests for stateless inference.\n\nThis endpoint serves requests from the RHEL Lightspeed Command Line Assistant (CLA).\n\nAccepts a question with optional context (stdin, attachments, terminal output,\nsystem info) and returns an LLM-generated response.\n\nArgs:\n    infer_request: The inference request containing question and context.\n    auth: Authentication tuple from the configured auth provider.\n\nReturns:\n    RlsapiV1InferResponse containing the generated response text and request ID.\n\nRaises:\n    HTTPException: 503 if the LLM service is unavailable.",
+                "description": "Handle rlsapi v1 /infer requests for stateless inference.\n\nThis endpoint serves requests from the RHEL Lightspeed Command Line Assistant (CLA).\n\nAccepts a question with optional context (stdin, attachments, terminal output,\nsystem info) and returns an LLM-generated response.\n\nArgs:\n    infer_request: The inference request containing question and context.\n    request: The FastAPI request object for accessing headers and state.\n    background_tasks: FastAPI background tasks for async Splunk event sending.\n    auth: Authentication tuple from the configured auth provider.\n\nReturns:\n    RlsapiV1InferResponse containing the generated response text and request ID.\n\nRaises:\n    HTTPException: 503 if the LLM service is unavailable.",
                 "operationId": "infer_endpoint_v1_infer_post",
                 "requestBody": {
                     "content": {
@@ -4290,7 +4290,7 @@
                 ],
                 "summary": "Handle A2A Jsonrpc",
                 "description": "Handle A2A JSON-RPC requests following the A2A protocol specification.\n\nThis endpoint uses the DefaultRequestHandler from the A2A SDK to handle\nall JSON-RPC requests including message/send, message/stream, etc.\n\nThe A2A SDK application is created per-request to include authentication\ncontext while still leveraging FastAPI's authorization middleware.\n\nAutomatically detects streaming requests (message/stream JSON-RPC method)\nand returns a StreamingResponse to enable real-time chunk delivery.\n\nArgs:\n    request: FastAPI request object\n    auth: Authentication tuple\n    mcp_headers: MCP headers for context propagation\n\nReturns:\n    JSON-RPC response or streaming response",
-                "operationId": "handle_a2a_jsonrpc_a2a_get",
+                "operationId": "handle_a2a_jsonrpc_a2a_post",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
@@ -4308,7 +4308,7 @@
                 ],
                 "summary": "Handle A2A Jsonrpc",
                 "description": "Handle A2A JSON-RPC requests following the A2A protocol specification.\n\nThis endpoint uses the DefaultRequestHandler from the A2A SDK to handle\nall JSON-RPC requests including message/send, message/stream, etc.\n\nThe A2A SDK application is created per-request to include authentication\ncontext while still leveraging FastAPI's authorization middleware.\n\nAutomatically detects streaming requests (message/stream JSON-RPC method)\nand returns a StreamingResponse to enable real-time chunk delivery.\n\nArgs:\n    request: FastAPI request object\n    auth: Authentication tuple\n    mcp_headers: MCP headers for context propagation\n\nReturns:\n    JSON-RPC response or streaming response",
-                "operationId": "handle_a2a_jsonrpc_a2a_get",
+                "operationId": "handle_a2a_jsonrpc_a2a_post",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
@@ -5339,7 +5339,7 @@
                         "type": "string",
                         "minLength": 1,
                         "title": "Vector DB ID",
-                        "description": "Vector DB identification."
+                        "description": "Vector database identification."
                     },
                     "db_path": {
                         "type": "string",

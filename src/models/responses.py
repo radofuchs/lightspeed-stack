@@ -8,8 +8,8 @@ from fastapi import status
 from pydantic import AnyUrl, BaseModel, Field
 from pydantic_core import SchemaError
 
-from quota.quota_exceed_error import QuotaExceedError
 from models.config import Action, Configuration
+from quota.quota_exceed_error import QuotaExceedError
 from utils.types import RAGChunk, ToolCallSummary, ToolResultSummary
 
 SUCCESSFUL_RESPONSE_DESCRIPTION = "Successful response"
