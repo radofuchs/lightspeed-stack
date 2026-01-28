@@ -3,6 +3,10 @@
 import pytest
 from pytest_mock import MockerFixture
 
+import constants
+
+from pydantic import SecretStr
+
 from models.config import (
     QuotaLimiterConfiguration,
     PostgreSQLDatabaseConfiguration,
@@ -16,7 +20,7 @@ from quota.user_quota_limiter import UserQuotaLimiter
 
 def test_quota_limiters_no_storage() -> None:
     """Test the quota limiters creating when no storage is configured."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.sqlite = None
     configuration.postgres = None
     configuration.limiters = []
@@ -26,37 +30,47 @@ def test_quota_limiters_no_storage() -> None:
 
 def test_quota_limiters_no_limiters_pg_storage() -> None:
     """Test the quota limiters creating when no limiters are specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.postgres = PostgreSQLDatabaseConfiguration(
         db="test",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        host="host",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
-    configuration.limiters = None
+    configuration.limiters = None  # pyright: ignore
     limiters = QuotaLimiterFactory.quota_limiters(configuration)
     assert not limiters
 
 
 def test_quota_limiters_no_limiters_sqlite_storage() -> None:
     """Test the quota limiters creating when no limiters are specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.sqlite = SQLiteDatabaseConfiguration(
         db_path="/foo/bar",
     )
-    configuration.limiters = None
+    configuration.limiters = None  # pyright: ignore
     limiters = QuotaLimiterFactory.quota_limiters(configuration)
     assert not limiters
 
 
 def test_quota_limiters_empty_limiters_pg_storage() -> None:
     """Test the quota limiters creating when no limiters are specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.postgres = PostgreSQLDatabaseConfiguration(
         db="test",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        host="host",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
     configuration.limiters = []
     limiters = QuotaLimiterFactory.quota_limiters(configuration)
@@ -65,7 +79,7 @@ def test_quota_limiters_empty_limiters_pg_storage() -> None:
 
 def test_quota_limiters_empty_limiters_sqlite_storage() -> None:
     """Test the quota limiters creating when no limiters are specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.sqlite = SQLiteDatabaseConfiguration(
         db_path="/foo/bar",
     )
@@ -78,12 +92,17 @@ def test_quota_limiters_user_quota_limiter_postgres_storage(
     mocker: MockerFixture,
 ) -> None:
     """Test the quota limiters creating when one limiter is specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.postgres = PostgreSQLDatabaseConfiguration(
         db="test",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        host="host",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
     configuration.limiters = [
         QuotaLimiterConfiguration(
@@ -103,7 +122,7 @@ def test_quota_limiters_user_quota_limiter_postgres_storage(
 
 def test_quota_limiters_user_quota_limiter_sqlite_storage() -> None:
     """Test the quota limiters creating when one limiter is specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.sqlite = SQLiteDatabaseConfiguration(
         db_path=":memory:",
     )
@@ -125,12 +144,17 @@ def test_quota_limiters_cluster_quota_limiter_postgres_storage(
     mocker: MockerFixture,
 ) -> None:
     """Test the quota limiters creating when one limiter is specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.postgres = PostgreSQLDatabaseConfiguration(
         db="test",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        host="host",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
     configuration.limiters = [
         QuotaLimiterConfiguration(
@@ -150,7 +174,7 @@ def test_quota_limiters_cluster_quota_limiter_postgres_storage(
 
 def test_quota_limiters_cluster_quota_limiter_sqlite_storage() -> None:
     """Test the quota limiters creating when one limiter is specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.sqlite = SQLiteDatabaseConfiguration(
         db_path=":memory:",
     )
@@ -170,12 +194,17 @@ def test_quota_limiters_cluster_quota_limiter_sqlite_storage() -> None:
 
 def test_quota_limiters_two_limiters(mocker: MockerFixture) -> None:
     """Test the quota limiters creating when two limiters are specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.postgres = PostgreSQLDatabaseConfiguration(
         db="test",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        host="host",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
     configuration.limiters = [
         QuotaLimiterConfiguration(
@@ -203,12 +232,17 @@ def test_quota_limiters_two_limiters(mocker: MockerFixture) -> None:
 
 def test_quota_limiters_invalid_limiter_type(mocker: MockerFixture) -> None:
     """Test the quota limiters creating when invalid limiter type is specified."""
-    configuration = QuotaHandlersConfiguration()
+    configuration = QuotaHandlersConfiguration()  # pyright: ignore[reportCallIssue]
     configuration.postgres = PostgreSQLDatabaseConfiguration(
         db="test",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        host="host",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
     configuration.limiters = [
         QuotaLimiterConfiguration(
@@ -219,7 +253,7 @@ def test_quota_limiters_invalid_limiter_type(mocker: MockerFixture) -> None:
             period="5 days",
         ),
     ]
-    configuration.limiters[0].type = "foo"
+    configuration.limiters[0].type = "foo"  # pyright: ignore
     # do not use connection to real PostgreSQL instance
     mocker.patch("psycopg2.connect")
     with pytest.raises(ValueError, match="Invalid limiter type: foo"):
