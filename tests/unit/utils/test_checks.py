@@ -75,7 +75,7 @@ def test_get_attribute_from_file_improper_filename() -> None:
 def test_file_check_existing_file(input_file: str) -> None:
     """Test the function file_check for existing file."""
     # just call the function, it should not raise an exception
-    checks.file_check(input_file, "description")
+    checks.file_check(Path(input_file), "description")
 
 
 def test_file_check_non_existing_file() -> None:
@@ -88,18 +88,21 @@ def test_file_check_not_readable_file(mocker: MockerFixture, input_file: str) ->
     """Test the function file_check for not readable file."""
     mocker.patch("os.access", return_value=False)
     with pytest.raises(checks.InvalidConfigurationError):
-        checks.file_check(input_file, "description")
+        checks.file_check(Path(input_file), "description")
 
 
 def test_directory_check_non_existing_directory() -> None:
     """Test the function directory_check skips non-existing directory."""
     # just call the function, it should not raise an exception
     checks.directory_check(
-        "/foo/bar/baz", must_exists=False, must_be_writable=False, desc="foobar"
+        Path("/foo/bar/baz"), must_exists=False, must_be_writable=False, desc="foobar"
     )
     with pytest.raises(checks.InvalidConfigurationError):
         checks.directory_check(
-            "/foo/bar/baz", must_exists=True, must_be_writable=False, desc="foobar"
+            Path("/foo/bar/baz"),
+            must_exists=True,
+            must_be_writable=False,
+            desc="foobar",
         )
 
 
@@ -107,7 +110,7 @@ def test_directory_check_existing_writable_directory(input_directory: str) -> No
     """Test the function directory_check checks directory."""
     # just call the function, it should not raise an exception
     checks.directory_check(
-        input_directory, must_exists=True, must_be_writable=True, desc="foobar"
+        Path(input_directory), must_exists=True, must_be_writable=True, desc="foobar"
     )
 
 
@@ -116,7 +119,7 @@ def test_directory_check_non_a_directory(input_file: str) -> None:
     # pass a filename not a directory name
     with pytest.raises(checks.InvalidConfigurationError):
         checks.directory_check(
-            input_file, must_exists=True, must_be_writable=True, desc="foobar"
+            Path(input_file), must_exists=True, must_be_writable=True, desc="foobar"
         )
 
 
@@ -127,7 +130,10 @@ def test_directory_check_existing_non_writable_directory(
     mocker.patch("os.access", return_value=False)
     with pytest.raises(checks.InvalidConfigurationError):
         checks.directory_check(
-            input_directory, must_exists=True, must_be_writable=True, desc="foobar"
+            Path(input_directory),
+            must_exists=True,
+            must_be_writable=True,
+            desc="foobar",
         )
 
 

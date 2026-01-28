@@ -29,7 +29,8 @@ class TestGraniteToolParser:
         """Test that get_tool_calls returns an empty array when CompletionMessage is None."""
         tool_parser = GraniteToolParser.get_parser("granite-3.3-8b-instruct")
         assert tool_parser is not None, "tool parser was not returned"
-        assert tool_parser.get_tool_calls(None) == [], "get_tool_calls should return []"
+        result = tool_parser.get_tool_calls(None)  # pyright: ignore[reportArgumentType]
+        assert result == [], "get_tool_calls should return []"
 
     def test_get_tool_calls_from_completion_message_when_not_none(
         self, mocker: MockerFixture
