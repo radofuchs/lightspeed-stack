@@ -3,9 +3,9 @@
 import pytest
 from pytest_mock import MockerFixture
 
-import constants
-
 from pydantic import SecretStr
+
+import constants
 
 from models.config import (
     QuotaLimiterConfiguration,
