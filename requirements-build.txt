@@ -6,8 +6,6 @@
 #
 calver==2025.10.20
     # via trove-classifiers
-cffi==2.0.0
-    # via cryptography
 coherent-licensed==0.5.2
     # via importlib-metadata
 dunamai==1.25.0
@@ -55,12 +53,9 @@ jinja2==3.1.6
 markupsafe==3.0.3
     # via jinja2
 maturin==1.10.2
-    # via
-    #   cryptography
-    #   fastuuid
+    # via fastuuid
 packaging==26.0
     # via
-    #   dunamai
     #   hatchling
     #   setuptools-scm
     #   wheel
@@ -76,8 +71,6 @@ poetry-core==2.3.0
     #   litellm
     #   rich
     #   tomlkit
-pycparser==3.0
-    # via cffi
 semantic-version==2.10.0
     # via setuptools-rust
 setuptools-rust==1.12.0
@@ -115,8 +108,6 @@ setuptools==80.10.2
     #   cachetools
     #   calver
     #   certifi
-    #   cffi
-    #   cryptography
     #   emoji
     #   google-api-core
     #   greenlet
