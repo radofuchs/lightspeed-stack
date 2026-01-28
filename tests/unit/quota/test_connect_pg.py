@@ -3,8 +3,10 @@
 import pytest
 from pytest_mock import MockerFixture
 
+from pydantic import SecretStr
 from psycopg2 import OperationalError
 
+import constants
 from quota.connect_pg import connect_pg
 from models.config import PostgreSQLDatabaseConfiguration
 
@@ -15,8 +17,13 @@ def test_connect_pg_when_connection_established(mocker: MockerFixture) -> None:
     configuration = PostgreSQLDatabaseConfiguration(
         db="db",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        host="host",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
 
     # do not use connection to real PostgreSQL instance
@@ -34,8 +41,12 @@ def test_connect_pg_when_connection_error(mocker: MockerFixture) -> None:
         host="foo",
         db="db",
         user="user",
-        password="password",
+        password=SecretStr("password"),
         namespace="foo",
+        port=1234,
+        ssl_mode=constants.POSTGRES_DEFAULT_SSL_MODE,
+        gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
+        ca_cert_path=None,
     )
 
     # do not use connection to real PostgreSQL instance
