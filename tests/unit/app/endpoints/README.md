@@ -27,6 +27,9 @@ Unit tests for the /health REST API endpoint.
 ## [test_info.py](test_info.py)
 Unit tests for the /info REST API endpoint.
 
+## [test_mcp_auth.py](test_mcp_auth.py)
+Unit tests for MCP auth endpoint.
+
 ## [test_metrics.py](test_metrics.py)
 Unit tests for the /metrics REST API endpoint.
 
