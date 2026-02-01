@@ -27,3 +27,6 @@ Implementation of common test steps.
 ## [llm_query_response.py](llm_query_response.py)
 LLM query and response steps.
 
+## [rbac.py](rbac.py)
+Step definitions for RBAC E2E tests.
+

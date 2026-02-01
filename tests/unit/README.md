@@ -19,7 +19,7 @@ Test configuration validation for unknown fields.
 Unit tests for functions defined in src/lightspeed_stack.py.
 
 ## [test_llama_stack_configuration.py](test_llama_stack_configuration.py)
-Unit tests for functions defined in src/llama_stack_configuration.py.
+Unit tests for src/llama_stack_configuration.py.
 
 ## [test_log.py](test_log.py)
 Unit tests for functions defined in src/log.py.

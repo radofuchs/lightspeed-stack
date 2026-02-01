@@ -21,6 +21,9 @@ Unit tests for endpoints utility functions.
 ## [test_llama_stack_version.py](test_llama_stack_version.py)
 Unit tests for utility function to check Llama Stack version.
 
+## [test_mcp_auth_headers.py](test_mcp_auth_headers.py)
+Unit tests for MCP authorization headers utilities.
+
 ## [test_mcp_headers.py](test_mcp_headers.py)
 Unit tests for MCP headers utility functions.
 

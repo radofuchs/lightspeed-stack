@@ -54,6 +54,9 @@ Unit tests for QuotaSchedulerConfig model.
 ## [test_service_configuration.py](test_service_configuration.py)
 Unit tests for ServiceConfiguration model.
 
+## [test_splunk_configuration.py](test_splunk_configuration.py)
+Unit tests for SplunkConfiguration model.
+
 ## [test_tls_configuration.py](test_tls_configuration.py)
 Unit tests for TLSConfiguration model.
 
