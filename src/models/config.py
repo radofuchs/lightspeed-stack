@@ -558,6 +558,13 @@ class LlamaStackConfiguration(ConfigurationBase):
         description="Path to configuration file used when Llama Stack is run in library mode",
     )
 
+    timeout: PositiveInt = Field(
+        180,
+        title="Request timeout",
+        description="Timeout in seconds for requests to Llama Stack service. "
+        "Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
+    )
+
     @model_validator(mode="after")
     def check_llama_stack_model(self) -> Self:
         """
