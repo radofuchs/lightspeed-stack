@@ -30,6 +30,9 @@ Handlers for health REST API endpoints.
 ## [info.py](info.py)
 Handler for REST API call to provide info.
 
+## [mcp_auth.py](mcp_auth.py)
+Handler for REST API calls related to MCP server authentication.
+
 ## [metrics.py](metrics.py)
 Handler for REST API call to provide metrics.
 

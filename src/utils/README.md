@@ -18,14 +18,23 @@ Utility functions for endpoint handlers.
 ## [llama_stack_version.py](llama_stack_version.py)
 Check if the Llama Stack version is supported by the LCS.
 
+## [mcp_auth_headers.py](mcp_auth_headers.py)
+Utilities for resolving MCP server authorization headers.
+
 ## [mcp_headers.py](mcp_headers.py)
 MCP headers handling.
+
+## [query.py](query.py)
+Utility functions for working with queries.
 
 ## [quota.py](quota.py)
 Quota handling helper functions.
 
 ## [responses.py](responses.py)
 Utility functions for processing Responses API output.
+
+## [schema_dumper.py](schema_dumper.py)
+Function to dump the configuration schema into OpenAPI-compatible format.
 
 ## [shields.py](shields.py)
 Utility functions for working with Llama Stack shields.
