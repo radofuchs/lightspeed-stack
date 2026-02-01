@@ -66,8 +66,13 @@ class AsyncLlamaStackClientHolder(metaclass=Singleton):
     def _load_service_client(self, config: LlamaStackConfiguration) -> None:
         """Initialize client in service mode (remote HTTP)."""
         logger.info("Using Llama stack running as a service")
+        logger.info(
+            "Using timeout of %d seconds for Llama Stack requests", config.timeout
+        )
         api_key = config.api_key.get_secret_value() if config.api_key else None
-        self._lsc = AsyncLlamaStackClient(base_url=config.url, api_key=api_key)
+        self._lsc = AsyncLlamaStackClient(
+            base_url=config.url, api_key=api_key, timeout=config.timeout
+        )
 
     def _enrich_library_config(
         self, input_config_path: str, byok_rag: list[dict]
