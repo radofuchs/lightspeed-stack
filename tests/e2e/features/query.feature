@@ -76,16 +76,6 @@ Feature: Query endpoint API tests
       Then The status code of the response is 401
       And The body of the response contains No token found in Authorization header
 
-  Scenario: Check if LLM responds to sent question with error when model does not exist
-    Given The system is in default state
-    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
-    When I use "query" to ask question with authorization header
-    """
-    {"query": "Write a simple code for reversing string", "model": "does-not-exist", "provider": "does-not-exist"}
-    """
-      Then The status code of the response is 404
-      And The body of the response contains Model not found
-
   Scenario: Check if LLM responds to sent question with error when attempting to access conversation
     Given The system is in default state
      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
@@ -95,6 +85,16 @@ Feature: Query endpoint API tests
      """
       Then The status code of the response is 404
       And The body of the response contains Conversation not found
+
+Scenario: Check if LLM responds to sent question with error when attempting to access conversation with incorrect conversation ID format
+    Given The system is in default state
+     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+     When I use "query" to ask question with authorization header
+     """
+     {"conversation_id": "123e4567", "query": "Write a simple code for reversing string", "model": "{MODEL}", "provider": "{PROVIDER}"}
+     """
+      Then The status code of the response is 422
+      And The body of the response contains Value error, Improper conversation ID '123e4567'
 
 Scenario: Check if LLM responds for query request with error for missing query
     Given The system is in default state
@@ -138,8 +138,28 @@ Scenario: Check if LLM responds for query request with error for missing query
      Then The status code of the response is 422
       And The body of the response contains Value error, Provider must be specified if model is specified
 
+    Scenario: Check if LLM responds for query request with error for unknown model
+    Given The system is in default state
+     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+     When I use "query" to ask question with authorization header
+     """
+     {"query": "Say hello", "provider": "{PROVIDER}", "model":"unknown"}
+     """
+     Then The status code of the response is 404
+      And The body of the response contains Model with ID unknown does not exist
+
+  Scenario: Check if LLM responds for query request with error for unknown provider
+    Given The system is in default state
+    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+    When I use "query" to ask question with authorization header
+    """
+    {"query": "Say hello", "model": "{MODEL}", "provider":"unknown"}
+    """
+     Then The status code of the response is 404
+      And The body of the response contains Model with ID gpt-4o-mini does not exist
+
   @skip-in-library-mode
-  Scenario: Check if LLM responds for query request with error for missing provider
+  Scenario: Check if LLM responds for query request with error for inability to connect to llama-stack
     Given The system is in default state
     And The llama-stack connection is disrupted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
