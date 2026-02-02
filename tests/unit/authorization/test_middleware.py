@@ -85,6 +85,7 @@ class TestGetAuthorizationResolvers:
             operator=JsonPathOperator.EQUALS,
             value="test",
             roles=["test"],
+            negate=False,
         )
 
     @pytest.mark.parametrize(

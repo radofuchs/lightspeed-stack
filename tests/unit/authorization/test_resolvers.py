@@ -74,6 +74,7 @@ class TestJwtRolesResolver:
             operator=JsonPathOperator.CONTAINS,
             value="redhat:employees",
             roles=["employee"],
+            negate=False,
         )
 
     @pytest.fixture
@@ -178,6 +179,7 @@ class TestJwtRolesResolver:
                     operator=JsonPathOperator.MATCH,
                     value=r"@redhat\.com$",
                     roles=["redhat_employee"],
+                    negate=False,
                 )
             ]
         )
@@ -198,6 +200,7 @@ class TestJwtRolesResolver:
                     operator=JsonPathOperator.EQUALS,
                     value=["bar"],
                     roles=["foobar"],
+                    negate=False,
                 )
             ]
         )
@@ -225,6 +228,7 @@ class TestJwtRolesResolver:
                     operator=JsonPathOperator.IN,
                     value=[["bar"], ["baz"]],
                     roles=["in_role"],
+                    negate=False,
                 )
             ]
         )
@@ -268,6 +272,7 @@ class TestJwtRolesResolver:
                 operator=JsonPathOperator.MATCH,
                 value="[invalid regex(",  # Invalid regex pattern
                 roles=["test_role"],
+                negate=False,
             )
 
     async def test_resolve_roles_match_operator_non_string_pattern(self) -> None:
@@ -280,6 +285,7 @@ class TestJwtRolesResolver:
                 operator=JsonPathOperator.MATCH,
                 value=123,  # Non-string pattern
                 roles=["test_role"],
+                negate=False,
             )
 
     async def test_resolve_roles_match_operator_non_string_value(self) -> None:
@@ -290,6 +296,7 @@ class TestJwtRolesResolver:
                 operator=JsonPathOperator.MATCH,
                 value=r"\d+",  # Number pattern
                 roles=["numeric_user"],
+                negate=False,
             )
         ]
         jwt_resolver = JwtRolesResolver(role_rules)
@@ -312,6 +319,7 @@ class TestJwtRolesResolver:
             operator=JsonPathOperator.MATCH,
             value=r"@example\.com$",
             roles=["example_user"],
+            negate=False,
         )
         assert match_rule.compiled_regex is not None
         assert isinstance(match_rule.compiled_regex, re.Pattern)
@@ -323,6 +331,7 @@ class TestJwtRolesResolver:
             operator=JsonPathOperator.EQUALS,
             value="test@example.com",
             roles=["example_user"],
+            negate=False,
         )
         assert equals_rule.compiled_regex is None
 
@@ -382,7 +391,7 @@ class TestGenericAccessResolver:
         assert has_access is True
 
         # Test access denied
-        has_access = resolver.check_access(Action.FEEDBACK, frozenset(["employee"]))
+        has_access = resolver.check_access(Action.FEEDBACK, {"employee"})
         assert has_access is False
 
     async def test_check_access_with_invalid_role(self) -> None:
