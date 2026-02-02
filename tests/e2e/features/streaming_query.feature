@@ -105,6 +105,26 @@ Feature: streaming_query endpoint API tests
      Then The status code of the response is 422
       And The body of the response contains Value error, Provider must be specified if model is specified
 
+   Scenario: Check if LLM responds for query request with error for unknown model
+    Given The system is in default state
+     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+     When I use "streaming_query" to ask question with authorization header
+     """
+     {"query": "Say hello", "provider": "{PROVIDER}", "model":"unknown"}
+     """
+     Then The status code of the response is 404
+      And The body of the response contains Model with ID unknown does not exist
+
+  Scenario: Check if LLM responds for query request with error for unknown provider
+    Given The system is in default state
+    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+    When I use "streaming_query" to ask question with authorization header
+    """
+    {"query": "Say hello", "model": "{MODEL}", "provider":"unknown"}
+    """
+     Then The status code of the response is 404
+      And The body of the response contains Model with ID gpt-4o-mini does not exist
+
   Scenario: Check if LLM responds properly when XML and JSON attachments are sent
     Given The system is in default state
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
