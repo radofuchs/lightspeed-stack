@@ -1,5 +1,12 @@
 @startuml classes
 set namespaceSeparator none
+class "A2AStateConfiguration" as src.models.config.A2AStateConfiguration {
+  config
+  postgres : Optional[PostgreSQLDatabaseConfiguration]
+  sqlite : Optional[SQLiteDatabaseConfiguration]
+  storage_type
+  check_a2a_state_configuration() -> Self
+}
 class "APIKeyTokenConfiguration" as src.models.config.APIKeyTokenConfiguration {
   api_key
 }
@@ -20,11 +27,18 @@ class "AuthenticationConfiguration" as src.models.config.AuthenticationConfigura
   module : str
   rh_identity_config : Optional[RHIdentityConfiguration]
   rh_identity_configuration
+  skip_for_health_probes : bool
   skip_tls_verification : bool
   check_authentication_model() -> Self
 }
 class "AuthorizationConfiguration" as src.models.config.AuthorizationConfiguration {
   access_rules : list[AccessRule]
+}
+class "AzureEntraIdConfiguration" as src.models.config.AzureEntraIdConfiguration {
+  client_id
+  client_secret
+  scope : str
+  tenant_id
 }
 class "ByokRag" as src.models.config.ByokRag {
   db_path
@@ -42,20 +56,25 @@ class "CORSConfiguration" as src.models.config.CORSConfiguration {
   check_cors_configuration() -> Self
 }
 class "Configuration" as src.models.config.Configuration {
+  a2a_state
   authentication
   authorization : Optional[AuthorizationConfiguration]
+  azure_entra_id : Optional[AzureEntraIdConfiguration]
   byok_rag : list[ByokRag]
   conversation_cache
   customization : Optional[Customization]
   database
+  deployment_environment : str
   inference
   llama_stack
   mcp_servers : list[ModelContextProtocolServer]
   name : str
   quota_handlers
   service
+  splunk : Optional[SplunkConfiguration]
   user_data_collection
-  dump(filename: str) -> None
+  dump(filename: str | Path) -> None
+  validate_mcp_auth_headers() -> Self
 }
 class "ConfigurationBase" as src.models.config.ConfigurationBase {
   model_config
@@ -64,7 +83,7 @@ class "ConversationHistoryConfiguration" as src.models.config.ConversationHistor
   memory : Optional[InMemoryCacheConfig]
   postgres : Optional[PostgreSQLDatabaseConfiguration]
   sqlite : Optional[SQLiteDatabaseConfiguration]
-  type : Literal['noop', 'memory', 'sqlite', 'postgres'] | None
+  type : Optional[Literal['noop', 'memory', 'sqlite', 'postgres']]
   check_cache_configuration() -> Self
 }
 class "CustomProfile" as src.models.config.CustomProfile {
@@ -73,6 +92,8 @@ class "CustomProfile" as src.models.config.CustomProfile {
   get_prompts() -> dict[str, str]
 }
 class "Customization" as src.models.config.Customization {
+  agent_card_config : Optional[dict[str, Any]]
+  agent_card_path : Optional[FilePath]
   custom_profile : Optional[CustomProfile]
   disable_query_system_prompt : bool
   profile_path : Optional[str]
@@ -121,14 +142,19 @@ class "JwtRoleRule" as src.models.config.JwtRoleRule {
 class "LlamaStackConfiguration" as src.models.config.LlamaStackConfiguration {
   api_key : Optional[SecretStr]
   library_client_config_path : Optional[str]
+  timeout
   url : Optional[str]
   use_as_library_client : Optional[bool]
   check_llama_stack_model() -> Self
 }
 class "ModelContextProtocolServer" as src.models.config.ModelContextProtocolServer {
+  authorization_headers : dict[str, str]
   name : str
   provider_id : str
+  resolved_authorization_headers
+  timeout : Optional[PositiveInt]
   url : str
+  resolve_auth_headers() -> Self
 }
 class "PostgreSQLDatabaseConfiguration" as src.models.config.PostgreSQLDatabaseConfiguration {
   ca_cert_path : Optional[FilePath]
@@ -170,6 +196,7 @@ class "SQLiteDatabaseConfiguration" as src.models.config.SQLiteDatabaseConfigura
 class "ServiceConfiguration" as src.models.config.ServiceConfiguration {
   access_log : bool
   auth_enabled : bool
+  base_url : Optional[str]
   color_log : bool
   cors
   host : str
@@ -177,6 +204,16 @@ class "ServiceConfiguration" as src.models.config.ServiceConfiguration {
   tls_config
   workers
   check_service_configuration() -> Self
+}
+class "SplunkConfiguration" as src.models.config.SplunkConfiguration {
+  enabled : bool
+  index : Optional[str]
+  source : str
+  timeout
+  token_path : Optional[FilePath]
+  url : Optional[str]
+  verify_ssl : bool
+  check_splunk_configuration() -> Self
 }
 class "TLSConfiguration" as src.models.config.TLSConfiguration {
   tls_certificate_path : Optional[FilePath]
@@ -191,10 +228,12 @@ class "UserDataCollection" as src.models.config.UserDataCollection {
   transcripts_storage : Optional[str]
   check_storage_location_is_set_when_needed() -> Self
 }
+src.models.config.A2AStateConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.APIKeyTokenConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.AccessRule --|> src.models.config.ConfigurationBase
 src.models.config.AuthenticationConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.AuthorizationConfiguration --|> src.models.config.ConfigurationBase
+src.models.config.AzureEntraIdConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.ByokRag --|> src.models.config.ConfigurationBase
 src.models.config.CORSConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.Configuration --|> src.models.config.ConfigurationBase
@@ -215,8 +254,10 @@ src.models.config.QuotaSchedulerConfiguration --|> src.models.config.Configurati
 src.models.config.RHIdentityConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.SQLiteDatabaseConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.ServiceConfiguration --|> src.models.config.ConfigurationBase
+src.models.config.SplunkConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.TLSConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.UserDataCollection --|> src.models.config.ConfigurationBase
+src.models.config.A2AStateConfiguration --* src.models.config.Configuration : a2a_state
 src.models.config.AuthenticationConfiguration --* src.models.config.Configuration : authentication
 src.models.config.CORSConfiguration --* src.models.config.ServiceConfiguration : cors
 src.models.config.ConversationHistoryConfiguration --* src.models.config.Configuration : conversation_cache
