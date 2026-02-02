@@ -161,7 +161,6 @@ echo "===== Deploying Services ====="
 create_secret api-url-secret --from-literal=key="$KSVC_URL"
 oc create configmap llama-stack-config -n "$NAMESPACE" --from-file=configs/run.yaml
 oc create configmap lightspeed-stack-config -n "$NAMESPACE" --from-file=configs/lightspeed-stack.yaml
-oc create configmap test-script-cm -n "$NAMESPACE" --from-file=run-tests.sh
 
 ./pipeline-services.sh
 
@@ -205,7 +204,7 @@ oc describe pod llama-stack-service -n "$NAMESPACE" || true
 
 
 #========================================
-# 8. EXTRACT LCS IP & STORE
+# 8. EXPOSE SERVICE & START PORT-FORWARD
 #========================================
 oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n $NAMESPACE
 
@@ -215,54 +214,35 @@ oc expose pod lightspeed-stack-service \
   --type=ClusterIP \
   -n $NAMESPACE
 
-E2E_LSC_HOSTNAME="lightspeed-stack-service-svc.$NAMESPACE.svc.cluster.local"
-echo "LCS IP: $E2E_LSC_HOSTNAME"
+# Start port-forward to make service accessible locally
+echo "Starting port-forward..."
+oc port-forward svc/lightspeed-stack-service-svc 8080:8080 -n $NAMESPACE &
+PF_PID=$!
+sleep 5
 
-create_secret lcs-ip-secret --from-literal=key="$E2E_LSC_HOSTNAME"
+export E2E_LSC_HOSTNAME="localhost"
+echo "LCS accessible at: http://$E2E_LSC_HOSTNAME:8080"
+
 
 
 #========================================
-# 9. LOGGING & TEST EXECUTION
+# 9. RUN TESTS
 #========================================
-echo "===== Running test pod ====="
-./pipeline-test-pod.sh 
+echo "===== Running E2E tests ====="
 
-sleep 20
-oc get pods -n "$NAMESPACE"
+# Disable exit on error to capture test exit code
+set +e
+./run-tests.sh
+TEST_EXIT_CODE=$?
+set -e
 
-# Wait until tests are complete
-oc wait --for=condition=Ready=True pod/test-pod -n $NAMESPACE --timeout=900s || oc wait --for=condition=Ready=False pod/test-pod -n $NAMESPACE --timeout=60s
-
-start_time=$(date +%s)
-timeout=2400
-while true; do
-  sleep 120
-  
-  PHASE=$(oc get pod test-pod -n $NAMESPACE -o jsonpath='{.status.phase}')
-  echo "Current phase test-pod: $PHASE"
-  if [[ "$PHASE" == "Succeeded" || "$PHASE" == "Failed" ]]; then
-      break
-  fi
-
-  current_time=$(date +%s)
-  elapsed=$((current_time - start_time))
-
-  if (( elapsed >= timeout )); then
-      echo "⏰ Timeout reached ($timeout seconds). Stopping test."
-      exit 1
-  fi
-
-  oc get pods -n "$NAMESPACE"
-done
-oc logs test-pod -n $NAMESPACE || oc describe pod test-pod -n $NAMESPACE || true
-
-
-TEST_EXIT_CODE=$(oc get pod test-pod -n $NAMESPACE -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}')
+# Cleanup port-forward
+kill $PF_PID 2>/dev/null || true
 
 echo "===== E2E COMPLETE ====="
 
-if [ "${TEST_EXIT_CODE:-2}" -ne 0 ]; then
-    echo "❌ E2E tests failed with exit code $TEST_EXIT_CODE (pod/test-pod failed)"
+if [ "${TEST_EXIT_CODE:-1}" -ne 0 ]; then
+    echo "❌ E2E tests failed with exit code $TEST_EXIT_CODE"
 else
     echo "✅ E2E tests succeeded"
 fi
