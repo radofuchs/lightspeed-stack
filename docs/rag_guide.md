@@ -65,14 +65,6 @@ Update the `run.yaml` file used by Llama Stack to point to:
 ### FAISS example
 
 ```yaml
-models:
-- model_id: <embedding-model-name> # e.g. sentence-transformers/all-mpnet-base-v2
-  metadata:
-      embedding_dimension: <embedding-dimension> # e.g. 768
-  model_type: embedding
-  provider_id: sentence-transformers
-  provider_model_id: <path-to-embedding-model> # e.g. /home/USER/embedding_model
-
 providers:
   inference:
   - provider_id: sentence-transformers
@@ -80,28 +72,42 @@ providers:
     config: {}
 
   # FAISS vector store
-  vector_io: 
+  vector_io:
   - provider_id: custom-index
     provider_type: inline::faiss
     config:
-      kvstore:
-        type: sqlite
-        db_path: <path-to-vector-index> # e.g. /home/USER/vector_db/faiss_store.db
-        namespace: null
+      persistence:
+        namespace: vector_io::faiss
+        backend: rag_backend  # References storage.backends.rag_backend
 
-vector_dbs:
-- embedding_dimension: <embedding-dimension> # e.g. 768
-  embedding_model: <embedding-model-name> # e.g. sentence-transformers/all-mpnet-base-v2
-  provider_id: custom-index
-  vector_db_id: <index-id> 
+storage:
+  backends:
+    rag_backend:
+      type: kv_sqlite
+      db_path: <path-to-vector-index>  # e.g. /home/USER/vector_db/faiss_store.db
+
+registered_resources:
+  models:
+  - model_id: <embedding-model-name> # e.g. sentence-transformers/all-mpnet-base-v2
+    metadata:
+        embedding_dimension: <embedding-dimension> # e.g. 768
+    model_type: embedding
+    provider_id: sentence-transformers
+    provider_model_id: <path-to-embedding-model> # e.g. /home/USER/embedding_model
+
+  vector_stores:
+  - embedding_dimension: <embedding-dimension> # e.g. 768
+    embedding_model: <embedding-model-name> # e.g. sentence-transformers/all-mpnet-base-v2
+    provider_id: custom-index
+    vector_store_id: <index-id> 
 ```
 
 Where:
 - `provider_model_id` is the path to the folder of the embedding model (or alternatively, the supported embedding model to download)
 - `db_path` is the path to the vector index (.db file in this case)
-- `vector_db_id` is the index ID used to generate the db
+- `vector_store_id` is the index ID used to generate the db
 
-See the full working [config example](examples/openai-faiss-run.yaml) for more details.
+See the full working [config example](examples/run.yaml) for more details.
 
 ### pgvector example
 
@@ -121,7 +127,7 @@ Each pgvector-backed table follows this schema:
 - `embedding` (`vector(n)`): the embedding vector, where `n` is the embedding dimension and will match the model's output size (e.g. 768 for `all-mpnet-base-v2`) 
 
 > [!NOTE]
-> The `vector_db_id` (e.g. `rhdocs`) is used to point to the table named `vector_store_rhdocs` in the specified database, which stores the vector embeddings.
+> The `vector_store_id` (e.g. `rhdocs`) is used to point to the table named `vector_store_rhdocs` in the specified database, which stores the vector embeddings.
 
 
 ```yaml
@@ -141,14 +147,14 @@ providers:
         type: sqlite
         db_path: .llama/distributions/pgvector/pgvector_registry.db
 
-vector_dbs:
+vector_stores:
 - embedding_dimension: 768
   embedding_model: sentence-transformers/all-mpnet-base-v2
   provider_id: pgvector-example 
   # A unique ID that becomes the PostgreSQL table name, prefixed with 'vector_store_'.
   # e.g., 'rhdocs' will create the table 'vector_store_rhdocs'.
   # If the table was already created, this value must match the ID used at creation.
-  vector_db_id: rhdocs
+  vector_store_id: rhdocs
 ```
 
 See the full working [config example](examples/openai-pgvector-run.yaml) for more details.
@@ -282,26 +288,12 @@ apis:
 - tool_runtime
 - safety
 
-models:
-- model_id: gpt-test 
-  provider_id: openai # This ID is a reference to 'providers.inference'
-  model_type: llm
-  provider_model_id: gpt-4o-mini
-
-- model_id: sentence-transformers/all-mpnet-base-v2
-  metadata:
-      embedding_dimension: 768
-  model_type: embedding
-  provider_id: sentence-transformers # This ID is a reference to 'providers.inference'
-  provider_model_id: /home/USER/lightspeed-stack/embedding_models/all-mpnet-base-v2 
-  
 providers:
   inference:
-  - provider_id: sentence-transformers 
+  - provider_id: sentence-transformers
     provider_type: inline::sentence-transformers
     config: {}
-
-  - provider_id: openai 
+  - provider_id: openai
     provider_type: remote::openai
     config:
       api_key: ${env.OPENAI_API_KEY}
@@ -310,12 +302,13 @@ providers:
   - provider_id: meta-reference
     provider_type: inline::meta-reference
     config:
-      persistence_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/agents_store.db
-      responses_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/responses_store.db
+      persistence:
+        agent_state:
+          namespace: agents_state
+          backend: kv_default
+        responses:
+          table_name: agents_responses
+          backend: sql_default
 
   safety:
   - provider_id: llama-guard
@@ -324,31 +317,50 @@ providers:
       excluded_categories: []
 
   vector_io:
-  - provider_id: ocp-docs 
+  - provider_id: ocp-docs
     provider_type: inline::faiss
     config:
-      kvstore:
-        type: sqlite
-        db_path: /home/USER/lightspeed-stack/vector_dbs/ocp_docs/faiss_store.db
-        namespace: null
+      persistence:
+        namespace: vector_io::faiss
+        backend: ocp_docs_backend  # References storage.backends
 
   tool_runtime:
-  - provider_id: rag-runtime 
+  - provider_id: rag-runtime
     provider_type: inline::rag-runtime
     config: {}
 
-# Enable the RAG tool
-tool_groups:
-- provider_id: rag-runtime
-  toolgroup_id: builtin::rag
-  args: null
-  mcp_endpoint: null
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: ~/.llama/storage/kv_store.db
+    sql_default:
+      type: sql_sqlite
+      db_path: ~/.llama/storage/sql_store.db
+    ocp_docs_backend:
+      type: kv_sqlite
+      db_path: /home/USER/lightspeed-stack/vector_dbs/ocp_docs/faiss_store.db
 
-vector_dbs:
-- embedding_dimension: 768
-  embedding_model: sentence-transformers/all-mpnet-base-v2 
-  provider_id: ocp-docs # This ID is a reference to 'providers.vector_io'
-  vector_db_id: openshift-index  # This ID was defined during index generation
+registered_resources:
+  models:
+  - model_id: gpt-test
+    provider_id: openai
+    model_type: llm
+    provider_model_id: gpt-4o-mini
+  - model_id: sentence-transformers/all-mpnet-base-v2
+    model_type: embedding
+    provider_id: sentence-transformers
+    provider_model_id: /home/USER/lightspeed-stack/embedding_models/all-mpnet-base-v2
+    metadata:
+      embedding_dimension: 768
+  vector_stores:
+  - vector_store_id: openshift-index  # This ID was defined during index generation
+    provider_id: ocp-docs  # References providers.vector_io
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+  tool_groups:
+  - toolgroup_id: builtin::rag
+    provider_id: rag-runtime
 ```
 
 ---

@@ -1491,7 +1491,7 @@ class ByokRag(ConfigurationBase):
         ...,
         min_length=1,
         title="Vector DB ID",
-        description="Vector DB identification.",
+        description="Vector database identification.",
     )
 
     db_path: FilePath = Field(

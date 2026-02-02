@@ -4186,7 +4186,7 @@ BYOK (Bring Your Own Knowledge) RAG configuration.
 | rag_type | string | Type of RAG database. |
 | embedding_model | string | Embedding model identification |
 | embedding_dimension | integer | Dimensionality of embedding vectors. |
-| vector_db_id | string | Vector DB identification. |
+| vector_db_id | string | Vector database identification. |
 | db_path | string | Path to RAG database. |
 
 

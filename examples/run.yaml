@@ -19,18 +19,9 @@ apis:
 - vector_io
       
 benchmarks: []
-conversations_store:
-  db_path: ~/.llama/storage/conversations.db
-  type: sqlite
 datasets: []
 image_name: starter
 # external_providers_dir: /opt/app-root/src/.llama/providers.d
-inference_store:
-  db_path: ~/.llama/storage/inference-store.db
-  type: sqlite
-metadata_store:
-  db_path: ~/.llama/storage/registry.db
-  type: sqlite
 
 providers:
   inference:
@@ -54,7 +45,8 @@ providers:
   - config:
       excluded_categories: []
     provider_id: llama-guard
-    provider_type: inline::llama-guard  scoring:
+    provider_type: inline::llama-guard
+  scoring:
   - provider_id: basic
     provider_type: inline::basic
     config: {}
@@ -152,6 +144,11 @@ registered_resources:
     provider_model_id: sentence-transformers/all-mpnet-base-v2
     metadata:
       embedding_dimension: 768
+  vector_stores: 
+  - embedding_dimension: 768
+    embedding_model: sentence-transformers/nomic-ai/nomic-embed-text-v1.5
+    provider_id: faiss
+    vector_store_id: vs_503a2261-c256-45ff-90aa-580a80de64b8
   shields:
   - shield_id: llama-guard
     provider_id: llama-guard

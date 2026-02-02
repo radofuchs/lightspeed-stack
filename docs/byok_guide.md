@@ -167,29 +167,11 @@ apis:
 - tool_runtime
 - safety
 
-models:
-  # Your LLM model
-  - model_id: your-llm-model
-    provider_id: openai  # or your preferred provider
-    model_type: llm
-    provider_model_id: gpt-4o-mini
-
-  # Embedding model for BYOK
-  - model_id: sentence-transformers/all-mpnet-base-v2
-    metadata:
-        embedding_dimension: 768
-    model_type: embedding
-    provider_id: sentence-transformers
-    provider_model_id: /path/to/embedding_models/all-mpnet-base-v2
-
 providers:
   inference:
-  # Embedding model provider
   - provider_id: sentence-transformers
     provider_type: inline::sentence-transformers
     config: {}
-
-  # LLM provider (example: OpenAI)
   - provider_id: openai
     provider_type: remote::openai
     config:
@@ -199,12 +181,13 @@ providers:
   - provider_id: meta-reference
     provider_type: inline::meta-reference
     config:
-      persistence_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/agents_store.db
-      responses_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/responses_store.db
+      persistence:
+        agent_state:
+          namespace: agents_state
+          backend: kv_default
+        responses:
+          table_name: agents_responses
+          backend: sql_default
 
   safety:
   - provider_id: llama-guard
@@ -212,35 +195,54 @@ providers:
     config:
       excluded_categories: []
 
-  # Vector database configuration
   vector_io:
   - provider_id: your-knowledge-base
-    provider_type: inline::faiss  # or remote::pgvector
+    provider_type: inline::faiss
     config:
-      kvstore:
-        type: sqlite
-        db_path: /path/to/vector_db/faiss_store.db
-        namespace: null
+      persistence:
+        namespace: vector_io::faiss
+        backend: byok_backend  # References storage.backends
 
   tool_runtime:
   - provider_id: rag-runtime
     provider_type: inline::rag-runtime
     config: {}
 
-# Enable RAG tools
-tool_groups:
-- provider_id: rag-runtime
-  toolgroup_id: builtin::rag
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: ~/.llama/storage/kv_store.db
+    sql_default:
+      type: sql_sqlite
+      db_path: ~/.llama/storage/sql_store.db
+    byok_backend:
+      type: kv_sqlite
+      db_path: /path/to/vector_db/faiss_store.db
 
-# Vector database configuration
-vector_dbs:
-- embedding_dimension: 768
-  embedding_model: sentence-transformers/all-mpnet-base-v2
-  provider_id: your-knowledge-base
-  vector_db_id: your-index-id  # ID used during index generation
+registered_resources:
+  models:
+  - model_id: your-llm-model
+    provider_id: openai
+    model_type: llm
+    provider_model_id: gpt-4o-mini
+  - model_id: sentence-transformers/all-mpnet-base-v2
+    model_type: embedding
+    provider_id: sentence-transformers
+    provider_model_id: /path/to/embedding_models/all-mpnet-base-v2
+    metadata:
+      embedding_dimension: 768
+  vector_stores:
+  - vector_store_id: your-index-id  # ID used during index generation
+    provider_id: your-knowledge-base
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+  tool_groups:
+  - toolgroup_id: builtin::rag
+    provider_id: rag-runtime
 ```
 
-**⚠️ Important**: The `vector_db_id` value must exactly match the ID you provided when creating the vector database using the rag-content tool. This identifier links your Llama Stack configuration to the specific vector database index you created.
+**⚠️ Important**: The `vector_store_id` value must exactly match the ID you provided when creating the vector database using the rag-content tool. This identifier links your Llama Stack configuration to the specific vector database index you created.
 
 ### Step 5: Enable RAG Tools
 
@@ -260,14 +262,20 @@ The configuration above automatically enables the RAG tools. The system will:
 - **Storage**: SQLite database file
 
 ```yaml
-vector_io:
-- provider_id: faiss-knowledge
-  provider_type: inline::faiss
-  config:
-    kvstore:
-      type: sqlite
+providers:
+  vector_io:
+  - provider_id: faiss-knowledge
+    provider_type: inline::faiss
+    config:
+      persistence:
+        namespace: vector_io::faiss
+        backend: faiss_backend
+
+storage:
+  backends:
+    faiss_backend:
+      type: kv_sqlite
       db_path: /path/to/faiss_store.db
-      namespace: null
 ```
 
 ### 2. pgvector (PostgreSQL)
@@ -314,19 +322,6 @@ apis:
 - tool_runtime
 - safety
 
-models:
-- model_id: gpt-4o-mini
-  provider_id: openai
-  model_type: llm
-  provider_model_id: gpt-4o-mini
-
-- model_id: sentence-transformers/all-mpnet-base-v2
-  metadata:
-      embedding_dimension: 768
-  model_type: embedding
-  provider_id: sentence-transformers
-  provider_model_id: /home/user/embedding_models/all-mpnet-base-v2
-
 providers:
   inference:
   - provider_id: sentence-transformers
@@ -341,12 +336,13 @@ providers:
   - provider_id: meta-reference
     provider_type: inline::meta-reference
     config:
-      persistence_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/agents_store.db
-      responses_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/responses_store.db
+      persistence:
+        agent_state:
+          namespace: agents_state
+          backend: kv_default
+        responses:
+          table_name: agents_responses
+          backend: sql_default
 
   safety:
   - provider_id: llama-guard
@@ -358,25 +354,47 @@ providers:
   - provider_id: company-docs
     provider_type: inline::faiss
     config:
-      kvstore:
-        type: sqlite
-        db_path: /home/user/vector_dbs/company_docs/faiss_store.db
-        namespace: null
+      persistence:
+        namespace: vector_io::faiss
+        backend: company_docs_backend
 
   tool_runtime:
   - provider_id: rag-runtime
     provider_type: inline::rag-runtime
     config: {}
 
-tool_groups:
-- provider_id: rag-runtime
-  toolgroup_id: builtin::rag
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: ~/.llama/storage/kv_store.db
+    sql_default:
+      type: sql_sqlite
+      db_path: ~/.llama/storage/sql_store.db
+    company_docs_backend:
+      type: kv_sqlite
+      db_path: /home/user/vector_dbs/company_docs/faiss_store.db
 
-vector_dbs:
-- embedding_dimension: 768
-  embedding_model: sentence-transformers/all-mpnet-base-v2
-  provider_id: company-docs
-  vector_db_id: company-knowledge-index
+registered_resources:
+  models:
+  - model_id: gpt-4o-mini
+    provider_id: openai
+    model_type: llm
+    provider_model_id: gpt-4o-mini
+  - model_id: sentence-transformers/all-mpnet-base-v2
+    model_type: embedding
+    provider_id: sentence-transformers
+    provider_model_id: /home/user/embedding_models/all-mpnet-base-v2
+    metadata:
+      embedding_dimension: 768
+  vector_stores:
+  - vector_store_id: company-knowledge-index
+    provider_id: company-docs
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+  tool_groups:
+  - toolgroup_id: builtin::rag
+    provider_id: rag-runtime
 ```
 
 ### Example 2: vLLM + pgvector
@@ -421,12 +439,13 @@ providers:
   - provider_id: meta-reference
     provider_type: inline::meta-reference
     config:
-      persistence_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/agents_store.db
-      responses_store:
-        type: sqlite
-        db_path: .llama/distributions/ollama/responses_store.db
+      persistence:
+        agent_state:
+          namespace: agents_state
+          backend: kv_default
+        responses:
+          table_name: agents_responses
+          backend: sql_default
 
   safety:
   - provider_id: llama-guard
@@ -458,11 +477,11 @@ tool_groups:
   args: null
   mcp_endpoint: null
 
-vector_dbs:
+vector_stores:
 - embedding_dimension: 768
   embedding_model: sentence-transformers/all-mpnet-base-v2
   provider_id: enterprise-knowledge
-  vector_db_id: enterprise-docs
+  vector_store_id: enterprise-docs
 ```
 
 ---

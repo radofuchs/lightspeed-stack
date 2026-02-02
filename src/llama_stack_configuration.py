@@ -11,10 +11,9 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
 
+import yaml
 from azure.core.exceptions import ClientAuthenticationError
 from azure.identity import ClientSecretCredential, CredentialUnavailableError
-
-import yaml
 from llama_stack.core.stack import replace_env_vars
 
 logger = logging.getLogger(__name__)
@@ -115,46 +114,140 @@ def setup_azure_entra_id_token(
 # =============================================================================
 
 
-def construct_vector_dbs_section(
+def construct_storage_backends_section(
+    ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Construct storage.backends section in Llama Stack configuration file.
+
+    Builds the storage.backends section for a Llama Stack configuration by
+    preserving existing backends and adding new ones for each BYOK RAG.
+
+    Parameters:
+        ls_config (dict[str, Any]): Existing Llama Stack configuration mapping.
+        byok_rag (list[dict[str, Any]]): List of BYOK RAG definitions.
+
+    Returns:
+        dict[str, Any]: The storage.backends dict with new backends added.
+    """
+    output: dict[str, Any] = {}
+
+    # preserve existing backends
+    if "storage" in ls_config and "backends" in ls_config["storage"]:
+        output = ls_config["storage"]["backends"].copy()
+
+    # add new backends for each BYOK RAG
+    for brag in byok_rag:
+        vector_db_id = brag.get("vector_db_id", "")
+        backend_name = f"byok_{vector_db_id}_storage"
+        output[backend_name] = {
+            "type": "kv_sqlite",
+            "db_path": brag.get("db_path", f".llama/{vector_db_id}.db"),
+        }
+    logger.info(
+        "Added %s backends into storage.backends section, total backends %s",
+        len(byok_rag),
+        len(output),
+    )
+    return output
+
+
+def construct_vector_stores_section(
     ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Construct vector_dbs section in Llama Stack configuration file.
+    """Construct registered_resources.vector_stores section in Llama Stack config.
 
-    Builds the vector_dbs section for a Llama Stack configuration.
+    Builds the vector_stores section for a Llama Stack configuration.
 
     Parameters:
         ls_config (dict[str, Any]): Existing Llama Stack configuration mapping
-        used as the base; existing `vector_dbs` entries are preserved if
-        present.
+        used as the base; existing `registered_resources.vector_stores` entries
+        are preserved if present.
         byok_rag (list[dict[str, Any]]): List of BYOK RAG definitions to be added to
-        the `vector_dbs` section.
+        the `vector_stores` section.
 
     Returns:
-        list[dict[str, Any]]: The `vector_dbs` list where each entry is a mapping with keys:
-            - `vector_db_id`: identifier of the vector database
+        list[dict[str, Any]]: The `vector_stores` list where each entry is a mapping with keys:
+            - `vector_store_id`: identifier of the vector store (for Llama Stack config)
             - `provider_id`: provider identifier prefixed with `"byok_"`
             - `embedding_model`: name of the embedding model
             - `embedding_dimension`: embedding vector dimensionality
     """
     output = []
 
-    # fill-in existing vector_dbs entries
-    if "vector_dbs" in ls_config:
-        output = ls_config["vector_dbs"]
+    # fill-in existing vector_stores entries from registered_resources
+    if "registered_resources" in ls_config:
+        if "vector_stores" in ls_config["registered_resources"]:
+            output = ls_config["registered_resources"]["vector_stores"].copy()
 
-    # append new vector_dbs entries
+    # append new vector_stores entries
     for brag in byok_rag:
+        vector_db_id = brag.get("vector_db_id", "")
         output.append(
             {
-                "vector_db_id": brag.get("vector_db_id", ""),
-                "provider_id": "byok_" + brag.get("vector_db_id", ""),
+                "vector_store_id": vector_db_id,
+                "provider_id": f"byok_{vector_db_id}",
                 "embedding_model": brag.get("embedding_model", ""),
                 "embedding_dimension": brag.get("embedding_dimension"),
             }
         )
     logger.info(
-        "Added %s items into vector_dbs section, total items %s",
+        "Added %s items into registered_resources.vector_stores, total items %s",
         len(byok_rag),
+        len(output),
+    )
+    return output
+
+
+def construct_models_section(
+    ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Construct registered_resources.models section with embedding models.
+
+    Adds embedding model entries for each BYOK RAG configuration.
+
+    Parameters:
+        ls_config (dict[str, Any]): Existing Llama Stack configuration mapping.
+        byok_rag (list[dict[str, Any]]): List of BYOK RAG definitions.
+
+    Returns:
+        list[dict[str, Any]]: The models list with embedding models added.
+    """
+    output: list[dict[str, Any]] = []
+
+    # preserve existing models
+    if "registered_resources" in ls_config:
+        if "models" in ls_config["registered_resources"]:
+            output = ls_config["registered_resources"]["models"].copy()
+
+    # add embedding models for each BYOK RAG
+    for brag in byok_rag:
+        embedding_model = brag.get("embedding_model", "")
+        vector_db_id = brag.get("vector_db_id", "")
+        embedding_dimension = brag.get("embedding_dimension")
+
+        # Strip sentence-transformers/ prefix if present
+        provider_model_id = embedding_model
+        if provider_model_id.startswith("sentence-transformers/"):
+            provider_model_id = provider_model_id[len("sentence-transformers/") :]
+
+        # Skip if embedding model already registered
+        existing_model_ids = [m.get("provider_model_id") for m in output]
+        if provider_model_id in existing_model_ids:
+            continue
+
+        output.append(
+            {
+                "model_id": f"byok_{vector_db_id}_embedding",
+                "model_type": "embedding",
+                "provider_id": "sentence-transformers",
+                "provider_model_id": provider_model_id,
+                "metadata": {
+                    "embedding_dimension": embedding_dimension,
+                },
+            }
+        )
+    logger.info(
+        "Added embedding models into registered_resources.models, total models %s",
         len(output),
     )
     return output
@@ -180,27 +273,28 @@ def construct_vector_io_providers_section(
         list[dict[str, Any]]: The resulting providers/vector_io list containing
         the original entries (if any) plus one entry per item in `byok_rag`.
         Each appended entry has `provider_id` set to "byok_<vector_db_id>",
-        `provider_type` set from the RAG item, and a `config` with a `kvstore`
-        pointing to ".llama/<vector_db_id>.db", `namespace` as None, and `type`
-        "sqlite".
+        `provider_type` set from the RAG item, and a `config` with `persistence`
+        referencing the corresponding backend.
     """
     output = []
 
     # fill-in existing vector_io entries
     if "providers" in ls_config and "vector_io" in ls_config["providers"]:
-        output = ls_config["providers"]["vector_io"]
+        output = ls_config["providers"]["vector_io"].copy()
 
     # append new vector_io entries
     for brag in byok_rag:
+        vector_db_id = brag.get("vector_db_id", "")
+        backend_name = f"byok_{vector_db_id}_storage"
+        provider_id = f"byok_{vector_db_id}"
         output.append(
             {
-                "provider_id": "byok_" + brag.get("vector_db_id", ""),
+                "provider_id": provider_id,
                 "provider_type": brag.get("rag_type", "inline::faiss"),
                 "config": {
-                    "kvstore": {
-                        "db_path": ".llama/" + brag.get("vector_db_id", "") + ".db",
-                        "namespace": None,
-                        "type": "sqlite",
+                    "persistence": {
+                        "namespace": "vector_io::faiss",
+                        "backend": backend_name,
                     }
                 },
             }
@@ -225,11 +319,30 @@ def enrich_byok_rag(ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]) -
         return
 
     logger.info("Enriching Llama Stack config with BYOK RAG")
-    ls_config["vector_dbs"] = construct_vector_dbs_section(ls_config, byok_rag)
 
+    # Add storage backends
+    if "storage" not in ls_config:
+        ls_config["storage"] = {}
+    ls_config["storage"]["backends"] = construct_storage_backends_section(
+        ls_config, byok_rag
+    )
+
+    # Add vector_io providers
     if "providers" not in ls_config:
         ls_config["providers"] = {}
     ls_config["providers"]["vector_io"] = construct_vector_io_providers_section(
+        ls_config, byok_rag
+    )
+
+    # Add registered vector stores
+    if "registered_resources" not in ls_config:
+        ls_config["registered_resources"] = {}
+    ls_config["registered_resources"]["vector_stores"] = (
+        construct_vector_stores_section(ls_config, byok_rag)
+    )
+
+    # Add embedding models
+    ls_config["registered_resources"]["models"] = construct_models_section(
         ls_config, byok_rag
     )
 
