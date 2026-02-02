@@ -61,11 +61,11 @@ packaging==26.0
     #   wheel
 pathspec==1.0.4
     # via hatchling
-pdm-backend==2.4.6
+pdm-backend==2.4.7
     # via fastapi
 pluggy==1.6.0
     # via hatchling
-poetry-core==2.3.0
+poetry-core==2.3.1
     # via
     #   dunamai
     #   litellm
@@ -79,8 +79,10 @@ setuptools-scm==9.2.2
     # via
     #   hatch-vcs
     #   importlib-metadata
+    #   llama-stack-api
     #   pluggy
     #   setuptools-rust
+    #   tqdm
     #   urllib3
 tomlkit==0.14.0
     # via uv-dynamic-versioning
@@ -124,12 +126,14 @@ setuptools==80.10.2
     #   psutil
     #   pycparser
     #   pycryptodomex
+    #   pyjwt
     #   regex
     #   semver
     #   sentence-transformers
     #   setuptools-rust
     #   setuptools-scm
     #   sse-starlette
+    #   tqdm
     #   tree-sitter
     #   trl
     #   trove-classifiers
