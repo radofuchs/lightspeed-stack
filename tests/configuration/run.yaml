@@ -9,7 +9,6 @@ apis:
   - post_training
   - safety
   - scoring
-  - telemetry
   - tool_runtime
   - vector_io
 benchmarks: []

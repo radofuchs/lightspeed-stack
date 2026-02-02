@@ -9,23 +9,13 @@ apis:
 - inference
 - safety
 - scoring
-- telemetry
 - tool_runtime
 - vector_io
       
 benchmarks: []
-conversations_store:
-  db_path: ${env.SQLITE_STORE_DIR:=~/.llama/storage/conversations.db}
-  type: sqlite
 datasets: []
 image_name: starter
 # external_providers_dir: /opt/app-root/src/.llama/providers.d
-inference_store:
-  db_path: ${env.SQLITE_STORE_DIR:=~/.llama/storage/inference-store.db}
-  type: sqlite
-metadata_store:
-  db_path: ${env.SQLITE_STORE_DIR:=~/.llama/storage/registry.db}
-  type: sqlite
 
 providers:
   inference:
@@ -117,8 +107,6 @@ providers:
     provider_id: meta-reference
     provider_type: inline::meta-reference
 scoring_fns: []
-telemetry:
-  enabled: true
 server:
   port: 8321
 storage:
@@ -154,7 +142,7 @@ registered_resources:
   - shield_id: llama-guard
     provider_id: llama-guard
     provider_shield_id: openai/gpt-4o-mini
-  vector_dbs: []
+  vector_stores: []
   datasets: []
   scoring_fns: []
   benchmarks: []
