@@ -12,6 +12,7 @@ from llama_stack_client import (
     RateLimitError,  # type: ignore
 )
 from llama_stack_client.types.model_list_response import ModelListResponse
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
 import constants
@@ -24,7 +25,7 @@ from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from models.cache_entry import CacheEntry
 from models.config import Action
-from models.database.conversations import UserConversation
+from models.database.conversations import UserConversation, UserTurn
 from models.requests import Attachment, QueryRequest
 from models.responses import (
     ForbiddenResponse,
@@ -86,7 +87,9 @@ def is_transcripts_enabled() -> bool:
 def persist_user_conversation_details(
     user_id: str,
     conversation_id: str,
-    model: str,
+    started_at: str,
+    completed_at: str,
+    model_id: str,
     provider_id: str,
     topic_summary: Optional[str],
 ) -> None:
@@ -109,7 +112,7 @@ def persist_user_conversation_details(
             conversation = UserConversation(
                 id=normalized_id,
                 user_id=user_id,
-                last_used_model=model,
+                last_used_model=model_id,
                 last_used_provider=provider_id,
                 topic_summary=topic_summary,
                 message_count=1,
@@ -119,7 +122,7 @@ def persist_user_conversation_details(
                 "Associated conversation %s to user %s", normalized_id, user_id
             )
         else:
-            existing_conversation.last_used_model = model
+            existing_conversation.last_used_model = model_id
             existing_conversation.last_used_provider = provider_id
             existing_conversation.last_message_at = datetime.now(UTC)
             existing_conversation.message_count += 1
@@ -129,6 +132,34 @@ def persist_user_conversation_details(
                 user_id,
                 existing_conversation.message_count,
             )
+
+        # Get the next turn number for this conversation
+        # Lock UserTurn rows for this conversation to prevent race conditions
+        # when computing max(turn_number) and inserting a new turn
+        session.query(UserTurn).filter_by(
+            conversation_id=normalized_id
+        ).with_for_update().all()
+        # Recompute max(turn_number) after acquiring the lock
+        max_turn_number = (
+            session.query(func.max(UserTurn.turn_number))
+            .filter_by(conversation_id=normalized_id)
+            .scalar()
+        )
+        turn_number = (max_turn_number or 0) + 1
+        turn = UserTurn(
+            conversation_id=normalized_id,
+            turn_number=turn_number,
+            started_at=datetime.fromisoformat(started_at),
+            completed_at=datetime.fromisoformat(completed_at),
+            provider=provider_id,
+            model=model_id,
+        )
+        session.add(turn)
+        logger.debug(
+            "Created conversation turn - Conversation: %s, Turn: %d",
+            normalized_id,
+            turn_number,
+        )
 
         session.commit()
         logger.debug(
@@ -313,6 +344,8 @@ async def query_endpoint_handler_base(  # pylint: disable=R0914
                         "Topic summary generation disabled by request parameter"
                     )
                     topic_summary = None
+
+        completed_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         # Convert RAG chunks to dictionary format once for reuse
         logger.info("Processing RAG chunks...")
         rag_chunks_dict = [chunk.model_dump() for chunk in summary.rag_chunks]
@@ -338,12 +371,13 @@ async def query_endpoint_handler_base(  # pylint: disable=R0914
         persist_user_conversation_details(
             user_id=user_id,
             conversation_id=conversation_id,
-            model=model_id,
+            started_at=started_at,
+            completed_at=completed_at,
+            model_id=model_id,
             provider_id=provider_id,
             topic_summary=topic_summary,
         )
 
-        completed_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         cache_entry = CacheEntry(
             query=query_request.query,
             response=summary.llm_response,

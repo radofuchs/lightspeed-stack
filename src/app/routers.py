@@ -15,7 +15,7 @@ from app.endpoints import (
     streaming_query_v2,
     authorized,
     conversations_v2,
-    conversations_v3,
+    conversations_v1,
     metrics,
     tools,
     mcp_auth,
@@ -54,8 +54,7 @@ def include_routers(app: FastAPI) -> None:
     app.include_router(streaming_query_v2.router, prefix="/v1")
     app.include_router(config.router, prefix="/v1")
     app.include_router(feedback.router, prefix="/v1")
-    # V1 conversations endpoint now uses V3 implementation (conversations is deprecated)
-    app.include_router(conversations_v3.router, prefix="/v1")
+    app.include_router(conversations_v1.router, prefix="/v1")
     app.include_router(conversations_v2.router, prefix="/v2")
 
     # Note: query_v2, streaming_query_v2, and conversations_v3 are now exposed at /v1 above

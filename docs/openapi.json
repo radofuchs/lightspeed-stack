@@ -2445,26 +2445,6 @@
                                 }
                             }
                         }
-                    },
-                    "503": {
-                        "description": "Service unavailable",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ServiceUnavailableResponse"
-                                },
-                                "examples": {
-                                    "llama stack": {
-                                        "value": {
-                                            "detail": {
-                                                "cause": "Connection error while trying to reach backend service.",
-                                                "response": "Unable to connect to Llama Stack"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -2510,7 +2490,11 @@
                                                     "type": "assistant"
                                                 }
                                             ],
-                                            "started_at": "2024-01-01T00:01:00Z"
+                                            "model": "gpt-4o-mini",
+                                            "provider": "openai",
+                                            "started_at": "2024-01-01T00:01:00Z",
+                                            "tool_calls": [],
+                                            "tool_results": []
                                         }
                                     ],
                                     "conversation_id": "123e4567-e89b-12d3-a456-426614174000"
@@ -3196,7 +3180,11 @@
                                                     "type": "assistant"
                                                 }
                                             ],
-                                            "started_at": "2024-01-01T00:01:00Z"
+                                            "model": "gpt-4o-mini",
+                                            "provider": "openai",
+                                            "started_at": "2024-01-01T00:01:00Z",
+                                            "tool_calls": [],
+                                            "tool_results": []
                                         }
                                     ],
                                     "conversation_id": "123e4567-e89b-12d3-a456-426614174000"
@@ -4290,7 +4278,7 @@
                 ],
                 "summary": "Handle A2A Jsonrpc",
                 "description": "Handle A2A JSON-RPC requests following the A2A protocol specification.\n\nThis endpoint uses the DefaultRequestHandler from the A2A SDK to handle\nall JSON-RPC requests including message/send, message/stream, etc.\n\nThe A2A SDK application is created per-request to include authentication\ncontext while still leveraging FastAPI's authorization middleware.\n\nAutomatically detects streaming requests (message/stream JSON-RPC method)\nand returns a StreamingResponse to enable real-time chunk delivery.\n\nArgs:\n    request: FastAPI request object\n    auth: Authentication tuple\n    mcp_headers: MCP headers for context propagation\n\nReturns:\n    JSON-RPC response or streaming response",
-                "operationId": "handle_a2a_jsonrpc_a2a_post",
+                "operationId": "handle_a2a_jsonrpc_a2a_get",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
@@ -4308,7 +4296,7 @@
                 ],
                 "summary": "Handle A2A Jsonrpc",
                 "description": "Handle A2A JSON-RPC requests following the A2A protocol specification.\n\nThis endpoint uses the DefaultRequestHandler from the A2A SDK to handle\nall JSON-RPC requests including message/send, message/stream, etc.\n\nThe A2A SDK application is created per-request to include authentication\ncontext while still leveraging FastAPI's authorization middleware.\n\nAutomatically detects streaming requests (message/stream JSON-RPC method)\nand returns a StreamingResponse to enable real-time chunk delivery.\n\nArgs:\n    request: FastAPI request object\n    auth: Authentication tuple\n    mcp_headers: MCP headers for context propagation\n\nReturns:\n    JSON-RPC response or streaming response",
-                "operationId": "handle_a2a_jsonrpc_a2a_post",
+                "operationId": "handle_a2a_jsonrpc_a2a_get",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
@@ -5924,8 +5912,7 @@
                     },
                     "chat_history": {
                         "items": {
-                            "additionalProperties": true,
-                            "type": "object"
+                            "$ref": "#/components/schemas/ConversationTurn"
                         },
                         "type": "array",
                         "title": "Chat History",
@@ -5943,7 +5930,11 @@
                                         "type": "assistant"
                                     }
                                 ],
-                                "started_at": "2024-01-01T00:01:00Z"
+                                "model": "gpt-4o-mini",
+                                "provider": "openai",
+                                "started_at": "2024-01-01T00:01:00Z",
+                                "tool_calls": [],
+                                "tool_results": []
                             }
                         ]
                     }
@@ -5954,7 +5945,7 @@
                     "chat_history"
                 ],
                 "title": "ConversationResponse",
-                "description": "Model representing a response for retrieving a conversation.\n\nAttributes:\n    conversation_id: The conversation ID (UUID).\n    chat_history: The simplified chat history as a list of conversation turns.\n\nExample:\n    ```python\n    conversation_response = ConversationResponse(\n        conversation_id=\"123e4567-e89b-12d3-a456-426614174000\",\n        chat_history=[\n            {\n                \"messages\": [\n                    {\"content\": \"Hello\", \"type\": \"user\"},\n                    {\"content\": \"Hi there!\", \"type\": \"assistant\"}\n                ],\n                \"started_at\": \"2024-01-01T00:01:00Z\",\n                \"completed_at\": \"2024-01-01T00:01:05Z\"\n            }\n        ]\n    )\n    ```",
+                "description": "Model representing a response for retrieving a conversation.\n\nAttributes:\n    conversation_id: The conversation ID (UUID).\n    chat_history: The chat history as a list of conversation turns.",
                 "examples": [
                     {
                         "chat_history": [
@@ -5970,12 +5961,85 @@
                                         "type": "assistant"
                                     }
                                 ],
-                                "started_at": "2024-01-01T00:01:00Z"
+                                "model": "gpt-4o-mini",
+                                "provider": "openai",
+                                "started_at": "2024-01-01T00:01:00Z",
+                                "tool_calls": [],
+                                "tool_results": []
                             }
                         ],
                         "conversation_id": "123e4567-e89b-12d3-a456-426614174000"
                     }
                 ]
+            },
+            "ConversationTurn": {
+                "properties": {
+                    "messages": {
+                        "items": {
+                            "$ref": "#/components/schemas/Message"
+                        },
+                        "type": "array",
+                        "title": "Messages",
+                        "description": "List of messages in this turn"
+                    },
+                    "tool_calls": {
+                        "items": {
+                            "$ref": "#/components/schemas/ToolCallSummary"
+                        },
+                        "type": "array",
+                        "title": "Tool Calls",
+                        "description": "List of tool calls made in this turn"
+                    },
+                    "tool_results": {
+                        "items": {
+                            "$ref": "#/components/schemas/ToolResultSummary"
+                        },
+                        "type": "array",
+                        "title": "Tool Results",
+                        "description": "List of tool results from this turn"
+                    },
+                    "provider": {
+                        "type": "string",
+                        "title": "Provider",
+                        "description": "Provider identifier used for this turn",
+                        "examples": [
+                            "openai"
+                        ]
+                    },
+                    "model": {
+                        "type": "string",
+                        "title": "Model",
+                        "description": "Model identifier used for this turn",
+                        "examples": [
+                            "gpt-4o-mini"
+                        ]
+                    },
+                    "started_at": {
+                        "type": "string",
+                        "title": "Started At",
+                        "description": "ISO 8601 timestamp when the turn started",
+                        "examples": [
+                            "2024-01-01T00:01:00Z"
+                        ]
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "title": "Completed At",
+                        "description": "ISO 8601 timestamp when the turn completed",
+                        "examples": [
+                            "2024-01-01T00:01:05Z"
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "provider",
+                    "model",
+                    "started_at",
+                    "completed_at"
+                ],
+                "title": "ConversationTurn",
+                "description": "Model representing a single conversation turn.\n\nAttributes:\n    messages: List of messages in this turn.\n    tool_calls: List of tool calls made in this turn.\n    tool_results: List of tool results from this turn.\n    provider: Provider identifier used for this turn.\n    model: Model identifier used for this turn.\n    started_at: ISO 8601 timestamp when the turn started.\n    completed_at: ISO 8601 timestamp when the turn completed."
             },
             "ConversationUpdateRequest": {
                 "properties": {
@@ -7028,6 +7092,42 @@
                 ],
                 "title": "MCPServerAuthInfo",
                 "description": "Information about MCP server client authentication options."
+            },
+            "Message": {
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "title": "Content",
+                        "description": "The message content",
+                        "examples": [
+                            "Hello, how can I help you?"
+                        ]
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "user",
+                            "assistant",
+                            "system",
+                            "developer"
+                        ],
+                        "title": "Type",
+                        "description": "The type of message",
+                        "examples": [
+                            "user",
+                            "assistant",
+                            "system",
+                            "developer"
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "content",
+                    "type"
+                ],
+                "title": "Message",
+                "description": "Model representing a message in a conversation turn.\n\nAttributes:\n    content: The message content.\n    type: The type of message."
             },
             "ModelContextProtocolServer": {
                 "properties": {

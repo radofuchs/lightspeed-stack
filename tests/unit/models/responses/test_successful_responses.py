@@ -592,6 +592,10 @@ class TestConversationResponse:
                     {"content": "Hello", "type": "user"},
                     {"content": "Hi there!", "type": "assistant"},
                 ],
+                "tool_calls": [],
+                "tool_results": [],
+                "provider": "google",
+                "model": "gemini-2.0-flash-exp",
                 "started_at": "2024-01-01T00:01:00Z",
                 "completed_at": "2024-01-01T00:01:05Z",
             }
@@ -602,7 +606,9 @@ class TestConversationResponse:
         )
         assert isinstance(response, AbstractSuccessfulResponse)
         assert response.conversation_id == "123e4567-e89b-12d3-a456-426614174000"
-        assert response.chat_history == chat_history
+        # Convert ConversationTurn objects to dicts for comparison
+        actual_history = [turn.model_dump() for turn in response.chat_history]
+        assert actual_history == chat_history
 
     def test_empty_chat_history(self) -> None:
         """Test ConversationResponse with empty chat_history."""

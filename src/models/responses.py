@@ -2,7 +2,7 @@
 
 """Models for REST API responses."""
 
-from typing import Any, ClassVar, Optional, Union
+from typing import Any, ClassVar, Literal, Optional, Union
 
 from fastapi import status
 from pydantic import AnyUrl, BaseModel, Field
@@ -835,29 +835,79 @@ class AuthorizedResponse(AbstractSuccessfulResponse):
     }
 
 
+class Message(BaseModel):
+    """Model representing a message in a conversation turn.
+
+    Attributes:
+        content: The message content.
+        type: The type of message.
+    """
+
+    content: str = Field(
+        ...,
+        description="The message content",
+        examples=["Hello, how can I help you?"],
+    )
+    type: Literal["user", "assistant", "system", "developer"] = Field(
+        ...,
+        description="The type of message",
+        examples=["user", "assistant", "system", "developer"],
+    )
+
+
+class ConversationTurn(BaseModel):
+    """Model representing a single conversation turn.
+
+    Attributes:
+        messages: List of messages in this turn.
+        tool_calls: List of tool calls made in this turn.
+        tool_results: List of tool results from this turn.
+        provider: Provider identifier used for this turn.
+        model: Model identifier used for this turn.
+        started_at: ISO 8601 timestamp when the turn started.
+        completed_at: ISO 8601 timestamp when the turn completed.
+    """
+
+    messages: list[Message] = Field(
+        default_factory=list,
+        description="List of messages in this turn",
+    )
+    tool_calls: list[ToolCallSummary] = Field(
+        default_factory=list,
+        description="List of tool calls made in this turn",
+    )
+    tool_results: list[ToolResultSummary] = Field(
+        default_factory=list,
+        description="List of tool results from this turn",
+    )
+    provider: str = Field(
+        ...,
+        description="Provider identifier used for this turn",
+        examples=["openai"],
+    )
+    model: str = Field(
+        ...,
+        description="Model identifier used for this turn",
+        examples=["gpt-4o-mini"],
+    )
+    started_at: str = Field(
+        ...,
+        description="ISO 8601 timestamp when the turn started",
+        examples=["2024-01-01T00:01:00Z"],
+    )
+    completed_at: str = Field(
+        ...,
+        description="ISO 8601 timestamp when the turn completed",
+        examples=["2024-01-01T00:01:05Z"],
+    )
+
+
 class ConversationResponse(AbstractSuccessfulResponse):
     """Model representing a response for retrieving a conversation.
 
     Attributes:
         conversation_id: The conversation ID (UUID).
-        chat_history: The simplified chat history as a list of conversation turns.
-
-    Example:
-        ```python
-        conversation_response = ConversationResponse(
-            conversation_id="123e4567-e89b-12d3-a456-426614174000",
-            chat_history=[
-                {
-                    "messages": [
-                        {"content": "Hello", "type": "user"},
-                        {"content": "Hi there!", "type": "assistant"}
-                    ],
-                    "started_at": "2024-01-01T00:01:00Z",
-                    "completed_at": "2024-01-01T00:01:05Z"
-                }
-            ]
-        )
-        ```
+        chat_history: The chat history as a list of conversation turns.
     """
 
     conversation_id: str = Field(
@@ -866,7 +916,7 @@ class ConversationResponse(AbstractSuccessfulResponse):
         examples=["c5260aec-4d82-4370-9fdf-05cf908b3f16"],
     )
 
-    chat_history: list[dict[str, Any]] = Field(
+    chat_history: list[ConversationTurn] = Field(
         ...,
         description="The simplified chat history as a list of conversation turns",
         examples=[
@@ -875,6 +925,10 @@ class ConversationResponse(AbstractSuccessfulResponse):
                     {"content": "Hello", "type": "user"},
                     {"content": "Hi there!", "type": "assistant"},
                 ],
+                "tool_calls": [],
+                "tool_results": [],
+                "provider": "openai",
+                "model": "gpt-4o-mini",
                 "started_at": "2024-01-01T00:01:00Z",
                 "completed_at": "2024-01-01T00:01:05Z",
             }
@@ -893,6 +947,10 @@ class ConversationResponse(AbstractSuccessfulResponse):
                                 {"content": "Hello", "type": "user"},
                                 {"content": "Hi there!", "type": "assistant"},
                             ],
+                            "tool_calls": [],
+                            "tool_results": [],
+                            "provider": "openai",
+                            "model": "gpt-4o-mini",
                             "started_at": "2024-01-01T00:01:00Z",
                             "completed_at": "2024-01-01T00:01:05Z",
                         }
