@@ -3200,6 +3200,8 @@ system info) and returns an LLM-generated response.
 
 Args:
     infer_request: The inference request containing question and context.
+    request: The FastAPI request object for accessing headers and state.
+    background_tasks: FastAPI background tasks for async Splunk event sending.
     auth: Authentication tuple from the configured auth provider.
 
 Returns:
@@ -4860,6 +4862,7 @@ Useful resources:
 | api_key |  | API key to access Llama Stack service |
 | use_as_library_client |  | When set to true Llama Stack will be used in library mode, not in server mode (default) |
 | library_client_config_path |  | Path to configuration file used when Llama Stack is run in library mode |
+| timeout | integer | Timeout in seconds for requests to Llama Stack service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
 
 
 ## MCPClientAuthOptionsResponse
