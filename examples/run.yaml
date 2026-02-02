@@ -15,7 +15,6 @@ apis:
 - inference
 - safety
 - scoring
-- telemetry
 - tool_runtime
 - vector_io
       
@@ -116,8 +115,6 @@ providers:
     provider_id: meta-reference
     provider_type: inline::meta-reference
 scoring_fns: []
-telemetry:
-  enabled: true
 server:
   port: 8321
 storage:

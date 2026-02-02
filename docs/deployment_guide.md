@@ -362,13 +362,17 @@ cp examples/run.yaml /tmp/llama-stack-server
                  provider_id: model-context-protocol
                  provider_type: remote::model-context-protocol
                vector_io:
-               - config:
-                   kvstore:
-                     db_path: .llama/distributions/ollama/faiss_store.db
-                     namespace: null
-                     type: sqlite
-                 provider_id: faiss
+               - provider_id: faiss
                  provider_type: inline::faiss
+                 config:
+                   persistence:
+                     namespace: vector_io::faiss
+                     backend: kv_default
+             storage:
+               backends:
+                 kv_default:
+                   type: kv_sqlite
+                   db_path: .llama/distributions/ollama/kv_store.db
              scoring_fns: []
              server:
                auth: null
@@ -380,7 +384,7 @@ cp examples/run.yaml /tmp/llama-stack-server
                tls_keyfile: null
              shields: []
              tool_groups: []
-             vector_dbs: []
+             vector_stores: []
              version: 2
     ```
 1. The server with Llama Stack listens on port 8321. A description of the REST API is available in the form of OpenAPI (endpoint /openapi.json), but other endpoints can also be used. It is possible to check if Llama Stack runs as REST API server by retrieving its version. We use `curl` and `jq` tools for this purposes:
@@ -789,135 +793,7 @@ a4982f43195537b9eb1cec510fe6655f245d6d4b7236a4759808115d5d719972
 
 #### Llama Stack configuration
 
-Llama Stack needs to be configured properly. For using the default runnable Llama Stack a file named `run.yaml` with following content needs to be created:
-
-```yaml
-version: '2'
-image_name: minimal-viable-llama-stack-configuration
-
-apis:
-  - agents
-  - datasetio
-  - eval
-  - inference
-  - post_training
-  - safety
-  - scoring
-  - telemetry
-  - tool_runtime
-  - vector_io
-benchmarks: []
-container_image: null
-datasets: []
-external_providers_dir: null
-inference_store:
-  db_path: .llama/distributions/ollama/inference_store.db
-  type: sqlite
-logging: null
-metadata_store:
-  db_path: .llama/distributions/ollama/registry.db
-  namespace: null
-  type: sqlite
-providers:
-  agents:
-  - config:
-      persistence_store:
-        db_path: .llama/distributions/ollama/agents_store.db
-        namespace: null
-        type: sqlite
-      responses_store:
-        db_path: .llama/distributions/ollama/responses_store.db
-        type: sqlite
-    provider_id: meta-reference
-    provider_type: inline::meta-reference
-  datasetio:
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/huggingface_datasetio.db
-        namespace: null
-        type: sqlite
-    provider_id: huggingface
-    provider_type: remote::huggingface
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/localfs_datasetio.db
-        namespace: null
-        type: sqlite
-    provider_id: localfs
-    provider_type: inline::localfs
-  eval:
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/meta_reference_eval.db
-        namespace: null
-        type: sqlite
-    provider_id: meta-reference
-    provider_type: inline::meta-reference
-  inference:
-    - provider_id: openai
-      provider_type: remote::openai
-      config:
-        api_key: ${env.OPENAI_API_KEY}
-  post_training:
-  - config:
-      checkpoint_format: huggingface
-      device: cpu
-      distributed_backend: null
-    provider_id: huggingface
-    provider_type: inline::huggingface
-  safety:
-  - config:
-      excluded_categories: []
-    provider_id: llama-guard
-    provider_type: inline::llama-guard
-  scoring:
-  - config: {}
-    provider_id: basic
-    provider_type: inline::basic
-  - config: {}
-    provider_id: llm-as-judge
-    provider_type: inline::llm-as-judge
-  - config:
-      openai_api_key: '********'
-    provider_id: braintrust
-    provider_type: inline::braintrust
-  telemetry:
-  - config:
-      service_name: 'lightspeed-stack'
-      sinks: sqlite
-      sqlite_db_path: .llama/distributions/ollama/trace_store.db
-    provider_id: meta-reference
-    provider_type: inline::meta-reference
-  tool_runtime:
-    - provider_id: model-context-protocol
-      provider_type: remote::model-context-protocol
-      config: {}
-  vector_io:
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/faiss_store.db
-        namespace: null
-        type: sqlite
-    provider_id: faiss
-    provider_type: inline::faiss
-scoring_fns: []
-server:
-  auth: null
-  host: null
-  port: 8321
-  quota: null
-  tls_cafile: null
-  tls_certfile: null
-  tls_keyfile: null
-shields: []
-vector_dbs: []
-
-models:
-  - model_id: gpt-4-turbo
-    provider_id: openai
-    model_type: llm
-    provider_model_id: gpt-4-turbo
-```
+Llama Stack needs to be configured properly. For using the default runnable Llama Stack a file named `run.yaml` needs to be created. Use the example configuration from [examples/run.yaml](../examples/run.yaml).
 
 
 
@@ -1043,13 +919,17 @@ models:
                  provider_id: model-context-protocol
                  provider_type: remote::model-context-protocol
                vector_io:
-               - config:
-                   kvstore:
-                     db_path: .llama/distributions/ollama/faiss_store.db
-                     namespace: null
-                     type: sqlite
-                 provider_id: faiss
+               - provider_id: faiss
                  provider_type: inline::faiss
+                 config:
+                   persistence:
+                     namespace: vector_io::faiss
+                     backend: kv_default
+             storage:
+               backends:
+                 kv_default:
+                   type: kv_sqlite
+                   db_path: .llama/distributions/ollama/kv_store.db
              scoring_fns: []
              server:
                auth: null
@@ -1061,7 +941,7 @@ models:
                tls_keyfile: null
              shields: []
              tool_groups: []
-             vector_dbs: []
+             vector_stores: []
              version: 2
     ```
 1. The server with Llama Stack listens on port 8321. A description of the REST API is available in the form of OpenAPI (endpoint /openapi.json), but other endpoints can also be used. It is possible to check if Llama Stack runs as REST API server by retrieving its version. We use `curl` and `jq` tools for this purposes:
@@ -1137,100 +1017,7 @@ export OPENAI_API_KEY="sk-foo-bar-baz-my-key"
 
 #### Llama Stack configuration
 
-Create a file named `run.yaml` with following content:
-
-```yaml
-version: '2'
-image_name: minimal-viable-llama-stack-configuration
-
-apis:
-  - agents
-  - datasetio
-  - eval
-  - inference
-  - post_training
-  - safety
-  - scoring
-  - telemetry
-  - tool_runtime
-  - vector_io
-benchmarks: []
-container_image: null
-datasets: []
-external_providers_dir: null
-inference_store:
-  db_path: .llama/distributions/ollama/inference_store.db
-  type: sqlite
-logging: null
-metadata_store:
-  db_path: .llama/distributions/ollama/registry.db
-  namespace: null
-  type: sqlite
-providers:
-  agents:
-  - config:
-      persistence_store:
-        db_path: .llama/distributions/ollama/agents_store.db
-        namespace: null
-        type: sqlite
-      responses_store:
-        db_path: .llama/distributions/ollama/responses_store.db
-        type: sqlite
-    provider_id: meta-reference
-    provider_type: inline::meta-reference
-  datasetio:
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/huggingface_datasetio.db
-        namespace: null
-        type: sqlite
-    provider_id: huggingface
-    provider_type: remote::huggingface
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/localfs_datasetio.db
-        namespace: null
-        type: sqlite
-    provider_id: localfs
-    provider_type: inline::localfs
-  eval:
-  - config:
-      kvstore:
-        db_path: .llama/distributions/ollama/meta_reference_eval.db
-        namespace: null
-        type: sqlite
-    provider_id: meta-reference
-    provider_type: inline::meta-reference
-  inference:
-    - provider_id: openai
-      provider_type: remote::openai
-      config:
-        api_key: ${env.OPENAI_API_KEY}
-  post_training:
-  - config:
-      checkpoint_format: huggingface
-      device: cpu
-      distributed_backend: null
-    provider_id: huggingface
-    provider_type: inline::huggingface
-  safety:
-  - config:
-      excluded_categories: []
-    provider_id: llama-guard
-    provider_type: inline::llama-guard
-  scoring:
-  - config: {}
-    provider_id: basic
-    provider_type: inline::basic
-  - config: {}
-    provider_id: llm-as-judge
-    provider_type: inline::llm-as-judge
-  - config:
-      openai_api_key: '********'
-    provider_id: braintrust
-    provider_type: inline::braintrust
-  telemetry:
-```
+Create a file named `run.yaml`. Use the example configuration from [examples/run.yaml](../examples/run.yaml).
 
 ### LCS configuration
 
