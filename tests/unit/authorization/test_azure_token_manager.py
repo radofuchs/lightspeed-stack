@@ -25,6 +25,7 @@ def dummy_config_fixture() -> AzureEntraIdConfiguration:
         tenant_id=SecretStr("tenant"),
         client_id=SecretStr("client"),
         client_secret=SecretStr("secret"),
+        scope="https://cognitiveservices.azure.com/.default",
     )
 
 
