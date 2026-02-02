@@ -188,8 +188,6 @@ pydantic-settings==2.12.0 \
     --hash=sha256:1f1d9882776a999776b4364623ff2715a409f7910722ac14bac2b08db58bfcdd
 pygments==2.19.2 \
     --hash=sha256:3c7239b5a90a9339df2ddb3d4fd8fdaa79eb1cffa183937fe92ff1042f94f0d0
-pyjwt==2.10.1 \
-    --hash=sha256:d7a2859c48ba7b92b238f283e68c7700befdd8ed1ed8b4ba6495b27b7ea1b414
 python-dateutil==2.9.0.post0 \
     --hash=sha256:9f85618b077d3ffc8beecb57c9444d7e4a25143764ed73647ea6cdf407fd58c0
 python-dotenv==1.2.1 \
@@ -270,8 +268,6 @@ tornado==6.5.4 \
     --hash=sha256:91a7119280c0c1424b107e725ae0ace234323d057220647e84e17156fe1d8acd \
     --hash=sha256:cac9ee0f7c9664b7d3736fa6cd93e752c583161a929fc2a4abc3a014192ac2f5 \
     --hash=sha256:d59e284efd19f3cad7ee1a1188d2fc7bb483253fd08bc3e9c034f063414a7037
-tqdm==4.67.1 \
-    --hash=sha256:1cdccba6e6e9ca388c44f874f4983c32fa9d8b314f8571e4e5231e0cc412eb3d
 transformers==4.57.3 \
     --hash=sha256:25a28e64a3ad117a1560eca50f41504d035606259902d421d933282f5d3a352e
 triton==3.5.0 \
