@@ -345,6 +345,7 @@ Useful resources:
 | api_key | string | API key to access Llama Stack service |
 | use_as_library_client | boolean | When set to true Llama Stack will be used in library mode, not in server mode (default) |
 | library_client_config_path | string | Path to configuration file used when Llama Stack is run in library mode |
+| timeout | integer | Timeout in seconds for requests to Llama Stack service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
 
 
 ## ModelContextProtocolServer

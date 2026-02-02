@@ -6,6 +6,40 @@
   },
   "components": {
     "schemas": {
+      "A2AStateConfiguration": {
+        "additionalProperties": false,
+        "description": "A2A protocol persistent state configuration.\n\nConfigures how A2A task state and context-to-conversation mappings are\nstored. For multi-worker deployments, use SQLite or PostgreSQL to ensure\nstate is shared across all workers.\n\nIf no configuration is provided, in-memory storage is used (default).\nThis is suitable for single-worker deployments but state will be lost\non restarts and not shared across workers.\n\nAttributes:\n    sqlite: SQLite database configuration for A2A state storage.\n    postgres: PostgreSQL database configuration for A2A state storage.",
+        "properties": {
+          "sqlite": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SQLiteDatabaseConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SQLite database configuration for A2A state storage.",
+            "title": "SQLite configuration"
+          },
+          "postgres": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PostgreSQLDatabaseConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PostgreSQL database configuration for A2A state storage.",
+            "title": "PostgreSQL configuration"
+          }
+        },
+        "title": "A2AStateConfiguration",
+        "type": "object"
+      },
       "APIKeyTokenConfiguration": {
         "additionalProperties": false,
         "description": "API Key Token configuration.",
@@ -78,7 +112,11 @@
           "get_config",
           "info",
           "model_override",
-          "rlsapi_v1_infer"
+          "rlsapi_v1_infer",
+          "a2a_agent_card",
+          "a2a_task_execution",
+          "a2a_message",
+          "a2a_jsonrpc"
         ],
         "title": "Action",
         "type": "string"
@@ -95,6 +133,12 @@
           "skip_tls_verification": {
             "default": false,
             "title": "Skip Tls Verification",
+            "type": "boolean"
+          },
+          "skip_for_health_probes": {
+            "default": false,
+            "description": "Skip authorization for readiness and liveness probes",
+            "title": "Skip authorization for probes",
             "type": "boolean"
           },
           "k8s_cluster_api": {
@@ -160,6 +204,43 @@
           }
         },
         "title": "AuthorizationConfiguration",
+        "type": "object"
+      },
+      "AzureEntraIdConfiguration": {
+        "additionalProperties": false,
+        "description": "Microsoft Entra ID authentication attributes for Azure.",
+        "properties": {
+          "tenant_id": {
+            "format": "password",
+            "title": "Tenant Id",
+            "type": "string",
+            "writeOnly": true
+          },
+          "client_id": {
+            "format": "password",
+            "title": "Client Id",
+            "type": "string",
+            "writeOnly": true
+          },
+          "client_secret": {
+            "format": "password",
+            "title": "Client Secret",
+            "type": "string",
+            "writeOnly": true
+          },
+          "scope": {
+            "default": "https://cognitiveservices.azure.com/.default",
+            "description": "Azure Cognitive Services scope for token requests. Override only if using a different Azure service.",
+            "title": "Token scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "client_id",
+          "client_secret"
+        ],
+        "title": "AzureEntraIdConfiguration",
         "type": "object"
       },
       "ByokRag": {
@@ -346,10 +427,45 @@
             "title": "BYOK RAG configuration",
             "type": "array"
           },
+          "a2a_state": {
+            "$ref": "#/components/schemas/A2AStateConfiguration",
+            "description": "Configuration for A2A protocol persistent state storage.",
+            "title": "A2A state configuration"
+          },
           "quota_handlers": {
             "$ref": "#/components/schemas/QuotaHandlersConfiguration",
             "description": "Quota handlers configuration",
             "title": "Quota handlers"
+          },
+          "azure_entra_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AzureEntraIdConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "splunk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplunkConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Splunk HEC configuration for sending telemetry events.",
+            "title": "Splunk configuration"
+          },
+          "deployment_environment": {
+            "default": "development",
+            "description": "Deployment environment name (e.g., 'development', 'staging', 'production'). Used in telemetry events.",
+            "title": "Deployment environment",
+            "type": "string"
           }
         },
         "required": [
@@ -465,6 +581,18 @@
             "nullable": true,
             "default": null,
             "title": "System Prompt"
+          },
+          "agent_card_path": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "title": "Agent Card Path"
+          },
+          "agent_card_config": {
+            "type": "object",
+            "nullable": true,
+            "default": null,
+            "title": "Agent Card Config"
           },
           "custom_profile": {
             "anyOf": [
@@ -713,6 +841,21 @@
             "description": "URL of the MCP server",
             "title": "MCP server URL",
             "type": "string"
+          },
+          "authorization_headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Headers to send to the MCP server. The map contains the header name and the path to a file containing the header value (secret). There are 2 special cases: 1. Usage of the kubernetes token in the header. To specify this use a string 'kubernetes' instead of the file path. 2. Usage of the client provided token in the header. To specify this use a string 'client' instead of the file path.",
+            "title": "Authorization headers",
+            "type": "object"
+          },
+          "timeout": {
+            "type": "integer",
+            "nullable": true,
+            "default": null,
+            "description": "Timeout in seconds for requests to the MCP server. If not specified, the default timeout from Llama Stack will be used. Note: This field is reserved for future use when Llama Stack adds timeout support.",
+            "title": "Request timeout"
           }
         },
         "required": [
@@ -900,6 +1043,20 @@
             "minimum": 0,
             "title": "Period",
             "type": "integer"
+          },
+          "database_reconnection_count": {
+            "default": 10,
+            "description": "Database reconnection count on startup. When database for quota is not available on startup, the service tries to reconnect N times with specified delay.",
+            "minimum": 0,
+            "title": "Database reconnection count on startup",
+            "type": "integer"
+          },
+          "database_reconnection_delay": {
+            "default": 1,
+            "description": "Database reconnection delay specified in seconds. When database for quota is not available on startup, the service tries to reconnect N times with specified delay.",
+            "minimum": 0,
+            "title": "Database reconnection delay",
+            "type": "integer"
           }
         },
         "title": "QuotaSchedulerConfiguration",
@@ -953,6 +1110,13 @@
             "title": "Port",
             "type": "integer"
           },
+          "base_url": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "Externally reachable base URL for the service; needed for A2A support.",
+            "title": "Base URL"
+          },
           "auth_enabled": {
             "default": false,
             "description": "Enables the authentication subsystem",
@@ -990,6 +1154,60 @@
           }
         },
         "title": "ServiceConfiguration",
+        "type": "object"
+      },
+      "SplunkConfiguration": {
+        "additionalProperties": false,
+        "description": "Splunk HEC (HTTP Event Collector) configuration.\n\nSplunk HEC allows sending events directly to Splunk over HTTP/HTTPS.\nThis configuration is used to send telemetry events for inference\nrequests to the corporate Splunk deployment.\n\nUseful resources:\n\n  - [Splunk HEC Docs](https://docs.splunk.com/Documentation/SplunkCloud)\n  - [About HEC](https://docs.splunk.com/Documentation/Splunk/latest/Data)",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "description": "Enable or disable Splunk HEC integration.",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "Splunk HEC endpoint URL.",
+            "title": "HEC URL"
+          },
+          "token_path": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "Path to file containing the Splunk HEC authentication token.",
+            "title": "Token path"
+          },
+          "index": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "Target Splunk index for events.",
+            "title": "Index"
+          },
+          "source": {
+            "default": "lightspeed-stack",
+            "description": "Event source identifier.",
+            "title": "Source",
+            "type": "string"
+          },
+          "timeout": {
+            "default": 5,
+            "description": "HTTP timeout in seconds for HEC requests.",
+            "minimum": 0,
+            "title": "Timeout",
+            "type": "integer"
+          },
+          "verify_ssl": {
+            "default": true,
+            "description": "Whether to verify SSL certificates for HEC endpoint.",
+            "title": "Verify SSL",
+            "type": "boolean"
+          }
+        },
+        "title": "SplunkConfiguration",
         "type": "object"
       },
       "TLSConfiguration": {
