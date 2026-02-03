@@ -309,6 +309,7 @@ def test_authentication_configuration_in_config_noop() -> None:
             library_client_config_path="tests/configuration/run.yaml",
             url="localhost",
             api_key=SecretStr(""),
+            timeout=60,
         ),
         user_data_collection=UserDataCollection(
             feedback_enabled=False,
@@ -347,6 +348,7 @@ def test_authentication_configuration_skip_readiness_probe() -> None:
             library_client_config_path="tests/configuration/run.yaml",
             url="localhost",
             api_key=SecretStr(""),
+            timeout=60,
         ),
         user_data_collection=UserDataCollection(
             feedback_enabled=False,
@@ -393,6 +395,7 @@ def test_authentication_configuration_in_config_k8s() -> None:
             library_client_config_path="tests/configuration/run.yaml",
             url="localhost",
             api_key=SecretStr(""),
+            timeout=60,
         ),
         user_data_collection=UserDataCollection(
             feedback_enabled=False,
@@ -449,6 +452,7 @@ def test_authentication_configuration_in_config_rh_identity() -> None:
             library_client_config_path="tests/configuration/run.yaml",
             url="localhost",
             api_key=SecretStr(""),
+            timeout=60,
         ),
         user_data_collection=UserDataCollection(
             feedback_enabled=False,
@@ -495,6 +499,7 @@ def test_authentication_configuration_in_config_jwktoken() -> None:
             library_client_config_path="tests/configuration/run.yaml",
             url="localhost",
             api_key=SecretStr(""),
+            timeout=60,
         ),
         user_data_collection=UserDataCollection(
             feedback_enabled=False,

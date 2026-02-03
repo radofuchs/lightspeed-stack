@@ -948,6 +948,7 @@ class TestConfigurationResponse:
                 use_as_library_client=False,
                 api_key=None,
                 library_client_config_path=None,
+                timeout=60,
             ),
             user_data_collection=UserDataCollection(
                 feedback_enabled=False,
