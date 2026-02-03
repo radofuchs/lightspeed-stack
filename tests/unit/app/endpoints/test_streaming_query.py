@@ -22,6 +22,7 @@ from constants import MEDIA_TYPE_JSON, MEDIA_TYPE_TEXT
 from models.requests import QueryRequest
 from models.responses import ReferencedDocument
 from utils.token_counter import TokenCounter
+from utils.types import TurnSummary
 
 # Note: content_delta module doesn't exist in llama-stack-client 0.3.x
 # These are mock classes for backward compatibility with Agent API tests
@@ -433,6 +434,9 @@ class TestOLSStreamEndEvent:
         }
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
+        mock_summary = TurnSummary(
+            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
+        )
         available_quotas: dict[str, int] = {}
         referenced_documents = [
             ReferencedDocument(
@@ -444,6 +448,7 @@ class TestOLSStreamEndEvent:
         ]
         result = stream_end_event(
             metadata_map,
+            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,
@@ -473,6 +478,9 @@ class TestOLSStreamEndEvent:
         }
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
+        mock_summary = TurnSummary(
+            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
+        )
         available_quotas: dict[str, int] = {}
         referenced_documents = [
             ReferencedDocument(
@@ -484,6 +492,7 @@ class TestOLSStreamEndEvent:
         ]
         result = stream_end_event(
             metadata_map,
+            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,
@@ -502,10 +511,14 @@ class TestOLSStreamEndEvent:
         metadata_map: dict = {}
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
+        mock_summary = TurnSummary(
+            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
+        )
         available_quotas: dict[str, int] = {}
         referenced_documents: list[ReferencedDocument] = []
         result = stream_end_event(
             metadata_map,
+            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,
@@ -630,6 +643,9 @@ class TestOLSCompatibilityIntegration:
         }
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
+        mock_summary = TurnSummary(
+            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
+        )
         available_quotas: dict[str, int] = {}
         referenced_documents = [
             ReferencedDocument(
@@ -638,6 +654,7 @@ class TestOLSCompatibilityIntegration:
         ]
         end_event = stream_end_event(
             metadata_map,
+            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,

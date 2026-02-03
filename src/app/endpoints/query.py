@@ -55,6 +55,11 @@ logger = logging.getLogger("app.endpoints.handlers")
 router = APIRouter(tags=["query"])
 
 
+# When OFFLINE is False, use reference_url for chunk source
+# When OFFLINE is True, use parent_id for chunk source
+# TODO: move this setting to a higher level configuration
+OFFLINE = True
+
 query_response: dict[int | str, dict[str, Any]] = {
     200: QueryResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(
@@ -386,9 +391,9 @@ async def query_endpoint_handler_base(  # pylint: disable=R0914
         response = QueryResponse(
             conversation_id=conversation_id,
             response=summary.llm_response,
-            tool_calls=summary.tool_calls,
-            tool_results=summary.tool_results,
-            rag_chunks=summary.rag_chunks,
+            rag_chunks=rag_chunks_dict,
+            tool_calls=summary.tool_calls if summary.tool_calls else [],
+            tool_results=summary.tool_results if summary.tool_results else [],
             referenced_documents=referenced_documents,
             truncated=False,  # TODO: implement truncation detection
             input_tokens=token_usage.input_tokens,
@@ -577,3 +582,33 @@ def validate_attachments_metadata(attachments: list[Attachment]) -> None:
                 response="Invalid attribute value", cause=message
             )
             raise HTTPException(**response.model_dump())
+
+
+# def get_rag_toolgroups(
+#     vector_db_ids: list[str],
+# ) -> Optional[list[Toolgroup]]:
+#     """
+#     Return a list of RAG Tool groups if the given vector DB list is not empty.
+
+#     Generate a list containing a RAG knowledge search toolgroup if
+#     vector database IDs are provided.
+
+#     Parameters:
+#         vector_db_ids (list[str]): List of vector database identifiers to include in the toolgroup.
+
+#     Returns:
+#         Optional[list[Toolgroup]]: A list with a single RAG toolgroup if
+#         vector_db_ids is non-empty; otherwise, None.
+#     """
+#     return (
+#         [
+#             ToolgroupAgentToolGroupWithArgs(
+#                 name="builtin::rag/file_search",
+#                 args={
+#                     "vector_db_ids": vector_db_ids,
+#                 },
+#             )
+#         ]
+#         if vector_db_ids
+#         else None
+#     )

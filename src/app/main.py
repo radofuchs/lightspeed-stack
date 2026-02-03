@@ -22,6 +22,10 @@ from models.responses import InternalServerErrorResponse
 from utils.common import register_mcp_servers_async
 from utils.llama_stack_version import check_llama_stack_version
 
+import faulthandler
+import signal
+faulthandler.register(signal.SIGUSR1)
+
 logger = get_logger(__name__)
 
 logger.info("Initializing app")
@@ -54,6 +58,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     client = AsyncLlamaStackClientHolder().get_client()
     # check if the Llama Stack version is supported by the service
     await check_llama_stack_version(client)
+
+    # try:
+    #     await client.vector_stores.delete(vector_store_id="portal-rag")
+    #     logger.info("Successfully deregistered vector store: portal-rag")
+    # except Exception as e:
+    #     logger.warning("Failed to deregister vector store 'portal-rag': %s", e)
 
     logger.info("Registering MCP servers")
     await register_mcp_servers_async(logger, configuration.configuration)

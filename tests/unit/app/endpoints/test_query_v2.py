@@ -53,6 +53,16 @@ def test_get_rag_tools() -> None:
     assert tools[0]["type"] == "file_search"
     assert tools[0]["vector_store_ids"] == ["db1", "db2"]
     assert tools[0]["max_num_results"] == 10
+    assert "solr" not in tools[0]
+
+    # Test with Solr parameters
+    solr_params = {"fq": ["product:*openshift*", "product_version:*4.16*"]}
+    tools_with_solr = get_rag_tools(["db1", "db2"], solr_params)
+    assert isinstance(tools_with_solr, list)
+    assert tools_with_solr[0]["type"] == "file_search"
+    assert tools_with_solr[0]["vector_store_ids"] == ["db1", "db2"]
+    assert tools_with_solr[0]["max_num_results"] == 10
+    assert tools_with_solr[0]["solr"] == solr_params
 
 
 def test_get_mcp_tools_with_and_without_token() -> None:

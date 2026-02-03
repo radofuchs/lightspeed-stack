@@ -127,7 +127,7 @@ MCP_AUTH_KUBERNETES = "kubernetes"
 MCP_AUTH_CLIENT = "client"
 
 # default RAG tool value
-DEFAULT_RAG_TOOL = "knowledge_search"
+DEFAULT_RAG_TOOL = "file_search"
 
 # Media type constants for streaming responses
 MEDIA_TYPE_JSON = "application/json"

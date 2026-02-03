@@ -417,7 +417,7 @@ async def retrieve_response(  # pylint: disable=too-many-locals
 
     # Prepare tools for responses API
     toolgroups = await prepare_tools_for_responses_api(
-        client, query_request, token, configuration, mcp_headers
+        client, query_request, token, configuration, mcp_headers=mcp_headers
     )
 
     # Prepare input for Responses API
