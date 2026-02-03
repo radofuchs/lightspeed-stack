@@ -18,6 +18,7 @@ def test_llama_stack_configuration_constructor() -> None:
         library_client_config_path="tests/configuration/run.yaml",
         url=None,
         api_key=None,
+        timeout=60,
     )
     assert llama_stack_configuration is not None
 
@@ -26,6 +27,7 @@ def test_llama_stack_configuration_constructor() -> None:
         url="http://localhost",
         library_client_config_path=None,
         api_key=None,
+        timeout=60,
     )
     assert llama_stack_configuration is not None
 
