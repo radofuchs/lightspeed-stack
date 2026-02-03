@@ -289,8 +289,20 @@ async def test_retrieve_response_builds_rag_and_mcp_tools(  # pylint: disable=to
     # Mock shields.list and models.list for run_shield_moderation
     mock_client.shields.list = mocker.AsyncMock(return_value=[])
     mock_client.models.list = mocker.AsyncMock(return_value=[])
+    
+    # Mock vector_io.query for direct vector querying
+    mock_query_response = mocker.Mock()
+    mock_query_response.chunks = []
+    mock_query_response.scores = []
+    mock_client.vector_io.query = mocker.AsyncMock(return_value=mock_query_response)
 
     mocker.patch("app.endpoints.query_v2.get_system_prompt", return_value="PROMPT")
+    
+    # Mock shield moderation
+    mock_moderation_result = mocker.Mock()
+    mock_moderation_result.blocked = False
+    mocker.patch("app.endpoints.query_v2.run_shield_moderation", return_value=mock_moderation_result)
+    
     mock_cfg = mocker.Mock()
     mock_cfg.mcp_servers = [
         ModelContextProtocolServer(
@@ -314,11 +326,9 @@ async def test_retrieve_response_builds_rag_and_mcp_tools(  # pylint: disable=to
     kwargs = mock_client.responses.create.call_args.kwargs
     tools = kwargs["tools"]
     assert isinstance(tools, list)
-    # Expect one file_search and one mcp tool
+    # Expect only MCP tools since RAG tools are skipped when doing direct vector querying
     tool_types = {t.get("type") for t in tools}
-    assert tool_types == {"file_search", "mcp"}
-    file_search = next(t for t in tools if t["type"] == "file_search")
-    assert file_search["vector_store_ids"] == ["dbA"]
+    assert tool_types == {"mcp"}
     mcp_tool = next(t for t in tools if t["type"] == "mcp")
     assert mcp_tool["server_label"] == "fs"
     assert mcp_tool["headers"] == {"Authorization": "Bearer mytoken"}

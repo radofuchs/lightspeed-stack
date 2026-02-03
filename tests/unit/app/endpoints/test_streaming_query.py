@@ -448,7 +448,6 @@ class TestOLSStreamEndEvent:
         ]
         result = stream_end_event(
             metadata_map,
-            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,
@@ -492,7 +491,6 @@ class TestOLSStreamEndEvent:
         ]
         result = stream_end_event(
             metadata_map,
-            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,
@@ -518,7 +516,6 @@ class TestOLSStreamEndEvent:
         referenced_documents: list[ReferencedDocument] = []
         result = stream_end_event(
             metadata_map,
-            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,
@@ -654,7 +651,6 @@ class TestOLSCompatibilityIntegration:
         ]
         end_event = stream_end_event(
             metadata_map,
-            mock_summary,
             mock_token_usage,
             available_quotas,
             referenced_documents,

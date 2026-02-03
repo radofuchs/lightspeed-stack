@@ -472,7 +472,9 @@ async def retrieve_response(  # pylint: disable=too-many-locals,too-many-branche
             logger.info("Final params being sent to vector_io.query: %s", params)
 
             query_response = await client.vector_io.query(
-                vector_store_id=vector_store_id, query=query_request.query, params=params
+                vector_store_id=vector_store_id,
+                query=query_request.query,
+                params=params,
             )
 
             logger.info("The query response total payload: %s", query_response)
@@ -504,7 +506,9 @@ async def retrieve_response(  # pylint: disable=too-many-locals,too-many-branche
                             title = title or cm.get("title")
                             reference_url = cm.get("reference_url")
                         else:
-                            doc_id = getattr(cm, "doc_id", None) or getattr(cm, "document_id", None)
+                            doc_id = getattr(cm, "doc_id", None) or getattr(
+                                cm, "document_id", None
+                            )
                             title = title or getattr(cm, "title", None)
                             reference_url = getattr(cm, "reference_url", None)
                     else:
@@ -523,7 +527,11 @@ async def retrieve_response(  # pylint: disable=too-many-locals,too-many-branche
                 else:
                     # Use reference_url if online
                     reference_doc = reference_url or doc_id
-                    doc_url = reference_doc if reference_doc.startswith("http") else ("https://mimir.corp.redhat.com" + reference_doc)
+                    doc_url = (
+                        reference_doc
+                        if reference_doc.startswith("http")
+                        else ("https://mimir.corp.redhat.com" + reference_doc)
+                    )
 
                 if reference_doc and reference_doc not in metadata_doc_ids:
                     metadata_doc_ids.add(reference_doc)
@@ -534,8 +542,9 @@ async def retrieve_response(  # pylint: disable=too-many-locals,too-many-branche
                         )
                     )
 
-            logger.info("Extracted %d unique document IDs from chunks", len(doc_ids_from_chunks))
-
+            logger.info(
+                "Extracted %d unique document IDs from chunks", len(doc_ids_from_chunks)
+            )
 
     except (
         APIConnectionError,
