@@ -3,7 +3,7 @@ FROM quay.io/rhoai/odh-llama-stack-core-rhel9:rhoai-3.3
 
 # Install missing dependencies and create required directories
 USER root
-RUN pip install faiss-cpu==1.11.0 azure-identity && \
+RUN pip install azure-identity && \
     mkdir -p /app-root && \
     chown -R 1001:0 /app-root && \
     chmod -R 775 /app-root && \
