@@ -460,7 +460,7 @@ async def retrieve_response(  # pylint: disable=too-many-locals,too-many-branche
         if vector_store_ids:
             vector_store_id = vector_store_ids[0]  # Use first available vector store
 
-            params = {"k": 5, "score_threshold": 0.0}
+            params = {"k": 5, "score_threshold": 0.0, "mode": "hybrid"}
             logger.info("Initial params: %s", params)
             logger.info("query_request.solr: %s", query_request.solr)
             if query_request.solr:
