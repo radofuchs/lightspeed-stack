@@ -36,6 +36,7 @@ The service includes comprehensive user data collection capabilities for various
         * [1. Static Tokens from Files (Recommended for Service Credentials)](#1-static-tokens-from-files-recommended-for-service-credentials)
         * [2. Kubernetes Service Account Tokens (For K8s Deployments)](#2-kubernetes-service-account-tokens-for-k8s-deployments)
         * [3. Client-Provided Tokens (For Per-User Authentication)](#3-client-provided-tokens-for-per-user-authentication)
+        * [Client-Authenticated MCP Servers Discovery](#client-authenticated-mcp-servers-discovery)
         * [Combining Authentication Methods](#combining-authentication-methods)
         * [Authentication Method Comparison](#authentication-method-comparison)
         * [Important: Automatic Server Skipping](#important-automatic-server-skipping)
@@ -768,6 +769,7 @@ verify                            Run all linters
 distribution-archives             Generate distribution archives to be uploaded into Python registry
 upload-distribution-archives      Upload distribution archives into Python registry
 konflux-requirements              generate hermetic requirements.*.txt file for konflux build
+konflux-rpm-lock 	                generate rpm.lock.yaml file for konflux build
 ```
 
 ## Running Linux container image
@@ -1229,7 +1231,10 @@ The script also updates the Tekton pipeline configurations (`.tekton/lightspeed-
 
 ### Updating RPM Dependencies
 
-**Prerequisites:** Install [rpm-lockfile-prototype](https://github.com/konflux-ci/rpm-lockfile-prototype?tab=readme-ov-file#installation)
+**Prerequisites:**
+- Install [rpm-lockfile-prototype](https://github.com/konflux-ci/rpm-lockfile-prototype?tab=readme-ov-file#installation)
+- Have an active RHEL Subscription, get activation keys from [RH console](https://console.redhat.com/insights/connector/activation-keys)
+- Have `dnf` installed in system
 
 **Steps:**
 
@@ -1237,12 +1242,24 @@ The script also updates the Tekton pipeline configurations (`.tekton/lightspeed-
 
 2. **If you changed the base image**, extract its repo file:
 ```shell
+# UBI images
 podman run -it $BASE_IMAGE cat /etc/yum.repos.d/ubi.repo > ubi.repo
+# RHEL images
+podman run -it $BASE_IMAGE cat /etc/yum.repos.d/redhat.repo > redhat.repo
+```
+If the repo file contains too many entries, we can filter them and keep only required repositories.
+Here is the command to check active repositories:
+```shell
+dnf repolist
+```
+Replace the architecture tag (`uname -m`) to `$basearch` so that rpm-lockfile-prototype can replace it with requested architecture names.
+```shell
+sed -i "s/$(uname -m)/\$basearch/g" redhat.repo
 ```
 
-3. **Generate the lock file**:
+1. **Generate the lock file**:
 ```shell
-rpm-lockfile-prototype --image $BASE_IMAGE rpms.in.yaml
+make konflux-rpm-lock
 ```
 
 This creates `rpms.lock.yaml` with pinned RPM versions.
