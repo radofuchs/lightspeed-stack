@@ -164,7 +164,9 @@ class TestConvertResponsesContentToA2AParts:
         mock_output_item = MagicMock()
         result = _convert_responses_content_to_a2a_parts([mock_output_item])
         assert len(result) == 1
-        assert result[0].root.text == "Hello, world!"
+        assert result[0].root is not None
+        text = result[0].root.text  # pyright: ignore[reportAttributeAccessIssue]
+        assert text == "Hello, world!"
 
     def test_convert_multiple_output_items(self, mocker: MockerFixture) -> None:
         """Test converting multiple output items."""
@@ -178,8 +180,12 @@ class TestConvertResponsesContentToA2AParts:
 
         result = _convert_responses_content_to_a2a_parts([mock_item1, mock_item2])
         assert len(result) == 2
-        assert result[0].root.text == "First"
-        assert result[1].root.text == "Second"
+        assert result[0].root is not None
+        assert result[1].root is not None
+        text1 = result[0].root.text  # pyright: ignore[reportAttributeAccessIssue]
+        text2 = result[1].root.text  # pyright: ignore[reportAttributeAccessIssue]
+        assert text1 == "First"
+        assert text2 == "Second"
 
     def test_convert_output_items_with_none_text(self, mocker: MockerFixture) -> None:
         """Test that output items with no text are filtered out."""
@@ -192,8 +198,12 @@ class TestConvertResponsesContentToA2AParts:
 
         result = _convert_responses_content_to_a2a_parts(mock_items)
         assert len(result) == 2
-        assert result[0].root.text == "Valid text"
-        assert result[1].root.text == "Another valid"
+        assert result[0].root is not None
+        assert result[1].root is not None
+        text1 = result[0].root.text  # pyright: ignore[reportAttributeAccessIssue]
+        text2 = result[1].root.text  # pyright: ignore[reportAttributeAccessIssue]
+        assert text1 == "Valid text"
+        assert text2 == "Another valid"
 
 
 # -----------------------------
@@ -823,8 +833,8 @@ class TestContextToConversationMapping:
         import app.endpoints.a2a as a2a_module
         from a2a_storage import A2AStorageFactory
 
-        a2a_module._context_store = None
-        a2a_module._task_store = None
+        a2a_module._context_store = None  # pyright: ignore[reportAttributeAccessIssue]
+        a2a_module._task_store = None  # pyright: ignore[reportAttributeAccessIssue]
         A2AStorageFactory.reset()
 
         store = await _get_context_store()
@@ -842,8 +852,8 @@ class TestContextToConversationMapping:
         import app.endpoints.a2a as a2a_module
         from a2a_storage import A2AStorageFactory
 
-        a2a_module._context_store = None
-        a2a_module._task_store = None
+        a2a_module._context_store = None  # pyright: ignore[reportAttributeAccessIssue]
+        a2a_module._task_store = None  # pyright: ignore[reportAttributeAccessIssue]
         A2AStorageFactory.reset()
 
         store = await _get_task_store()
