@@ -434,9 +434,6 @@ class TestOLSStreamEndEvent:
         }
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
-        mock_summary = TurnSummary(
-            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
-        )
         available_quotas: dict[str, int] = {}
         referenced_documents = [
             ReferencedDocument(
@@ -477,9 +474,6 @@ class TestOLSStreamEndEvent:
         }
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
-        mock_summary = TurnSummary(
-            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
-        )
         available_quotas: dict[str, int] = {}
         referenced_documents = [
             ReferencedDocument(
@@ -509,9 +503,6 @@ class TestOLSStreamEndEvent:
         metadata_map: dict = {}
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
-        mock_summary = TurnSummary(
-            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
-        )
         available_quotas: dict[str, int] = {}
         referenced_documents: list[ReferencedDocument] = []
         result = stream_end_event(
@@ -640,9 +631,6 @@ class TestOLSCompatibilityIntegration:
         }
         # Create mock objects for the test
         mock_token_usage = TokenCounter(input_tokens=100, output_tokens=50)
-        mock_summary = TurnSummary(
-            llm_response="", tool_calls=[], tool_results=[], rag_chunks=[]
-        )
         available_quotas: dict[str, int] = {}
         referenced_documents = [
             ReferencedDocument(

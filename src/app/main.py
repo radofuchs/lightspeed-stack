@@ -24,6 +24,7 @@ from utils.llama_stack_version import check_llama_stack_version
 
 import faulthandler
 import signal
+
 faulthandler.register(signal.SIGUSR1)
 
 logger = get_logger(__name__)

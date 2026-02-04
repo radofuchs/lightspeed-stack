@@ -289,7 +289,7 @@ async def test_retrieve_response_builds_rag_and_mcp_tools(  # pylint: disable=to
     # Mock shields.list and models.list for run_shield_moderation
     mock_client.shields.list = mocker.AsyncMock(return_value=[])
     mock_client.models.list = mocker.AsyncMock(return_value=[])
-    
+
     # Mock vector_io.query for direct vector querying
     mock_query_response = mocker.Mock()
     mock_query_response.chunks = []
@@ -297,12 +297,15 @@ async def test_retrieve_response_builds_rag_and_mcp_tools(  # pylint: disable=to
     mock_client.vector_io.query = mocker.AsyncMock(return_value=mock_query_response)
 
     mocker.patch("app.endpoints.query_v2.get_system_prompt", return_value="PROMPT")
-    
+
     # Mock shield moderation
     mock_moderation_result = mocker.Mock()
     mock_moderation_result.blocked = False
-    mocker.patch("app.endpoints.query_v2.run_shield_moderation", return_value=mock_moderation_result)
-    
+    mocker.patch(
+        "app.endpoints.query_v2.run_shield_moderation",
+        return_value=mock_moderation_result,
+    )
+
     mock_cfg = mocker.Mock()
     mock_cfg.mcp_servers = [
         ModelContextProtocolServer(
