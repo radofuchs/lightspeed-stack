@@ -161,3 +161,6 @@ DEFAULT_EMBEDDING_DIMENSION = 768
 # quota limiters constants
 USER_QUOTA_LIMITER = "user_limiter"
 CLUSTER_QUOTA_LIMITER = "cluster_limiter"
+
+# SOLR OKP RAG
+MIMIR_DOC_URL = "https://mimir.corp.redhat.com"

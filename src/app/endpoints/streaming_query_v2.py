@@ -44,7 +44,7 @@ from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
 from configuration import configuration
-from constants import MEDIA_TYPE_JSON
+from constants import MEDIA_TYPE_JSON, MIMIR_DOC_URL
 from models.config import Action
 from models.context import ResponseGeneratorContext
 from models.requests import QueryRequest
@@ -529,14 +529,14 @@ async def retrieve_response(  # pylint: disable=too-many-locals
                 if offline:
                     # Use parent/doc path
                     reference_doc = doc_id
-                    doc_url = "https://mimir.corp.redhat.com" + reference_doc
+                    doc_url = MIMIR_DOC_URL + reference_doc
                 else:
                     # Use reference_url if online
                     reference_doc = reference_url or doc_id
                     doc_url = (
                         reference_doc
                         if reference_doc.startswith("http")
-                        else ("https://mimir.corp.redhat.com" + reference_doc)
+                        else (MIMIR_DOC_URL + reference_doc)
                     )
 
                 if reference_doc and reference_doc not in metadata_doc_ids:
@@ -571,7 +571,7 @@ async def retrieve_response(  # pylint: disable=too-many-locals
             if offline:
                 parent_id = chunk.metadata.get("parent_id")
                 if parent_id:
-                    source = urljoin("https://mimir.corp.redhat.com", parent_id)
+                    source = urljoin(MIMIR_DOC_URL, parent_id)
             else:
                 source = chunk.metadata.get("reference_url")
 

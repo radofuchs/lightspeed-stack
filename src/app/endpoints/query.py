@@ -582,33 +582,3 @@ def validate_attachments_metadata(attachments: list[Attachment]) -> None:
                 response="Invalid attribute value", cause=message
             )
             raise HTTPException(**response.model_dump())
-
-
-# def get_rag_toolgroups(
-#     vector_db_ids: list[str],
-# ) -> Optional[list[Toolgroup]]:
-#     """
-#     Return a list of RAG Tool groups if the given vector DB list is not empty.
-
-#     Generate a list containing a RAG knowledge search toolgroup if
-#     vector database IDs are provided.
-
-#     Parameters:
-#         vector_db_ids (list[str]): List of vector database identifiers to include in the toolgroup.
-
-#     Returns:
-#         Optional[list[Toolgroup]]: A list with a single RAG toolgroup if
-#         vector_db_ids is non-empty; otherwise, None.
-#     """
-#     return (
-#         [
-#             ToolgroupAgentToolGroupWithArgs(
-#                 name="builtin::rag/file_search",
-#                 args={
-#                     "vector_db_ids": vector_db_ids,
-#                 },
-#             )
-#         ]
-#         if vector_db_ids
-#         else None
-#     )
