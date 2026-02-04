@@ -10,7 +10,9 @@ from runners.uvicorn import start_uvicorn
 
 def test_start_uvicorn(mocker: MockerFixture) -> None:
     """Test the function to start Uvicorn server using de-facto default configuration."""
-    configuration = ServiceConfiguration(host="localhost", port=8080, workers=1)
+    configuration = ServiceConfiguration(
+        host="localhost", port=8080, workers=1
+    )  # pyright: ignore[reportCallIssue]
 
     # don't start real Uvicorn server
     mocked_run = mocker.patch("uvicorn.run")
@@ -31,7 +33,9 @@ def test_start_uvicorn(mocker: MockerFixture) -> None:
 
 def test_start_uvicorn_different_host_port(mocker: MockerFixture) -> None:
     """Test the function to start Uvicorn server using custom configuration."""
-    configuration = ServiceConfiguration(host="x.y.com", port=1234, workers=10)
+    configuration = ServiceConfiguration(
+        host="x.y.com", port=1234, workers=10
+    )  # pyright: ignore[reportCallIssue]
 
     # don't start real Uvicorn server
     mocked_run = mocker.patch("uvicorn.run")
@@ -55,7 +59,7 @@ def test_start_uvicorn_empty_tls_configuration(mocker: MockerFixture) -> None:
     tls_config = TLSConfiguration()
     configuration = ServiceConfiguration(
         host="x.y.com", port=1234, workers=10, tls_config=tls_config
-    )
+    )  # pyright: ignore[reportCallIssue]
 
     # don't start real Uvicorn server
     mocked_run = mocker.patch("uvicorn.run")
@@ -83,7 +87,7 @@ def test_start_uvicorn_tls_configuration(mocker: MockerFixture) -> None:
     )
     configuration = ServiceConfiguration(
         host="x.y.com", port=1234, workers=10, tls_config=tls_config
-    )
+    )  # pyright: ignore[reportCallIssue]
 
     # don't start real Uvicorn server
     mocked_run = mocker.patch("uvicorn.run")
