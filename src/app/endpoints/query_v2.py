@@ -1053,17 +1053,10 @@ async def prepare_tools_for_responses_api(
 
         # Add RAG tools if vector stores are available
         if vector_store_ids:
-            # logger.info("query_request.solr: %s", query_request.solr)
             rag_tools = get_rag_tools(vector_store_ids)
             if rag_tools:
                 logger.info("rag_tool are: %s", rag_tools)
                 toolgroups.extend(rag_tools)
-                # if query_request.solr:
-                #     logger.info(
-                #         "RAG tools configured with Solr filters: %s", query_request.solr
-                #     )
-                # else:
-                #     logger.info("RAG tools configured without Solr filters")
             else:
                 logger.info("No RAG tools configured")
         else:

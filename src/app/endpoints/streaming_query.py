@@ -557,6 +557,7 @@ def _handle_heartbeat_event(
         media_type=media_type,
     )
 
+
 async def streaming_query_endpoint_handler_base(  # pylint: disable=too-many-locals,too-many-statements,too-many-arguments,too-many-positional-arguments
     request: Request,
     query_request: QueryRequest,

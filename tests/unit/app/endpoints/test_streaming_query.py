@@ -22,7 +22,6 @@ from constants import MEDIA_TYPE_JSON, MEDIA_TYPE_TEXT
 from models.requests import QueryRequest
 from models.responses import ReferencedDocument
 from utils.token_counter import TokenCounter
-from utils.types import TurnSummary
 
 # Note: content_delta module doesn't exist in llama-stack-client 0.3.x
 # These are mock classes for backward compatibility with Agent API tests
