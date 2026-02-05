@@ -40,7 +40,7 @@ MOCK_AUTH: AuthTuple = ("mock_user_id", "mock_username", False, "mock_token")
 def _create_mock_request(mocker: MockerFixture, rh_identity: Any = None) -> Any:
     """Create a mock FastAPI Request with optional RH Identity data."""
     mock_request = mocker.Mock()
-    mock_request.headers = {"User-Agent": "CLA/0.4.0"}
+    mock_request.headers = {"User-Agent": "CLA/0.4.1"}
 
     if rh_identity is not None:
         mock_request.state = mocker.Mock()
