@@ -533,10 +533,11 @@ class LlamaStackConfiguration(ConfigurationBase):
       - [Build AI Applications with Llama Stack](https://llamastack.github.io/)
     """
 
-    url: Optional[str] = Field(
+    url: Optional[AnyHttpUrl] = Field(
         None,
         title="Llama Stack URL",
-        description="URL to Llama Stack service; used when library mode is disabled",
+        description="URL to Llama Stack service; used when library mode is disabled. "
+        "Must be a valid HTTP or HTTPS URL.",
     )
 
     api_key: Optional[SecretStr] = Field(

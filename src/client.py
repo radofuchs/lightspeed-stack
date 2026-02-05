@@ -70,8 +70,10 @@ class AsyncLlamaStackClientHolder(metaclass=Singleton):
             "Using timeout of %d seconds for Llama Stack requests", config.timeout
         )
         api_key = config.api_key.get_secret_value() if config.api_key else None
+        # Convert AnyHttpUrl to string for the client
+        base_url = str(config.url) if config.url else None
         self._lsc = AsyncLlamaStackClient(
-            base_url=config.url, api_key=api_key, timeout=config.timeout
+            base_url=base_url, api_key=api_key, timeout=config.timeout
         )
 
     def _enrich_library_config(
