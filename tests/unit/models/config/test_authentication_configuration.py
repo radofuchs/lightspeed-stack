@@ -307,7 +307,7 @@ def test_authentication_configuration_in_config_noop() -> None:
         llama_stack=LlamaStackConfiguration(
             use_as_library_client=True,
             library_client_config_path="tests/configuration/run.yaml",
-            url="localhost",
+            url="http://localhost",
             api_key=SecretStr(""),
             timeout=60,
         ),
@@ -346,7 +346,7 @@ def test_authentication_configuration_skip_readiness_probe() -> None:
         llama_stack=LlamaStackConfiguration(
             use_as_library_client=True,
             library_client_config_path="tests/configuration/run.yaml",
-            url="localhost",
+            url="http://localhost",
             api_key=SecretStr(""),
             timeout=60,
         ),
@@ -393,7 +393,7 @@ def test_authentication_configuration_in_config_k8s() -> None:
         llama_stack=LlamaStackConfiguration(
             use_as_library_client=True,
             library_client_config_path="tests/configuration/run.yaml",
-            url="localhost",
+            url="http://localhost",
             api_key=SecretStr(""),
             timeout=60,
         ),
@@ -450,7 +450,7 @@ def test_authentication_configuration_in_config_rh_identity() -> None:
         llama_stack=LlamaStackConfiguration(
             use_as_library_client=True,
             library_client_config_path="tests/configuration/run.yaml",
-            url="localhost",
+            url="http://localhost",
             api_key=SecretStr(""),
             timeout=60,
         ),
@@ -497,7 +497,7 @@ def test_authentication_configuration_in_config_jwktoken() -> None:
         llama_stack=LlamaStackConfiguration(
             use_as_library_client=True,
             library_client_config_path="tests/configuration/run.yaml",
-            url="localhost",
+            url="http://localhost",
             api_key=SecretStr(""),
             timeout=60,
         ),
