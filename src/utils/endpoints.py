@@ -822,7 +822,9 @@ async def cleanup_after_streaming(
     persist_user_conversation_details_func(
         user_id=user_id,
         conversation_id=conversation_id,
-        model=model_id,
+        started_at=started_at,
+        completed_at=completed_at,
+        model_id=model_id,
         provider_id=provider_id,
         topic_summary=topic_summary,
     )
