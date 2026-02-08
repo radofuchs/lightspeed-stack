@@ -1,1 +1,3 @@
+"""Broken profile."""
+
 xyzzy
