@@ -15,6 +15,7 @@ from utils.suid import get_suid
 from models.database.conversations import UserConversation
 
 # number of records to be stored in database before benchmarks
+SMALL_DB_RECORDS_COUNT = 100
 MIDDLE_DB_RECORDS_COUNT = 1000
 LARGE_DB_RECORDS_COUNT = 10000
 
@@ -321,10 +322,12 @@ def benchmark_store_new_user_conversations(
         benchmark(store_new_user_conversation, session)
 
 
-def test_store_new_user_conversations_small_db(
+def test_store_new_user_conversations_empty_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against empty DB.
 
     Parameters:
         sqlite_database: Fixture that prepares a temporary SQLite DB.
@@ -336,10 +339,29 @@ def test_store_new_user_conversations_small_db(
     benchmark_store_new_user_conversations(benchmark, 0)
 
 
+def test_store_new_user_conversations_small_db(
+    sqlite_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against small DB.
+
+    Parameters:
+        sqlite_database: Fixture that prepares a temporary SQLite DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_store_new_user_conversations(benchmark, SMALL_DB_RECORDS_COUNT)
+
+
 def test_store_new_user_conversations_middle_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against middle-sized DB.
 
     Parameters:
         sqlite_database: Fixture that prepares a temporary SQLite DB.
@@ -355,6 +377,8 @@ def test_store_new_user_conversations_large_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against large DB.
 
     Parameters:
         sqlite_database: Fixture that prepares a temporary SQLite DB.
@@ -397,7 +421,7 @@ def benchmark_update_user_conversation(
         benchmark(update_user_conversation, session, "1234")
 
 
-def test_update_user_conversation_small_db(
+def test_update_user_conversation_empty_db(
     sqlite_database: None,
     benchmark: BenchmarkFixture,
 ) -> None:
@@ -411,6 +435,22 @@ def test_update_user_conversation_small_db(
         None
     """
     benchmark_update_user_conversation(benchmark, 0)
+
+
+def test_update_user_conversation_small_db(
+    sqlite_database: None,
+    benchmark: BenchmarkFixture,
+) -> None:
+    """Benchmark updating conversation on small database.
+
+    Parameters:
+        sqlite_database: Fixture that prepares a temporary SQLite DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_update_user_conversation(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
 def test_update_user_conversation_middle_db(
@@ -468,7 +508,7 @@ def benchmark_list_conversations_for_all_users(
         benchmark(list_conversation_for_all_users, session)
 
 
-def test_list_conversations_for_all_users_small_db(
+def test_list_conversations_for_all_users_empty_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on an empty database.
@@ -481,6 +521,21 @@ def test_list_conversations_for_all_users_small_db(
         None
     """
     benchmark_list_conversations_for_all_users(benchmark, 0)
+
+
+def test_list_conversations_for_all_users_small_db(
+    sqlite_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark listing conversations on small database.
+
+    Parameters:
+        sqlite_database: Fixture that prepares a temporary SQLite DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_list_conversations_for_all_users(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
 def test_list_conversations_for_all_users_middle_db(
