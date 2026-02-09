@@ -31,9 +31,8 @@ from models.responses import (
 )
 from models.rlsapi.requests import RlsapiV1InferRequest, RlsapiV1SystemInfo
 from models.rlsapi.responses import RlsapiV1InferData, RlsapiV1InferResponse
-from app.endpoints.query_v2 import get_mcp_tools
 from observability import InferenceEventData, build_inference_event, send_splunk_event
-from utils.responses import extract_text_from_response_output_item
+from utils.responses import extract_text_from_response_output_item, get_mcp_tools
 from utils.suid import get_suid
 
 logger = logging.getLogger(__name__)
@@ -149,7 +148,7 @@ async def retrieve_simple_response(
     """Retrieve a simple response from the LLM for a stateless query.
 
     Uses the Responses API for simple stateless inference, consistent with
-    other endpoints (query_v2, streaming_query_v2).
+    other endpoints (query, streaming_query).
 
     Args:
         question: The combined user input (question + context).
