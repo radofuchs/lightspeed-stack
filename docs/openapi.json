@@ -6975,14 +6975,16 @@
                     "url": {
                         "anyOf": [
                             {
-                                "type": "string"
+                                "type": "string",
+                                "minLength": 1,
+                                "format": "uri"
                             },
                             {
                                 "type": "null"
                             }
                         ],
                         "title": "Llama Stack URL",
-                        "description": "URL to Llama Stack service; used when library mode is disabled"
+                        "description": "URL to Llama Stack service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL."
                     },
                     "api_key": {
                         "anyOf": [
@@ -9401,6 +9403,13 @@
                     "type": {
                         "type": "string",
                         "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
                     }
                 },
                 "type": "object",
