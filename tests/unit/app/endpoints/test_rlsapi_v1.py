@@ -167,6 +167,55 @@ def test_build_instructions(
         assert not_expected not in result
 
 
+# --- Test _build_instructions with customization.system_prompt ---
+
+
+@pytest.mark.parametrize(
+    ("custom_prompt", "expected_prompt"),
+    [
+        pytest.param(
+            "You are a RHEL expert.",
+            "You are a RHEL expert.",
+            id="customization_system_prompt_set",
+        ),
+        pytest.param(
+            None,
+            constants.DEFAULT_SYSTEM_PROMPT,
+            id="customization_system_prompt_none",
+        ),
+    ],
+)
+def test_build_instructions_with_customization(
+    mocker: MockerFixture,
+    custom_prompt: str | None,
+    expected_prompt: str,
+) -> None:
+    """Test _build_instructions uses customization.system_prompt when set."""
+    mock_customization = mocker.Mock()
+    mock_customization.system_prompt = custom_prompt
+    mock_config = mocker.Mock()
+    mock_config.customization = mock_customization
+    mocker.patch("app.endpoints.rlsapi_v1.configuration", mock_config)
+
+    systeminfo = RlsapiV1SystemInfo(os="RHEL", version="9.3", arch="x86_64")
+    result = _build_instructions(systeminfo)
+
+    assert expected_prompt in result
+    assert "OS: RHEL" in result
+
+
+def test_build_instructions_no_customization(mocker: MockerFixture) -> None:
+    """Test _build_instructions falls back when customization is None."""
+    mock_config = mocker.Mock()
+    mock_config.customization = None
+    mocker.patch("app.endpoints.rlsapi_v1.configuration", mock_config)
+
+    systeminfo = RlsapiV1SystemInfo()
+    result = _build_instructions(systeminfo)
+
+    assert result == constants.DEFAULT_SYSTEM_PROMPT
+
+
 # --- Test _get_default_model_id ---
 
 
