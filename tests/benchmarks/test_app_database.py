@@ -303,6 +303,29 @@ def list_conversation_for_all_users(session: Session) -> None:
     assert len(user_conversations) >= 0
 
 
+def retrieve_conversation(
+    session: Session, conversation_id: str, should_be_none: bool
+) -> None:
+    """Query and assert retrieval of one conversation.
+
+    This helper function retrieves one given conversation from a database. It
+    is intended for use in a benchmark that measures the listing performance.
+
+    Parameters:
+        session (Session): SQLAlchemy session used to query conversations.
+
+    Returns:
+        None
+    """
+    query = session.query(UserConversation).filter_by(id=conversation_id)
+
+    conversation = query.first()
+    if should_be_none:
+        assert conversation is None
+    else:
+        assert conversation is not None
+
+
 def list_conversation_for_one_user(session: Session, user_id: str) -> None:
     """Query and assert retrieval of one user conversation.
 
@@ -676,3 +699,91 @@ def test_list_conversations_for_one_user_large_db(
         None
     """
     benchmark_list_conversations_for_one_user(benchmark, LARGE_DB_RECORDS_COUNT)
+
+
+def benchmark_retrieve_conversation(
+    benchmark: BenchmarkFixture, records_to_insert: int
+) -> None:
+    """Prepare DB and benchmark retrieving one conversation.
+
+    Pre-populates the DB with ``records_to_insert`` entries and benchmarks
+    the performance of querying and retrieving one UserConversation record.
+
+    Parameters:
+        benchmark (BenchmarkFixture): pytest-benchmark fixture to run the measurement.
+        records_to_insert (int): Number of records to pre-populate before benchmarking.
+
+    Returns:
+        None
+    """
+    with get_session() as session:
+        # store bunch of conversations first
+        for id in range(records_to_insert):
+            # use explicit conversation ID and also user ID
+            store_new_user_conversation(session, str(id), str(id))
+        # user ID somewhere in the middle of database
+        conversation_id = str(records_to_insert // 2)
+        # then perform the benchmark
+        benchmark(
+            retrieve_conversation, session, conversation_id, records_to_insert == 0
+        )
+
+
+def test_retrieve_conversation_empty_db(
+    sqlite_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on an empty database.
+
+    Parameters:
+        sqlite_database: Fixture that prepares a temporary SQLite DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, 0)
+
+
+def test_retrieve_conversation_small_db(
+    sqlite_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on a small database.
+
+    Parameters:
+        sqlite_database: Fixture that prepares a temporary SQLite DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, SMALL_DB_RECORDS_COUNT)
+
+
+def test_retrieve_conversation_middle_db(
+    sqlite_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on a medium-sized database.
+
+    Parameters:
+        sqlite_database: Fixture that prepares a temporary SQLite DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, MIDDLE_DB_RECORDS_COUNT)
+
+
+def test_retrieve_conversation_large_db(
+    sqlite_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on a large database.
+
+    Parameters:
+        sqlite_database: Fixture that prepares a temporary SQLite DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, LARGE_DB_RECORDS_COUNT)
