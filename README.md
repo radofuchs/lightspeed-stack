@@ -56,6 +56,9 @@ The service includes comprehensive user data collection capabilities for various
 * [RAG Configuration](#rag-configuration)
     * [Example configurations for inference](#example-configurations-for-inference)
 * [Usage](#usage)
+    * [CLI options](#cli-options)
+        * [Dumping configuration](#dumping-configuration)
+        * [Dumping configuration schema](#dumping-configuration-schema)
     * [Make targets](#make-targets)
     * [Running Linux container image](#running-linux-container-image)
     * [Building Container Images](#building-container-images)
@@ -730,6 +733,22 @@ options:
                         path to configuration file (default: lightspeed-stack.yaml)
 
 ```
+
+## CLI options
+
+### Dumping configuration
+
+If `--dump-configuration` CLI option is provided, LCORE writes the active
+configuration to a file named `configuration.json` and exits (exits with status
+1 on failure).
+
+### Dumping configuration schema
+
+If `--dump-schema` CLI option is provided, LCORE writes the active
+configuration schema to a file named `schema.json` and exits (exits with status
+1 on failure).
+
+
 
 ## Make targets
 
