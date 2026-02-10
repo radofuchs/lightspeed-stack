@@ -1,0 +1,39 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-pod-sa
+  namespace: e2e-rhoai-dsc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-pod-role
+  namespace: e2e-rhoai-dsc
+rules:
+  # Permissions to manage pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "apply"]
+  # Permissions to manage configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  # Permissions to check pod logs
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-pod-rolebinding
+  namespace: e2e-rhoai-dsc
+subjects:
+  - kind: ServiceAccount
+    name: test-pod-sa
+    namespace: e2e-rhoai-dsc
+roleRef:
+  kind: Role
+  name: test-pod-role
+  apiGroup: rbac.authorization.k8s.io

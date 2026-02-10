@@ -2,6 +2,8 @@
 set -euo pipefail
 trap 'echo "❌ Pipeline failed at line $LINENO"; exit 1' ERR
 
+# Signal to e2e tests that we're running in Prow/OpenShift
+export RUNNING_PROW=true
 
 #========================================
 # 1. GLOBAL CONFIG
@@ -214,11 +216,15 @@ oc expose pod lightspeed-stack-service \
   --type=ClusterIP \
   -n $NAMESPACE
 
+# Kill any existing process on port 8080
+echo "Checking for existing processes on port 8080..."
+lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+
 # Start port-forward to make service accessible locally
 echo "Starting port-forward..."
 oc port-forward svc/lightspeed-stack-service-svc 8080:8080 -n $NAMESPACE &
 PF_PID=$!
-sleep 5
+sleep 10
 
 export E2E_LSC_HOSTNAME="localhost"
 echo "LCS accessible at: http://$E2E_LSC_HOSTNAME:8080"
@@ -229,6 +235,9 @@ echo "LCS accessible at: http://$E2E_LSC_HOSTNAME:8080"
 # 9. RUN TESTS
 #========================================
 echo "===== Running E2E tests ====="
+
+# Ensure run-tests.sh is executable
+chmod +x ./run-tests.sh
 
 # Disable exit on error to capture test exit code
 set +e

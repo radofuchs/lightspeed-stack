@@ -12,7 +12,7 @@ spec:
             secretKeyRef:
               name: llama-stack-ip-secret
               key: key
-      image: quay.io/lightspeed-core/lightspeed-stack:dev-latest
+      image: quay.io/lightspeed-core/lightspeed-stack:0.3.1
       ports:
         - containerPort: 8080
       volumeMounts:
