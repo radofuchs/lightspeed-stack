@@ -13,10 +13,11 @@ from openai._exceptions import APIStatusError as OpenAIAPIStatusError
 from llama_stack_client.types import ModelListResponse, Shield
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from configuration import AppConfig, configuration
 from models.cache_entry import CacheEntry
 from models.config import Action
-from models.database.conversations import UserConversation
+from models.database.conversations import UserConversation, UserTurn
 import constants
 from models.requests import Attachment, QueryRequest
 from models.responses import (
@@ -330,8 +331,9 @@ def prepare_input(query_request: QueryRequest) -> str:
 def store_query_results(  # pylint: disable=too-many-arguments,too-many-locals
     user_id: str,
     conversation_id: str,
-    model_id: str,
+    model: str,
     started_at: str,
+    completed_at: str,
     summary: TurnSummary,
     query_request: QueryRequest,
     configuration: AppConfig,
@@ -349,8 +351,9 @@ def store_query_results(  # pylint: disable=too-many-arguments,too-many-locals
     Args:
         user_id: The authenticated user ID
         conversation_id: The conversation ID
-        model_id: The model identifier
+        model: The model identifier
         started_at: ISO formatted timestamp when the request started
+        completed_at: ISO formatted timestamp when the request completed
         summary: Summary of the turn including LLM response and tool calls
         query_request: The original query request
         configuration: Application configuration
@@ -360,7 +363,7 @@ def store_query_results(  # pylint: disable=too-many-arguments,too-many-locals
     Raises:
         HTTPException: On any database, cache, or IO errors during processing
     """
-    provider, model = extract_provider_and_model_from_model_id(model_id)
+    provider_id, model_id = extract_provider_and_model_from_model_id(model)
     # Store transcript if enabled
     if is_transcripts_enabled():
         try:
@@ -370,8 +373,8 @@ def store_query_results(  # pylint: disable=too-many-arguments,too-many-locals
             store_transcript(
                 user_id=user_id,
                 conversation_id=conversation_id,
-                model_id=model,
-                provider_id=provider,
+                model_id=model_id,
+                provider_id=provider_id,
                 query_is_valid=True,  # TODO(lucasagomes): implement as part of query validation
                 query=query_request.query,
                 query_request=query_request,
@@ -394,8 +397,10 @@ def store_query_results(  # pylint: disable=too-many-arguments,too-many-locals
         persist_user_conversation_details(
             user_id=user_id,
             conversation_id=conversation_id,
-            model=model,
-            provider_id=provider,
+            started_at=started_at,
+            completed_at=completed_at,
+            model_id=model_id,
+            provider_id=provider_id,
             topic_summary=topic_summary,
         )
     except SQLAlchemyError as e:
@@ -405,12 +410,11 @@ def store_query_results(  # pylint: disable=too-many-arguments,too-many-locals
 
     # Store conversation in cache
     try:
-        completed_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         cache_entry = CacheEntry(
             query=query_request.query,
             response=summary.llm_response,
-            provider=provider,
-            model=model,
+            provider=provider_id,
+            model=model_id,
             started_at=started_at,
             completed_at=completed_at,
             referenced_documents=summary.referenced_documents,
@@ -484,7 +488,9 @@ def is_transcripts_enabled() -> bool:
 def persist_user_conversation_details(
     user_id: str,
     conversation_id: str,
-    model: str,
+    started_at: str,
+    completed_at: str,
+    model_id: str,
     provider_id: str,
     topic_summary: Optional[str],
 ) -> None:
@@ -493,7 +499,9 @@ def persist_user_conversation_details(
     Args:
         user_id: The authenticated user ID
         conversation_id: The conversation ID
-        model: The model identifier
+        started_at: The timestamp when the conversation started
+        completed_at: The timestamp when the conversation completed
+        model_id: The model identifier
         provider_id: The provider identifier
         topic_summary: Optional topic summary for the conversation
     """
@@ -515,7 +523,7 @@ def persist_user_conversation_details(
             conversation = UserConversation(
                 id=normalized_id,
                 user_id=user_id,
-                last_used_model=model,
+                last_used_model=model_id,
                 last_used_provider=provider_id,
                 topic_summary=topic_summary or "",
                 message_count=1,
@@ -525,7 +533,7 @@ def persist_user_conversation_details(
                 "Associated conversation %s to user %s", normalized_id, user_id
             )
         else:
-            existing_conversation.last_used_model = model
+            existing_conversation.last_used_model = model_id
             existing_conversation.last_used_provider = provider_id
             existing_conversation.last_message_at = datetime.now(UTC)
             existing_conversation.message_count += 1
@@ -535,6 +543,27 @@ def persist_user_conversation_details(
                 user_id,
                 existing_conversation.message_count,
             )
+
+        max_turn_number = (
+            session.query(func.max(UserTurn.turn_number))
+            .filter_by(conversation_id=normalized_id)
+            .scalar()
+        )
+        turn_number = (max_turn_number or 0) + 1
+        turn = UserTurn(
+            conversation_id=normalized_id,
+            turn_number=turn_number,
+            started_at=datetime.fromisoformat(started_at),
+            completed_at=datetime.fromisoformat(completed_at),
+            provider=provider_id,
+            model=model_id,
+        )
+        session.add(turn)
+        logger.debug(
+            "Created conversation turn - Conversation: %s, Turn: %d",
+            normalized_id,
+            turn_number,
+        )
 
         session.commit()
         logger.debug(
