@@ -1,6 +1,9 @@
 """Unit tests for utils/query.py functions."""
 
+# pylint: disable=too-many-lines
+
 import sqlite3
+from typing import Any
 
 import psycopg2
 import pytest
@@ -14,13 +17,14 @@ from cache.cache_error import CacheError
 from configuration import AppConfig
 from models.cache_entry import CacheEntry
 from models.config import Action
-from models.database.conversations import UserConversation
+from models.database.conversations import UserConversation, UserTurn
 from models.requests import Attachment, QueryRequest
 from models.responses import (
     InternalServerErrorResponse,
     PromptTooLongResponse,
     QuotaExceededResponse,
 )
+
 from tests.unit import config_dict
 from utils.query import (
     consume_query_tokens,
@@ -522,11 +526,27 @@ class TestIsTranscriptsEnabled:
 class TestPersistUserConversationDetails:
     """Tests for persist_user_conversation_details function."""
 
-    @pytest.mark.asyncio
-    async def test_create_new_conversation(self, mocker: MockerFixture) -> None:
+    def test_create_new_conversation(self, mocker: MockerFixture) -> None:
         """Test creating a new conversation."""
         mock_session = mocker.Mock()
-        mock_session.query.return_value.filter_by.return_value.first.return_value = None
+
+        # Mock the UserConversation query
+        mock_conv_query = mocker.Mock()
+        mock_conv_query.filter_by.return_value.first.return_value = None
+
+        # Mock the max turn number query
+        mock_filtered_query = mocker.Mock()
+        mock_filtered_query.scalar.return_value = None
+        mock_max_query = mocker.Mock()
+        mock_max_query.filter_by.return_value = mock_filtered_query
+
+        def query_side_effect(*args: Any) -> Any:
+            """Route queries based on the argument type."""
+            if args and args[0] is UserConversation:
+                return mock_conv_query
+            return mock_max_query
+
+        mock_session.query.side_effect = query_side_effect
         mock_session.__enter__ = mocker.Mock(return_value=mock_session)
         mock_session.__exit__ = mocker.Mock(return_value=None)
         mocker.patch("utils.query.get_session", return_value=mock_session)
@@ -534,16 +554,17 @@ class TestPersistUserConversationDetails:
         persist_user_conversation_details(
             user_id="user1",
             conversation_id="conv1",
-            model="model1",
+            started_at="2024-01-01T00:00:00Z",
+            completed_at="2024-01-01T00:00:05Z",
+            model_id="model1",
             provider_id="provider1",
             topic_summary="Topic",
         )
 
-        mock_session.add.assert_called_once()
+        mock_session.add.assert_called()
         mock_session.commit.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_update_existing_conversation(self, mocker: MockerFixture) -> None:
+    def test_update_existing_conversation(self, mocker: MockerFixture) -> None:
         """Test updating an existing conversation."""
         existing_conv = UserConversation(
             id="conv1",
@@ -553,9 +574,26 @@ class TestPersistUserConversationDetails:
             message_count=5,
         )
         mock_session = mocker.Mock()
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            existing_conv
-        )
+
+        # Mock the UserConversation query
+        mock_conv_query = mocker.Mock()
+        mock_conv_query.filter_by.return_value.first.return_value = existing_conv
+
+        # Mock the max turn number query
+        # The query chain is: session.query(func.max(...)).filter_by(...).scalar()
+        mock_filtered_query = mocker.Mock()
+        mock_filtered_query.scalar.return_value = None
+        mock_max_query = mocker.Mock()
+        mock_max_query.filter_by.return_value = mock_filtered_query
+
+        def query_side_effect(*args: Any) -> Any:
+            """Route queries based on the argument type."""
+            if args and args[0] is UserConversation:
+                return mock_conv_query
+            # func.max(UserTurn.turn_number) doesn't match UserTurn type, falls through
+            return mock_max_query
+
+        mock_session.query.side_effect = query_side_effect
         mock_session.__enter__ = mocker.Mock(return_value=mock_session)
         mock_session.__exit__ = mocker.Mock(return_value=None)
         mocker.patch("utils.query.get_session", return_value=mock_session)
@@ -563,7 +601,9 @@ class TestPersistUserConversationDetails:
         persist_user_conversation_details(
             user_id="user1",
             conversation_id="conv1",
-            model="new_model",
+            started_at="2024-01-01T00:00:00Z",
+            completed_at="2024-01-01T00:00:05Z",
+            model_id="new_model",
             provider_id="new_provider",
             topic_summary=None,
         )
@@ -571,6 +611,62 @@ class TestPersistUserConversationDetails:
         assert existing_conv.last_used_model == "new_model"
         assert existing_conv.last_used_provider == "new_provider"
         assert existing_conv.message_count == 6
+        mock_session.commit.assert_called_once()
+
+    def test_create_new_conversation_with_existing_turns(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test creating a new conversation when there are existing turns."""
+        mock_session = mocker.Mock()
+
+        # Mock the UserConversation query
+        mock_conv_query = mocker.Mock()
+        mock_conv_query.filter_by.return_value.first.return_value = None
+
+        # Mock the max turn number query - return existing turn number
+        mock_filtered_query = mocker.Mock()
+        mock_filtered_query.scalar.return_value = 5  # Existing max turn number
+        mock_max_query = mocker.Mock()
+        mock_max_query.filter_by.return_value = mock_filtered_query
+
+        def query_side_effect(*args: Any) -> Any:
+            """Route queries based on the argument type."""
+            if args and args[0] is UserConversation:
+                return mock_conv_query
+            # func.max(UserTurn.turn_number) doesn't match UserTurn type, falls through
+            return mock_max_query
+
+        mock_session.query.side_effect = query_side_effect
+        mock_session.__enter__ = mocker.Mock(return_value=mock_session)
+        mock_session.__exit__ = mocker.Mock(return_value=None)
+        mocker.patch("utils.query.get_session", return_value=mock_session)
+
+        persist_user_conversation_details(
+            user_id="user1",
+            conversation_id="conv1",
+            started_at="2024-01-01T00:00:00Z",
+            completed_at="2024-01-01T00:00:05Z",
+            model_id="model1",
+            provider_id="provider1",
+            topic_summary="Topic",
+        )
+
+        # Verify that the turn number is incremented correctly
+        add_calls = mock_session.add.call_args_list
+        assert len(add_calls) == 2  # Conversation and UserTurn
+
+        # Find the UserTurn object in the add calls
+        turn_added = None
+        for call in add_calls:
+            obj = call[0][0]
+            if isinstance(obj, UserTurn):
+                turn_added = obj
+                break
+
+        assert turn_added is not None, "UserTurn should have been added"
+        assert (
+            turn_added.turn_number == 6
+        ), "Turn number should be incremented from 5 to 6"
         mock_session.commit.assert_called_once()
 
 
@@ -729,8 +825,9 @@ class TestStoreQueryResults:
         store_query_results(
             user_id="user1",
             conversation_id="conv1",
-            model_id="provider1/model1",
+            model="provider1/model1",
             started_at="2024-01-01T00:00:00Z",
+            completed_at="2024-01-01T00:00:05Z",
             summary=summary,
             query_request=query_request,
             configuration=mock_config,
@@ -759,8 +856,9 @@ class TestStoreQueryResults:
             store_query_results(
                 user_id="user1",
                 conversation_id="conv1",
-                model_id="provider1/model1",
+                model="provider1/model1",
                 started_at="2024-01-01T00:00:00Z",
+                completed_at="2024-01-01T00:00:05Z",
                 summary=summary,
                 query_request=query_request,
                 configuration=mock_config,
@@ -789,8 +887,9 @@ class TestStoreQueryResults:
             store_query_results(
                 user_id="user1",
                 conversation_id="conv1",
-                model_id="provider1/model1",
+                model="provider1/model1",
                 started_at="2024-01-01T00:00:00Z",
+                completed_at="2024-01-01T00:00:05Z",
                 summary=summary,
                 query_request=query_request,
                 configuration=mock_config,
@@ -820,8 +919,9 @@ class TestStoreQueryResults:
             store_query_results(
                 user_id="user1",
                 conversation_id="conv1",
-                model_id="provider1/model1",
+                model="provider1/model1",
                 started_at="2024-01-01T00:00:00Z",
+                completed_at="2024-01-01T00:00:05Z",
                 summary=summary,
                 query_request=query_request,
                 configuration=mock_config,
@@ -851,8 +951,9 @@ class TestStoreQueryResults:
             store_query_results(
                 user_id="user1",
                 conversation_id="conv1",
-                model_id="provider1/model1",
+                model="provider1/model1",
                 started_at="2024-01-01T00:00:00Z",
+                completed_at="2024-01-01T00:00:05Z",
                 summary=summary,
                 query_request=query_request,
                 configuration=mock_config,
@@ -882,8 +983,9 @@ class TestStoreQueryResults:
             store_query_results(
                 user_id="user1",
                 conversation_id="conv1",
-                model_id="provider1/model1",
+                model="provider1/model1",
                 started_at="2024-01-01T00:00:00Z",
+                completed_at="2024-01-01T00:00:05Z",
                 summary=summary,
                 query_request=query_request,
                 configuration=mock_config,
@@ -913,8 +1015,9 @@ class TestStoreQueryResults:
             store_query_results(
                 user_id="user1",
                 conversation_id="conv1",
-                model_id="provider1/model1",
+                model="provider1/model1",
                 started_at="2024-01-01T00:00:00Z",
+                completed_at="2024-01-01T00:00:05Z",
                 summary=summary,
                 query_request=query_request,
                 configuration=mock_config,
