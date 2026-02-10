@@ -247,6 +247,24 @@
                 "summary": "Models Endpoint Handler",
                 "description": "Handle requests to the /models endpoint.\n\nProcess GET requests to the /models endpoint, returning a list of available\nmodels from the Llama Stack service.\n\nRaises:\n    HTTPException: If unable to connect to the Llama Stack server or if\n    model retrieval fails for any reason.\n\nReturns:\n    ModelsResponse: An object containing the list of available models.",
                 "operationId": "models_endpoint_handler_v1_models_get",
+                "parameters": [
+                    {
+                        "name": "model_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Model Type"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -275,9 +293,6 @@
                         "description": "Unauthorized",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/UnauthorizedResponse"
-                                },
                                 "examples": {
                                     "missing header": {
                                         "value": {
@@ -295,6 +310,9 @@
                                             }
                                         }
                                     }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponse"
                                 }
                             }
                         }
@@ -303,9 +321,6 @@
                         "description": "Permission denied",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ForbiddenResponse"
-                                },
                                 "examples": {
                                     "endpoint": {
                                         "value": {
@@ -315,6 +330,9 @@
                                             }
                                         }
                                     }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenResponse"
                                 }
                             }
                         }
@@ -323,9 +341,6 @@
                         "description": "Internal server error",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/InternalServerErrorResponse"
-                                },
                                 "examples": {
                                     "configuration": {
                                         "value": {
@@ -335,6 +350,9 @@
                                             }
                                         }
                                     }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponse"
                                 }
                             }
                         }
@@ -343,9 +361,6 @@
                         "description": "Service unavailable",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ServiceUnavailableResponse"
-                                },
                                 "examples": {
                                     "llama stack": {
                                         "value": {
@@ -355,6 +370,19 @@
                                             }
                                         }
                                     }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServiceUnavailableResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
                                 }
                             }
                         }
