@@ -258,6 +258,11 @@ Returns:
 
 
 
+### 🔗 Parameters
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| model_type |  | False |  |
 
 
 ### ✅ Responses
@@ -345,6 +350,7 @@ Examples
 }
 ```
  |
+| 422 | Validation Error | [HTTPValidationError](#httpvalidationerror) |
 ## GET `/v1/tools`
 
 > **Tools Endpoint Handler**
@@ -1119,15 +1125,26 @@ Examples
 | 422 | Validation Error | [HTTPValidationError](#httpvalidationerror) |
 ## POST `/v1/query`
 
-> **Query Endpoint Handler V1**
+> **Query Endpoint Handler**
 
 Handle request to the /query endpoint using Responses API.
 
-This is a wrapper around query_endpoint_handler_base that provides
-the Responses API specific retrieve_response and get_topic_summary functions.
+Processes a POST request to a query endpoint, forwarding the
+user's query to a selected Llama Stack LLM and returning the generated response.
 
 Returns:
     QueryResponse: Contains the conversation ID and the LLM-generated response.
+
+Raises:
+    HTTPException:
+        - 401: Unauthorized - Missing or invalid credentials
+        - 403: Forbidden - Insufficient permissions or model override not allowed
+        - 404: Not Found - Conversation, model, or provider not found
+        - 413: Prompt too long - Prompt exceeded model's context window size
+        - 422: Unprocessable Entity - Request validation failed
+        - 429: Quota limit exceeded - The token quota for model or user has been exceeded
+        - 500: Internal Server Error - Configuration not loaded or other server errors
+        - 503: Service Unavailable - Unable to connect to Llama Stack backend
 
 
 
@@ -1253,6 +1270,23 @@ Examples
 }
 ```
  |
+| 413 | Prompt is too long | [PromptTooLongResponse](#prompttoolongresponse)
+
+Examples
+
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "The prompt exceeds the maximum allowed length.",
+    "response": "Prompt is too long"
+  }
+}
+```
+ |
 | 422 | Request validation failed | [UnprocessableEntityResponse](#unprocessableentityresponse)
 
 Examples
@@ -1288,7 +1322,7 @@ Examples
 ```json
 {
   "detail": {
-    "cause": "Invalid attatchment type: must be one of ['text/plain', 'application/json', 'application/yaml', 'application/xml']",
+    "cause": "Invalid attachment type: must be one of ['text/plain', 'application/json', 'application/yaml', 'application/xml']",
     "response": "Invalid attribute value"
   }
 }
@@ -1419,7 +1453,7 @@ Examples
  |
 ## POST `/v1/streaming_query`
 
-> **Streaming Query Endpoint Handler V1**
+> **Streaming Query Endpoint Handler**
 
 Handle request to the /streaming_query endpoint using Responses API.
 
@@ -1427,17 +1461,16 @@ Returns a streaming response using Server-Sent Events (SSE) format with
 content type text/event-stream.
 
 Returns:
-    StreamingResponse: An HTTP streaming response yielding
-    SSE-formatted events for the query lifecycle with content type
-    text/event-stream.
+    SSE-formatted events for the query lifecycle.
 
 Raises:
     HTTPException:
         - 401: Unauthorized - Missing or invalid credentials
         - 403: Forbidden - Insufficient permissions or model override not allowed
         - 404: Not Found - Conversation, model, or provider not found
+        - 413: Prompt too long - Prompt exceeded model's context window size
         - 422: Unprocessable Entity - Request validation failed
-        - 429: Too Many Requests - Quota limit exceeded
+        - 429: Quota limit exceeded - The token quota for model or user has been exceeded
         - 500: Internal Server Error - Configuration not loaded or other server errors
         - 503: Service Unavailable - Unable to connect to Llama Stack backend
 
@@ -1565,6 +1598,23 @@ Examples
 }
 ```
  |
+| 413 | Prompt is too long | [PromptTooLongResponse](#prompttoolongresponse)
+
+Examples
+
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "The prompt exceeds the maximum allowed length.",
+    "response": "Prompt is too long"
+  }
+}
+```
+ |
 | 422 | Request validation failed | [UnprocessableEntityResponse](#unprocessableentityresponse)
 
 Examples
@@ -1600,7 +1650,7 @@ Examples
 ```json
 {
   "detail": {
-    "cause": "Invalid attatchment type: must be one of ['text/plain', 'application/json', 'application/yaml', 'application/xml']",
+    "cause": "Invalid attachment type: must be one of ['text/plain', 'application/json', 'application/yaml', 'application/xml']",
     "response": "Invalid attribute value"
   }
 }
@@ -3287,7 +3337,7 @@ Examples
 ```json
 {
   "detail": {
-    "cause": "Invalid attatchment type: must be one of ['text/plain', 'application/json', 'application/yaml', 'application/xml']",
+    "cause": "Invalid attachment type: must be one of ['text/plain', 'application/json', 'application/yaml', 'application/xml']",
     "response": "Invalid attribute value"
   }
 }
@@ -5041,6 +5091,18 @@ Useful resources:
 | ca_cert_path |  | Path to CA certificate |
 
 
+## PromptTooLongResponse
+
+
+413 Payload Too Large - Prompt is too long.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| status_code | integer |  |
+| detail |  |  |
+
+
 ## ProviderHealthStatus
 
 
@@ -5147,7 +5209,7 @@ Attributes:
 | response | string | Response from LLM |
 | rag_chunks | array | Deprecated: List of RAG chunks used to generate the response. |
 | referenced_documents | array | List of documents referenced in generating the response |
-| truncated | boolean | Whether conversation history was truncated |
+| truncated | boolean | Deprecated:Whether conversation history was truncated |
 | input_tokens | integer | Number of tokens sent to LLM |
 | output_tokens | integer | Number of tokens received from LLM |
 | available_quotas | object | Quota available as measured by all configured quota limiters |

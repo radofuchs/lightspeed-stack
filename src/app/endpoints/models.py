@@ -1,7 +1,7 @@
 """Handler for REST API call to list available models."""
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.params import Depends
@@ -57,7 +57,6 @@ def parse_llama_stack_model(model: Any) -> dict[str, Any]:
         "provider_resource_id": str(custom_metadata.get("provider_resource_id", "")),
         "model_type": model_type,
     }
-
     return legacy_model
 
 
@@ -77,6 +76,7 @@ models_responses: dict[int | str, dict[str, Any]] = {
 async def models_endpoint_handler(
     request: Request,
     auth: Annotated[AuthTuple, Depends(get_auth_dependency())],
+    model_type: Optional[str] = None,
 ) -> ModelsResponse:
     """
     Handle requests to the /models endpoint.
@@ -107,8 +107,16 @@ async def models_endpoint_handler(
         client = AsyncLlamaStackClientHolder().get_client()
         # retrieve models
         models = await client.models.list()
-        # Parse models to legacy format
+
+        # parse models to legacy format
         parsed_models = [parse_llama_stack_model(model) for model in models]
+
+        # optional filtering by model type
+        if model_type is not None:
+            parsed_models = [
+                model for model in parsed_models if model["model_type"] == model_type
+            ]
+
         return ModelsResponse(models=parsed_models)
 
     # Connection to Llama Stack server failed
