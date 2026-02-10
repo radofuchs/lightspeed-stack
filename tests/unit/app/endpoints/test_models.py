@@ -13,6 +13,19 @@ from configuration import AppConfig
 from tests.unit.utils.auth_helpers import mock_authorization_resolvers
 
 
+# pylint: disable=R0903
+class Model:
+    """Model information returned in response."""
+
+    def __init__(self, model_id: str, provider_id: str, model_type: str) -> None:
+        """Initialize model information."""
+        self.id = model_id
+        self.custom_metadata = {
+            "model_type": model_type,
+            "provider_id": provider_id,
+        }
+
+
 @pytest.mark.asyncio
 async def test_models_endpoint_handler_configuration_not_loaded(
     mocker: MockerFixture,
@@ -162,6 +175,220 @@ async def test_models_endpoint_handler_unable_to_retrieve_models_list(
 
     response = await models_endpoint_handler(request=request, auth=auth)
     assert response is not None
+
+
+@pytest.mark.asyncio
+async def test_models_endpoint_handler_model_type_query_parameter(
+    mocker: MockerFixture,
+) -> None:
+    """Test the models endpoint handler if model_type query parameter is specified."""
+    mock_authorization_resolvers(mocker)
+
+    # configuration for tests
+    config_dict: dict[str, Any] = {
+        "name": "foo",
+        "service": {
+            "host": "localhost",
+            "port": 8080,
+            "auth_enabled": False,
+            "workers": 1,
+            "color_log": True,
+            "access_log": True,
+        },
+        "llama_stack": {
+            "api_key": "xyzzy",
+            "url": "http://x.y.com:1234",
+            "use_as_library_client": False,
+        },
+        "user_data_collection": {
+            "feedback_enabled": False,
+        },
+        "customization": None,
+        "authorization": {"access_rules": []},
+        "authentication": {"module": "noop"},
+    }
+    cfg = AppConfig()
+    cfg.init_from_dict(config_dict)
+
+    # Mock the LlamaStack client
+    mock_client = mocker.AsyncMock()
+    mock_client.models.list.return_value = []
+    mock_lsc = mocker.patch(
+        "app.endpoints.models.AsyncLlamaStackClientHolder.get_client"
+    )
+    mock_lsc.return_value = mock_client
+    mock_config = mocker.Mock()
+    mocker.patch("app.endpoints.models.configuration", mock_config)
+
+    request = Request(
+        scope={
+            "type": "http",
+            "headers": [(b"authorization", b"Bearer invalid-token")],
+        }
+    )
+
+    # Authorization tuple required by URL endpoint handler
+    auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
+    response = await models_endpoint_handler(
+        request=request, auth=auth, model_type="llm"
+    )
+    assert response is not None
+
+
+@pytest.mark.asyncio
+async def test_models_endpoint_handler_model_list_retrieved(
+    mocker: MockerFixture,
+) -> None:
+    """Test the models endpoint handler if model list can be retrieved."""
+    mock_authorization_resolvers(mocker)
+
+    # configuration for tests
+    config_dict: dict[str, Any] = {
+        "name": "foo",
+        "service": {
+            "host": "localhost",
+            "port": 8080,
+            "auth_enabled": False,
+            "workers": 1,
+            "color_log": True,
+            "access_log": True,
+        },
+        "llama_stack": {
+            "api_key": "xyzzy",
+            "url": "http://x.y.com:1234",
+            "use_as_library_client": False,
+        },
+        "user_data_collection": {
+            "feedback_enabled": False,
+        },
+        "customization": None,
+        "authorization": {"access_rules": []},
+        "authentication": {"module": "noop"},
+    }
+    cfg = AppConfig()
+    cfg.init_from_dict(config_dict)
+
+    # Mock the LlamaStack client
+    mock_client = mocker.AsyncMock()
+    mock_client.models.list.return_value = [
+        Model("model1", "provider1", "llm"),
+        Model("model2", "provider2", "embedding"),
+        Model("model3", "provider3", "llm"),
+        Model("model4", "provider4", "embedding"),
+    ]
+    mock_lsc = mocker.patch(
+        "app.endpoints.models.AsyncLlamaStackClientHolder.get_client"
+    )
+    mock_lsc.return_value = mock_client
+    mock_config = mocker.Mock()
+    mocker.patch("app.endpoints.models.configuration", mock_config)
+
+    request = Request(
+        scope={
+            "type": "http",
+            "headers": [(b"authorization", b"Bearer invalid-token")],
+        }
+    )
+
+    # Authorization tuple required by URL endpoint handler
+    auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
+
+    response = await models_endpoint_handler(request=request, auth=auth)
+    assert response is not None
+    assert len(response.models) == 4
+    assert response.models[0]["identifier"] == "model1"
+    assert response.models[0]["model_type"] == "llm"
+    assert response.models[1]["identifier"] == "model2"
+    assert response.models[1]["model_type"] == "embedding"
+    assert response.models[2]["identifier"] == "model3"
+    assert response.models[2]["model_type"] == "llm"
+    assert response.models[3]["identifier"] == "model4"
+    assert response.models[3]["model_type"] == "embedding"
+
+
+@pytest.mark.asyncio
+async def test_models_endpoint_handler_model_list_retrieved_with_query_parameter(
+    mocker: MockerFixture,
+) -> None:
+    """Test the models endpoint handler if model list can be retrieved."""
+    mock_authorization_resolvers(mocker)
+
+    # configuration for tests
+    config_dict: dict[str, Any] = {
+        "name": "foo",
+        "service": {
+            "host": "localhost",
+            "port": 8080,
+            "auth_enabled": False,
+            "workers": 1,
+            "color_log": True,
+            "access_log": True,
+        },
+        "llama_stack": {
+            "api_key": "xyzzy",
+            "url": "http://x.y.com:1234",
+            "use_as_library_client": False,
+        },
+        "user_data_collection": {
+            "feedback_enabled": False,
+        },
+        "customization": None,
+        "authorization": {"access_rules": []},
+        "authentication": {"module": "noop"},
+    }
+    cfg = AppConfig()
+    cfg.init_from_dict(config_dict)
+
+    # Mock the LlamaStack client
+    mock_client = mocker.AsyncMock()
+    mock_client.models.list.return_value = [
+        Model("model1", "provider1", "llm"),
+        Model("model2", "provider2", "embedding"),
+        Model("model3", "provider3", "llm"),
+        Model("model4", "provider4", "embedding"),
+    ]
+    mock_lsc = mocker.patch(
+        "app.endpoints.models.AsyncLlamaStackClientHolder.get_client"
+    )
+    mock_lsc.return_value = mock_client
+    mock_config = mocker.Mock()
+    mocker.patch("app.endpoints.models.configuration", mock_config)
+
+    request = Request(
+        scope={
+            "type": "http",
+            "headers": [(b"authorization", b"Bearer invalid-token")],
+        }
+    )
+
+    # Authorization tuple required by URL endpoint handler
+    auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
+
+    response = await models_endpoint_handler(
+        request=request, auth=auth, model_type="llm"
+    )
+    assert response is not None
+    assert len(response.models) == 2
+    assert response.models[0]["identifier"] == "model1"
+    assert response.models[0]["model_type"] == "llm"
+    assert response.models[1]["identifier"] == "model3"
+    assert response.models[1]["model_type"] == "llm"
+
+    response = await models_endpoint_handler(
+        request=request, auth=auth, model_type="embedding"
+    )
+    assert response is not None
+    assert len(response.models) == 2
+    assert response.models[0]["identifier"] == "model2"
+    assert response.models[0]["model_type"] == "embedding"
+    assert response.models[1]["identifier"] == "model4"
+    assert response.models[1]["model_type"] == "embedding"
+
+    response = await models_endpoint_handler(
+        request=request, auth=auth, model_type="xyzzy"
+    )
+    assert response is not None
+    assert len(response.models) == 0
 
 
 @pytest.mark.asyncio
