@@ -55,11 +55,6 @@ logger = logging.getLogger("app.endpoints.handlers")
 router = APIRouter(tags=["query"])
 
 
-# When OFFLINE is False, use reference_url for chunk source
-# When OFFLINE is True, use parent_id for chunk source
-# TODO: move this setting to a higher level configuration
-OFFLINE = True
-
 query_response: dict[int | str, dict[str, Any]] = {
     200: QueryResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(
