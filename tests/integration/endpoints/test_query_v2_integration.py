@@ -16,8 +16,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.database
-import app.endpoints.query
-from app.endpoints.query_v2 import query_endpoint_handler_v2
+import app.endpoints.query_old
+from app.endpoints.query import query_endpoint_handler_v2
 from authentication.interface import AuthTuple
 from configuration import AppConfig
 from models.cache_entry import CacheEntry
@@ -861,7 +861,7 @@ async def test_query_v2_endpoint_creates_valid_cache_entry(
     _ = mock_llama_stack_client
     _ = patch_db_session
 
-    cache_spy = mocker.spy(app.endpoints.query, "store_conversation_into_cache")
+    cache_spy = mocker.spy(app.endpoints.query_old, "store_conversation_into_cache")
 
     query_request = QueryRequest(query="What is Ansible?")
 
@@ -1153,8 +1153,8 @@ async def test_query_v2_endpoint_quota_integration(
 
     mock_llama_stack_client.responses.create.return_value = mock_response
 
-    mock_consume = mocker.spy(app.endpoints.query, "consume_tokens")
-    _ = mocker.spy(app.endpoints.query, "get_available_quotas")
+    mock_consume = mocker.spy(app.endpoints.query_old, "consume_tokens")
+    _ = mocker.spy(app.endpoints.query_old, "get_available_quotas")
 
     query_request = QueryRequest(query="What is Ansible?")
 

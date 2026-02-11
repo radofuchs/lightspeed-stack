@@ -36,11 +36,11 @@ from llama_stack_client import APIConnectionError
 from starlette.responses import Response, StreamingResponse
 
 from a2a_storage import A2AContextStore, A2AStorageFactory
-from app.endpoints.query import (
+from app.endpoints.query_old import (
     evaluate_model_hints,
     select_model_and_provider_id,
 )
-from app.endpoints.streaming_query_v2 import retrieve_response
+from app.endpoints.streaming_query import retrieve_response
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
