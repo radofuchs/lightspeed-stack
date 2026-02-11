@@ -16,6 +16,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    field_validator,
     model_validator,
     FilePath,
     AnyHttpUrl,
@@ -405,6 +406,36 @@ class ServiceConfiguration(ConfigurationBase):
         title="TLS configuration",
         description="Transport Layer Security configuration for HTTPS support",
     )
+
+    root_path: str = Field(
+        "",
+        title="Root path",
+        description="ASGI root path for serving behind a reverse proxy on a subpath",
+    )
+
+    @field_validator("root_path")
+    @classmethod
+    def validate_root_path(cls, value: str) -> str:
+        """Validate root_path format.
+
+        Ensures the root path is either empty or starts with a leading
+        slash and does not end with a trailing slash.
+
+        Parameters:
+            value: The root path value to validate.
+
+        Returns:
+            The validated root path value.
+
+        Raises:
+            ValueError: If root_path is missing a leading slash or has
+                a trailing slash.
+        """
+        if value and not value.startswith("/"):
+            raise ValueError("root_path must start with '/'")
+        if value.endswith("/"):
+            raise ValueError("root_path must not end with '/'")
+        return value
 
     cors: CORSConfiguration = Field(
         default_factory=lambda: CORSConfiguration(
