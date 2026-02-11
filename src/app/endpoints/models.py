@@ -1,9 +1,9 @@
 """Handler for REST API call to list available models."""
 
 import logging
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from fastapi.params import Depends
 from llama_stack_client import APIConnectionError
 
@@ -13,6 +13,7 @@ from authorization.middleware import authorize
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from models.config import Action
+from models.requests import ModelFilter
 from models.responses import (
     ForbiddenResponse,
     InternalServerErrorResponse,
@@ -76,13 +77,18 @@ models_responses: dict[int | str, dict[str, Any]] = {
 async def models_endpoint_handler(
     request: Request,
     auth: Annotated[AuthTuple, Depends(get_auth_dependency())],
-    model_type: Optional[str] = None,
+    model_type: Annotated[ModelFilter, Query()],
 ) -> ModelsResponse:
     """
     Handle requests to the /models endpoint.
 
     Process GET requests to the /models endpoint, returning a list of available
     models from the Llama Stack service.
+
+    Parameters:
+        request: The incoming HTTP request.
+        auth: Authentication tuple from the auth dependency.
+        model_type: Optional filter to return only models matching this type.
 
     Raises:
         HTTPException: If unable to connect to the Llama Stack server or if
@@ -112,9 +118,11 @@ async def models_endpoint_handler(
         parsed_models = [parse_llama_stack_model(model) for model in models]
 
         # optional filtering by model type
-        if model_type is not None:
+        if model_type.model_type is not None:
             parsed_models = [
-                model for model in parsed_models if model["model_type"] == model_type
+                model
+                for model in parsed_models
+                if model["model_type"] == model_type.model_type
             ]
 
         return ModelsResponse(models=parsed_models)
