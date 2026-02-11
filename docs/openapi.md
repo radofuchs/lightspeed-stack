@@ -249,6 +249,11 @@ Handle requests to the /models endpoint.
 Process GET requests to the /models endpoint, returning a list of available
 models from the Llama Stack service.
 
+Parameters:
+    request: The incoming HTTP request.
+    auth: Authentication tuple from the auth dependency.
+    model_type: Optional filter to return only models matching this type.
+
 Raises:
     HTTPException: If unable to connect to the Llama Stack server or if
     model retrieval fails for any reason.
@@ -262,7 +267,7 @@ Returns:
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| model_type |  | False |  |
+| model_type |  | False | Optional filter to return only models matching this type |
 
 
 ### ✅ Responses

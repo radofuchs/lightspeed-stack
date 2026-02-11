@@ -245,7 +245,7 @@
                     "models"
                 ],
                 "summary": "Models Endpoint Handler",
-                "description": "Handle requests to the /models endpoint.\n\nProcess GET requests to the /models endpoint, returning a list of available\nmodels from the Llama Stack service.\n\nRaises:\n    HTTPException: If unable to connect to the Llama Stack server or if\n    model retrieval fails for any reason.\n\nReturns:\n    ModelsResponse: An object containing the list of available models.",
+                "description": "Handle requests to the /models endpoint.\n\nProcess GET requests to the /models endpoint, returning a list of available\nmodels from the Llama Stack service.\n\nParameters:\n    request: The incoming HTTP request.\n    auth: Authentication tuple from the auth dependency.\n    model_type: Optional filter to return only models matching this type.\n\nRaises:\n    HTTPException: If unable to connect to the Llama Stack server or if\n    model retrieval fails for any reason.\n\nReturns:\n    ModelsResponse: An object containing the list of available models.",
                 "operationId": "models_endpoint_handler_v1_models_get",
                 "parameters": [
                     {
@@ -261,8 +261,14 @@
                                     "type": "null"
                                 }
                             ],
+                            "description": "Optional filter to return only models matching this type",
+                            "examples": [
+                                "llm",
+                                "embeddings"
+                            ],
                             "title": "Model Type"
-                        }
+                        },
+                        "description": "Optional filter to return only models matching this type"
                     }
                 ],
                 "responses": {
@@ -4346,7 +4352,7 @@
                 ],
                 "summary": "Handle A2A Jsonrpc",
                 "description": "Handle A2A JSON-RPC requests following the A2A protocol specification.\n\nThis endpoint uses the DefaultRequestHandler from the A2A SDK to handle\nall JSON-RPC requests including message/send, message/stream, etc.\n\nThe A2A SDK application is created per-request to include authentication\ncontext while still leveraging FastAPI's authorization middleware.\n\nAutomatically detects streaming requests (message/stream JSON-RPC method)\nand returns a StreamingResponse to enable real-time chunk delivery.\n\nArgs:\n    request: FastAPI request object\n    auth: Authentication tuple\n    mcp_headers: MCP headers for context propagation\n\nReturns:\n    JSON-RPC response or streaming response",
-                "operationId": "handle_a2a_jsonrpc_a2a_post",
+                "operationId": "handle_a2a_jsonrpc_a2a_get",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
@@ -4364,7 +4370,7 @@
                 ],
                 "summary": "Handle A2A Jsonrpc",
                 "description": "Handle A2A JSON-RPC requests following the A2A protocol specification.\n\nThis endpoint uses the DefaultRequestHandler from the A2A SDK to handle\nall JSON-RPC requests including message/send, message/stream, etc.\n\nThe A2A SDK application is created per-request to include authentication\ncontext while still leveraging FastAPI's authorization middleware.\n\nAutomatically detects streaming requests (message/stream JSON-RPC method)\nand returns a StreamingResponse to enable real-time chunk delivery.\n\nArgs:\n    request: FastAPI request object\n    auth: Authentication tuple\n    mcp_headers: MCP headers for context propagation\n\nReturns:\n    JSON-RPC response or streaming response",
-                "operationId": "handle_a2a_jsonrpc_a2a_post",
+                "operationId": "handle_a2a_jsonrpc_a2a_get",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
