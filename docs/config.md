@@ -513,6 +513,7 @@ the service can handle requests concurrently.
 | color_log | boolean | Enables colorized logging |
 | access_log | boolean | Enables logging of all access information |
 | tls_config |  | Transport Layer Security configuration for HTTPS support |
+| root_path | string | ASGI root path for serving behind a reverse proxy on a subpath |
 | cors |  | Cross-Origin Resource Sharing configuration for cross-domain requests |
 
 
