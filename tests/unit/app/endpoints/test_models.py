@@ -6,7 +6,9 @@ import pytest
 from fastapi import HTTPException, Request, status
 from llama_stack_client import APIConnectionError
 from pytest_mock import MockerFixture
+from pytest_subtests import SubTests
 
+from models.requests import ModelFilter
 from app.endpoints.models import models_endpoint_handler
 from authentication.interface import AuthTuple
 from configuration import AppConfig
@@ -48,7 +50,9 @@ async def test_models_endpoint_handler_configuration_not_loaded(
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
 
     with pytest.raises(HTTPException) as e:
-        await models_endpoint_handler(request=request, auth=auth)
+        await models_endpoint_handler(
+            request=request, auth=auth, model_type=ModelFilter(model_type=None)
+        )
         assert e.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert e.value.detail["response"] == "Configuration is not loaded"  # type: ignore
 
@@ -115,7 +119,9 @@ async def test_models_endpoint_handler_configuration_loaded(
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
 
     with pytest.raises(HTTPException) as e:
-        await models_endpoint_handler(request=request, auth=auth)
+        await models_endpoint_handler(
+            request=request, auth=auth, model_type=ModelFilter(model_type=None)
+        )
     assert e.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert e.value.detail["response"] == "Unable to connect to Llama Stack"  # type: ignore
 
@@ -173,7 +179,9 @@ async def test_models_endpoint_handler_unable_to_retrieve_models_list(
     # Authorization tuple required by URL endpoint handler
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
 
-    response = await models_endpoint_handler(request=request, auth=auth)
+    response = await models_endpoint_handler(
+        request=request, auth=auth, model_type=ModelFilter(model_type=None)
+    )
     assert response is not None
 
 
@@ -230,7 +238,7 @@ async def test_models_endpoint_handler_model_type_query_parameter(
     # Authorization tuple required by URL endpoint handler
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
     response = await models_endpoint_handler(
-        request=request, auth=auth, model_type="llm"
+        request=request, auth=auth, model_type=ModelFilter(model_type="llm")
     )
     assert response is not None
 
@@ -293,7 +301,9 @@ async def test_models_endpoint_handler_model_list_retrieved(
     # Authorization tuple required by URL endpoint handler
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
 
-    response = await models_endpoint_handler(request=request, auth=auth)
+    response = await models_endpoint_handler(
+        request=request, auth=auth, model_type=ModelFilter(model_type=None)
+    )
     assert response is not None
     assert len(response.models) == 4
     assert response.models[0]["identifier"] == "model1"
@@ -309,6 +319,7 @@ async def test_models_endpoint_handler_model_list_retrieved(
 @pytest.mark.asyncio
 async def test_models_endpoint_handler_model_list_retrieved_with_query_parameter(
     mocker: MockerFixture,
+    subtests: SubTests,
 ) -> None:
     """Test the models endpoint handler if model list can be retrieved."""
     mock_authorization_resolvers(mocker)
@@ -364,31 +375,41 @@ async def test_models_endpoint_handler_model_list_retrieved_with_query_parameter
     # Authorization tuple required by URL endpoint handler
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
 
-    response = await models_endpoint_handler(
-        request=request, auth=auth, model_type="llm"
-    )
-    assert response is not None
-    assert len(response.models) == 2
-    assert response.models[0]["identifier"] == "model1"
-    assert response.models[0]["model_type"] == "llm"
-    assert response.models[1]["identifier"] == "model3"
-    assert response.models[1]["model_type"] == "llm"
+    with subtests.test(msg="Model type = 'llm'"):
+        response = await models_endpoint_handler(
+            request=request, auth=auth, model_type=ModelFilter(model_type="llm")
+        )
+        assert response is not None
+        assert len(response.models) == 2
+        assert response.models[0]["identifier"] == "model1"
+        assert response.models[0]["model_type"] == "llm"
+        assert response.models[1]["identifier"] == "model3"
+        assert response.models[1]["model_type"] == "llm"
 
-    response = await models_endpoint_handler(
-        request=request, auth=auth, model_type="embedding"
-    )
-    assert response is not None
-    assert len(response.models) == 2
-    assert response.models[0]["identifier"] == "model2"
-    assert response.models[0]["model_type"] == "embedding"
-    assert response.models[1]["identifier"] == "model4"
-    assert response.models[1]["model_type"] == "embedding"
+    with subtests.test(msg="Model type = 'embedding'"):
+        response = await models_endpoint_handler(
+            request=request, auth=auth, model_type=ModelFilter(model_type="embedding")
+        )
+        assert response is not None
+        assert len(response.models) == 2
+        assert response.models[0]["identifier"] == "model2"
+        assert response.models[0]["model_type"] == "embedding"
+        assert response.models[1]["identifier"] == "model4"
+        assert response.models[1]["model_type"] == "embedding"
 
-    response = await models_endpoint_handler(
-        request=request, auth=auth, model_type="xyzzy"
-    )
-    assert response is not None
-    assert len(response.models) == 0
+    with subtests.test(msg="Model type = 'xyzzy'"):
+        response = await models_endpoint_handler(
+            request=request, auth=auth, model_type=ModelFilter(model_type="xyzzy")
+        )
+        assert response is not None
+        assert len(response.models) == 0
+
+    with subtests.test(msg="Model type is empty string"):
+        response = await models_endpoint_handler(
+            request=request, auth=auth, model_type=ModelFilter(model_type="")
+        )
+        assert response is not None
+        assert len(response.models) == 0
 
 
 @pytest.mark.asyncio
@@ -445,7 +466,9 @@ async def test_models_endpoint_llama_stack_connection_error(
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
 
     with pytest.raises(HTTPException) as e:
-        await models_endpoint_handler(request=request, auth=auth)
+        await models_endpoint_handler(
+            request=request, auth=auth, model_type=ModelFilter(model_type=None)
+        )
         assert e.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert e.value.detail["response"] == "Unable to connect to Llama Stack"  # type: ignore
         assert "Unable to connect to Llama Stack" in e.value.detail["cause"]  # type: ignore
