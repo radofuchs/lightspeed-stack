@@ -92,7 +92,13 @@ def _build_instructions(systeminfo: RlsapiV1SystemInfo) -> str:
     Returns:
         Instructions string for the LLM, with system context if available.
     """
-    base_prompt = constants.DEFAULT_SYSTEM_PROMPT
+    if (
+        configuration.customization is not None
+        and configuration.customization.system_prompt is not None
+    ):
+        base_prompt = configuration.customization.system_prompt
+    else:
+        base_prompt = constants.DEFAULT_SYSTEM_PROMPT
 
     context_parts = []
     if systeminfo.os:
