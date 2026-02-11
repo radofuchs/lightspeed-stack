@@ -40,7 +40,7 @@ Unit tests for the /models REST API endpoint.
 Unit tests for the /providers REST API endpoints.
 
 ## [test_query.py](test_query.py)
-Unit tests for the /query REST API endpoint (includes utility function tests for get_rag_tools and get_mcp_tools).
+Unit tests for the /query REST API endpoint.
 
 ## [test_rags.py](test_rags.py)
 Unit tests for the /rags REST API endpoints.

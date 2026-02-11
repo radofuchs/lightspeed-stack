@@ -13,7 +13,7 @@ Common utilities for the project.
 Decorator that makes sure the object is 'connected' according to it's connected predicate.
 
 ## [conversations.py](conversations.py)
-Utility functions for working with conversations.
+Utilities for conversations.
 
 ## [endpoints.py](endpoints.py)
 Utility functions for endpoint handlers.
@@ -28,7 +28,7 @@ Utilities for resolving MCP server authorization headers.
 MCP headers handling.
 
 ## [prompts.py](prompts.py)
-Utility functions for working with prompts.
+Utility functions for system prompts.
 
 ## [query.py](query.py)
 Utility functions for working with queries.
