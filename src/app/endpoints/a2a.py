@@ -44,7 +44,7 @@ from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from models.config import Action
 from models.requests import QueryRequest
-from utils.mcp_headers import mcp_headers_dependency
+from utils.mcp_headers import mcp_headers_dependency, McpHeaders
 from utils.responses import (
     extract_text_from_response_output_item,
     prepare_responses_params,
@@ -183,9 +183,7 @@ class A2AAgentExecutor(AgentExecutor):
     routing queries to the LLM backend using the Responses API.
     """
 
-    def __init__(
-        self, auth_token: str, mcp_headers: Optional[dict[str, dict[str, str]]] = None
-    ):
+    def __init__(self, auth_token: str, mcp_headers: Optional[McpHeaders] = None):
         """Initialize the A2A agent executor.
 
         Args:
@@ -193,7 +191,7 @@ class A2AAgentExecutor(AgentExecutor):
             mcp_headers: MCP headers for context propagation
         """
         self.auth_token: str = auth_token
-        self.mcp_headers: dict[str, dict[str, str]] = mcp_headers or {}
+        self.mcp_headers: McpHeaders = mcp_headers or {}
 
     async def execute(
         self,
@@ -648,9 +646,7 @@ async def get_agent_card(  # pylint: disable=unused-argument
         raise
 
 
-async def _create_a2a_app(
-    auth_token: str, mcp_headers: dict[str, dict[str, str]]
-) -> Any:
+async def _create_a2a_app(auth_token: str, mcp_headers: McpHeaders) -> Any:
     """Create an A2A Starlette application instance with auth context.
 
     Args:
@@ -681,7 +677,7 @@ async def _create_a2a_app(
 async def handle_a2a_jsonrpc(  # pylint: disable=too-many-locals,too-many-statements
     request: Request,
     auth: Annotated[AuthTuple, Depends(auth_dependency)],
-    mcp_headers: dict[str, dict[str, str]] = Depends(mcp_headers_dependency),
+    mcp_headers: McpHeaders = Depends(mcp_headers_dependency),
 ) -> Response | StreamingResponse:
     """
     Handle A2A JSON-RPC requests following the A2A protocol specification.

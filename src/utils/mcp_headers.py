@@ -10,8 +10,10 @@ from configuration import AppConfig
 
 logger = logging.getLogger("app.endpoints.dependencies")
 
+type McpHeaders = dict[str, dict[str, str]]
 
-async def mcp_headers_dependency(request: Request) -> dict[str, dict[str, str]]:
+
+async def mcp_headers_dependency(request: Request) -> McpHeaders:
     """Get the MCP headers dependency to passed to mcp servers.
 
     mcp headers is a json dictionary or mcp url paths and their respective headers
@@ -25,7 +27,7 @@ async def mcp_headers_dependency(request: Request) -> dict[str, dict[str, str]]:
     return extract_mcp_headers(request)
 
 
-def extract_mcp_headers(request: Request) -> dict[str, dict[str, str]]:
+def extract_mcp_headers(request: Request) -> McpHeaders:
     """Extract mcp headers from MCP-HEADERS header.
 
     If the header is missing, contains invalid JSON, or the decoded
@@ -56,8 +58,8 @@ def extract_mcp_headers(request: Request) -> dict[str, dict[str, str]]:
 
 
 def handle_mcp_headers_with_toolgroups(
-    mcp_headers: dict[str, dict[str, str]], config: AppConfig
-) -> dict[str, dict[str, str]]:
+    mcp_headers: McpHeaders, config: AppConfig
+) -> McpHeaders:
     """Process MCP headers by converting toolgroup names to URLs.
 
     This function takes MCP headers where keys can be either valid URLs or
