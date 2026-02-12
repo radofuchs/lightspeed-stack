@@ -42,6 +42,7 @@ from authentication.interface import AuthTuple
 from authorization.middleware import authorize
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
+from constants import MEDIA_TYPE_EVENT_STREAM
 from models.config import Action
 from models.requests import QueryRequest
 from utils.mcp_headers import mcp_headers_dependency, McpHeaders
@@ -827,7 +828,7 @@ async def handle_a2a_jsonrpc(  # pylint: disable=too-many-locals,too-many-statem
         # Return streaming response with SSE content type for A2A protocol
         return StreamingResponse(
             response_generator(),
-            media_type="text/event-stream",
+            media_type=MEDIA_TYPE_EVENT_STREAM,
         )
 
     # Non-streaming mode: Buffer entire response

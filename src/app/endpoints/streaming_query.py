@@ -34,6 +34,7 @@ from constants import (
     LLM_TOOL_CALL_EVENT,
     LLM_TOOL_RESULT_EVENT,
     LLM_TURN_COMPLETE_EVENT,
+    MEDIA_TYPE_EVENT_STREAM,
     MEDIA_TYPE_JSON,
     MEDIA_TYPE_TEXT,
 )
@@ -216,7 +217,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     response_media_type = (
         MEDIA_TYPE_TEXT
         if query_request.media_type == MEDIA_TYPE_TEXT
-        else "text/event-stream"
+        else MEDIA_TYPE_EVENT_STREAM
     )
 
     return StreamingResponse(

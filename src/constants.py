@@ -132,6 +132,7 @@ DEFAULT_RAG_TOOL = "knowledge_search"
 # Media type constants for streaming responses
 MEDIA_TYPE_JSON = "application/json"
 MEDIA_TYPE_TEXT = "text/plain"
+MEDIA_TYPE_EVENT_STREAM = "text/event-stream"
 
 # Streaming event type constants
 LLM_TOKEN_EVENT = "token"
