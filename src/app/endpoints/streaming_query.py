@@ -213,6 +213,12 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         context=context,
     )
 
+    response_media_type = (
+        MEDIA_TYPE_TEXT
+        if query_request.media_type == MEDIA_TYPE_TEXT
+        else "text/event-stream"
+    )
+
     return StreamingResponse(
         generate_response(
             generator=generator,
@@ -220,7 +226,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
             responses_params=responses_params,
             turn_summary=turn_summary,
         ),
-        media_type=query_request.media_type or MEDIA_TYPE_TEXT,
+        media_type=response_media_type,
     )
 
 
