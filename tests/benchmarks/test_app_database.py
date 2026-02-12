@@ -30,7 +30,7 @@ def configuration_filename_fixture() -> str:
     Returns:
         str: Path to the benchmark configuration file to load.
     """
-    return "tests/configuration/benchmarks-lightspeed-stack.yaml"
+    return "tests/configuration/benchmarks-sqlite.yaml"
 
 
 @pytest.fixture(name="sqlite_database")
