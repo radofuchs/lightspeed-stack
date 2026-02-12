@@ -11,7 +11,8 @@ from typing import Optional
 
 from fastapi import HTTPException, Request
 
-from authentication.interface import AuthInterface, AuthTuple
+from authentication.interface import NO_AUTH_TUPLE, AuthInterface, AuthTuple
+from configuration import configuration
 from constants import DEFAULT_VIRTUAL_PATH, NO_USER_TOKEN
 
 logger = logging.getLogger(__name__)
@@ -215,6 +216,10 @@ class RHIdentityAuthDependency(AuthInterface):  # pylint: disable=too-few-public
         # Extract header
         identity_header = request.headers.get("x-rh-identity")
         if not identity_header:
+            # Skip auth for health probes when configured
+            if request.url.path in ("/readiness", "/liveness"):
+                if configuration.authentication_configuration.skip_for_health_probes:
+                    return NO_AUTH_TUPLE
             logger.warning("Missing x-rh-identity header")
             raise HTTPException(status_code=401, detail="Missing x-rh-identity header")
 
