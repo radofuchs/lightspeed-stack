@@ -40,7 +40,7 @@ from utils.endpoints import (
     check_configuration_loaded,
     validate_and_retrieve_conversation,
 )
-from utils.mcp_headers import mcp_headers_dependency
+from utils.mcp_headers import mcp_headers_dependency, McpHeaders
 from utils.query import (
     consume_query_tokens,
     handle_known_apistatus_errors,
@@ -93,7 +93,7 @@ async def query_endpoint_handler(
     request: Request,
     query_request: QueryRequest,
     auth: Annotated[AuthTuple, Depends(get_auth_dependency())],
-    mcp_headers: dict[str, dict[str, str]] = Depends(mcp_headers_dependency),
+    mcp_headers: McpHeaders = Depends(mcp_headers_dependency),
 ) -> QueryResponse:
     """
     Handle request to the /query endpoint using Responses API.

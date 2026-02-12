@@ -37,6 +37,7 @@ from utils.query import (
     prepare_input,
     select_model_and_provider_id,
 )
+from utils.mcp_headers import McpHeaders
 from utils.suid import to_llama_stack_conversation_id
 from utils.token_counter import TokenCounter
 from utils.types import (
@@ -141,7 +142,7 @@ async def prepare_tools(
     query_request: QueryRequest,
     token: str,
     config: AppConfig,
-    mcp_headers: Optional[dict[str, dict[str, str]]] = None,
+    mcp_headers: Optional[McpHeaders] = None,
 ) -> Optional[list[dict[str, Any]]]:
     """Prepare tools for Responses API including RAG and MCP tools.
 
@@ -202,7 +203,7 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
     query_request: QueryRequest,
     user_conversation: Optional[UserConversation],
     token: str,
-    mcp_headers: Optional[dict[str, dict[str, str]]] = None,
+    mcp_headers: Optional[McpHeaders] = None,
     stream: bool = False,
     store: bool = True,
 ) -> ResponsesApiParams:
@@ -315,7 +316,7 @@ def get_rag_tools(vector_store_ids: list[str]) -> Optional[list[dict[str, Any]]]
 def get_mcp_tools(
     mcp_servers: list[ModelContextProtocolServer],
     token: str | None = None,
-    mcp_headers: dict[str, dict[str, str]] | None = None,
+    mcp_headers: Optional[McpHeaders] = None,
 ) -> list[dict[str, Any]]:
     """Convert MCP servers to tools format for Responses API.
 

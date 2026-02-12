@@ -57,7 +57,7 @@ from utils.endpoints import (
     check_configuration_loaded,
     validate_and_retrieve_conversation,
 )
-from utils.mcp_headers import mcp_headers_dependency
+from utils.mcp_headers import mcp_headers_dependency, McpHeaders
 from utils.query import (
     consume_query_tokens,
     extract_provider_and_model_from_model_id,
@@ -118,7 +118,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     request: Request,
     query_request: QueryRequest,
     auth: Annotated[AuthTuple, Depends(get_auth_dependency())],
-    mcp_headers: dict[str, dict[str, str]] = Depends(mcp_headers_dependency),
+    mcp_headers: McpHeaders = Depends(mcp_headers_dependency),
 ) -> StreamingResponse:
     """
     Handle request to the /streaming_query endpoint using Responses API.
