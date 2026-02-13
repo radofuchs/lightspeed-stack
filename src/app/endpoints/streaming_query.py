@@ -434,9 +434,9 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
     chunk_id = 0
     media_type = context.query_request.media_type or MEDIA_TYPE_JSON
     text_parts: list[str] = []
-    mcp_calls: dict[
-        int, tuple[str, str]
-    ] = {}  # output_index -> (mcp_call_id, mcp_call_name)
+    mcp_calls: dict[int, tuple[str, str]] = (
+        {}
+    )  # output_index -> (mcp_call_id, mcp_call_name)
     latest_response_object: Optional[OpenAIResponseObject] = None
 
     logger.debug("Starting streaming response (Responses API) processing")
