@@ -115,7 +115,9 @@ async def perform_vector_search(
                         if chunk_meta is not None:
                             # chunk_meta might be a pydantic model or a dict depending on caller
                             if isinstance(chunk_meta, dict):
-                                doc_id = chunk_meta.get("doc_id") or chunk_meta.get("document_id")
+                                doc_id = chunk_meta.get("doc_id") or chunk_meta.get(
+                                    "document_id"
+                                )
                                 title = title or chunk_meta.get("title")
                                 reference_url = chunk_meta.get("reference_url")
                             else:
@@ -123,7 +125,9 @@ async def perform_vector_search(
                                     chunk_meta, "document_id", None
                                 )
                                 title = title or getattr(chunk_meta, "title", None)
-                                reference_url = getattr(chunk_meta, "reference_url", None)
+                                reference_url = getattr(
+                                    chunk_meta, "reference_url", None
+                                )
                         else:
                             reference_url = None
                     else:

@@ -36,20 +36,21 @@ from llama_stack_client import APIConnectionError
 from starlette.responses import Response, StreamingResponse
 
 from a2a_storage import A2AContextStore, A2AStorageFactory
-from app.endpoints.query_old import (
-    evaluate_model_hints,
-    select_model_and_provider_id,
-)
-from app.endpoints.streaming_query import retrieve_response
+
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
+from constants import MEDIA_TYPE_EVENT_STREAM
 from models.config import Action
 from models.requests import QueryRequest
-from utils.mcp_headers import mcp_headers_dependency
-from utils.responses import extract_text_from_response_output_item
+from utils.mcp_headers import mcp_headers_dependency, McpHeaders
+from utils.responses import (
+    extract_text_from_response_output_item,
+    prepare_responses_params,
+)
+from utils.suid import normalize_conversation_id
 from version import __version__
 
 logger = logging.getLogger("app.endpoints.handlers")
@@ -183,9 +184,7 @@ class A2AAgentExecutor(AgentExecutor):
     routing queries to the LLM backend using the Responses API.
     """
 
-    def __init__(
-        self, auth_token: str, mcp_headers: Optional[dict[str, dict[str, str]]] = None
-    ):
+    def __init__(self, auth_token: str, mcp_headers: Optional[McpHeaders] = None):
         """Initialize the A2A agent executor.
 
         Args:
@@ -193,7 +192,7 @@ class A2AAgentExecutor(AgentExecutor):
             mcp_headers: MCP headers for context propagation
         """
         self.auth_token: str = auth_token
-        self.mcp_headers: dict[str, dict[str, str]] = mcp_headers or {}
+        self.mcp_headers: McpHeaders = mcp_headers or {}
 
     async def execute(
         self,
@@ -317,23 +316,17 @@ class A2AAgentExecutor(AgentExecutor):
         # Get LLM client and select model
         client = AsyncLlamaStackClientHolder().get_client()
         try:
-            llama_stack_model_id, _model_id, _provider_id = (
-                select_model_and_provider_id(
-                    await client.models.list(),
-                    *evaluate_model_hints(
-                        user_conversation=None, query_request=query_request
-                    ),
-                )
-            )
-
-            # Stream response from LLM using the Responses API
-            stream, conversation_id = await retrieve_response(
+            responses_params = await prepare_responses_params(
                 client,
-                llama_stack_model_id,
                 query_request,
+                None,
                 self.auth_token,
-                mcp_headers=self.mcp_headers,
+                self.mcp_headers,
+                stream=True,
+                store=True,
             )
+            # Stream response from LLM using the Responses API
+            stream = await client.responses.create(**responses_params.model_dump())
         except APIConnectionError as e:
             error_message = (
                 f"Unable to connect to Llama Stack backend service: {str(e)}. "
@@ -356,6 +349,9 @@ class A2AAgentExecutor(AgentExecutor):
             return
 
         # Persist conversation_id for next turn in same A2A context
+        conversation_id = conversation_id or normalize_conversation_id(
+            responses_params.conversation
+        )
         if conversation_id:
             await context_store.set(a2a_context_id, conversation_id)
             logger.info(
@@ -379,7 +375,7 @@ class A2AAgentExecutor(AgentExecutor):
                 context_id=context_id,
                 final=False,
                 metadata={
-                    "model": llama_stack_model_id,
+                    "model": responses_params.model,
                     "conversation_id": conversation_id,
                 },
             )
@@ -651,9 +647,7 @@ async def get_agent_card(  # pylint: disable=unused-argument
         raise
 
 
-async def _create_a2a_app(
-    auth_token: str, mcp_headers: dict[str, dict[str, str]]
-) -> Any:
+async def _create_a2a_app(auth_token: str, mcp_headers: McpHeaders) -> Any:
     """Create an A2A Starlette application instance with auth context.
 
     Args:
@@ -684,7 +678,7 @@ async def _create_a2a_app(
 async def handle_a2a_jsonrpc(  # pylint: disable=too-many-locals,too-many-statements
     request: Request,
     auth: Annotated[AuthTuple, Depends(auth_dependency)],
-    mcp_headers: dict[str, dict[str, str]] = Depends(mcp_headers_dependency),
+    mcp_headers: McpHeaders = Depends(mcp_headers_dependency),
 ) -> Response | StreamingResponse:
     """
     Handle A2A JSON-RPC requests following the A2A protocol specification.
@@ -834,7 +828,7 @@ async def handle_a2a_jsonrpc(  # pylint: disable=too-many-locals,too-many-statem
         # Return streaming response with SSE content type for A2A protocol
         return StreamingResponse(
             response_generator(),
-            media_type="text/event-stream",
+            media_type=MEDIA_TYPE_EVENT_STREAM,
         )
 
     # Non-streaming mode: Buffer entire response
