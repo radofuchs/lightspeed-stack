@@ -111,6 +111,7 @@ def create_request_with_header(header_value: Optional[str]) -> Mock:
     """
     request = Mock(spec=Request)
     request.headers = {"x-rh-identity": header_value} if header_value else {}
+    request.url = Mock(path="/test")
     request.state = Mock()
     return request
 
@@ -467,7 +468,15 @@ class TestRHIdentityHealthProbeSkip:
         mocker.patch("authentication.rh_identity.configuration", mock_config)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("path", ["/readiness", "/liveness"])
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/readiness",
+            "/liveness",
+            "/api/lightspeed/readiness",
+            "/api/lightspeed/liveness",
+        ],
+    )
     async def test_probe_paths_skip_auth_when_enabled(
         self, mocker: MockerFixture, path: str
     ) -> None:
@@ -481,7 +490,15 @@ class TestRHIdentityHealthProbeSkip:
         assert result == NO_AUTH_TUPLE
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("path", ["/readiness", "/liveness"])
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/readiness",
+            "/liveness",
+            "/api/lightspeed/readiness",
+            "/api/lightspeed/liveness",
+        ],
+    )
     async def test_probe_paths_require_auth_when_disabled(
         self, mocker: MockerFixture, path: str
     ) -> None:
