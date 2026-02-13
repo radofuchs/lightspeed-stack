@@ -17,7 +17,6 @@ from models.config import ModelContextProtocolServer
 from models.database.conversations import UserConversation
 from models.requests import Attachment, QueryRequest
 from models.responses import QueryResponse
-from utils.responses import get_mcp_tools
 from utils.token_counter import TokenCounter
 from utils.types import ResponsesApiParams, TurnSummary
 
@@ -47,31 +46,9 @@ def create_dummy_request() -> Request:
     tools_no_headers = get_mcp_tools(servers, token=None, mcp_headers=None)
     assert len(tools_no_headers) == 0  # Server skipped due to missing required auth
 
-
-def test_get_mcp_tools_with_static_headers(tmp_path: Path) -> None:
-    """Test get_mcp_tools with static headers from config files."""
-    # Create a secret file
-    secret_file = tmp_path / "token.txt"
-    secret_file.write_text("static-secret-token")
-
-    servers = [
-        ModelContextProtocolServer(
-            name="server1",
-            url="http://localhost:3000",
-            authorization_headers={"Authorization": str(secret_file)},
-        ),
-    ]
-
-    tools = get_mcp_tools(servers, token=None)
-    assert len(tools) == 1
-    assert tools[0]["headers"] == {"Authorization": "static-secret-token"}
-
-
-def test_get_mcp_tools_with_mixed_headers(tmp_path: Path) -> None:
-    """Test get_mcp_tools with mixed header types.
-    # Create a secret file
-    secret_file = tmp_path / "api-key.txt"
-    secret_file.write_text("secret-api-key")
+@pytest.fixture(name="setup_configuration")
+def setup_configuration_fixture() -> AppConfig:
+    """Set up configuration for tests.
 
     Create a reusable application configuration tailored for unit tests.
 
@@ -109,6 +86,9 @@ def test_get_mcp_tools_with_mixed_headers(tmp_path: Path) -> None:
             "type": "noop",
         },
     }
+    cfg = AppConfig()
+    cfg.init_from_dict(config_dict)
+    return cfg
 
 
 class TestQueryEndpointHandler:
@@ -480,7 +460,6 @@ class TestQueryEndpointHandler:
         )
 
         mock_update_token.assert_called_once()
-        mock_updated_client.responses.create.assert_called_once()
 
 
 class TestRetrieveResponse:

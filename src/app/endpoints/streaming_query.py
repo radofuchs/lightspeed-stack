@@ -226,6 +226,12 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         doc_ids_from_chunks=doc_ids_from_chunks,
     )
 
+    response_media_type = (
+        MEDIA_TYPE_TEXT
+        if query_request.media_type == MEDIA_TYPE_TEXT
+        else MEDIA_TYPE_EVENT_STREAM
+    )
+
     return StreamingResponse(
         generate_response(
             generator=generator,

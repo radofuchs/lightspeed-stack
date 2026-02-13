@@ -2,8 +2,6 @@
 
 """Handler for REST API call to provide answer to query using Response API."""
 
-"""Handler for REST API call to provide answer to query using Response API."""
-
 import datetime
 import logging
 from typing import Annotated, Any, cast
@@ -51,6 +49,7 @@ from utils.query import (
     store_query_results,
     update_azure_token,
     validate_attachments_metadata,
+    validate_model_provider_override,
 )
 from utils.quota import check_tokens_available, get_available_quotas
 from utils.responses import (
@@ -124,12 +123,13 @@ async def query_endpoint_handler(
     """
     check_configuration_loaded(configuration)
 
-    started_at = datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+    started_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     user_id, _, _skip_userid_check, token = auth
     # Check token availability
     check_tokens_available(configuration.quota_limiters, user_id)
+
+    # Enforce RBAC: optionally disallow overriding model/provider in requests
+    validate_model_provider_override(query_request, request.state.authorized_actions)
 
     # Validate attachments if provided
     if query_request.attachments:

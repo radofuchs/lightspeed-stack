@@ -74,12 +74,6 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         )
         raise
 
-    # try:
-    #     await client.vector_stores.delete(vector_store_id="portal-rag")
-    #     logger.info("Successfully deregistered vector store: portal-rag")
-    # except Exception as e:
-    #     logger.warning("Failed to deregister vector store 'portal-rag': %s", e)
-
     logger.info("Registering MCP servers")
     await register_mcp_servers_async(logger, configuration.configuration)
     get_logger("app.endpoints.handlers")

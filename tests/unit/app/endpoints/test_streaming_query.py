@@ -391,6 +391,85 @@ class TestStreamingQueryEndpointHandler:
         )
 
         assert isinstance(response, StreamingResponse)
+        assert response.media_type == "text/event-stream"
+
+    @pytest.mark.asyncio
+    async def test_streaming_query_text_media_type_header(
+        self,
+        dummy_request: Request,  # pylint: disable=redefined-outer-name
+        setup_configuration: AppConfig,
+        mocker: MockerFixture,
+    ) -> None:
+        """Test streaming query uses plain text header when requested."""
+        query_request = QueryRequest(
+            query="What is Kubernetes?", media_type=MEDIA_TYPE_TEXT
+        )  # pyright: ignore[reportCallIssue]
+
+        mocker.patch("app.endpoints.streaming_query.configuration", setup_configuration)
+        mocker.patch("app.endpoints.streaming_query.check_configuration_loaded")
+        mocker.patch("app.endpoints.streaming_query.check_tokens_available")
+        mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
+
+        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client_holder = mocker.Mock()
+        mock_client_holder.get_client.return_value = mock_client
+        mocker.patch(
+            "app.endpoints.streaming_query.AsyncLlamaStackClientHolder",
+            return_value=mock_client_holder,
+        )
+
+        mock_responses_params = mocker.Mock(spec=ResponsesApiParams)
+        mock_responses_params.model = "provider1/model1"
+        mock_responses_params.conversation = "conv_123"
+        mock_responses_params.model_dump.return_value = {
+            "input": "test",
+            "model": "provider1/model1",
+        }
+        mocker.patch(
+            "app.endpoints.streaming_query.prepare_responses_params",
+            new=mocker.AsyncMock(return_value=mock_responses_params),
+        )
+
+        mocker.patch("app.endpoints.streaming_query.AzureEntraIDManager")
+        mocker.patch(
+            "app.endpoints.streaming_query.extract_provider_and_model_from_model_id",
+            return_value=("provider1", "model1"),
+        )
+        mocker.patch("app.endpoints.streaming_query.metrics.llm_calls_total")
+
+        async def mock_generator() -> AsyncIterator[str]:
+            yield "data: test\n\n"
+
+        mock_turn_summary = TurnSummary()
+        mocker.patch(
+            "app.endpoints.streaming_query.retrieve_response_generator",
+            return_value=(mock_generator(), mock_turn_summary),
+        )
+
+        async def mock_generate_response(
+            *_args: Any, **_kwargs: Any
+        ) -> AsyncIterator[str]:
+            async for item in mock_generator():
+                yield item
+
+        mocker.patch(
+            "app.endpoints.streaming_query.generate_response",
+            side_effect=mock_generate_response,
+        )
+        mocker.patch(
+            "app.endpoints.streaming_query.normalize_conversation_id",
+            return_value="123",
+        )
+
+        response = await streaming_query_endpoint_handler(
+            request=dummy_request,
+            query_request=query_request,
+            auth=MOCK_AUTH_STREAMING,
+            mcp_headers={},
+        )
+
+        assert isinstance(response, StreamingResponse)
+        assert response.media_type == MEDIA_TYPE_TEXT
 
     @pytest.mark.asyncio
     async def test_streaming_query_with_conversation(
