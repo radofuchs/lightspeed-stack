@@ -2,7 +2,7 @@
 
 import datetime
 import json
-import logging
+
 from typing import Annotated, Any, AsyncIterator, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -87,8 +87,9 @@ from utils.suid import normalize_conversation_id
 from utils.token_counter import TokenCounter
 from utils.types import ResponsesApiParams, TurnSummary
 from utils.vector_search import format_rag_context_for_injection, perform_vector_search
+from log import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(tags=["streaming_query"])
 
 streaming_query_responses: dict[int | str, dict[str, Any]] = {
@@ -433,9 +434,9 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
     chunk_id = 0
     media_type = context.query_request.media_type or MEDIA_TYPE_JSON
     text_parts: list[str] = []
-    mcp_calls: dict[int, tuple[str, str]] = (
-        {}
-    )  # output_index -> (mcp_call_id, mcp_call_name)
+    mcp_calls: dict[
+        int, tuple[str, str]
+    ] = {}  # output_index -> (mcp_call_id, mcp_call_name)
     latest_response_object: Optional[OpenAIResponseObject] = None
 
     logger.debug("Starting streaming response (Responses API) processing")
