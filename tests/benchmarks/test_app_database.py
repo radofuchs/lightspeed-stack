@@ -976,3 +976,71 @@ def test_sqlite_retrieve_conversation_for_one_user_large_db(
         None
     """
     benchmark_retrieve_conversation_for_one_user(benchmark, LARGE_DB_RECORDS_COUNT)
+
+
+def test_postgres_store_new_user_conversations_empty_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against empty DB.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_store_new_user_conversations(benchmark, 0)
+
+
+def test_postgres_store_new_user_conversations_small_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against small DB.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_store_new_user_conversations(benchmark, SMALL_DB_RECORDS_COUNT)
+
+
+def test_postgres_store_new_user_conversations_middle_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against middle-sized DB.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_store_new_user_conversations(benchmark, MIDDLE_DB_RECORDS_COUNT)
+
+
+def test_postgres_store_new_user_conversations_large_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
+
+    Benchmark is performed against large DB.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_store_new_user_conversations(benchmark, LARGE_DB_RECORDS_COUNT)
