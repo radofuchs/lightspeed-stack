@@ -1168,3 +1168,63 @@ def test_postgres_list_conversations_for_all_users_large_db(
         None
     """
     benchmark_list_conversations_for_all_users(benchmark, LARGE_DB_RECORDS_COUNT)
+
+
+def test_postgres_list_conversations_for_one_user_empty_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark listing conversations on an empty database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_list_conversations_for_one_user(benchmark, 0)
+
+
+def test_postgres_list_conversations_for_one_user_small_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark listing conversations on an small database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_list_conversations_for_one_user(benchmark, SMALL_DB_RECORDS_COUNT)
+
+
+def test_postgres_list_conversations_for_one_user_middle_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark listing conversations on a medium-sized database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_list_conversations_for_one_user(benchmark, MIDDLE_DB_RECORDS_COUNT)
+
+
+def test_postgres_list_conversations_for_one_user_large_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark listing conversations on a large database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_list_conversations_for_one_user(benchmark, LARGE_DB_RECORDS_COUNT)
