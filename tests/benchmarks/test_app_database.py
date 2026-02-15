@@ -1228,3 +1228,63 @@ def test_postgres_list_conversations_for_one_user_large_db(
         None
     """
     benchmark_list_conversations_for_one_user(benchmark, LARGE_DB_RECORDS_COUNT)
+
+
+def test_postgres_retrieve_conversation_empty_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on an empty database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, 0)
+
+
+def test_postgres_retrieve_conversation_small_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on a small database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, SMALL_DB_RECORDS_COUNT)
+
+
+def test_postgres_retrieve_conversation_middle_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on a medium-sized database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, MIDDLE_DB_RECORDS_COUNT)
+
+
+def test_postgres_retrieve_conversation_large_db(
+    postgres_database: None, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark retrieving conversations on a large database.
+
+    Parameters:
+        postgres_database: Fixture that prepares a temporary PostgreSQL DB.
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+        None
+    """
+    benchmark_retrieve_conversation(benchmark, LARGE_DB_RECORDS_COUNT)
