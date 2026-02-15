@@ -154,8 +154,8 @@ class RAGChunk(BaseModel):
     """Model representing a RAG chunk used in the response."""
 
     content: str = Field(description="The content of the chunk")
-    source: Optional[str] = Field(None, description="Source document or URL")
-    score: Optional[float] = Field(None, description="Relevance score")
+    source: Optional[str] = Field(default=None, description="Source document or URL")
+    score: Optional[float] = Field(default=None, description="Relevance score")
 
 
 class ReferencedDocument(BaseModel):
