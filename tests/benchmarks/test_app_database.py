@@ -465,7 +465,7 @@ def benchmark_store_new_user_conversations(
         benchmark(store_new_user_conversation, session)
 
 
-def test_store_new_user_conversations_empty_db(
+def test_sqlite_store_new_user_conversations_empty_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
@@ -482,7 +482,7 @@ def test_store_new_user_conversations_empty_db(
     benchmark_store_new_user_conversations(benchmark, 0)
 
 
-def test_store_new_user_conversations_small_db(
+def test_sqlite_store_new_user_conversations_small_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
@@ -499,7 +499,7 @@ def test_store_new_user_conversations_small_db(
     benchmark_store_new_user_conversations(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
-def test_store_new_user_conversations_middle_db(
+def test_sqlite_store_new_user_conversations_middle_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
@@ -516,7 +516,7 @@ def test_store_new_user_conversations_middle_db(
     benchmark_store_new_user_conversations(benchmark, MIDDLE_DB_RECORDS_COUNT)
 
 
-def test_store_new_user_conversations_large_db(
+def test_sqlite_store_new_user_conversations_large_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark for the DB operation to create and store new topic and conversation ID mapping.
@@ -564,7 +564,7 @@ def benchmark_update_user_conversation(
         benchmark(update_user_conversation, session, "1234")
 
 
-def test_update_user_conversation_empty_db(
+def test_sqlite_update_user_conversation_empty_db(
     sqlite_database: None,
     benchmark: BenchmarkFixture,
 ) -> None:
@@ -580,7 +580,7 @@ def test_update_user_conversation_empty_db(
     benchmark_update_user_conversation(benchmark, 0)
 
 
-def test_update_user_conversation_small_db(
+def test_sqlite_update_user_conversation_small_db(
     sqlite_database: None,
     benchmark: BenchmarkFixture,
 ) -> None:
@@ -596,7 +596,7 @@ def test_update_user_conversation_small_db(
     benchmark_update_user_conversation(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
-def test_update_user_conversation_middle_db(
+def test_sqlite_update_user_conversation_middle_db(
     sqlite_database: None,
     benchmark: BenchmarkFixture,
 ) -> None:
@@ -612,7 +612,7 @@ def test_update_user_conversation_middle_db(
     benchmark_update_user_conversation(benchmark, MIDDLE_DB_RECORDS_COUNT)
 
 
-def test_update_user_conversation_large_db(
+def test_sqlite_update_user_conversation_large_db(
     sqlite_database: None,
     benchmark: BenchmarkFixture,
 ) -> None:
@@ -651,7 +651,7 @@ def benchmark_list_conversations_for_all_users(
         benchmark(list_conversation_for_all_users, session)
 
 
-def test_list_conversations_for_all_users_empty_db(
+def test_sqlite_list_conversations_for_all_users_empty_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on an empty database.
@@ -666,7 +666,7 @@ def test_list_conversations_for_all_users_empty_db(
     benchmark_list_conversations_for_all_users(benchmark, 0)
 
 
-def test_list_conversations_for_all_users_small_db(
+def test_sqlite_list_conversations_for_all_users_small_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on small database.
@@ -681,7 +681,7 @@ def test_list_conversations_for_all_users_small_db(
     benchmark_list_conversations_for_all_users(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
-def test_list_conversations_for_all_users_middle_db(
+def test_sqlite_list_conversations_for_all_users_middle_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on a medium-sized database.
@@ -696,7 +696,7 @@ def test_list_conversations_for_all_users_middle_db(
     benchmark_list_conversations_for_all_users(benchmark, MIDDLE_DB_RECORDS_COUNT)
 
 
-def test_list_conversations_for_all_users_large_db(
+def test_sqlite_list_conversations_for_all_users_large_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on a large database.
@@ -737,7 +737,7 @@ def benchmark_list_conversations_for_one_user(
         benchmark(list_conversation_for_one_user, session, user_id)
 
 
-def test_list_conversations_for_one_user_empty_db(
+def test_sqlite_list_conversations_for_one_user_empty_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on an empty database.
@@ -752,7 +752,7 @@ def test_list_conversations_for_one_user_empty_db(
     benchmark_list_conversations_for_one_user(benchmark, 0)
 
 
-def test_list_conversations_for_one_user_small_db(
+def test_sqlite_list_conversations_for_one_user_small_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on an small database.
@@ -767,7 +767,7 @@ def test_list_conversations_for_one_user_small_db(
     benchmark_list_conversations_for_one_user(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
-def test_list_conversations_for_one_user_middle_db(
+def test_sqlite_list_conversations_for_one_user_middle_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on a medium-sized database.
@@ -782,7 +782,7 @@ def test_list_conversations_for_one_user_middle_db(
     benchmark_list_conversations_for_one_user(benchmark, MIDDLE_DB_RECORDS_COUNT)
 
 
-def test_list_conversations_for_one_user_large_db(
+def test_sqlite_list_conversations_for_one_user_large_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark listing conversations on a large database.
@@ -825,7 +825,7 @@ def benchmark_retrieve_conversation(
         )
 
 
-def test_retrieve_conversation_empty_db(
+def test_sqlite_retrieve_conversation_empty_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on an empty database.
@@ -840,7 +840,7 @@ def test_retrieve_conversation_empty_db(
     benchmark_retrieve_conversation(benchmark, 0)
 
 
-def test_retrieve_conversation_small_db(
+def test_sqlite_retrieve_conversation_small_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on a small database.
@@ -855,7 +855,7 @@ def test_retrieve_conversation_small_db(
     benchmark_retrieve_conversation(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
-def test_retrieve_conversation_middle_db(
+def test_sqlite_retrieve_conversation_middle_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on a medium-sized database.
@@ -870,7 +870,7 @@ def test_retrieve_conversation_middle_db(
     benchmark_retrieve_conversation(benchmark, MIDDLE_DB_RECORDS_COUNT)
 
 
-def test_retrieve_conversation_large_db(
+def test_sqlite_retrieve_conversation_large_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on a large database.
@@ -918,7 +918,7 @@ def benchmark_retrieve_conversation_for_one_user(
         )
 
 
-def test_retrieve_conversation_for_one_user_empty_db(
+def test_sqlite_retrieve_conversation_for_one_user_empty_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on an empty database.
@@ -933,7 +933,7 @@ def test_retrieve_conversation_for_one_user_empty_db(
     benchmark_retrieve_conversation_for_one_user(benchmark, 0)
 
 
-def test_retrieve_conversation_for_one_user_small_db(
+def test_sqlite_retrieve_conversation_for_one_user_small_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on a small database.
@@ -948,7 +948,7 @@ def test_retrieve_conversation_for_one_user_small_db(
     benchmark_retrieve_conversation_for_one_user(benchmark, SMALL_DB_RECORDS_COUNT)
 
 
-def test_retrieve_conversation_for_one_user_middle_db(
+def test_sqlite_retrieve_conversation_for_one_user_middle_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on a medium-sized database.
@@ -963,7 +963,7 @@ def test_retrieve_conversation_for_one_user_middle_db(
     benchmark_retrieve_conversation_for_one_user(benchmark, MIDDLE_DB_RECORDS_COUNT)
 
 
-def test_retrieve_conversation_for_one_user_large_db(
+def test_sqlite_retrieve_conversation_for_one_user_large_db(
     sqlite_database: None, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark retrieving conversations on a large database.
