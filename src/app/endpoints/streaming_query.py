@@ -588,7 +588,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
         latest_response_object, context.model_id
     )
     tool_based_documents = parse_referenced_documents(latest_response_object)
-    
+
     # Merge pre-RAG documents with tool-based documents (similar to query.py)
     if turn_summary.pre_rag_documents:
         all_documents = turn_summary.pre_rag_documents + tool_based_documents
