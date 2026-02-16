@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import yaml
 from pydantic import SecretStr
@@ -24,9 +24,9 @@ from models.config import Configuration
 logger = logging.getLogger(__name__)
 
 # Masking output constants
-CONFIGURED = "configured"
-NOT_CONFIGURED = "not_configured"
-NOT_AVAILABLE = "not_available"
+CONFIGURED: Literal["configured"] = "configured"
+NOT_CONFIGURED: Literal["not_configured"] = "not_configured"
+NOT_AVAILABLE: Literal["not_available"] = "not_available"
 
 
 class MaskingType(Enum):
@@ -278,10 +278,12 @@ def _serialize_passthrough(value: Any) -> Any:
         return [_serialize_passthrough(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _serialize_passthrough(v) for k, v in value.items()}
-    # Safety: mask SecretStr and file paths; log and stringify everything else
+    # Safety: mask SecretStr, file paths, and any unrecognised types
     if not isinstance(value, (SecretStr, PurePath)):
-        logger.debug("Passthrough fallback to str() for type %s", type(value).__name__)
-    return CONFIGURED if isinstance(value, (SecretStr, PurePath)) else str(value)
+        logger.warning(
+            "Passthrough masking unexpected type %s as configured", type(value).__name__
+        )
+    return CONFIGURED
 
 
 def mask_value(value: Any, masking: MaskingType) -> Any:
@@ -332,7 +334,9 @@ def _extract_field(source: Any, spec: FieldSpec) -> Any:
     return mask_value(value, spec.masking)
 
 
-def _extract_list_field(source: Any, spec: ListFieldSpec) -> list[dict[str, Any]] | str:
+def _extract_list_field(
+    source: Any, spec: ListFieldSpec
+) -> list[dict[str, Any]] | Literal["not_configured"]:
     """Extract and mask a list field with per-item sub-fields.
 
     Parameters:

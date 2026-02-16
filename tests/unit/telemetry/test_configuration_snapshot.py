@@ -698,12 +698,14 @@ class TestRegistryValidation:
 
     def test_no_duplicate_paths_in_lightspeed_registry(self) -> None:
         """Verify no duplicate paths in lightspeed-stack registry."""
-        paths = [spec.path for spec in LIGHTSPEED_STACK_FIELDS]
-        duplicates = [p for p in paths if paths.count(p) > 1]
-        assert not duplicates, f"Duplicate paths: {set(duplicates)}"
+        paths = [s.path for s in LIGHTSPEED_STACK_FIELDS]
+        assert len(paths) == len(
+            set(paths)
+        ), f"Duplicate paths: {set(p for p in paths if paths.count(p) > 1)}"
 
     def test_no_duplicate_paths_in_llama_stack_registry(self) -> None:
         """Verify no duplicate paths in llama-stack registry."""
-        paths = [spec.path for spec in LLAMA_STACK_FIELDS]
-        duplicates = [p for p in paths if paths.count(p) > 1]
-        assert not duplicates, f"Duplicate paths: {set(duplicates)}"
+        paths = [s.path for s in LLAMA_STACK_FIELDS]
+        assert len(paths) == len(
+            set(paths)
+        ), f"Duplicate paths: {set(p for p in paths if paths.count(p) > 1)}"
