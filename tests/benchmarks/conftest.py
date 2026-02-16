@@ -69,7 +69,6 @@ def drop_postgres_tables(configuration: AppConfig) -> None:
 
     The tables will be re-created so every benchmark start with fresh DB.
     """
-
     pgconfig = configuration.database_configuration.postgres
     assert pgconfig is not None
 
