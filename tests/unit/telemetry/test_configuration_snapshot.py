@@ -1,7 +1,6 @@
 """Tests for configuration snapshot with PII masking."""
 
 import json
-import tempfile
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -244,6 +243,13 @@ class TestSetNestedValue:
         _set_nested_value(target, "service.workers", 4)
         _set_nested_value(target, "service.port", 8080)
         assert target == {"service": {"workers": 4, "port": 8080}}
+
+    def test_path_prefix_collision(self) -> None:
+        """Test that a scalar at a.b is replaced by a dict when a.b.c is set."""
+        target: dict[str, Any] = {}
+        _set_nested_value(target, "a.b", "scalar")
+        _set_nested_value(target, "a.b.c", "nested")
+        assert target == {"a": {"b": {"c": "nested"}}}
 
 
 # =============================================================================
@@ -492,68 +498,64 @@ class TestBuildLightspeedStackSnapshot:
 class TestBuildLlamaStackSnapshot:
     """Tests for build_llama_stack_snapshot function."""
 
-    def test_service_mode_returns_not_available(self) -> None:
+    async def test_service_mode_returns_not_available(self) -> None:
         """Test that service mode (no path) returns not_available status."""
-        assert build_llama_stack_snapshot(None) == {"status": NOT_AVAILABLE}
+        assert await build_llama_stack_snapshot(None) == {"status": NOT_AVAILABLE}
 
-    def test_nonexistent_file(self) -> None:
+    async def test_nonexistent_file(self) -> None:
         """Test that missing file returns not_available status."""
-        assert build_llama_stack_snapshot("/nonexistent/path.yaml") == {
+        assert await build_llama_stack_snapshot("/nonexistent/path.yaml") == {
             "status": NOT_AVAILABLE
         }
 
-    def test_invalid_yaml(self) -> None:
+    async def test_invalid_yaml(self, tmp_path: Path) -> None:
         """Test that invalid YAML returns not_available status."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(": invalid: yaml: [")
-            path = f.name
-        result = build_llama_stack_snapshot(path)
-        Path(path).unlink()
+        path = tmp_path / "invalid.yaml"
+        path.write_text(": invalid: yaml: [")
+        result = await build_llama_stack_snapshot(str(path))
         assert result == {"status": NOT_AVAILABLE}
 
-    def test_valid_config(self, llama_stack_config_file: str) -> None:
+    async def test_valid_config(self, llama_stack_config_file: str) -> None:
         """Test snapshot from valid llama-stack config."""
-        result = build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_llama_stack_snapshot(llama_stack_config_file)
         assert result["version"] == 2
         assert result["image_name"] == "starter"
         assert result["apis"] == ["agents", "inference", "safety", "vector_io"]
         assert result["external_providers_dir"] == CONFIGURED
 
-    def test_models_extraction(self, llama_stack_config_file: str) -> None:
+    async def test_models_extraction(self, llama_stack_config_file: str) -> None:
         """Test models list extraction."""
-        result = build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_llama_stack_snapshot(llama_stack_config_file)
         models = result["registered_resources"]["models"]
         assert len(models) == 2
         assert models[0]["model_id"] == "gpt-4o-mini"
         assert models[0]["model_type"] == "llm"
 
-    def test_providers_extraction(self, llama_stack_config_file: str) -> None:
+    async def test_providers_extraction(self, llama_stack_config_file: str) -> None:
         """Test provider lists extraction shows only id and type."""
-        result = build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_llama_stack_snapshot(llama_stack_config_file)
         inference = result["providers"]["inference"]
         assert len(inference) == 1
         assert inference[0]["provider_id"] == "openai"
         assert inference[0]["provider_type"] == "remote::openai"
         assert "config" not in inference[0]
 
-    def test_storage_fields(self, llama_stack_config_file: str) -> None:
+    async def test_storage_fields(self, llama_stack_config_file: str) -> None:
         """Test storage store extraction."""
-        result = build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_llama_stack_snapshot(llama_stack_config_file)
         assert result["inference_store"]["type"] == "sql_sqlite"
         assert result["inference_store"]["db_path"] == CONFIGURED
         assert result["metadata_store"]["type"] == "kv_sqlite"
         assert result["metadata_store"]["namespace"] == "registry"
 
-    def test_missing_providers_section(self) -> None:
+    async def test_missing_providers_section(self, tmp_path: Path) -> None:
         """Test config without providers section."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump({"version": 1, "apis": []}, f)
-            path = f.name
-        result = build_llama_stack_snapshot(path)
-        Path(path).unlink()
+        path = tmp_path / "no_providers.yaml"
+        path.write_text(yaml.dump({"version": 1, "apis": []}))
+        result = await build_llama_stack_snapshot(str(path))
         assert result["providers"]["inference"] == NOT_CONFIGURED
 
-    def test_server_fields_masked(self) -> None:
+    async def test_server_fields_masked(self, tmp_path: Path) -> None:
         """Test server host and TLS fields are masked."""
         config = {
             "version": 1,
@@ -565,11 +567,9 @@ class TestBuildLlamaStackSnapshot:
                 "tls_keyfile": "/etc/ssl/key.pem",
             },
         }
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump(config, f)
-            path = f.name
-        result = build_llama_stack_snapshot(path)
-        Path(path).unlink()
+        path = tmp_path / "server.yaml"
+        path.write_text(yaml.dump(config))
+        result = await build_llama_stack_snapshot(str(path))
         assert result["server"]["host"] == CONFIGURED
         assert result["server"]["port"] == 8321
         assert result["server"]["tls_cafile"] == CONFIGURED
@@ -583,17 +583,17 @@ class TestBuildLlamaStackSnapshot:
 class TestBuildConfigurationSnapshot:
     """Tests for build_configuration_snapshot function."""
 
-    def test_combines_both_sources(self) -> None:
+    async def test_combines_both_sources(self) -> None:
         """Test that snapshot contains both lightspeed_stack and llama_stack."""
-        result = build_configuration_snapshot(build_minimal_config(), None)
+        result = await build_configuration_snapshot(build_minimal_config(), None)
         assert "lightspeed_stack" in result
         assert "llama_stack" in result
         assert result["llama_stack"] == {"status": NOT_AVAILABLE}
         assert result["lightspeed_stack"]["name"] == "minimal"
 
-    def test_with_llama_stack_config(self, llama_stack_config_file: str) -> None:
+    async def test_with_llama_stack_config(self, llama_stack_config_file: str) -> None:
         """Test snapshot with both config sources."""
-        result = build_configuration_snapshot(
+        result = await build_configuration_snapshot(
             build_minimal_config(), llama_stack_config_file
         )
         assert result["lightspeed_stack"]["name"] == "minimal"
@@ -618,17 +618,21 @@ class TestPiiLeakPrevention:
                 pii_value not in json_str
             ), f"PII leaked in lightspeed-stack snapshot: '{pii_value}'"
 
-    def test_no_pii_in_llama_stack_snapshot(self, llama_stack_config_file: str) -> None:
+    async def test_no_pii_in_llama_stack_snapshot(
+        self, llama_stack_config_file: str
+    ) -> None:
         """Verify no PII leaks in llama-stack snapshot JSON."""
-        json_str = json.dumps(build_llama_stack_snapshot(llama_stack_config_file))
+        json_str = json.dumps(await build_llama_stack_snapshot(llama_stack_config_file))
         for pii_value in LLAMA_STACK_PII_VALUES:
             assert (
                 pii_value not in json_str
             ), f"PII leaked in llama-stack snapshot: '{pii_value}'"
 
-    def test_no_pii_in_combined_snapshot(self, llama_stack_config_file: str) -> None:
+    async def test_no_pii_in_combined_snapshot(
+        self, llama_stack_config_file: str
+    ) -> None:
         """Verify no PII leaks in the combined snapshot JSON."""
-        snapshot = build_configuration_snapshot(
+        snapshot = await build_configuration_snapshot(
             build_fully_populated_config(), llama_stack_config_file
         )
         json_str = json.dumps(snapshot)
@@ -646,9 +650,11 @@ class TestPiiLeakPrevention:
             not unexpected
         ), f"Snapshot contains unexpected top-level keys: {unexpected}"
 
-    def test_provider_config_not_leaked(self, llama_stack_config_file: str) -> None:
+    async def test_provider_config_not_leaked(
+        self, llama_stack_config_file: str
+    ) -> None:
         """Verify provider config sections (with secrets) are not included."""
-        json_str = json.dumps(build_llama_stack_snapshot(llama_stack_config_file))
+        json_str = json.dumps(await build_llama_stack_snapshot(llama_stack_config_file))
         assert "api_key" not in json_str
         assert "sk-openai" not in json_str
 
@@ -661,10 +667,10 @@ class TestPiiLeakPrevention:
         assert "P@ssw0rd!SuperSecret" not in json_str
         assert "**********" not in json_str
 
-    def test_snapshot_is_json_serializable(self) -> None:
+    async def test_snapshot_is_json_serializable(self) -> None:
         """Verify the snapshot can be serialized to JSON without errors."""
         json_str = json.dumps(
-            build_configuration_snapshot(build_fully_populated_config(), None)
+            await build_configuration_snapshot(build_fully_populated_config(), None)
         )
         assert isinstance(json.loads(json_str), dict)
 

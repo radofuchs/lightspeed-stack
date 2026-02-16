@@ -9,6 +9,7 @@ The snapshot is built as a JSON-serializable dict ready for telemetry emission.
 No integration with ingress is provided here — only methods to build the JSON.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from enum import Enum
@@ -199,7 +200,8 @@ LLAMA_STACK_FIELDS: tuple[FieldSpec | ListFieldSpec, ...] = (
             FieldSpec("provider_id", MaskingType.PASSTHROUGH),
         ),
     ),
-    # Providers — extract only provider_id and provider_type per entry
+    # Providers — extract only provider_id and provider_type per entry.
+    # NOTE: Update this list when llama-stack adds new provider categories.
     *(
         ListFieldSpec(
             f"providers.{provider_name}",
@@ -276,7 +278,9 @@ def _serialize_passthrough(value: Any) -> Any:
         return [_serialize_passthrough(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _serialize_passthrough(v) for k, v in value.items()}
-    # Safety: mask SecretStr and file paths; stringify everything else
+    # Safety: mask SecretStr and file paths; log and stringify everything else
+    if not isinstance(value, (SecretStr, PurePath)):
+        logger.debug("Passthrough fallback to str() for type %s", type(value).__name__)
     return CONFIGURED if isinstance(value, (SecretStr, PurePath)) else str(value)
 
 
@@ -308,7 +312,7 @@ def _set_nested_value(target: dict[str, Any], path: str, value: Any) -> None:
     parts = path.split(".")
     current = target
     for part in parts[:-1]:
-        if part not in current:
+        if part not in current or not isinstance(current[part], dict):
             current[part] = {}
         current = current[part]
     current[parts[-1]] = value
@@ -442,7 +446,24 @@ def build_lightspeed_stack_snapshot(
     return _extract_snapshot_fields(config, LIGHTSPEED_STACK_FIELDS)
 
 
-def build_llama_stack_snapshot(
+def _read_yaml_file(config_path: str) -> Any:
+    """Read and parse a YAML config file synchronously.
+
+    Parameters:
+        config_path: Path to the YAML file.
+
+    Returns:
+        The parsed YAML content, or None on failure.
+    """
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except (OSError, yaml.YAMLError) as e:
+        logger.warning("Failed to read llama-stack config for snapshot: %s", e)
+        return None
+
+
+async def build_llama_stack_snapshot(
     config_path: Optional[str] = None,
 ) -> dict[str, Any]:
     """Build snapshot of llama-stack configuration with PII masking.
@@ -462,12 +483,7 @@ def build_llama_stack_snapshot(
     if config_path is None:
         return {"status": NOT_AVAILABLE}
 
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            ls_config = yaml.safe_load(f)
-    except (OSError, yaml.YAMLError) as e:
-        logger.warning("Failed to read llama-stack config for snapshot: %s", e)
-        return {"status": NOT_AVAILABLE}
+    ls_config = await asyncio.to_thread(_read_yaml_file, config_path)
 
     if not isinstance(ls_config, dict):
         logger.warning("Llama-stack config is not a dict, skipping snapshot")
@@ -479,7 +495,7 @@ def build_llama_stack_snapshot(
     return snapshot
 
 
-def build_configuration_snapshot(
+async def build_configuration_snapshot(
     config: Configuration,
     llama_stack_config_path: Optional[str] = None,
 ) -> dict[str, Any]:
@@ -501,5 +517,5 @@ def build_configuration_snapshot(
     """
     return {
         "lightspeed_stack": build_lightspeed_stack_snapshot(config),
-        "llama_stack": build_llama_stack_snapshot(llama_stack_config_path),
+        "llama_stack": await build_llama_stack_snapshot(llama_stack_config_path),
     }

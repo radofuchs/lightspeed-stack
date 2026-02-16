@@ -1,8 +1,7 @@
 """Shared fixtures for telemetry unit tests."""
 
-import tempfile
-from pathlib import Path, PurePosixPath
-from typing import Any, Generator
+from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -187,9 +186,9 @@ def build_fully_populated_config() -> Configuration:
             access_log=False,
             root_path="",
             tls_config=TLSConfiguration.model_construct(
-                tls_certificate_path=PurePosixPath(PII_TLS_CERT),
-                tls_key_path=PurePosixPath(PII_TLS_KEY),
-                tls_key_password=PurePosixPath(PII_TLS_PASS),
+                tls_certificate_path=Path(PII_TLS_CERT),
+                tls_key_path=Path(PII_TLS_KEY),
+                tls_key_password=Path(PII_TLS_PASS),
             ),
             cors=CORSConfiguration.model_construct(
                 allow_origins=[PII_CORS_ORIGIN, "https://admin.corp.com"],
@@ -214,7 +213,7 @@ def build_fully_populated_config() -> Configuration:
             skip_tls_verification=False,
             skip_for_health_probes=False,
             k8s_cluster_api=PII_K8S_API,
-            k8s_ca_cert_path=PurePosixPath(PII_K8S_CERT),
+            k8s_ca_cert_path=Path(PII_K8S_CERT),
             jwk_config=JwkConfiguration.model_construct(
                 url=PII_JWK_URL,
                 jwt_configuration=JwtConfiguration.model_construct(
@@ -255,7 +254,7 @@ def build_fully_populated_config() -> Configuration:
         ),
         customization=Customization.model_construct(
             system_prompt=PII_SYSTEM_PROMPT,
-            system_prompt_path=PurePosixPath(PII_PROMPT_PATH),
+            system_prompt_path=Path(PII_PROMPT_PATH),
             disable_query_system_prompt=False,
             profile_path=None,
             custom_profile=None,
@@ -275,7 +274,7 @@ def build_fully_populated_config() -> Configuration:
                 namespace=PII_PG_NAMESPACE,
                 ssl_mode="verify-full",
                 gss_encmode="prefer",
-                ca_cert_path=PurePosixPath(PII_PG_CA_CERT),
+                ca_cert_path=Path(PII_PG_CA_CERT),
             ),
         ),
         mcp_servers=[
@@ -375,14 +374,15 @@ def build_minimal_config() -> Configuration:
 
 
 @pytest.fixture(name="llama_stack_config_file")
-def llama_stack_config_file_fixture() -> Generator[str, None, None]:
+def llama_stack_config_file_fixture(tmp_path: Path) -> str:
     """Write SAMPLE_LLAMA_STACK_CONFIG to a temp YAML file and return its path.
 
-    Yields:
+    Parameters:
+        tmp_path: Pytest-managed temporary directory (auto-cleaned).
+
+    Returns:
         str: Path to the temporary YAML file.
     """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        yaml.dump(SAMPLE_LLAMA_STACK_CONFIG, f)
-        path = f.name
-    yield path
-    Path(path).unlink(missing_ok=True)
+    path = tmp_path / "llama_stack_config.yaml"
+    path.write_text(yaml.dump(SAMPLE_LLAMA_STACK_CONFIG))
+    return str(path)
