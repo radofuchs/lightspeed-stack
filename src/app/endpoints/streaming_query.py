@@ -1,8 +1,8 @@
 """Streaming query handler using Responses API."""
 
+import datetime
 import json
 import logging
-from datetime import UTC, datetime
 from typing import Annotated, Any, AsyncIterator, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -34,6 +34,7 @@ from constants import (
     LLM_TOOL_CALL_EVENT,
     LLM_TOOL_RESULT_EVENT,
     LLM_TURN_COMPLETE_EVENT,
+    MEDIA_TYPE_EVENT_STREAM,
     MEDIA_TYPE_JSON,
     MEDIA_TYPE_TEXT,
 )
@@ -144,7 +145,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     check_configuration_loaded(configuration)
 
     user_id, _user_name, _skip_userid_check, token = auth
-    started_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    started_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Check token availability
     check_tokens_available(configuration.quota_limiters, user_id)
@@ -239,7 +240,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
             responses_params=responses_params,
             turn_summary=turn_summary,
         ),
-        media_type=query_request.media_type or MEDIA_TYPE_TEXT,
+        media_type=response_media_type,
     )
 
 
@@ -388,7 +389,7 @@ async def generate_response(
         turn_summary.referenced_documents,
         context.query_request.media_type or MEDIA_TYPE_JSON,
     )
-    completed_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    completed_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Store query results (transcript, conversation details, cache)
     logger.info("Storing query results")

@@ -123,7 +123,7 @@ async def query_endpoint_handler(
     """
     check_configuration_loaded(configuration)
 
-    started_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    started_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     user_id, _, _skip_userid_check, token = auth
     # Check token availability
     check_tokens_available(configuration.quota_limiters, user_id)

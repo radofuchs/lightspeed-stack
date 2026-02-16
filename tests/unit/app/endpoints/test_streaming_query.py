@@ -132,14 +132,12 @@ class TestOLSStreamEventFormatting:
         """Test tool call event formatting for text media type."""
         data = {
             "id": 0,
-            "token": {"tool_name": "search", "arguments": {"query": "test"}},
+            "function_name": "search",
+            "arguments": {"query": "test"},
         }
         result = stream_event(data, LLM_TOOL_CALL_EVENT, MEDIA_TYPE_TEXT)
 
-        expected = (
-            '\nTool call: {"id": 0, "token": '
-            '{"tool_name": "search", "arguments": {"query": "test"}}}\n'
-        )
+        expected = "[Tool Call: search]\n"
         assert result == expected
 
     def test_stream_event_json_tool_result(self) -> None:
@@ -160,14 +158,12 @@ class TestOLSStreamEventFormatting:
         """Test tool result event formatting for text media type."""
         data = {
             "id": 0,
-            "token": {"tool_name": "search", "response": "Found results"},
+            "tool_name": "search",
+            "response": "Found results",
         }
         result = stream_event(data, LLM_TOOL_RESULT_EVENT, MEDIA_TYPE_TEXT)
 
-        expected = (
-            '\nTool result: {"id": 0, "token": '
-            '{"tool_name": "search", "response": "Found results"}}\n'
-        )
+        expected = "[Tool Result]\n"
         assert result == expected
 
     def test_stream_event_unknown_type(self) -> None:
@@ -331,6 +327,14 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.check_configuration_loaded")
         mocker.patch("app.endpoints.streaming_query.check_tokens_available")
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
+        mocker.patch(
+            "app.endpoints.streaming_query.perform_vector_search",
+            new=mocker.AsyncMock(return_value=([], [], [], []))
+        )
+        mocker.patch(
+            "app.endpoints.streaming_query.perform_vector_search",
+            new=mocker.AsyncMock(return_value=([], [], [], []))
+        )
 
         mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
         mock_client_holder = mocker.Mock()
@@ -409,6 +413,10 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.check_configuration_loaded")
         mocker.patch("app.endpoints.streaming_query.check_tokens_available")
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
+        mocker.patch(
+            "app.endpoints.streaming_query.perform_vector_search",
+            new=mocker.AsyncMock(return_value=([], [], [], []))
+        )
 
         mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
         mock_client_holder = mocker.Mock()
@@ -490,6 +498,10 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.check_configuration_loaded")
         mocker.patch("app.endpoints.streaming_query.check_tokens_available")
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
+        mocker.patch(
+            "app.endpoints.streaming_query.perform_vector_search",
+            new=mocker.AsyncMock(return_value=([], [], [], []))
+        )
         mocker.patch(
             "app.endpoints.streaming_query.normalize_conversation_id",
             return_value="normalized_123",
@@ -582,6 +594,10 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.check_configuration_loaded")
         mocker.patch("app.endpoints.streaming_query.check_tokens_available")
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
+        mocker.patch(
+            "app.endpoints.streaming_query.perform_vector_search",
+            new=mocker.AsyncMock(return_value=([], [], [], []))
+        )
         mock_validate = mocker.patch(
             "app.endpoints.streaming_query.validate_attachments_metadata"
         )
@@ -662,6 +678,10 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.check_configuration_loaded")
         mocker.patch("app.endpoints.streaming_query.check_tokens_available")
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
+        mocker.patch(
+            "app.endpoints.streaming_query.perform_vector_search",
+            new=mocker.AsyncMock(return_value=([], [], [], []))
+        )
 
         mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
         mock_client_holder = mocker.Mock()
@@ -787,7 +807,7 @@ class TestCreateResponseGenerator:
         )
 
         generator, turn_summary = await retrieve_response_generator(
-            mock_responses_params, mock_context
+            mock_responses_params, mock_context, []
         )
 
         assert isinstance(turn_summary, TurnSummary)
@@ -824,7 +844,7 @@ class TestCreateResponseGenerator:
         )
 
         _generator, turn_summary = await retrieve_response_generator(
-            mock_responses_params, mock_context
+            mock_responses_params, mock_context, []
         )
 
         assert isinstance(turn_summary, TurnSummary)
@@ -879,7 +899,7 @@ class TestCreateResponseGenerator:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            await retrieve_response_generator(mock_responses_params, mock_context)
+            await retrieve_response_generator(mock_responses_params, mock_context, [])
 
         assert exc_info.value.status_code == 503
 
@@ -929,7 +949,7 @@ class TestCreateResponseGenerator:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            await retrieve_response_generator(mock_responses_params, mock_context)
+            await retrieve_response_generator(mock_responses_params, mock_context, [])
 
         assert exc_info.value.status_code == 500
 
@@ -976,7 +996,7 @@ class TestCreateResponseGenerator:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            await retrieve_response_generator(mock_responses_params, mock_context)
+            await retrieve_response_generator(mock_responses_params, mock_context, [])
 
         assert exc_info.value.status_code == 413
 
@@ -1013,7 +1033,7 @@ class TestCreateResponseGenerator:
         )
 
         with pytest.raises(RuntimeError):
-            await retrieve_response_generator(mock_responses_params, mock_context)
+            await retrieve_response_generator(mock_responses_params, mock_context, [])
 
 
 class TestGenerateResponse:

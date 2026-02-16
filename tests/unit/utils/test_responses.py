@@ -1220,7 +1220,7 @@ class TestBuildToolCallSummary:
         call_summary, result_summary = build_tool_call_summary(mock_item, rag_chunks)
 
         assert call_summary is not None
-        assert call_summary.name == "knowledge_search"
+        assert call_summary.name == "file_search"
         assert len(rag_chunks) == 1
         assert result_summary is not None
         assert result_summary.status == "success"
