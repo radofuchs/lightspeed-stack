@@ -510,6 +510,32 @@ class TestGetMCPTools:
         assert tools[0]["server_label"] == "public-server"
         assert "headers" not in tools[0]
 
+    def test_get_mcp_tools_oauth_no_headers_raises_401_with_www_authenticate(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test get_mcp_tools raises 401 with WWW-Authenticate when OAuth required and no headers."""
+        servers = [
+            ModelContextProtocolServer(
+                name="oauth-server",
+                url="http://localhost:3000",
+                authorization_headers={"Authorization": "oauth"},
+            ),
+        ]
+
+        mock_resp = mocker.Mock()
+        mock_resp.headers = {"WWW-Authenticate": 'Bearer error="invalid_token"'}
+        mocker.patch("utils.responses.requests.get", return_value=mock_resp)
+
+        with pytest.raises(HTTPException) as exc_info:
+            get_mcp_tools(servers, token=None, mcp_headers=None)
+
+        assert exc_info.value.status_code == 401
+        assert exc_info.value.headers is not None
+        assert (
+            exc_info.value.headers.get("WWW-Authenticate")
+            == 'Bearer error="invalid_token"'
+        )
+
 
 class TestGetTopicSummary:
     """Tests for get_topic_summary function."""

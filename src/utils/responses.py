@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Any, Optional, cast
 
+import requests
 from fastapi import HTTPException
 from llama_stack_api.openai_responses import (
     OpenAIResponseObject,
@@ -28,6 +29,7 @@ from models.requests import QueryRequest
 from models.responses import (
     InternalServerErrorResponse,
     ServiceUnavailableResponse,
+    UnauthorizedResponse,
 )
 from utils.prompts import get_system_prompt, get_topic_summary_system_prompt
 from utils.query import (
@@ -313,7 +315,7 @@ def get_rag_tools(vector_store_ids: list[str]) -> Optional[list[dict[str, Any]]]
     ]
 
 
-def get_mcp_tools(
+def get_mcp_tools(  # pylint: disable=too-many-return-statements
     mcp_servers: list[ModelContextProtocolServer],
     token: str | None = None,
     mcp_headers: Optional[McpHeaders] = None,
@@ -327,6 +329,10 @@ def get_mcp_tools(
 
     Returns:
         List of MCP tool definitions with server details and optional auth headers
+
+    Raises:
+        HTTPException: 401 with WWW-Authenticate header when an MCP server uses OAuth,
+            no headers are passed, and the server responds with 401 and WWW-Authenticate.
     """
 
     def _get_token_value(original: str, header: str) -> str | None:
@@ -339,6 +345,14 @@ def get_mcp_tools(
                 return f"Bearer {token}"
             case constants.MCP_AUTH_CLIENT:
                 # use client provided token
+                if mcp_headers is None:
+                    return None
+                c_headers = mcp_headers.get(mcp_server.name, None)
+                if c_headers is None:
+                    return None
+                return c_headers.get(header, None)
+            case constants.MCP_AUTH_OAUTH:
+                # use oauth token
                 if mcp_headers is None:
                     return None
                 c_headers = mcp_headers.get(mcp_server.name, None)
@@ -372,6 +386,23 @@ def get_mcp_tools(
         if mcp_server.authorization_headers and len(headers) != len(
             mcp_server.authorization_headers
         ):
+            # If OAuth was required and no headers passed, probe endpoint and forward
+            # 401 with WWW-Authenticate so the client can perform OAuth
+            uses_oauth = (
+                constants.MCP_AUTH_OAUTH
+                in mcp_server.resolved_authorization_headers.values()
+            )
+            if uses_oauth and (
+                mcp_headers is None or not mcp_headers.get(mcp_server.name)
+            ):
+                resp = requests.get(mcp_server.url, timeout=10)
+                error_response = UnauthorizedResponse(
+                    cause=f"MCP server at {mcp_server.url} requires OAuth authentication",
+                )
+                raise HTTPException(
+                    **error_response.model_dump(),
+                    headers={"WWW-Authenticate": resp.headers["WWW-Authenticate"]},
+                )
             logger.warning(
                 "Skipping MCP server %s: required %d auth headers but only resolved %d",
                 mcp_server.name,

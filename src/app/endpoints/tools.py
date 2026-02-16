@@ -2,9 +2,10 @@
 
 import logging
 from typing import Annotated, Any
+import requests
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from llama_stack_client import APIConnectionError, BadRequestError
+from llama_stack_client import APIConnectionError, BadRequestError, AuthenticationError
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
@@ -89,6 +90,18 @@ async def tools_endpoint_handler(  # pylint: disable=too-many-locals
         except BadRequestError:
             logger.error("Toolgroup %s is not found", toolgroup.identifier)
             continue
+        except AuthenticationError as e:
+            logger.error("Authentication error: %s", e)
+            if toolgroup.mcp_endpoint:
+                resp = requests.get(toolgroup.mcp_endpoint.uri, timeout=10)
+                cause = f"MCP server at {toolgroup.mcp_endpoint.uri} requires OAuth"
+                error_response = UnauthorizedResponse(cause=cause)
+                raise HTTPException(
+                    **error_response.model_dump(),
+                    headers={"WWW-Authenticate": resp.headers["WWW-Authenticate"]},
+                ) from e
+            error_response = UnauthorizedResponse(cause=str(e))
+            raise HTTPException(**error_response.model_dump()) from e
         except APIConnectionError as e:
             logger.error("Unable to connect to Llama Stack: %s", e)
             response = ServiceUnavailableResponse(
