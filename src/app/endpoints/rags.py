@@ -11,8 +11,8 @@ from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
 from client import AsyncLlamaStackClientHolder
-from configuration import LogicError, configuration
-from models.config import Action
+from configuration import configuration
+from models.config import Action, ByokRag
 from models.responses import (
     ForbiddenResponse,
     InternalServerErrorResponse,
@@ -104,7 +104,7 @@ async def rags_endpoint_handler(
         raise HTTPException(**response.model_dump()) from e
 
 
-def _resolve_rag_id_to_vector_db_id(rag_id: str) -> str:
+def _resolve_rag_id_to_vector_db_id(rag_id: str, byok_rags: list[ByokRag]) -> str:
     """Resolve a user-facing rag_id to the llama-stack vector_db_id.
 
     Checks if the given ID matches a rag_id in the BYOK config and returns
@@ -113,15 +113,11 @@ def _resolve_rag_id_to_vector_db_id(rag_id: str) -> str:
 
     Parameters:
         rag_id: The user-provided RAG identifier.
+        byok_rags: List of BYOK RAG config entries.
 
     Returns:
         The llama-stack vector_db_id, or the original ID if no mapping found.
     """
-    try:
-        byok_rags = configuration.configuration.byok_rag
-    except (AttributeError, RuntimeError, LogicError):
-        return rag_id
-
     for brag in byok_rags:
         if brag.rag_id == rag_id:
             return brag.vector_db_id
@@ -164,7 +160,9 @@ async def get_rag_endpoint_handler(
     logger.info("Llama stack config: %s", llama_stack_configuration)
 
     # Resolve user-facing rag_id to llama-stack vector_db_id
-    vector_db_id = _resolve_rag_id_to_vector_db_id(rag_id)
+    vector_db_id = _resolve_rag_id_to_vector_db_id(
+        rag_id, configuration.configuration.byok_rag
+    )
 
     try:
         # try to get Llama Stack client

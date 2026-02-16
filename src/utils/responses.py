@@ -407,7 +407,7 @@ def get_mcp_tools(
     return tools
 
 
-def parse_referenced_documents(
+def parse_referenced_documents(  # pylint: disable=too-many-locals
     response: Optional[OpenAIResponseObject],
     vector_store_ids: Optional[list[str]] = None,
     rag_id_mapping: Optional[dict[str, str]] = None,
@@ -430,9 +430,8 @@ def parse_referenced_documents(
     if response is None or not response.output:
         return documents
 
-    resolved_source = _resolve_single_store_source(
-        vector_store_ids or [], rag_id_mapping or {}
-    )
+    vs_ids = vector_store_ids or []
+    id_mapping = rag_id_mapping or {}
 
     for output_item in response.output:
         item_type = getattr(output_item, "type", None)
@@ -440,6 +439,8 @@ def parse_referenced_documents(
         if item_type == "file_search_call":
             results = getattr(output_item, "results", []) or []
             for result in results:
+                resolved_source = _resolve_source_for_result(result, vs_ids, id_mapping)
+
                 # Handle both object and dict access
                 if isinstance(result, dict):
                     attributes = result.get("attributes", {})
@@ -470,26 +471,6 @@ def parse_referenced_documents(
                         seen_docs.add((final_url, doc_title))
 
     return documents
-
-
-def _resolve_single_store_source(
-    vector_store_ids: list[str],
-    rag_id_mapping: dict[str, str],
-) -> Optional[str]:
-    """Resolve source name when there is exactly one vector store.
-
-    Parameters:
-        vector_store_ids: The vector store IDs used in the query.
-        rag_id_mapping: Mapping from vector_db_id to user-facing rag_id.
-
-    Returns:
-        The resolved rag_id (or raw store_id as fallback) if exactly one
-        store is used, None otherwise.
-    """
-    if len(vector_store_ids) == 1:
-        store_id = vector_store_ids[0]
-        return rag_id_mapping.get(store_id, store_id)
-    return None
 
 
 def extract_token_usage(
