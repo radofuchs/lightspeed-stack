@@ -254,15 +254,17 @@ async def query_endpoint_handler(
 def parse_referenced_docs(
     docs: list[ReferencedDocument],
 ) -> list[ReferencedDocument]:
+    """Remove duplicate referenced documents based on URL and title."""
     seen: set[tuple[str | None, str | None]] = set()
     out: list[ReferencedDocument] = []
     for d in docs:
-        key = (d.doc_url, d.doc_title)
+        key = (str(d.doc_url) if d.doc_url else None, d.doc_title)
         if key in seen:
             continue
         seen.add(key)
         out.append(d)
     return out
+
 
 async def retrieve_response(  # pylint: disable=too-many-locals
     client: AsyncLlamaStackClient,

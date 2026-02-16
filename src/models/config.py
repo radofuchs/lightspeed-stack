@@ -1658,8 +1658,15 @@ class SolrConfiguration(ConfigurationBase):
     """Solr configuration for vector search queries.
 
     Controls whether to use offline or online mode when building document URLs
-    from vector search results.
+    from vector search results, and enables/disables Solr vector IO functionality.
     """
+
+    enabled: bool = Field(
+        False,
+        title="Solr enabled",
+        description="When True, enables Solr vector IO functionality for vector search queries. "
+        "When False, disables Solr vector search processing.",
+    )
 
     offline: bool = Field(
         True,

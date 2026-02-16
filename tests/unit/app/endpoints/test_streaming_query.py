@@ -329,11 +329,11 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
         mocker.patch(
             "app.endpoints.streaming_query.perform_vector_search",
-            new=mocker.AsyncMock(return_value=([], [], [], []))
+            new=mocker.AsyncMock(return_value=([], [], [], [])),
         )
         mocker.patch(
             "app.endpoints.streaming_query.perform_vector_search",
-            new=mocker.AsyncMock(return_value=([], [], [], []))
+            new=mocker.AsyncMock(return_value=([], [], [], [])),
         )
 
         mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
@@ -415,7 +415,7 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
         mocker.patch(
             "app.endpoints.streaming_query.perform_vector_search",
-            new=mocker.AsyncMock(return_value=([], [], [], []))
+            new=mocker.AsyncMock(return_value=([], [], [], [])),
         )
 
         mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
@@ -500,7 +500,7 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
         mocker.patch(
             "app.endpoints.streaming_query.perform_vector_search",
-            new=mocker.AsyncMock(return_value=([], [], [], []))
+            new=mocker.AsyncMock(return_value=([], [], [], [])),
         )
         mocker.patch(
             "app.endpoints.streaming_query.normalize_conversation_id",
@@ -596,7 +596,7 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
         mocker.patch(
             "app.endpoints.streaming_query.perform_vector_search",
-            new=mocker.AsyncMock(return_value=([], [], [], []))
+            new=mocker.AsyncMock(return_value=([], [], [], [])),
         )
         mock_validate = mocker.patch(
             "app.endpoints.streaming_query.validate_attachments_metadata"
@@ -680,7 +680,7 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch("app.endpoints.streaming_query.validate_model_provider_override")
         mocker.patch(
             "app.endpoints.streaming_query.perform_vector_search",
-            new=mocker.AsyncMock(return_value=([], [], [], []))
+            new=mocker.AsyncMock(return_value=([], [], [], [])),
         )
 
         mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)

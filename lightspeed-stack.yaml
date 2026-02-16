@@ -33,4 +33,5 @@ authentication:
 
 
 solr:
-  offline: True
+  enabled: true
+  offline: true

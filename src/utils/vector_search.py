@@ -9,6 +9,8 @@ import traceback
 from typing import Any, Optional
 from urllib.parse import urljoin
 
+from pydantic import AnyUrl
+
 from llama_stack_client import AsyncLlamaStackClient
 
 import constants
@@ -18,6 +20,113 @@ from models.responses import ReferencedDocument
 from utils.types import RAGChunk
 
 logger = logging.getLogger(__name__)
+
+
+def _is_solr_enabled(configuration: AppConfig) -> bool:
+    """Check if Solr is enabled in configuration."""
+    return bool(configuration.solr and configuration.solr.enabled)
+
+
+def _get_vector_store_ids(solr_enabled: bool) -> list[str]:
+    """Get vector store IDs based on Solr configuration."""
+    if solr_enabled:
+        vector_store_ids = ["portal-rag"]
+        logger.info(
+            "Using portal-rag vector store for Solr query: %s",
+            vector_store_ids,
+        )
+        return vector_store_ids
+    return []
+
+
+def _build_query_params(query_request: QueryRequest) -> dict:
+    """Build query parameters for vector search."""
+    params = {
+        "k": constants.VECTOR_SEARCH_DEFAULT_K,
+        "score_threshold": constants.VECTOR_SEARCH_DEFAULT_SCORE_THRESHOLD,
+        "mode": constants.VECTOR_SEARCH_DEFAULT_MODE,
+    }
+    logger.info("Initial params: %s", params)
+    logger.info("query_request.solr: %s", query_request.solr)
+
+    if query_request.solr:
+        params["solr"] = query_request.solr
+        logger.info("Final params with solr filters: %s", params)
+    else:
+        logger.info("No solr filters provided")
+
+    logger.info("Final params being sent to vector_io.query: %s", params)
+    return params
+
+
+def _extract_document_metadata(
+    chunk: Any,
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Extract document ID, title, and reference URL from chunk metadata."""
+    # 1) dict metadata
+    metadata = getattr(chunk, "metadata", None) or {}
+    doc_id = metadata.get("doc_id") or metadata.get("document_id")
+    title = metadata.get("title")
+    reference_url = metadata.get("reference_url")
+
+    # 2) typed chunk_metadata
+    if not doc_id:
+        chunk_meta = getattr(chunk, "chunk_metadata", None)
+        if chunk_meta is not None:
+            if isinstance(chunk_meta, dict):
+                doc_id = chunk_meta.get("doc_id") or chunk_meta.get("document_id")
+                title = title or chunk_meta.get("title")
+                reference_url = chunk_meta.get("reference_url")
+            else:
+                doc_id = getattr(chunk_meta, "doc_id", None) or getattr(
+                    chunk_meta, "document_id", None
+                )
+                title = title or getattr(chunk_meta, "title", None)
+                reference_url = getattr(chunk_meta, "reference_url", None)
+
+    return doc_id, title, reference_url
+
+
+def _process_chunks_for_documents(
+    chunks: list[Any], offline: bool
+) -> list[ReferencedDocument]:
+    """Process chunks to extract referenced documents."""
+    doc_ids_from_chunks = []
+    metadata_doc_ids = set()
+
+    for chunk in chunks:
+        logger.info("Extract doc ids from chunk: %s", chunk)
+
+        doc_id, title, reference_url = _extract_document_metadata(chunk)
+
+        if not doc_id and not reference_url:
+            continue
+
+        # Build URL based on offline flag
+        doc_url, reference_doc = _build_document_url(offline, doc_id, reference_url)
+
+        if reference_doc and reference_doc not in metadata_doc_ids:
+            metadata_doc_ids.add(reference_doc)
+            # Convert string URL to AnyUrl if valid
+            parsed_url: Optional[AnyUrl] = None
+            if doc_url:
+                try:
+                    parsed_url = AnyUrl(doc_url)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    parsed_url = None
+
+            doc_ids_from_chunks.append(
+                ReferencedDocument(
+                    doc_title=title,
+                    doc_url=parsed_url,
+                )
+            )
+
+    logger.info(
+        "Extracted %d unique document IDs from chunks",
+        len(doc_ids_from_chunks),
+    )
+    return doc_ids_from_chunks
 
 
 async def perform_vector_search(
@@ -40,49 +149,25 @@ async def perform_vector_search(
         - doc_ids_from_chunks: Referenced documents extracted from chunks
         - rag_chunks: Processed RAG chunks ready for use
     """
-    retrieved_chunks = []
-    retrieved_scores = []
-    doc_ids_from_chunks = []
-    rag_chunks = []
+    retrieved_chunks: list[Any] = []
+    retrieved_scores: list[float] = []
+    doc_ids_from_chunks: list[ReferencedDocument] = []
+    rag_chunks: list[RAGChunk] = []
+
+    # Check if Solr is enabled in configuration
+    if not _is_solr_enabled(configuration):
+        logger.info("Solr vector IO is disabled, skipping vector search")
+        return retrieved_chunks, retrieved_scores, doc_ids_from_chunks, rag_chunks
 
     # Get offline setting from configuration
     offline = configuration.solr.offline if configuration.solr else True
 
     try:
-        # Get vector stores for direct querying
-        if query_request.vector_store_ids:
-            vector_store_ids = query_request.vector_store_ids
-            logger.info(
-                "Using specified vector_store_ids for direct query: %s",
-                vector_store_ids,
-            )
-        else:
-            vector_store_ids = [
-                vector_store.id
-                for vector_store in (await client.vector_stores.list()).data
-            ]
-            logger.info(
-                "Using all available vector_store_ids for direct query: %s",
-                vector_store_ids,
-            )
+        vector_store_ids = _get_vector_store_ids(True)
 
         if vector_store_ids:
-            vector_store_id = vector_store_ids[0]  # Use first available vector store
-
-            params = {
-                "k": constants.VECTOR_SEARCH_DEFAULT_K,
-                "score_threshold": constants.VECTOR_SEARCH_DEFAULT_SCORE_THRESHOLD,
-                "mode": constants.VECTOR_SEARCH_DEFAULT_MODE,
-            }
-            logger.info("Initial params: %s", params)
-            logger.info("query_request.solr: %s", query_request.solr)
-            if query_request.solr:
-                # Pass the entire solr dict under the 'solr' key
-                params["solr"] = query_request.solr
-                logger.info("Final params with solr filters: %s", params)
-            else:
-                logger.info("No solr filters provided")
-            logger.info("Final params being sent to vector_io.query: %s", params)
+            vector_store_id = vector_store_ids[0]
+            params = _build_query_params(query_request)
 
             query_response = await client.vector_io.query(
                 vector_store_id=vector_store_id,
@@ -99,60 +184,8 @@ async def perform_vector_search(
                 )
 
                 # Extract doc_ids from chunks for referenced_documents
-                metadata_doc_ids = set()
-
-                for chunk in query_response.chunks:
-                    logger.info("Extract doc ids from chunk: %s", chunk)
-
-                    # 1) dict metadata
-                    metadata = getattr(chunk, "metadata", None) or {}
-                    doc_id = metadata.get("doc_id") or metadata.get("document_id")
-                    title = metadata.get("title")
-
-                    # 2) typed chunk_metadata
-                    if not doc_id:
-                        chunk_meta = getattr(chunk, "chunk_metadata", None)
-                        if chunk_meta is not None:
-                            # chunk_meta might be a pydantic model or a dict depending on caller
-                            if isinstance(chunk_meta, dict):
-                                doc_id = chunk_meta.get("doc_id") or chunk_meta.get(
-                                    "document_id"
-                                )
-                                title = title or chunk_meta.get("title")
-                                reference_url = chunk_meta.get("reference_url")
-                            else:
-                                doc_id = getattr(chunk_meta, "doc_id", None) or getattr(
-                                    chunk_meta, "document_id", None
-                                )
-                                title = title or getattr(chunk_meta, "title", None)
-                                reference_url = getattr(
-                                    chunk_meta, "reference_url", None
-                                )
-                        else:
-                            reference_url = None
-                    else:
-                        reference_url = metadata.get("reference_url")
-
-                    if not doc_id and not reference_url:
-                        continue
-
-                    # Build URL based on offline flag
-                    doc_url, reference_doc = _build_document_url(
-                        offline, doc_id, reference_url
-                    )
-
-                    if reference_doc and reference_doc not in metadata_doc_ids:
-                        metadata_doc_ids.add(reference_doc)
-                        doc_ids_from_chunks.append(
-                            ReferencedDocument(
-                                doc_title=title,
-                                doc_url=doc_url,
-                            )
-                        )
-
-                logger.info(
-                    "Extracted %d unique document IDs from chunks",
-                    len(doc_ids_from_chunks),
+                doc_ids_from_chunks = _process_chunks_for_documents(
+                    query_response.chunks, offline
                 )
 
                 # Convert retrieved chunks to RAGChunk format
@@ -161,7 +194,7 @@ async def perform_vector_search(
                 )
                 logger.info("Retrieved %d chunks from vector DB", len(rag_chunks))
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.warning("Failed to query vector database for chunks: %s", e)
         logger.debug("Vector DB query error details: %s", traceback.format_exc())
         # Continue without RAG chunks

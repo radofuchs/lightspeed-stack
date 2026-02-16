@@ -2,7 +2,6 @@
 # pyright: reportCallIssue=false
 """Unit tests for the /query (v2) REST API endpoint using Responses API."""
 
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -13,7 +12,6 @@ from pytest_mock import MockerFixture
 
 from app.endpoints.query import query_endpoint_handler, retrieve_response
 from configuration import AppConfig
-from models.config import ModelContextProtocolServer
 from models.database.conversations import UserConversation
 from models.requests import Attachment, QueryRequest
 from models.responses import QueryResponse
@@ -42,9 +40,6 @@ def create_dummy_request() -> Request:
     req = Request(scope={"type": "http"})
     return req
 
-    # Test with mcp_headers=None (server should be skipped since auth is required but unavailable)
-    tools_no_headers = get_mcp_tools(servers, token=None, mcp_headers=None)
-    assert len(tools_no_headers) == 0  # Server skipped due to missing required auth
 
 @pytest.fixture(name="setup_configuration")
 def setup_configuration_fixture() -> AppConfig:
