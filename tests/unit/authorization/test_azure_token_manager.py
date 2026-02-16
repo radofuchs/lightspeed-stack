@@ -12,6 +12,7 @@ from azure.core.exceptions import ClientAuthenticationError
 from pydantic import SecretStr
 from pytest_mock import MockerFixture
 
+from authorization import azure_token_manager
 from authorization.azure_token_manager import (
     AzureEntraIDManager,
     TOKEN_EXPIRATION_LEEWAY,
@@ -136,7 +137,7 @@ class TestAzureEntraIDTokenManager:
             return_value=mock_credential_instance,
         )
 
-        azure_logger = logging.getLogger("authorization.azure_token_manager")
+        azure_logger = logging.getLogger(azure_token_manager.__name__)
         azure_logger.propagate = True
         try:
             with caplog.at_level("WARNING"):

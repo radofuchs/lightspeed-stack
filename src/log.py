@@ -28,6 +28,10 @@ def get_logger(name: str) -> logging.Logger:
     if any(isinstance(h, RichHandler) for h in logger.handlers):
         return logger
 
+    # Attach RichHandler before any log calls so warnings use consistent formatting
+    logger.handlers = [RichHandler()]
+    logger.propagate = False
+
     # Read log level from environment variable with default fallback
     level_str = os.environ.get(LIGHTSPEED_STACK_LOG_LEVEL_ENV_VAR, DEFAULT_LOG_LEVEL)
 
@@ -42,6 +46,4 @@ def get_logger(name: str) -> logging.Logger:
         validated_level = getattr(logging, DEFAULT_LOG_LEVEL)
 
     logger.setLevel(validated_level)
-    logger.handlers = [RichHandler()]
-    logger.propagate = False
     return logger

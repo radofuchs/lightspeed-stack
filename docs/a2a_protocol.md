@@ -771,7 +771,7 @@ service:
   color_log: true
 ```
 
-Check logs for entries from `app.endpoints.health` logger.
+Check logs for entries from `app.endpoints.a2a` logger.
 
 ## Protocol Version
 
