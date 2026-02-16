@@ -1,8 +1,8 @@
 """Streaming query handler using Responses API."""
 
+import datetime
 import json
 import logging
-from datetime import UTC, datetime
 from typing import Annotated, Any, AsyncIterator, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -53,7 +53,7 @@ from models.responses import (
     UnauthorizedResponse,
     UnprocessableEntityResponse,
 )
-from utils.types import ReferencedDocument
+from utils.types import RAGChunk, ReferencedDocument
 from utils.endpoints import (
     check_configuration_loaded,
     validate_and_retrieve_conversation,
@@ -85,6 +85,7 @@ from utils.shields import (
 from utils.suid import normalize_conversation_id
 from utils.token_counter import TokenCounter
 from utils.types import ResponsesApiParams, TurnSummary
+from utils.vector_search import format_rag_context_for_injection, perform_vector_search
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["streaming_query"])
@@ -100,7 +101,7 @@ streaming_query_responses: dict[int | str, dict[str, Any]] = {
     404: NotFoundResponse.openapi_response(
         examples=["conversation", "model", "provider"]
     ),
-    413: PromptTooLongResponse.openapi_response(),
+    # 413: PromptTooLongResponse.openapi_response(),
     422: UnprocessableEntityResponse.openapi_response(),
     429: QuotaExceededResponse.openapi_response(),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
@@ -144,7 +145,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     check_configuration_loaded(configuration)
 
     user_id, _user_name, _skip_userid_check, token = auth
-    started_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    started_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Check token availability
     check_tokens_available(configuration.quota_limiters, user_id)
@@ -171,6 +172,17 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         )
 
     client = AsyncLlamaStackClientHolder().get_client()
+
+    pre_rag_chunks: list[RAGChunk] = []
+    doc_ids_from_chunks: list[ReferencedDocument] = []
+
+    _, _, doc_ids_from_chunks, pre_rag_chunks = await perform_vector_search(
+        client, query_request, configuration
+    )
+    rag_context = format_rag_context_for_injection(pre_rag_chunks)
+    if rag_context:
+        query_request = query_request.model_copy(deep=True)
+        query_request.query = query_request.query + rag_context
 
     # Prepare API request parameters
     responses_params = await prepare_responses_params(
@@ -212,6 +224,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     generator, turn_summary = await retrieve_response_generator(
         responses_params=responses_params,
         context=context,
+        doc_ids_from_chunks=doc_ids_from_chunks,
     )
 
     response_media_type = (
@@ -234,6 +247,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
 async def retrieve_response_generator(
     responses_params: ResponsesApiParams,
     context: ResponseGeneratorContext,
+    doc_ids_from_chunks: list[ReferencedDocument],
 ) -> tuple[AsyncIterator[str], TurnSummary]:
     """
     Retrieve the appropriate response generator.
@@ -273,6 +287,8 @@ async def retrieve_response_generator(
         response = await context.client.responses.create(
             **responses_params.model_dump()
         )
+        # Store pre-RAG documents for later merging
+        turn_summary.pre_rag_documents = doc_ids_from_chunks
         return response_generator(response, context, turn_summary), turn_summary
 
     # Handle know LLS client errors only at stream creation time and shield execution
@@ -373,7 +389,7 @@ async def generate_response(
         turn_summary.referenced_documents,
         context.query_request.media_type or MEDIA_TYPE_JSON,
     )
-    completed_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    completed_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Store query results (transcript, conversation details, cache)
     logger.info("Storing query results")
@@ -571,9 +587,21 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
     turn_summary.token_usage = extract_token_usage(
         latest_response_object, context.model_id
     )
-    turn_summary.referenced_documents = parse_referenced_documents(
-        latest_response_object
-    )
+    tool_based_documents = parse_referenced_documents(latest_response_object)
+
+    # Merge pre-RAG documents with tool-based documents (similar to query.py)
+    if turn_summary.pre_rag_documents:
+        all_documents = turn_summary.pre_rag_documents + tool_based_documents
+        seen = set()
+        deduplicated_documents = []
+        for doc in all_documents:
+            key = (doc.doc_url, doc.doc_title)
+            if key not in seen:
+                seen.add(key)
+                deduplicated_documents.append(doc)
+        turn_summary.referenced_documents = deduplicated_documents
+    else:
+        turn_summary.referenced_documents = tool_based_documents
 
 
 def stream_http_error_event(
@@ -608,7 +636,7 @@ def stream_http_error_event(
 
 def format_stream_data(d: dict) -> str:
     """
-    Format a dictionary as a Server-Sent Events (SSE) data string.
+    Create a response generator function for Responses API streaming.
 
     Parameters:
         d (dict): The data to be formatted as an SSE event.
@@ -694,22 +722,24 @@ def stream_event(data: dict, event_type: str, media_type: str) -> str:
     """Build an item to yield based on media type.
 
     Args:
-        data: The data to yield.
-        event_type: The type of event (e.g. token, tool request, tool execution).
-        media_type: Media type of the response (e.g. text or JSON).
+        data: Dictionary containing the event data
+        event_type: Type of event (token, tool call, etc.)
+        media_type: The media type for the response format
 
     Returns:
-        str: The formatted string or JSON to yield.
+        SSE-formatted string representing the event
     """
     if media_type == MEDIA_TYPE_TEXT:
         if event_type == LLM_TOKEN_EVENT:
-            return data["token"]
+            return data.get("token", "")
         if event_type == LLM_TOOL_CALL_EVENT:
-            return f"\nTool call: {json.dumps(data)}\n"
+            return f"[Tool Call: {data.get('function_name', 'unknown')}]\n"
         if event_type == LLM_TOOL_RESULT_EVENT:
-            return f"\nTool result: {json.dumps(data)}\n"
-        logger.error("Unknown event type: %s", event_type)
+            return "[Tool Result]\n"
+        if event_type == LLM_TURN_COMPLETE_EVENT:
+            return ""
         return ""
+
     return format_stream_data(
         {
             "event": event_type,

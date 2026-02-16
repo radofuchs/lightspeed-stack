@@ -7,18 +7,18 @@ from typing import AsyncIterator, Awaitable, Callable
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.routing import Mount, Route, WebSocketRoute
 from llama_stack_client import APIConnectionError
+from starlette.routing import Mount, Route, WebSocketRoute
 
-from authorization.azure_token_manager import AzureEntraIDManager
 import metrics
 import version
+from a2a_storage import A2AStorageFactory
 from app import routers
 from app.database import create_tables, initialize_database
+from authorization.azure_token_manager import AzureEntraIDManager
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from log import get_logger
-from a2a_storage import A2AStorageFactory
 from models.responses import InternalServerErrorResponse
 from utils.common import register_mcp_servers_async
 from utils.llama_stack_version import check_llama_stack_version
