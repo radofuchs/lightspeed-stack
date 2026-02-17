@@ -61,8 +61,7 @@ def update_user_conversation(session: Session, id: str) -> None:
 
     Parameters:
         session (Session): SQLAlchemy session used to persist the record.
-        id (Optional[str]): Optional explicit ID to assign to the new conversation.
-            If not provided, a generated suid will be used.
+        id (str): Explicit ID to assign to the new conversation.
 
     Returns:
         None
