@@ -418,7 +418,7 @@ def _extract_store_info(ls_config: dict[str, Any], store_name: str) -> dict[str,
 
     result: dict[str, Any] = {
         "type": backend.get("type", NOT_CONFIGURED),
-        "db_path": CONFIGURED if backend.get("db_path") else NOT_CONFIGURED,
+        "db_path": CONFIGURED if backend.get("db_path") is not None else NOT_CONFIGURED,
     }
 
     if store_name == "metadata":
