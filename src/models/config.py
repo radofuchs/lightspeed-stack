@@ -508,8 +508,8 @@ class ModelContextProtocolServer(ConfigurationBase):
             "There are 3 special cases: "
             "1. Usage of the kubernetes token in the header. "
             "To specify this use a string 'kubernetes' instead of the file path. "
-            "2. Usage of the client provided token in the header. "
-            "To specify this use a string 'client' instead of the file path."
+            "2. Usage of the client-provided token in the header. "
+            "To specify this use a string 'client' instead of the file path. "
             "3. Usage of the oauth token in the header. "
             "To specify this use a string 'oauth' instead of the file path. "
         ),

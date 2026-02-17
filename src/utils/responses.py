@@ -4,7 +4,6 @@ import json
 import logging
 from typing import Any, Optional, cast
 
-import requests
 from fastapi import HTTPException
 from llama_stack_api.openai_responses import (
     OpenAIResponseObject,
@@ -29,8 +28,8 @@ from models.requests import QueryRequest
 from models.responses import (
     InternalServerErrorResponse,
     ServiceUnavailableResponse,
-    UnauthorizedResponse,
 )
+from utils.mcp_oauth_probe import probe_mcp_oauth_and_raise_401
 from utils.prompts import get_system_prompt, get_topic_summary_system_prompt
 from utils.query import (
     evaluate_model_hints,
@@ -185,7 +184,7 @@ async def prepare_tools(
         toolgroups.extend(rag_tools)
 
     # Add MCP server tools
-    mcp_tools = get_mcp_tools(config.mcp_servers, token, mcp_headers)
+    mcp_tools = await get_mcp_tools(config.mcp_servers, token, mcp_headers)
     if mcp_tools:
         toolgroups.extend(mcp_tools)
         logger.debug(
@@ -315,7 +314,7 @@ def get_rag_tools(vector_store_ids: list[str]) -> Optional[list[dict[str, Any]]]
     ]
 
 
-def get_mcp_tools(  # pylint: disable=too-many-return-statements
+async def get_mcp_tools(  # pylint: disable=too-many-return-statements,too-many-locals
     mcp_servers: list[ModelContextProtocolServer],
     token: str | None = None,
     mcp_headers: Optional[McpHeaders] = None,
@@ -395,14 +394,7 @@ def get_mcp_tools(  # pylint: disable=too-many-return-statements
             if uses_oauth and (
                 mcp_headers is None or not mcp_headers.get(mcp_server.name)
             ):
-                resp = requests.get(mcp_server.url, timeout=10)
-                error_response = UnauthorizedResponse(
-                    cause=f"MCP server at {mcp_server.url} requires OAuth authentication",
-                )
-                raise HTTPException(
-                    **error_response.model_dump(),
-                    headers={"WWW-Authenticate": resp.headers["WWW-Authenticate"]},
-                )
+                await probe_mcp_oauth_and_raise_401(mcp_server.url)
             logger.warning(
                 "Skipping MCP server %s: required %d auth headers but only resolved %d",
                 mcp_server.name,

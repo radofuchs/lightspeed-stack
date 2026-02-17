@@ -658,9 +658,17 @@ async def test_tools_endpoint_authentication_error_with_mcp_endpoint(
     )
     mock_client.tools.list.side_effect = auth_error
 
-    mock_resp = mocker.Mock()
-    mock_resp.headers = {"WWW-Authenticate": 'Bearer error="invalid_token"'}
-    mocker.patch("app.endpoints.tools.requests.get", return_value=mock_resp)
+    expected_headers = {"WWW-Authenticate": 'Bearer error="invalid_token"'}
+    probe_exception = HTTPException(
+        status_code=401,
+        detail={"cause": "MCP server at http://localhost:3000 requires OAuth"},
+        headers=expected_headers,
+    )
+    mocker.patch(
+        "app.endpoints.tools.probe_mcp_oauth_and_raise_401",
+        new_callable=mocker.AsyncMock,
+        side_effect=probe_exception,
+    )
 
     mock_request = mocker.Mock()
     mock_auth = MOCK_AUTH
