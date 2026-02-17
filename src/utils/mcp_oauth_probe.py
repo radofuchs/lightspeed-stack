@@ -1,7 +1,5 @@
 """Probe MCP server for OAuth and raise 401 with WWW-Authenticate when required."""
 
-from typing import Optional
-
 import aiohttp
 from fastapi import HTTPException
 
@@ -14,8 +12,7 @@ logger = get_logger(__name__)
 
 async def probe_mcp_oauth_and_raise_401(
     url: str,
-    *,
-    chain_from: Optional[BaseException] = None,
+    chain_from: BaseException | None = None,
 ) -> None:
     """Probe MCP endpoint and raise 401 so the client can perform OAuth.
 
@@ -25,8 +22,11 @@ async def probe_mcp_oauth_and_raise_401(
 
     Args:
         url: MCP server URL to probe.
-        chain_from: Optional exception to chain the HTTPException from when
+        chain_from: Exception to chain the HTTPException from when
             the probe succeeds (e.g. the original AuthenticationError).
+
+    Returns:
+        None. Always raises an HTTPException.
 
     Raises:
         HTTPException: 401 with WWW-Authenticate when the probe succeeds, or
