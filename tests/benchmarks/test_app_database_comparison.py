@@ -13,7 +13,7 @@ from .db_benchmarks import (
 )
 
 # number of records to be stored in database before benchmarks
-DB_RECORDS_COUNT = 100
+DB_RECORDS_COUNT = 10000
 
 
 @pytest.mark.parametrize("db_fixture", ["sqlite_database", "postgres_database"])
@@ -95,7 +95,7 @@ def test_list_conversations_for_one_user(
 
 
 @pytest.mark.parametrize("db_fixture", ["sqlite_database", "postgres_database"])
-def test_retrieve_conversation(
+def test_retrieve_conversation_for_all_users(
     request: pytest.FixtureRequest,
     db_fixture: str,
     benchmark: BenchmarkFixture,
