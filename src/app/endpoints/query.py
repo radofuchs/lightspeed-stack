@@ -3,7 +3,6 @@
 """Handler for REST API call to provide answer to query using Response API."""
 
 import datetime
-import logging
 from typing import Annotated, Any, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -71,8 +70,9 @@ from utils.types import (
     TurnSummary,
 )
 from utils.vector_search import perform_vector_search, format_rag_context_for_injection
+from log import get_logger
 
-logger = logging.getLogger("app.endpoints.handlers")
+logger = get_logger(__name__)
 router = APIRouter(tags=["query"])
 
 query_response: dict[int | str, dict[str, Any]] = {
