@@ -4,7 +4,7 @@
 
 import datetime
 import logging
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from llama_stack_api.openai_responses import OpenAIResponseObject
@@ -56,6 +56,7 @@ from utils.responses import (
     build_tool_call_summary,
     extract_text_from_response_output_item,
     extract_token_usage,
+    extract_vector_store_ids_from_tools,
     get_topic_summary,
     parse_referenced_documents,
     prepare_responses_params,
@@ -184,8 +185,14 @@ async def query_endpoint_handler(
     ):
         client = await update_azure_token(client)
 
+    # Build index identification mapping for RAG source resolution
+    vector_store_ids = extract_vector_store_ids_from_tools(responses_params.tools)
+    rag_id_mapping = configuration.rag_id_mapping
+
     # Retrieve response using Responses API
-    turn_summary = await retrieve_response(client, responses_params)
+    turn_summary = await retrieve_response(
+        client, responses_params, vector_store_ids, rag_id_mapping
+    )
 
     if pre_rag_chunks:
         turn_summary.rag_chunks = pre_rag_chunks + (turn_summary.rag_chunks or [])
@@ -269,6 +276,8 @@ def parse_referenced_docs(
 async def retrieve_response(  # pylint: disable=too-many-locals
     client: AsyncLlamaStackClient,
     responses_params: ResponsesApiParams,
+    vector_store_ids: Optional[list[str]] = None,
+    rag_id_mapping: Optional[dict[str, str]] = None,
 ) -> TurnSummary:
     """
     Retrieve response from LLMs and agents.
@@ -279,6 +288,8 @@ async def retrieve_response(  # pylint: disable=too-many-locals
     Parameters:
         client: The AsyncLlamaStackClient to use for the request.
         responses_params: The Responses API parameters.
+        vector_store_ids: Vector store IDs used in the query for source resolution.
+        rag_id_mapping: Mapping from vector_db_id to user-facing rag_id.
 
     Returns:
         TurnSummary: Summary of the LLM response content
@@ -323,7 +334,7 @@ async def retrieve_response(  # pylint: disable=too-many-locals
             summary.llm_response += message_text
 
         tool_call, tool_result = build_tool_call_summary(
-            output_item, summary.rag_chunks
+            output_item, summary.rag_chunks, vector_store_ids, rag_id_mapping
         )
         if tool_call:
             summary.tool_calls.append(tool_call)
@@ -337,7 +348,9 @@ async def retrieve_response(  # pylint: disable=too-many-locals
     )
 
     # Extract referenced documents and token usage from Responses API response
-    summary.referenced_documents = parse_referenced_documents(response)
+    summary.referenced_documents = parse_referenced_documents(
+        response, vector_store_ids, rag_id_mapping
+    )
     summary.token_usage = extract_token_usage(response, responses_params.model)
 
     return summary
