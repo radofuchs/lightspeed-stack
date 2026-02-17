@@ -126,6 +126,15 @@ def mock_api_connection_error_fixture(mocker: MockerFixture) -> None:
     )
 
 
+@pytest.fixture(name="mock_generic_runtime_error")
+def mock_generic_runtime_error_fixture(mocker: MockerFixture) -> None:
+    """Mock responses.create() to raise a non-context-length RuntimeError."""
+    _setup_responses_mock(
+        mocker,
+        mocker.AsyncMock(side_effect=RuntimeError("something went wrong")),
+    )
+
+
 # --- Test _build_instructions ---
 
 
@@ -656,3 +665,49 @@ async def test_infer_endpoint_calls_get_mcp_tools(
     )
 
     mock_get_mcp_tools.assert_called_once_with(mock_configuration.mcp_servers)
+
+
+@pytest.mark.asyncio
+async def test_infer_generic_runtime_error_reraises(
+    mocker: MockerFixture,
+    mock_configuration: AppConfig,
+    mock_generic_runtime_error: None,
+    mock_auth_resolvers: None,
+) -> None:
+    """Test /infer endpoint re-raises non-context-length RuntimeErrors."""
+    infer_request = RlsapiV1InferRequest(question="Test question")
+    mock_request = _create_mock_request(mocker)
+    mock_background_tasks = _create_mock_background_tasks(mocker)
+
+    with pytest.raises(RuntimeError, match="something went wrong"):
+        await infer_endpoint(
+            infer_request=infer_request,
+            request=mock_request,
+            background_tasks=mock_background_tasks,
+            auth=MOCK_AUTH,
+        )
+
+
+@pytest.mark.asyncio
+async def test_infer_generic_runtime_error_records_failure(
+    mocker: MockerFixture,
+    mock_configuration: AppConfig,
+    mock_generic_runtime_error: None,
+    mock_auth_resolvers: None,
+) -> None:
+    """Test that non-context-length RuntimeErrors record inference failure metrics."""
+    infer_request = RlsapiV1InferRequest(question="Test question")
+    mock_request = _create_mock_request(mocker)
+    mock_background_tasks = _create_mock_background_tasks(mocker)
+
+    with pytest.raises(RuntimeError):
+        await infer_endpoint(
+            infer_request=infer_request,
+            request=mock_request,
+            background_tasks=mock_background_tasks,
+            auth=MOCK_AUTH,
+        )
+
+    mock_background_tasks.add_task.assert_called_once()
+    call_args = mock_background_tasks.add_task.call_args
+    assert call_args[0][2] == "infer_error"
