@@ -1,6 +1,7 @@
 """Uvicorn runner."""
 
-import logging
+from logging import INFO
+
 import uvicorn
 
 from log import get_logger
@@ -21,7 +22,7 @@ def start_uvicorn(configuration: ServiceConfiguration) -> None:
     """
     logger.info("Starting Uvicorn")
 
-    log_level = logging.INFO
+    log_level = INFO
 
     # please note:
     # TLS fields can be None, which means we will pass those values as None to uvicorn.run
