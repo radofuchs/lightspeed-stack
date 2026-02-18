@@ -82,7 +82,7 @@
 * Check if feedback endpoint fails when required fields are not specified
 * Check if feedback endpoint is working when sentiment is negative
 * Check if feedback endpoint is working when sentiment is positive
-* Check if feedback submittion fails when invald sentiment is passed
+* Check if feedback submission fails when invalid sentiment is passed
 * Check if feedback submission fails when nonexisting conversation ID is passed
 * Check if feedback submission fails when conversation belongs to a different user
 * Check if feedback endpoint is not working when not authorized
