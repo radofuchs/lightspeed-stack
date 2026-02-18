@@ -5,14 +5,14 @@
 * Check if the authorized endpoint works fine when user_id and auth header are not provided
 * Check if the authorized endpoint works when auth token is not provided
 * Check if the authorized endpoint works when user_id is not provided
-* Check if the authorized endpoint works when providing empty user_id
+* Check if the authorized endpoint rejects empty user_id
 * Check if the authorized endpoint works when providing proper user_id
 
 ## [`authorized_noop_token.feature`](https://github.com/lightspeed-core/lightspeed-stack/blob/main/tests/e2e/features/authorized_noop_token.feature)
 
 * Check if the authorized endpoint fails when user_id and auth header are not provided
 * Check if the authorized endpoint works when user_id is not provided
-* Check if the authorized endpoint works when providing empty user_id
+* Check if the authorized endpoint rejects empty user_id
 * Check if the authorized endpoint works when providing proper user_id
 * Check if the authorized endpoint works with proper user_id but bearer token is not present
 * Check if the authorized endpoint works when auth token is malformed
@@ -103,11 +103,11 @@
 * Check if info endpoint is working
 * Check if info endpoint reports error when llama-stack connection is not working
 * Check if models endpoint is working
-* Check if models endpoint reports error when llama-stack in unreachable
+* Check if models endpoint reports error when llama-stack is unreachable
 * Check if shields endpoint is working
-* Check if shields endpoint reports error when llama-stack in unreachable
+* Check if shields endpoint reports error when llama-stack is unreachable
 * Check if tools endpoint is working
-* Check if tools endpoint reports error when llama-stack in unreachable
+* Check if tools endpoint reports error when llama-stack is unreachable
 * Check if metrics endpoint is working
 * Check if MCP client auth options endpoint is working
 
@@ -118,13 +118,16 @@
 * Check if LLM ignores new system prompt in same conversation
 * Check if LLM responds to sent question with error when not authenticated
 * Check if LLM responds to sent question with error when bearer token is missing
-* Check if LLM responds to sent question with error when model does not exist
 * Check if LLM responds to sent question with error when attempting to access conversation
+* Check if LLM responds to sent question with error when attempting to access conversation with incorrect conversation ID format
+* Check if LLM responds for query request with error for missing query
 * Check if LLM responds for query request with error for missing query
 * Check if LLM responds for query request for missing model and provider
 * Check if LLM responds for query request with error for missing model
 * Check if LLM responds for query request with error for missing provider
-* Check if LLM responds for query request with error for missing provider
+* Check if LLM responds for query request with error for unknown model
+* Check if LLM responds for query request with error for unknown provider
+* Check if LLM responds for query request with error for inability to connect to llama-stack
 * Check if LLM responds properly when XML and JSON attachments are sent
 
 ## [`rbac.feature`](https://github.com/lightspeed-core/lightspeed-stack/blob/main/tests/e2e/features/rbac.feature)
@@ -164,6 +167,8 @@
 * Check if LLM responds for streaming_query request for missing model and provider
 * Check if LLM responds for streaming_query request with error for missing model
 * Check if LLM responds for streaming_query request with error for missing provider
+* Check if LLM responds for streaming_query request with error for unknown model
+* Check if LLM responds for streaming_query request with error for unknown provider
 * Check if LLM responds properly when XML and JSON attachments are sent
 * Check if LLM responds to sent question with error when not authenticated
 
