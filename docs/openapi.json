@@ -1170,7 +1170,7 @@
                     "rags"
                 ],
                 "summary": "Get Rag Endpoint Handler",
-                "description": "Retrieve a single RAG by its unique ID.\n\nReturns:\n    RAGInfoResponse: A single RAG's details.\n\nRaises:\n    HTTPException:\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 404: RAG with the given ID not found\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to Llama Stack",
+                "description": "Retrieve a single RAG by its unique ID.\n\nAccepts both user-facing rag_id (from LCORE config) and llama-stack\nvector_store_id. If a rag_id from config is provided, it is resolved\nto the underlying vector_store_id for the llama-stack lookup.\n\nReturns:\n    RAGInfoResponse: A single RAG's details.\n\nRaises:\n    HTTPException:\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 404: RAG with the given ID not found\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to Llama Stack",
                 "operationId": "get_rag_endpoint_handler_v1_rags__rag_id__get",
                 "parameters": [
                     {
@@ -8349,7 +8349,7 @@
                             }
                         ],
                         "title": "Source",
-                        "description": "Source document or URL"
+                        "description": "Index name identifying the knowledge source from configuration"
                     },
                     "score": {
                         "anyOf": [
@@ -8362,6 +8362,19 @@
                         ],
                         "title": "Score",
                         "description": "Relevance score"
+                    },
+                    "attributes": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Attributes",
+                        "description": "Document metadata from the RAG provider (e.g., url, title, author)"
                     }
                 },
                 "type": "object",
@@ -8607,6 +8620,18 @@
                         ],
                         "title": "Doc Title",
                         "description": "Title of the referenced document"
+                    },
+                    "source": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Source",
+                        "description": "Index name identifying the knowledge source from configuration"
                     }
                 },
                 "type": "object",
