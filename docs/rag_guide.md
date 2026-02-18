@@ -303,6 +303,15 @@ solr:
                    # Set to false to use reference_url (online mode)
 ```
 
+**Query Request Example:**
+```
+curl -sX POST http://localhost:8080/v1/query \
+    -H "Content-Type: application/json" \
+    -d '{"query" : "how do I secure a nodejs application with keycloak?", "no_tools":true}' | jq .
+```
+Note: Solr does not currently work with RAG tools. You will need to specify "no_tools": true in request.
+
+
 **Query Processing:**
 
 1. When Solr is enabled, queries use the `portal-rag` vector store
