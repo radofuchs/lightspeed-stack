@@ -1,6 +1,5 @@
 """Handler for REST API call to list available tools from MCP servers."""
 
-import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,8 +21,9 @@ from models.responses import (
 from utils.endpoints import check_configuration_loaded
 from utils.mcp_oauth_probe import probe_mcp_oauth_and_raise_401
 from utils.tool_formatter import format_tools_list
+from log import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(tags=["tools"])
 
 
