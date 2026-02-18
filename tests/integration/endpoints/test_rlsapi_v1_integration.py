@@ -389,6 +389,7 @@ async def test_rlsapi_v1_infer_no_mcp_servers_passes_empty_tools(
 
     mocker.patch(
         "app.endpoints.rlsapi_v1.get_mcp_tools",
+        new_callable=mocker.AsyncMock,
         return_value=[],
     )
 
@@ -437,6 +438,7 @@ async def test_rlsapi_v1_infer_mcp_tools_passed_to_llm(
     ]
     mocker.patch(
         "app.endpoints.rlsapi_v1.get_mcp_tools",
+        new_callable=mocker.AsyncMock,
         return_value=mcp_tools,
     )
 

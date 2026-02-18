@@ -650,6 +650,7 @@ async def test_infer_endpoint_calls_get_mcp_tools(
     """Test that infer_endpoint calls get_mcp_tools with configuration.mcp_servers."""
     mock_get_mcp_tools = mocker.patch(
         "app.endpoints.rlsapi_v1.get_mcp_tools",
+        new_callable=mocker.AsyncMock,
         return_value=[{"type": "mcp", "server_label": "test"}],
     )
 
