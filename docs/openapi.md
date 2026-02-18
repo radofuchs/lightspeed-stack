@@ -1005,6 +1005,10 @@ Examples
 
 Retrieve a single RAG by its unique ID.
 
+Accepts both user-facing rag_id (from LCORE config) and llama-stack
+vector_store_id. If a rag_id from config is provided, it is resolved
+to the underlying vector_store_id for the llama-stack lookup.
+
 Returns:
     RAGInfoResponse: A single RAG's details.
 
@@ -5265,8 +5269,9 @@ Model representing a RAG chunk used in the response.
 | Field | Type | Description |
 |-------|------|-------------|
 | content | string | The content of the chunk |
-| source |  | Source document or URL |
+| source |  | Index name identifying the knowledge source from configuration |
 | score |  | Relevance score |
+| attributes |  | Document metadata from the RAG provider (e.g., url, title, author) |
 
 
 ## RAGInfoResponse
@@ -5356,6 +5361,7 @@ Attributes:
 |-------|------|-------------|
 | doc_url |  | URL of the referenced document |
 | doc_title |  | Title of the referenced document |
+| source |  | Index name identifying the knowledge source from configuration |
 
 
 ## RlsapiV1Attachment
