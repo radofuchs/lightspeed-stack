@@ -66,8 +66,12 @@ def wait_for_pod_health(pod_name: str, max_attempts: int = 12) -> None:
         print(result.stdout, end="")
         if result.returncode != 0:
             print(result.stderr, end="")
+            raise subprocess.CalledProcessError(
++                result.returncode, "wait-for-pod"
++            )
     except subprocess.TimeoutExpired:
         print(f"Timeout waiting for pod {actual_pod_name}")
+        raise
 
 
 def restart_pod(container_name: str) -> None:

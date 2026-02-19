@@ -183,6 +183,8 @@ oc wait pod/mock-jwks pod/mcp-mock-server \
     oc get pods -n "$NAMESPACE" | grep -E "mock-jwks|mcp-mock" || true
     oc describe pod mock-jwks -n "$NAMESPACE" 2>/dev/null | tail -20 || true
     oc describe pod mcp-mock-server -n "$NAMESPACE" 2>/dev/null | tail -20 || true
+    echo "❌ Mock servers failed to become ready"
+    exit 1
 }
 echo "✅ Mock servers deployed"
 
