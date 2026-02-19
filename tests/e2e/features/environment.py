@@ -232,7 +232,7 @@ def _restore_llama_stack(context: Context) -> None:
 
         # Wait for the service to be healthy
         print("Restoring Llama Stack connection...")
-        time.sleep(5)
+        time.sleep(20)
 
         # Check if it's healthy
         for attempt in range(6):  # Try for 30 seconds
@@ -254,7 +254,7 @@ def _restore_llama_stack(context: Context) -> None:
                     print("✓ Llama Stack connection restored successfully")
                     break
             except subprocess.TimeoutExpired:
-                print(f"⏱Health check timed out on attempt {attempt + 1}/6")
+                print(f"⏱ Health check timed out on attempt {attempt + 1}/6")
 
             if attempt < 5:
                 print(
