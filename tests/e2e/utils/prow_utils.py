@@ -77,9 +77,7 @@ def restart_pod(container_name: str) -> None:
         print(result.stdout, end="")
         if result.returncode != 0:
             print(result.stderr, end="")
-            raise subprocess.CalledProcessError(
-                result.returncode, "restart-lightspeed"
-            )
+            raise subprocess.CalledProcessError(result.returncode, "restart-lightspeed")
     except subprocess.TimeoutExpired as e:
         print(f"Failed to restart pod {container_name}: {e}")
         raise
