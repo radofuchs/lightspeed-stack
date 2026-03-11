@@ -8,13 +8,16 @@ export RUNNING_PROW=true
 #========================================
 # 1. GLOBAL CONFIG
 #========================================
-NAMESPACE="e2e-rhoai-dsc"
+NAMESPACE="${NAMESPACE:-e2e-rhoai-dsc}"
 MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# RHOAI llama-stack image
+# Lightspeed-stack and llama-stack images (from Konflux SNAPSHOT or defaults)
+LIGHTSPEED_STACK_IMAGE="${LIGHTSPEED_STACK_IMAGE:-quay.io/lightspeed-core/lightspeed-stack:dev-latest}"
 LLAMA_STACK_IMAGE="${LLAMA_STACK_IMAGE:-quay.io/rhoai/odh-llama-stack-core-rhel9:rhoai-3.3}"
+echo "Using lightspeed-stack image: $LIGHTSPEED_STACK_IMAGE"
 echo "Using llama-stack image: $LLAMA_STACK_IMAGE"
+export LIGHTSPEED_STACK_IMAGE
 export LLAMA_STACK_IMAGE
 
 #========================================

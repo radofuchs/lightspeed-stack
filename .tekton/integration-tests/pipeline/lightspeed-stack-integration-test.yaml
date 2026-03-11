@@ -1,0 +1,301 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  annotations:
+    pipelinesascode.tekton.dev/task: "[ols-installer, ols-e2e-task]"
+  name: ols-integration-tests-pipeline
+spec:
+  description: |
+    This pipeline automates the process of running end-to-end tests for Lightspeed Stack
+    using a ROSA (Red Hat OpenShift Service on AWS cluster. The pipeline provisions
+    the ROSA cluster, installs the Lightspeed Stack, runs the tests, collects artifacts,
+    and finally deprovisions the ROSA cluster.
+  params:
+    - name: SNAPSHOT
+      description: 'The JSON string representing the snapshot of the application under test (includes lightspeed-stack and llama-stack images).'
+      default: '{"components": [{"name":"lightspeed-stack", "containerImage": "quay.io/example/lightspeed-stack:latest"}, {"name":"llama-stack", "containerImage": "quay.io/example/llama-stack:latest"}]}'
+      type: string
+    - name: test-name
+      description: 'The name of the test corresponding to a defined Konflux integration test.'
+      default: 'lightspeed-stack-e2e-tests'
+    - name: namespace
+      description: 'Namespace to run tests in'
+      default: 'lightspeed-stack'
+  tasks:
+    - name: eaas-provision-space
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
+      params:
+        - name: ownerKind
+          value: PipelineRun
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+    - name: provision-cluster
+      runAfter:
+        - eaas-provision-space
+      taskSpec:
+        results:
+          - name: clusterName
+            value: "$(steps.create-cluster.results.clusterName)"
+        steps:
+          - name: pick-version
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-latest-openshift-version-by-prefix/0.1/eaas-get-latest-openshift-version-by-prefix.yaml
+            params:
+              - name: prefix
+                value: "4.19."
+          - name: create-cluster
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.eaas-provision-space.results.secretRef)
+              - name: version
+                value: "$(steps.pick-version.results.version)"
+              - name: instanceType
+                value: "m5.large"
+    - name: get-stack-images
+      description: Extract lightspeed-stack and llama-stack images from SNAPSHOT
+      runAfter:
+        - provision-cluster
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: namespace
+          value: "$(params.namespace)"
+      taskSpec:
+        results:
+          - name: lightspeed-stack-image
+            value: "$(steps.get-stack-images.results.lightspeed-stack-image)"
+          - name: llama-stack-image
+            value: "$(steps.get-stack-images.results.llama-stack-image)"
+          - name: commit
+            value: "$(steps.get-stack-images.results.commit)"
+        params:
+          - name: SNAPSHOT
+          - name: namespace
+            type: string
+        volumes:
+          - name: credentials
+            emptyDir: {}
+        steps:
+          - name: get-stack-images
+            image: registry.redhat.io/openshift4/ose-cli:latest
+            env:
+              - name: SNAPSHOT
+                value: $(params.SNAPSHOT)
+            results:
+              - name: lightspeed-stack-image
+                type: string
+                description: "lightspeed-stack container image from snapshot"
+              - name: llama-stack-image
+                type: string
+                description: "llama-stack container image from snapshot"
+              - name: commit
+                type: string
+                description: "commit sha to be used to store artifacts"
+            script: |
+              dnf -y install jq
+              echo -n "$(jq -r --arg n "lightspeed-stack" '.components[] | select(.name == $n) | .containerImage // ""' <<< "$SNAPSHOT")" > $(step.results.lightspeed-stack-image.path)
+              echo -n "$(jq -r --arg n "llama-stack" '.components[] | select(.name == $n) | .containerImage // ""' <<< "$SNAPSHOT")" > $(step.results.llama-stack-image.path)
+              echo -n "$(jq -r --arg n "lightspeed-stack" '.components[] | select(.name == $n) | .source.git.revision // "latest"' <<< "$SNAPSHOT")" > $(step.results.commit.path)
+    - name: lightspeed-stack-integration-tests
+      description: Task to run integration tests from lightspeed-stack repository
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: lightspeedstackimage
+          value: $(tasks.get-stack-images.results.lightspeed-stack-image)
+        - name: llamastackimage
+          value: $(tasks.get-stack-images.results.llama-stack-image)
+        - name: commit
+          value: $(tasks.get-stack-images.results.commit)
+        - name: namespace
+          value: "$(params.namespace)"
+      runAfter:
+        - get-stack-images
+      taskSpec:
+        params:
+          - name: SNAPSHOT
+          - name: lightspeedstackimage
+          - name: llamastackimage
+          - name: commit
+          - name: namespace
+            type: string
+        volumes:
+          # Secrets for pipeline.sh (e2e-prow): HuggingFace, vLLM API, Quay pull for images
+          - name: huggingface-token
+            secret:
+              secretName: huggingface-token
+          - name: vllm-api-key
+            secret:
+              secretName: vllm-api-key
+          - name: quay-aipcc-name
+            secret:
+              secretName: quay-aipcc-name
+          - name: quay-aipcc-password
+            secret:
+              secretName: quay-aipcc-password
+          - name: ols-konflux-artifacts-bot-creds
+            secret:
+              secretName: ols-konflux-artifacts-bot
+          - name: credentials
+            emptyDir: {}
+        steps:
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.eaas-provision-space.results.spaceRequestSecretName)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+          - name: run-e2e-tests
+            onError: continue
+            resources:
+              requests:
+                cpu: '1'
+                memory: 10Gi
+              limits:
+                memory: 10Gi
+            volumeMounts:
+              # Mount paths expected by pipeline.sh (tests/e2e-prow/rhoai/pipeline.sh)
+              - name: huggingface-token
+                mountPath: /var/run/huggingface
+              - name: vllm-api-key
+                mountPath: /var/run/vllm
+              - name: quay-aipcc-name
+                mountPath: /var/run/quay-aipcc-name
+              - name: quay-aipcc-password
+                mountPath: /var/run/quay-aipcc-password
+              - name: credentials
+                mountPath: /credentials
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: ARTIFACT_DIR
+                value: "/workspace/artifacts"
+              - name: SUITE_ID
+                value: "nosuite"
+              - name: KONFLUX_BOOL
+                value: "true"
+              - name: LIGHTSPEED_STACK_IMAGE
+                value: "$(params.lightspeedstackimage)"
+              - name: LLAMA_STACK_IMAGE
+                value: "$(params.llamastackimage)"
+              - name: NAMESPACE
+                value: "$(params.namespace)"
+              - name: SNAPSHOT
+                value: $(params.SNAPSHOT)
+            image: registry.access.redhat.com/ubi9/ubi-minimal
+            script: |
+              set -e
+              echo "---------------------------------------------"
+              echo "KUBECONFIG=$KUBECONFIG"
+              echo "LIGHTSPEED_STACK_IMAGE=$LIGHTSPEED_STACK_IMAGE"
+              echo "LLAMA_STACK_IMAGE=$LLAMA_STACK_IMAGE"
+              echo "NAMESPACE=$NAMESPACE"
+              echo "---------------------------------------------"
+              microdnf -y install git tar jq curl
+              curl -L -o oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.19/openshift-client-linux-amd64-rhel9.tar.gz \
+                  && tar -xvzf oc.tar.gz \
+                  && chmod +x kubectl oc \
+                  && mv oc kubectl /usr/local/bin/
+              oc version
+              REPO_URL=$(echo "$SNAPSHOT" | jq -r --arg n "lightspeed-stack" '.components[] | select(.name == $n) | .source.git.url // "https://github.com/openshift/lightspeed-stack.git"')
+              REPO_REV=$(echo "$SNAPSHOT" | jq -r --arg n "lightspeed-stack" '.components[] | select(.name == $n) | .source.git.revision // "main"')
+              echo "Cloning $REPO_URL at $REPO_REV"
+              git clone "$REPO_URL" /workspace/lightspeed-stack
+              cd /workspace/lightspeed-stack
+              git fetch origin "$REPO_REV"
+              git checkout "$REPO_REV"
+              cd tests/e2e-prow/rhoai
+              chmod +x pipeline.sh
+              ./pipeline.sh
+          - name: gather-cluster-resources
+            onError: continue
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/tekton-integration-catalog
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/gather-cluster-resources/0.1/gather-cluster-resources.yaml
+            params:
+              - name: credentials
+                value: "credentials"
+              - name: kubeconfig
+                value: "$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: artifact-dir
+                value: "/workspace/konflux-artifacts"
+          # validate that the cluster resources are available in another tekton step
+          - name: list-artifacts
+            onError: continue
+            image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+            workingDir: "/workspace"
+            script: |
+              #!/bin/bash
+              ls -la /workspace
+          - name: push-artifacts
+            onError: continue
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/tekton-integration-catalog.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/secure-push-oci/0.1/secure-push-oci.yaml
+            params:
+              - name: workdir-path
+                value: /workspace
+              - name: oci-ref
+                value: "quay.io/openshift-lightspeed/ols-service-artifacts:$(params.commit)"
+              - name: credentials-volume-name
+                value: ols-konflux-artifacts-bot-creds
+          - name: fail-if-any-step-failed
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/tekton-integration-catalog.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/fail-if-any-step-failed/0.1/fail-if-any-step-failed.yaml
