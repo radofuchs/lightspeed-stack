@@ -137,7 +137,7 @@ spec:
         - name: namespace
           value: "$(params.namespace)"
         - name: spaceRequestSecretName
-          value: $(tasks.eaas-provision-space.results.spaceRequestSecretName)
+          value: $(tasks.eaas-provision-space.results.secretRef)
         - name: clusterName
           value: $(tasks.provision-cluster.results.clusterName)
       runAfter:
