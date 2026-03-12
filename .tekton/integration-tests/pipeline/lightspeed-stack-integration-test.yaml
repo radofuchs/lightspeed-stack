@@ -136,6 +136,10 @@ spec:
           value: $(tasks.get-stack-images.results.commit)
         - name: namespace
           value: "$(params.namespace)"
+        - name: spaceRequestSecretName
+          value: $(tasks.eaas-provision-space.results.spaceRequestSecretName)
+        - name: clusterName
+          value: $(tasks.provision-cluster.results.clusterName)
       runAfter:
         - get-stack-images
       taskSpec:
@@ -146,6 +150,13 @@ spec:
           - name: commit
           - name: namespace
             type: string
+          - name: spaceRequestSecretName
+            type: string
+          - name: clusterName
+            type: string
+        results:
+          - name: TEST_OUTPUT
+            description: Standardized JSON output for Enterprise Contract
         volumes:
           # Secrets for pipeline.sh (e2e-prow): HuggingFace, vLLM API, Quay pull for images
           - name: huggingface-token
@@ -160,9 +171,6 @@ spec:
           - name: quay-aipcc-password
             secret:
               secretName: quay-aipcc-password
-          - name: ols-konflux-artifacts-bot-creds
-            secret:
-              secretName: ols-konflux-artifacts-bot
           - name: credentials
             emptyDir: {}
         steps:
@@ -178,9 +186,9 @@ spec:
                   value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
             params:
               - name: eaasSpaceSecretRef
-                value: $(tasks.eaas-provision-space.results.spaceRequestSecretName)
+                value: $(params.spaceRequestSecretName)
               - name: clusterName
-                value: "$(tasks.provision-cluster.results.clusterName)"
+                value: "$(params.clusterName)"
               - name: credentials
                 value: credentials
           - name: run-e2e-tests
@@ -188,7 +196,7 @@ spec:
             resources:
               requests:
                 cpu: '1'
-                memory: 10Gi
+                memory: 1Gi
               limits:
                 memory: 10Gi
             volumeMounts:
