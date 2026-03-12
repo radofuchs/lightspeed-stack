@@ -171,6 +171,9 @@ spec:
           - name: quay-aipcc-password
             secret:
               secretName: quay-aipcc-password
+          - name: ols-konflux-artifacts-bot-creds
+            secret:
+              secretName: ols-konflux-artifacts-bot
           - name: credentials
             emptyDir: {}
         steps:
