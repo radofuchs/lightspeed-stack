@@ -3,7 +3,7 @@
 """Unit tests for all successful response models."""
 
 import pytest
-from pydantic import AnyUrl, ValidationError, ConfigDict
+from pydantic import AnyUrl, AnyHttpUrl, ValidationError, ConfigDict
 from pydantic_core import SchemaError
 
 from models.config import (
@@ -607,8 +607,10 @@ class TestConversationResponse:
         )
         assert isinstance(response, AbstractSuccessfulResponse)
         assert response.conversation_id == "123e4567-e89b-12d3-a456-426614174000"
-        # Convert ConversationTurn objects to dicts for comparison
-        actual_history = [turn.model_dump() for turn in response.chat_history]
+        # Convert ConversationTurn objects to dicts for comparison (exclude None for clean output)
+        actual_history = [
+            turn.model_dump(exclude_none=True) for turn in response.chat_history
+        ]
         assert actual_history == chat_history
 
     def test_empty_chat_history(self) -> None:
@@ -955,9 +957,10 @@ class TestConfigurationResponse:
                 workers=10,
                 color_log=True,
                 access_log=True,
+                root_path="/.",
             ),
             llama_stack=LlamaStackConfiguration(
-                url="http://localhost:8321",
+                url=AnyHttpUrl("http://localhost:8321"),
                 use_as_library_client=False,
                 api_key=None,
                 library_client_config_path=None,

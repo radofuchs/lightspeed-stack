@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Optional, Any
-from typing_extensions import Self
+from typing import Self
 
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoice as ToolChoice,
@@ -179,8 +179,7 @@ class QueryRequest(BaseModel):
     shield_ids: Optional[list[str]] = Field(
         None,
         description="Optional list of safety shield IDs to apply. "
-        "If None, all configured shields are used. "
-        "If provided, must contain at least one valid shield ID (empty list raises 422 error).",
+        "If None, all configured shields are used. ",
         examples=["llama-guard", "custom-shield"],
     )
 
@@ -503,8 +502,7 @@ class FeedbackRequest(BaseModel):
         if len(value) == 0:
             return None  # Convert empty list to None for consistency
 
-        unique_categories = list(dict.fromkeys(value))  # don't lose ordering
-        return unique_categories
+        return list(dict.fromkeys(value))  # don't lose ordering
 
     @model_validator(mode="after")
     def check_feedback_provided(self) -> Self:

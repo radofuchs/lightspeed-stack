@@ -268,7 +268,7 @@ def restart_container(container_name: str) -> None:
             check=True,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        print(f"Failed to restart container {container_name}: {str(e.stderr)}")
+        print(f"Failed to restart container {container_name}: {e.stderr!s}")
         raise
 
     # Wait for container to be healthy
@@ -287,5 +287,4 @@ def replace_placeholders(context: Context, text: str) -> str:
     """
     result = text.replace("{MODEL}", context.default_model)
     result = result.replace("{PROVIDER}", context.default_provider)
-    result = result.replace("{VECTOR_STORE_ID}", context.faiss_vector_store_id)
-    return result
+    return result.replace("{VECTOR_STORE_ID}", context.faiss_vector_store_id)

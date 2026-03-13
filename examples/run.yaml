@@ -1,9 +1,9 @@
 # Example llama-stack configuration for OpenAI inference + FAISS (RAG)
-# 
+#
 # Notes:
 # - You will need an OpenAI API key
 # - You can generate the vector index with the rag-content tool (https://github.com/lightspeed-core/rag-content)
-# 
+#
 version: 2
 
 apis:
@@ -17,7 +17,7 @@ apis:
 - scoring
 - tool_runtime
 - vector_io
-      
+
 benchmarks: []
 datasets: []
 image_name: starter
@@ -61,6 +61,9 @@ providers:
   - config: {} # Enable the RAG tool
     provider_id: rag-runtime
     provider_type: inline::rag-runtime
+  - config: {} # Enable the MCP tool
+    provider_id: model-context-protocol
+    provider_type: remote::model-context-protocol
   vector_io:
   - config: # Define the storage backend for RAG
       persistence:
@@ -144,7 +147,7 @@ registered_resources:
     provider_model_id: sentence-transformers/all-mpnet-base-v2
     metadata:
       embedding_dimension: 768
-  vector_stores: 
+  vector_stores:
   - embedding_dimension: 768
     embedding_model: sentence-transformers/nomic-ai/nomic-embed-text-v1.5
     provider_id: faiss
@@ -160,6 +163,12 @@ registered_resources:
   - toolgroup_id: builtin::rag # Register the RAG tool
     provider_id: rag-runtime
 vector_stores:
+  annotation_prompt_params: # Override the default Llama Stack annotation that adds <| file-xyz |> to responses
+    enable_annotations: true
+    annotation_instruction_template: >
+      When appropriate, cite sources at the end of sentences using doc_url and doc_title format. 
+      Citing sources is not always required because citations are handled externally. 
+      Never include any citation that is in the form '<| file-id |>'.
   default_provider_id: faiss
   default_embedding_model: # Define the default embedding model for RAG
     provider_id: sentence-transformers

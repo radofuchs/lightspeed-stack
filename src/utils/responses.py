@@ -11,8 +11,11 @@ from llama_stack_api.openai_responses import (
     OpenAIResponseContentPartRefusal as ContentPartRefusal,
     OpenAIResponseInputMessageContent as InputMessageContent,
     OpenAIResponseInputMessageContentText as InputTextPart,
+    OpenAIResponseInputTool as InputTool,
     OpenAIResponseInputToolFileSearch as InputToolFileSearch,
     OpenAIResponseInputToolMCP as InputToolMCP,
+    OpenAIResponseMCPApprovalRequest as MCPApprovalRequest,
+    OpenAIResponseMCPApprovalResponse as MCPApprovalResponse,
     OpenAIResponseMessage as ResponseMessage,
     OpenAIResponseObject as ResponseObject,
     OpenAIResponseOutput as ResponseOutput,
@@ -23,10 +26,7 @@ from llama_stack_api.openai_responses import (
     OpenAIResponseOutputMessageMCPCall as MCPCall,
     OpenAIResponseOutputMessageMCPListTools as MCPListTools,
     OpenAIResponseOutputMessageWebSearchToolCall as WebSearchCall,
-    OpenAIResponseMCPApprovalRequest as MCPApprovalRequest,
-    OpenAIResponseMCPApprovalResponse as MCPApprovalResponse,
     OpenAIResponseUsage as ResponseUsage,
-    OpenAIResponseInputTool as InputTool,
 )
 from llama_stack_client import APIConnectionError, APIStatusError, AsyncLlamaStackClient
 
@@ -34,6 +34,8 @@ import constants
 import metrics
 from configuration import configuration
 from constants import DEFAULT_RAG_TOOL
+from log import get_logger
+from models.config import ByokRag
 from models.database.conversations import UserConversation
 from models.requests import QueryRequest
 from models.responses import (
@@ -41,14 +43,13 @@ from models.responses import (
     NotFoundResponse,
     ServiceUnavailableResponse,
 )
-from utils.mcp_oauth_probe import probe_mcp_oauth_and_raise_401
+from utils.mcp_headers import McpHeaders, extract_propagated_headers
 from utils.prompts import get_system_prompt, get_topic_summary_system_prompt
 from utils.query import (
     extract_provider_and_model_from_model_id,
     handle_known_apistatus_errors,
     prepare_input,
 )
-from utils.mcp_headers import McpHeaders, extract_propagated_headers
 from utils.suid import to_llama_stack_conversation_id
 from utils.token_counter import TokenCounter
 from utils.types import (
@@ -60,12 +61,49 @@ from utils.types import (
     ToolResultSummary,
     TurnSummary,
 )
-from log import get_logger
 
 logger = get_logger(__name__)
 
 
-async def get_topic_summary(
+async def get_vector_store_ids(
+    client: AsyncLlamaStackClient,
+    vector_store_ids: Optional[list[str]] = None,
+) -> list[str]:
+    """Get vector store IDs for querying.
+
+    If vector_store_ids are provided, returns them. Otherwise fetches all
+    available vector stores from Llama Stack.
+
+    Args:
+        client: The AsyncLlamaStackClient to use for fetching stores
+        vector_store_ids: Optional list of vector store IDs. If provided,
+            returns this list. If None, fetches all available vector stores.
+
+    Returns:
+        List of vector store IDs to query
+
+    Raises:
+        HTTPException: With ServiceUnavailableResponse if connection fails,
+            or InternalServerErrorResponse if API returns an error status
+    """
+    if vector_store_ids is not None:
+        return vector_store_ids
+
+    try:
+        vector_stores = await client.vector_stores.list()
+        return [vector_store.id for vector_store in vector_stores.data]
+    except APIConnectionError as e:
+        error_response = ServiceUnavailableResponse(
+            backend_name="Llama Stack",
+            cause=str(e),
+        )
+        raise HTTPException(**error_response.model_dump()) from e
+    except APIStatusError as e:
+        error_response = InternalServerErrorResponse.generic()
+        raise HTTPException(**error_response.model_dump()) from e
+
+
+async def get_topic_summary(  # pylint: disable=too-many-nested-blocks
     question: str, client: AsyncLlamaStackClient, model_id: str
 ) -> str:
     """Get a topic summary for a question using Responses API.
@@ -128,23 +166,22 @@ async def prepare_tools(  # pylint: disable=too-many-arguments,too-many-position
         return None
 
     toolgroups: list[InputTool] = []
-    # Get all vector stores if vector stores are not restricted by request
-    if vector_store_ids is None:
-        try:
-            vector_stores = await client.vector_stores.list()
-            vector_store_ids = [vector_store.id for vector_store in vector_stores.data]
-        except APIConnectionError as e:
-            error_response = ServiceUnavailableResponse(
-                backend_name="Llama Stack",
-                cause=str(e),
-            )
-            raise HTTPException(**error_response.model_dump()) from e
-        except APIStatusError as e:
-            error_response = InternalServerErrorResponse.generic()
-            raise HTTPException(**error_response.model_dump()) from e
+
+    # Priority: per-request IDs > rag.tool config > all registered stores.
+    # In all cases, customer-facing rag_ids are translated to internal vector_db_ids.
+    # IDs fetched from llama-stack are already internal and need no translation.
+    byok_rags = configuration.configuration.byok_rag
+    if vector_store_ids is not None:
+        effective_ids: list[str] = resolve_vector_store_ids(vector_store_ids, byok_rags)
+    elif configuration.configuration.rag.tool is not None:
+        effective_ids = resolve_vector_store_ids(
+            configuration.configuration.rag.tool, byok_rags
+        )
+    else:
+        effective_ids = await get_vector_store_ids(client, None)
 
     # Add RAG tools if vector stores are available
-    rag_tools = get_rag_tools(vector_store_ids)
+    rag_tools = get_rag_tools(effective_ids)
     if rag_tools:
         toolgroups.extend(rag_tools)
 
@@ -204,6 +241,7 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
     stream: bool = False,
     store: bool = True,
     request_headers: Optional[Mapping[str, str]] = None,
+    inline_rag_context: Optional[str] = None,
 ) -> ResponsesApiParams:
     """Prepare API request parameters for Responses API.
 
@@ -216,6 +254,9 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
         stream: Whether to stream the response
         store: Whether to store the response
         request_headers: Incoming HTTP request headers for allowlist propagation
+        inline_rag_context: Optional RAG context to inject into the query before
+            sending to the LLM. Passed separately to keep QueryRequest a pure public
+            API model.
 
     Returns:
         ResponsesApiParams containing all prepared parameters for the API request
@@ -245,7 +286,8 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
     )
 
     # Prepare input for Responses API
-    input_text = prepare_input(query_request)
+    # Adds inline RAG context and attachments
+    input_text = prepare_input(query_request, inline_rag_context)
 
     # Handle conversation ID for Responses API
     conversation_id = query_request.conversation_id
@@ -309,6 +351,32 @@ def extract_vector_store_ids_from_tools(
     return vector_store_ids
 
 
+def resolve_vector_store_ids(
+    vector_store_ids: list[str], byok_rags: list[ByokRag]
+) -> list[str]:
+    """Translate customer-facing rag_ids to llama-stack vector_db_ids.
+
+    Each ID is looked up against the BYOK RAG configuration. If a matching
+    ``rag_id`` is found, the corresponding ``vector_db_id`` is returned.
+    The special ``okp`` ID is mapped to the Solr vector store ID.
+    Otherwise the ID is passed through unchanged (assumed to already be a
+    llama-stack vector store ID).
+
+    Parameters:
+        vector_store_ids: List of IDs from the client request (may be
+            customer-facing rag_ids or raw llama-stack vector_db_ids).
+        byok_rags: BYOK RAG configuration entries.
+
+    Returns:
+        List of llama-stack vector_db_ids ready for the Llama Stack API.
+    """
+    rag_id_to_vector_db_id = {brag.rag_id: brag.vector_db_id for brag in byok_rags}
+    rag_id_to_vector_db_id[constants.OKP_RAG_ID] = (
+        constants.SOLR_DEFAULT_VECTOR_STORE_ID
+    )
+    return [rag_id_to_vector_db_id.get(vs_id, vs_id) for vs_id in vector_store_ids]
+
+
 def get_rag_tools(vector_store_ids: list[str]) -> Optional[list[InputToolFileSearch]]:
     """Convert vector store IDs to tools format for Responses API.
 
@@ -316,15 +384,16 @@ def get_rag_tools(vector_store_ids: list[str]) -> Optional[list[InputToolFileSea
         vector_store_ids: List of vector store identifiers
 
     Returns:
-        List containing file_search tool configuration, or None if no vector stores provided
+        List containing file_search tool configuration, or empty list if no stores available
     """
-    if not vector_store_ids:
-        return None
+    if vector_store_ids == []:
+        return []
 
     return [
         InputToolFileSearch(
+            type="file_search",
             vector_store_ids=vector_store_ids,
-            max_num_results=10,
+            max_num_results=constants.TOOL_RAG_MAX_CHUNKS,
         )
     ]
 
@@ -394,16 +463,6 @@ async def get_mcp_tools(  # pylint: disable=too-many-return-statements,too-many-
         if mcp_server.authorization_headers and len(headers) != len(
             mcp_server.authorization_headers
         ):
-            # If OAuth was required and no headers passed, probe endpoint and forward
-            # 401 with WWW-Authenticate so the client can perform OAuth
-            uses_oauth = (
-                constants.MCP_AUTH_OAUTH
-                in mcp_server.resolved_authorization_headers.values()
-            )
-            if uses_oauth and (
-                mcp_headers is None or not mcp_headers.get(mcp_server.name)
-            ):
-                await probe_mcp_oauth_and_raise_401(mcp_server.url)
             logger.warning(
                 "Skipping MCP server %s: required %d auth headers but only resolved %d",
                 mcp_server.name,
@@ -425,6 +484,7 @@ async def get_mcp_tools(  # pylint: disable=too-many-return-statements,too-many-
         authorization = headers.pop("Authorization", None)
         tools.append(
             InputToolMCP(
+                type="mcp",
                 server_label=mcp_server.name,
                 server_url=mcp_server.url,
                 require_approval="never",
@@ -782,6 +842,16 @@ def _resolve_source_for_result(
 
     if len(vector_store_ids) > 1:
         attributes = getattr(result, "attributes", {}) or {}
+
+        # Primary: read index name embedded directly by rag-content.
+        # This value is already the user-facing rag_id, not a vector_db_id,
+        # so no mapping is needed.
+        attr_source: Optional[str] = attributes.get("source")
+        if attr_source:
+            return attr_source
+
+        # Fallback: if llama-stack ever populates vector_store_id in results,
+        # use it with the rag_id_mapping.
         attr_store_id: Optional[str] = attributes.get("vector_store_id")
         if attr_store_id:
             return rag_id_mapping.get(attr_store_id, attr_store_id)
@@ -937,8 +1007,7 @@ async def select_model_for_responses(
         and user_conversation.last_used_model
         and user_conversation.last_used_provider
     ):
-        model_id = f"{user_conversation.last_used_provider}/{user_conversation.last_used_model}"
-        return model_id
+        return f"{user_conversation.last_used_provider}/{user_conversation.last_used_model}"
 
     # 2. Select default model from configuration
     if configuration.inference is not None:
@@ -1079,15 +1148,16 @@ def _extract_text_from_content(
 
     text_fragments: list[str] = []
     for part in content:
-        if part.type == "input_text":
+        part_type = getattr(part, "type", None)
+        if part_type == "input_text":
             input_text_part = cast(InputTextPart, part)
             if input_text_part.text:
                 text_fragments.append(input_text_part.text.strip())
-        elif part.type == "output_text":
+        elif part_type == "output_text":
             output_text_part = cast(OutputTextPart, part)
             if output_text_part.text:
                 text_fragments.append(output_text_part.text.strip())
-        elif part.type == "refusal":
+        elif part_type == "refusal":
             refusal_part = cast(ContentPartRefusal, part)
             if refusal_part.refusal:
                 text_fragments.append(refusal_part.refusal.strip())

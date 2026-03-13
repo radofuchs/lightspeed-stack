@@ -13,6 +13,7 @@ from typing import Any, cast
 
 import pytest
 from fastapi import HTTPException, status
+from fastapi.testclient import TestClient
 from llama_stack_client import APIConnectionError
 from pytest_mock import MockerFixture
 
@@ -43,7 +44,7 @@ def _create_mock_request(mocker: MockerFixture) -> Any:
     mock_request = mocker.Mock()
     # Use spec=[] to create a Mock with no attributes, simulating absent rh_identity_data
     mock_request.state = mocker.Mock(spec=[])
-    mock_request.headers = {"User-Agent": "CLA/0.4.1"}
+    mock_request.headers = {"User-Agent": "CLA/0.4.2"}
     return mock_request
 
 
@@ -494,3 +495,22 @@ async def test_rlsapi_v1_infer_skip_rag(
         auth=test_auth,
     )
     assert isinstance(response, RlsapiV1InferResponse)
+
+
+@pytest.mark.parametrize(
+    "json",
+    (
+        ({"question": "?" * 10_241}),
+        ({"question": "Q", "context": {"stdin": "a" * 65_537}}),
+        ({"question": "Q", "context": {"attachments": {"contents": "A" * 65_537}}}),
+        ({"question": "Q", "context": {"terminal": {"output": "T" * 65_537}}}),
+    ),
+    ids=["question", "stdin", "attachment_contents", "terminal_output"],
+)
+def test_infer_size_limit(integration_http_client: TestClient, json: dict) -> None:
+    """Test that a field exceeding limit is rejected."""
+    response = integration_http_client.post("/v1/infer", json=json)
+    detail = response.json()["detail"]
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert "string_too_long" in {item["type"] for item in detail}

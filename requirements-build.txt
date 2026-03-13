@@ -6,45 +6,49 @@
 #
 calver==2025.10.20
     # via trove-classifiers
-coherent-licensed==0.5.2
-    # via importlib-metadata
-dunamai==1.25.0
+cython==3.2.4
+    # via oracledb
+dunamai==1.26.0
     # via uv-dynamic-versioning
 flit-core==3.12.0
     # via
-    #   coherent-licensed
     #   jinja2
     #   packaging
     #   pathspec
+    #   pip
     #   wheel
 hatch-fancy-pypi-readme==25.1.0
     # via
-    #   jsonschema
     #   llama-stack-client
     #   openai
 hatch-vcs==0.5.0
     # via
+    #   chardet
     #   filelock
-    #   jsonschema
-    #   termcolor
-    #   urllib3
 hatchling==1.26.3
     # via
     #   hatch-fancy-pypi-readme
     #   llama-stack-client
     #   openai
-hatchling==1.28.0
+hatchling==1.29.0
     # via
     #   a2a-sdk
-    #   einops
+    #   chardet
     #   filelock
     #   hatch-fancy-pypi-readme
     #   hatch-vcs
-    #   jsonschema
-    #   mcp
-    #   python-multipart
-    #   termcolor
-    #   urllib3
+    #   opentelemetry-api
+    #   opentelemetry-distro
+    #   opentelemetry-exporter-otlp
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-instrumentation
+    #   opentelemetry-proto
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+    #   pydantic-settings
+    #   pythainlp
     #   uv-dynamic-versioning
     #   uvicorn
     #   wcwidth
@@ -56,7 +60,6 @@ maturin==1.10.2
     # via fastuuid
 packaging==26.0
     # via
-    #   dunamai
     #   hatchling
     #   setuptools-scm
     #   wheel
@@ -70,8 +73,10 @@ poetry-core==2.3.1
     # via
     #   dunamai
     #   litellm
+    #   pybuild-deps
     #   rich
     #   tomlkit
+    #   xdg
 semantic-version==2.10.0
     # via setuptools-rust
 setuptools-rust==1.12.0
@@ -79,31 +84,33 @@ setuptools-rust==1.12.0
 setuptools-scm==9.2.2
     # via
     #   hatch-vcs
-    #   importlib-metadata
+    #   llama-stack
     #   llama-stack-api
+    #   pip-tools
     #   pluggy
     #   setuptools-rust
-    #   tqdm
-    #   urllib3
+    #   tenacity
 tomlkit==0.14.0
     # via uv-dynamic-versioning
 trove-classifiers==2026.1.14.14
     # via hatchling
 uv-dynamic-versioning==0.13.0
-    # via
-    #   a2a-sdk
-    #   mcp
+    # via a2a-sdk
 wheel==0.46.3
     # via
     #   authlib
     #   azure-identity
     #   cachetools
     #   litellm
-    #   pycparser
+    #   oci
+    #   oracledb
     #   sentence-transformers
+    #   tornado
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==80.10.2
+setuptools==82.0.0
+    # via charset-normalizer
+setuptools==82.0.1
     # via
     #   authlib
     #   azure-identity
@@ -113,30 +120,32 @@ setuptools==80.10.2
     #   certifi
     #   emoji
     #   google-api-core
+    #   google-cloud-bigquery
+    #   googleapis-common-protos
     #   greenlet
-    #   importlib-metadata
     #   llama-stack
     #   llama-stack-api
     #   markupsafe
     #   maturin
-    #   multidict
     #   multiprocess
+    #   oci
+    #   oracledb
     #   pathspec
+    #   pip-tools
     #   pluggy
     #   polyleven
-    #   prometheus-client
     #   proto-plus
     #   psutil
-    #   pycparser
     #   pycryptodomex
     #   pyjwt
+    #   python-dotenv
     #   regex
     #   semver
     #   sentence-transformers
     #   setuptools-rust
     #   setuptools-scm
     #   sse-starlette
-    #   tqdm
-    #   tree-sitter
+    #   tenacity
+    #   tornado
     #   trl
     #   trove-classifiers

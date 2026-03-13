@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-Apache-blue)](https://github.com/lightspeed-core/lightspeed-stack/blob/main/LICENSE)
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 [![Required Python version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Flightspeed-core%2Flightspeed-stack%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)](https://www.python.org/)
-[![Tag](https://img.shields.io/github/v/tag/lightspeed-core/lightspeed-stack)](https://github.com/lightspeed-core/lightspeed-stack/releases/tag/0.4.1)
+[![Tag](https://img.shields.io/github/v/tag/lightspeed-core/lightspeed-stack)](https://github.com/lightspeed-core/lightspeed-stack/releases/tag/0.4.2)
 
 Lightspeed Core Stack (LCS) is an AI-powered assistant that provides answers to product questions using backend LLM services, agents, and RAG databases.
 
@@ -330,6 +330,15 @@ user_data_collection:
 
 **Important**: Only MCP servers defined in the `lightspeed-stack.yaml` configuration are available to the agents. Tools configured in the llama-stack `run.yaml` are not accessible to lightspeed-core agents.
 
+Besides configuring the MCP Servers in `lightspeed-stack.yaml` we also need to enable the appropriate tool in llama-stack's `run.yaml` file under the `tool_runtime` section. Here's an example using the default `provider_id` name used by lightspeed-stack for MCPs:
+
+```yaml
+  tool_runtime:
+    - provider_id: model-context-protocol
+      provider_type: remote::model-context-protocol
+      config: {}
+```
+
 #### Configuring MCP Servers
 
 MCP (Model Context Protocol) servers provide tools and capabilities to the AI agents. These are configured in the `mcp_servers` section of your `lightspeed-stack.yaml`.
@@ -377,7 +386,7 @@ The secret files should contain only the header value (tokens are automatically 
 
 ```bash
 # /var/secrets/api-token
-Bearer sk-abc123def456...
+sk-abc123def456...
 
 # /var/secrets/api-key
 my-api-key-value
@@ -847,8 +856,8 @@ ruff                              Check source code using Ruff linter
 verify                            Run all linters
 distribution-archives             Generate distribution archives to be uploaded into Python registry
 upload-distribution-archives      Upload distribution archives into Python registry
-konflux-requirements              generate hermetic requirements.*.txt file for konflux build
-konflux-rpm-lock 	              generate rpm.lock.yaml file for konflux build
+konflux-requirements              Generate hermetic requirements.*.txt file for konflux build
+konflux-rpm-lock 	              Generate rpm.lock.yaml file for konflux build
 ```
 
 ## Running Linux container image
