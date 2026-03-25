@@ -11,7 +11,7 @@ OpenShift e2e passes 3000 to match the pod's containerPort.
 
 import json
 import sys
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Optional
 
 # Standard OAuth-style challenge so the client can drive an OAuth flow

@@ -14,16 +14,16 @@ from typing import Optional
 
 import requests
 from behave.model import Feature, Scenario
-from tests.e2e.utils.prow_utils import (
-    restore_llama_stack_pod,
-    restart_lightspeed_stack_only,
-)
 from behave.runner import Context
 
 from tests.e2e.utils.llama_stack_utils import (
     register_shield,
     unregister_mcp_toolgroups,
     unregister_shield,
+)
+from tests.e2e.utils.prow_utils import (
+    restart_lightspeed_stack_only,
+    restore_llama_stack_pod,
 )
 from tests.e2e.utils.utils import (
     clear_llama_stack_storage,
