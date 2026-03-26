@@ -46,7 +46,7 @@ spec:
         - |
           set -e
           # Repo URL/revision: from ConfigMap or defaults; convert SSH to HTTPS for clone
-          REPO_URL="${REPO_URL:-https://github.com/radofuchs/lightspeed-stack.git}"
+          REPO_URL="${REPO_URL:-https://github.com/lightspeed-core/lightspeed-stack.git}"
           REPO_REVISION="${REPO_REVISION:-main}"
           case "$REPO_URL" in git@github.com:*) REPO_URL="https://github.com/${REPO_URL#git@github.com:}"; esac
           # Install system deps and uv

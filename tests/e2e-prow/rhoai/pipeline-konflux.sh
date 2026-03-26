@@ -187,7 +187,7 @@ fi
 # ConfigMap for Llama Stack run-from-source (init container clones this repo @ this revision)
 REPO_URL="${REPO_URL:-$(cd "$REPO_ROOT" && git config --get remote.origin.url 2>/dev/null)}"
 REPO_REVISION="${REPO_REVISION:-$(cd "$REPO_ROOT" && git rev-parse HEAD 2>/dev/null)}"
-[[ -z "$REPO_URL" ]] && REPO_URL='https://github.com/radofuchs/lightspeed-stack.git'
+[[ -z "$REPO_URL" ]] && REPO_URL='https://github.com/lightspeed-core/lightspeed-stack.git'
 [[ -z "$REPO_REVISION" ]] && REPO_REVISION='main'
 oc create configmap llama-stack-source -n "$NAMESPACE" \
   --from-literal=repo_url="$REPO_URL" \

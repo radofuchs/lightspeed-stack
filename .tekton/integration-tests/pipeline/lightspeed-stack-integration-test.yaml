@@ -230,21 +230,6 @@ spec:
                 value: "$(params.clusterName)"
               - name: credentials
                 value: credentials
-          - name: echo-kubeconfig
-            image: registry.access.redhat.com/ubi9/ubi-minimal
-            volumeMounts:
-              - name: credentials
-                mountPath: /credentials
-            env:
-              - name: KUBECONFIG
-                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
-            script: |
-              echo "========== KUBECONFIG (for verification) =========="
-              echo "KUBECONFIG path: $KUBECONFIG"
-              echo "File exists: $(test -f "$KUBECONFIG" && echo yes || echo no)"
-              echo "--- kubeconfig contents ---"
-              cat "$KUBECONFIG" 2>/dev/null || echo "(could not read file)"
-              echo "--- end kubeconfig ---"
           - name: run-e2e-tests
             onError: continue
             resources:
@@ -291,8 +276,8 @@ spec:
               tar -xzf oc.tar.gz && chmod +x kubectl oc && mv oc kubectl /usr/local/bin/
               echo "[e2e] 4/8 SNAPSHOT (length ${#SNAPSHOT} chars; clone URL fixed — SNAPSHOT is main/upstream, not fork)..."
               # Fixed fork + branch: Konflux SNAPSHOT points at main repo/rev, not the PR/fork under test.
-              REPO_URL="https://github.com/radofuchs/lightspeed-stack.git"
-              REPO_REV="lcore-1221-konflux-e2e-tests"
+              REPO_URL=$(jq -r '.components[] | select(.name == "lightspeed-stack") | .source.git.url // "https://github.com/lightspeed-core/lightspeed-stack.git"' <<< "$SNAPSHOT")
+              REPO_REV=$(jq -r '.components[] | select(.name == "lightspeed-stack") | .source.git.revision // "main"' <<< "$SNAPSHOT")
               echo "[e2e] 5/8 Clone $REPO_URL @ $REPO_REV"
               git clone -q "$REPO_URL" /workspace/lightspeed-stack
               cd /workspace/lightspeed-stack && git fetch origin "$REPO_REV" && git checkout -q "$REPO_REV"
