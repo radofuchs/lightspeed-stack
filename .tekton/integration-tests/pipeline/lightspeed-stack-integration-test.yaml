@@ -2,8 +2,6 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  annotations:
-    pipelinesascode.tekton.dev/task: "[ols-installer, ols-e2e-task]"
   name: lightspeed-stack-integration-tests-pipeline
 spec:
   description: |
@@ -212,9 +210,6 @@ spec:
           - name: quay-aipcc-password
             secret:
               secretName: quay-aipcc-password
-          - name: ols-konflux-artifacts-bot-creds
-            secret:
-              secretName: ols-konflux-artifacts-bot
           - name: credentials
             emptyDir: {}
         steps:
@@ -335,6 +330,7 @@ spec:
           #     #!/bin/bash
           #     ls -la /workspace
           # - name: push-artifacts
+          #   (requires volume ols-konflux-artifacts-bot-creds + Secret ols-konflux-artifacts-bot)
           #   onError: continue
           #   ref:
           #     resolver: git
