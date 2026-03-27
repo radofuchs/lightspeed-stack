@@ -178,10 +178,10 @@ def check_response_body_contains(context: Context, substring: str) -> None:
     """
     assert context.response is not None, "Request needs to be performed first"
     expected = replace_placeholders(context, substring)
-    haystack = context.response.text.lower()
-    needle = expected.lower()
+    response_text_lower = context.response.text.lower()
+    expected_substring_lower = expected.lower()
     assert (
-        needle in haystack
+        expected_substring_lower in response_text_lower
     ), f"The response text '{context.response.text}' doesn't contain '{expected}'"
 
 
