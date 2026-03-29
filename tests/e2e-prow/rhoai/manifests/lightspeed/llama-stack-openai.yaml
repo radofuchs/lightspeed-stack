@@ -111,7 +111,7 @@ spec:
         - name: HOME
           value: "/opt/app-root/src"
         - name: KV_STORE_PATH
-          value: "/opt/app-root/src/.llama/storage/rag/kv_store.db"
+          value: "/opt/app-root/src/.llama/storage/kv_store.db"
         - name: KV_RAG_PATH
           value: "/opt/app-root/src/.llama/storage/rag/kv_store.db"
         - name: SQL_STORE_PATH

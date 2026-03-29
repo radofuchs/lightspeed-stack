@@ -22,10 +22,10 @@ PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 2. ENVIRONMENT SETUP
 #========================================
 echo "===== Setting up environment variables ====="
-# export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test || true)
-# export VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test || true)
-# export QUAY_ROBOT_NAME=$(cat /var/run/quay-aipcc-name/lcore-quay-name-lcore-test || true)
-# export QUAY_ROBOT_PASSWORD=$(cat /var/run/quay-aipcc-password/lcore-quay-password-lcore-test || true)
+export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test || true)
+export VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test || true)
+export QUAY_ROBOT_NAME=$(cat /var/run/quay-aipcc-name/lcore-quay-name-lcore-test || true)
+export QUAY_ROBOT_PASSWORD=$(cat /var/run/quay-aipcc-password/lcore-quay-password-lcore-test || true)
 
 
 [[ -n "$HUGGING_FACE_HUB_TOKEN" ]] && echo "✅ HUGGING_FACE_HUB_TOKEN is set" || { echo "❌ Missing HUGGING_FACE_HUB_TOKEN"; exit 1; }
@@ -206,7 +206,39 @@ oc wait pod/mock-jwks pod/mcp-mock-server \
 echo "✅ Mock servers deployed"
 
 #========================================
-# 8. DEPLOY LIGHTSPEED STACK AND LLAMA STACK
+# 8. BUILD LLAMA STACK IMAGE
+#========================================
+echo "===== Building llama-stack image ====="
+LLAMA_STACK_IMAGE="image-registry.openshift-image-registry.svc:5000/${NAMESPACE}/llama-stack-e2e:latest"
+export LLAMA_STACK_IMAGE
+
+# Create BuildConfig (idempotent)
+oc new-build --name=llama-stack-e2e \
+  --binary \
+  --strategy=docker \
+  --image="registry.access.redhat.com/ubi9/ubi-minimal" \
+  --to="llama-stack-e2e:latest" \
+  -n "$NAMESPACE" 2>/dev/null || echo "BuildConfig llama-stack-e2e already exists"
+
+# Patch BuildConfig to use test.containerfile instead of Dockerfile
+oc patch bc llama-stack-e2e -n "$NAMESPACE" --type=json \
+  -p '[{"op":"replace","path":"/spec/strategy/dockerStrategy/dockerfilePath","value":"test.containerfile"}]' 2>/dev/null || true
+
+# Build from repo root
+oc start-build llama-stack-e2e \
+  --from-dir="$REPO_ROOT" \
+  --follow \
+  -n "$NAMESPACE" || { echo "❌ llama-stack image build failed"; exit 1; }
+
+echo "✅ llama-stack image built: $LLAMA_STACK_IMAGE"
+
+# Allow default SA to pull from the internal registry
+oc policy add-role-to-user system:image-puller \
+  system:serviceaccount:${NAMESPACE}:default \
+  -n "$NAMESPACE" 2>/dev/null || true
+
+#========================================
+# 9. DEPLOY LIGHTSPEED STACK AND LLAMA STACK
 #========================================
 echo "===== Deploying Services ====="
 
