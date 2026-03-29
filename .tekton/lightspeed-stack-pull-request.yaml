@@ -58,7 +58,7 @@ spec:
            ],
            "requirements_build_files": ["requirements-build.txt"],
            "binary": {
-             "packages": "aiohappyeyeballs,aiohttp,aiosignal,aiosqlite,annotated-doc,annotated-types,anyio,asyncpg,cffi,chevron,click,cryptography,datasets,dill,distro,dnspython,docstring-parser,durationpy,einops,email-validator,faiss-cpu,fire,frozenlist,fsspec,google-cloud-core,google-cloud-resource-manager,google-crc32c,google-genai,google-resumable-media,grpc-google-iam-v1,grpcio,grpcio-status,h11,hf-xet,httpcore,httpx,httpx-sse,idna,importlib-metadata,jinja2,jiter,joblib,jsonschema,jsonschema-specifications,kubernetes,lxml,markdown-it-py,mcp,mdurl,mpmath,multidict,networkx,numpy,oauthlib,packaging,pandas,peft,pillow,prometheus-client,prompt-toolkit,propcache,psycopg2-binary,pyarrow,pyasn1-modules,pycparser,pydantic,pydantic-core,pygments,python-dateutil,python-multipart,pyyaml,referencing,requests,requests-oauthlib,rpds-py,safetensors,scikit-learn,scipy,setuptools,six,sniffio,sqlalchemy,sympy,termcolor,threadpoolctl,tiktoken,tokenizers,torch,tqdm,transformers,tree-sitter,triton,typing-extensions,typing-inspection,tzdata,urllib3,websocket-client,websockets,wrapt,xxhash,yarl,zipp,uv,pip,maturin",
+             "packages": "aiohappyeyeballs,aiohttp,aiosignal,aiosqlite,annotated-doc,annotated-types,anyio,asyncpg,cffi,chevron,click,cryptography,datasets,dill,distro,dnspython,docstring-parser,durationpy,einops,email-validator,faiss-cpu,fire,frozenlist,fsspec,google-cloud-core,google-crc32c,google-genai,google-resumable-media,grpc-google-iam-v1,grpcio,grpcio-status,h11,hf-xet,httpcore,httpx,httpx-sse,idna,importlib-metadata,jinja2,jiter,joblib,jsonschema,jsonschema-specifications,kubernetes,lxml,markdown-it-py,mcp,mdurl,mpmath,multidict,networkx,numpy,oauthlib,packaging,pandas,peft,pillow,prometheus-client,prompt-toolkit,propcache,psycopg2-binary,pyarrow,pyasn1-modules,pycparser,pydantic,pydantic-core,pygments,python-dateutil,python-multipart,pyyaml,referencing,requests-oauthlib,rpds-py,safetensors,scikit-learn,scipy,setuptools,six,sniffio,sqlalchemy,sympy,termcolor,threadpoolctl,tiktoken,tokenizers,torch,tqdm,transformers,tree-sitter,triton,typing-extensions,typing-inspection,tzdata,urllib3,websocket-client,websockets,wrapt,xxhash,yarl,zipp,uv,pip,maturin",
              "os": "linux",
              "arch": "x86_64,aarch64",
              "py_version": 312
@@ -213,7 +213,7 @@ spec:
         - name: name
           value: prefetch-dependencies-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.3@sha256:a579d00fe370b6d9a1cb1751c883ecd0ec9f663604344e2fd61e1f6d5bf4e990
+          value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.3@sha256:2229dbc5e15acc0a6d8aec526465aeb0ad54e269c311ac3d0aba88013845e308
         - name: kind
           value: task
         resolver: bundles
@@ -367,7 +367,7 @@ spec:
         - name: name
           value: clair-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-clair-scan:0.3@sha256:59dec3000fa35c714d0209dc61e6ec9de15d4d45172246cf5eeff796c5cff65f
+          value: quay.io/konflux-ci/tekton-catalog/task-clair-scan:0.3@sha256:3fa03be0280f33d7070ea53f26d53e727199737a7a2b9a59a95071ae40a999ac
         - name: kind
           value: task
         resolver: bundles
@@ -587,7 +587,7 @@ spec:
         - name: name
           value: apply-tags
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.3@sha256:510b6d2a3b188adeb716e49566b57d611ab36bd69a2794b5ddfc11dbf014c2ca
+          value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.3@sha256:aa62b41861c09e2e59c69cc6e9a1f740bf0c81e6a1eb03f57f59dfda0f65840e
         - name: kind
           value: task
         resolver: bundles
@@ -627,7 +627,7 @@ spec:
         - name: name
           value: rpms-signature-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:35a4ccda7e213d83d9f5e7ea5cad91dd180cbcebcb6c46f8d41a579478dd2072
+          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:3d48fa2fcc898bae9ce730a71789c34758a767b44bc36fd24938779deef4ee96
         - name: kind
           value: task
         resolver: bundles
