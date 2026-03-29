@@ -279,14 +279,11 @@ cmd_restart_llama_stack() {
             exit 1
         fi
     else
-        # Prow: vLLM Llama Stack image (matches pipeline.sh / pipeline-services.sh)
-        if command -v envsubst >/dev/null 2>&1; then
-            envsubst < "$MANIFEST_DIR/llama-stack.yaml" | oc apply -n "$NAMESPACE" -f -
-        else
-            sed "s|\${LLAMA_STACK_IMAGE}|${LLAMA_STACK_IMAGE:-}|g" "$MANIFEST_DIR/llama-stack.yaml" |
-                oc apply -n "$NAMESPACE" -f -
-        fi
-        wait_for_pod "llama-stack-service" 24
+        # Prow: Llama Stack built from source — delete + recreate since cluster security
+        # policy mutates pod spec (extra capability drops), making oc apply fail on immutable fields
+        oc delete pod llama-stack-service -n "$NAMESPACE" --ignore-not-found --wait=true 2>/dev/null || true
+        oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/llama-stack.yaml"
+        wait_for_pod "llama-stack-service" 60
         echo "Labeling pod for service..."
         oc label pod llama-stack-service pod=llama-stack-service -n "$NAMESPACE" --overwrite
     fi

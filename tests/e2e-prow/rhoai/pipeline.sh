@@ -8,23 +8,24 @@ export RUNNING_PROW=true
 #========================================
 # 1. GLOBAL CONFIG
 #========================================
-NAMESPACE="e2e-rhoai-dsc"
+NAMESPACE="${NAMESPACE:-e2e-rhoai-dsc}"
+export NAMESPACE
 MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# RHOAI llama-stack image
-LLAMA_STACK_IMAGE="${LLAMA_STACK_IMAGE:-quay.io/rhoai/odh-llama-stack-core-rhel9:rhoai-3.4-ea.2}"
-echo "Using llama-stack image: $LLAMA_STACK_IMAGE"
-export LLAMA_STACK_IMAGE
+# RHOAI llama-stack image (unused when building from source via llama-stack-openai.yaml)
+# LLAMA_STACK_IMAGE="${LLAMA_STACK_IMAGE:-quay.io/rhoai/odh-llama-stack-core-rhel9:rhoai-3.4-ea.2}"
+# echo "Using llama-stack image: $LLAMA_STACK_IMAGE"
+# export LLAMA_STACK_IMAGE
 
 #========================================
 # 2. ENVIRONMENT SETUP
 #========================================
 echo "===== Setting up environment variables ====="
-export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test || true)
-export VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test || true)
-export QUAY_ROBOT_NAME=$(cat /var/run/quay-aipcc-name/lcore-quay-name-lcore-test || true)
-export QUAY_ROBOT_PASSWORD=$(cat /var/run/quay-aipcc-password/lcore-quay-password-lcore-test || true)
+# export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test || true)
+# export VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test || true)
+# export QUAY_ROBOT_NAME=$(cat /var/run/quay-aipcc-name/lcore-quay-name-lcore-test || true)
+# export QUAY_ROBOT_PASSWORD=$(cat /var/run/quay-aipcc-password/lcore-quay-password-lcore-test || true)
 
 
 [[ -n "$HUGGING_FACE_HUB_TOKEN" ]] && echo "✅ HUGGING_FACE_HUB_TOKEN is set" || { echo "❌ Missing HUGGING_FACE_HUB_TOKEN"; exit 1; }
@@ -56,6 +57,22 @@ create_secret() {
 
 create_secret hf-token-secret --from-literal=token="$HUGGING_FACE_HUB_TOKEN"
 create_secret vllm-api-key-secret --from-literal=key="$VLLM_API_KEY"
+create_secret openai-api-key-secret --from-literal=key=""
+
+# MCP token secrets for lightspeed-stack
+REPO_ROOT="$(cd "$PIPELINE_DIR/../../.." && pwd)"
+if [ -f "$REPO_ROOT/tests/e2e/secrets/mcp-token" ]; then
+  oc create secret generic mcp-file-auth-token -n "$NAMESPACE" \
+    --from-file=token="$REPO_ROOT/tests/e2e/secrets/mcp-token" \
+    --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
+  echo "✅ mcp-file-auth-token secret applied"
+fi
+if [ -f "$REPO_ROOT/tests/e2e/secrets/invalid-mcp-token" ]; then
+  oc create secret generic mcp-invalid-file-auth-token -n "$NAMESPACE" \
+    --from-file=token="$REPO_ROOT/tests/e2e/secrets/invalid-mcp-token" \
+    --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
+  echo "✅ mcp-invalid-file-auth-token secret applied"
+fi
 
 # Create Quay pull secret for llama-stack images
 echo "Creating Quay pull secret..."
@@ -79,7 +96,7 @@ curl -sL -o tool_chat_template_llama3.1_json.jinja \
     || { echo "❌ Failed to download jinja template"; exit 1; }
 
 oc create configmap vllm-chat-template -n "$NAMESPACE" \
-    --from-file=tool_chat_template_llama3.1_json.jinja --dry-run=client -o yaml | oc apply -f -
+    --from-file=tool_chat_template_llama3.1_json.jinja --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
 
 
 #========================================
@@ -162,18 +179,18 @@ REPO_ROOT="$(cd "$PIPELINE_DIR/../../.." && pwd)"
 echo "Creating mock server ConfigMaps..."
 oc create configmap mock-jwks-script -n "$NAMESPACE" \
     --from-file=server.py="$REPO_ROOT/tests/e2e/mock_jwks_server/server.py" \
-    --dry-run=client -o yaml | oc apply -f -
+    --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
 
 oc create configmap mcp-mock-server-script -n "$NAMESPACE" \
     --from-file=server.py="$REPO_ROOT/tests/e2e/mock_mcp_server/server.py" \
-    --dry-run=client -o yaml | oc apply -f -
+    --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
 
 # Deploy mock server pods and services
 echo "Deploying mock-jwks..."
-oc apply -f "$PIPELINE_DIR/manifests/lightspeed/mock-jwks.yaml"
+oc apply -n "$NAMESPACE" -f "$PIPELINE_DIR/manifests/lightspeed/mock-jwks.yaml"
 
 echo "Deploying mcp-mock-server..."
-oc apply -f "$PIPELINE_DIR/manifests/lightspeed/mcp-mock-server.yaml"
+oc apply -n "$NAMESPACE" -f "$PIPELINE_DIR/manifests/lightspeed/mcp-mock-server.yaml"
 
 # Wait for mock servers to be ready
 echo "Waiting for mock servers to be ready..."
@@ -310,6 +327,15 @@ for i in $(seq 1 36); do
   fi
   if [ $i -eq 36 ]; then
     echo "❌ Port-forward to lightspeed-stack never became ready (3 min)"
+    echo ""
+    echo "DEBUG: lightspeed-stack-service logs:"
+    oc logs lightspeed-stack-service -n "$NAMESPACE" --tail=100 || true
+    echo ""
+    echo "DEBUG: llama-stack-service logs:"
+    oc logs llama-stack-service -n "$NAMESPACE" --tail=100 || true
+    echo ""
+    echo "DEBUG: Pod status:"
+    oc get pods -n "$NAMESPACE" -o wide || true
     kill $PF_LCS_PID 2>/dev/null || true
     kill $PF_JWKS_PID 2>/dev/null || true
     exit 1

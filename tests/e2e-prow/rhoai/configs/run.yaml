@@ -109,9 +109,9 @@ server:
   port: 8321
 storage:
   backends:
-    kv_default:  # Single database for registry AND RAG data
+    kv_default:
       type: kv_sqlite
-      db_path: /opt/app-root/src/.llama/storage/rag/kv_store.db
+      db_path: /opt/app-root/src/.llama/storage/kv_store.db
     kv_rag:
       type: kv_sqlite
       db_path: /opt/app-root/src/.llama/storage/rag/kv_store.db
