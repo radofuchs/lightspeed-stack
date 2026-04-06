@@ -268,6 +268,7 @@ spec:
             image: registry.access.redhat.com/ubi9/ubi-minimal
             script: |
               set +e
+              mkdir -p /workspace/artifacts /workspace/konflux-artifacts
               echo "[e2e] 1/8 Starting run-e2e-tests step"
               echo "[e2e] 2/8 Installing deps (git, tar, jq, curl-minimal, python3, gettext for envsubst)..."
               microdnf -y install git tar jq curl-minimal python3 gettext
@@ -287,35 +288,59 @@ spec:
               ./pipeline-konflux.sh
               PIPELINE_EXIT=$?
               echo "[e2e] 8/8 pipeline-konflux.sh exited with code $PIPELINE_EXIT"
+              if [[ -d /workspace/lightspeed-stack/tests/test_results ]]; then
+                cp -a /workspace/lightspeed-stack/tests/test_results/. /workspace/artifacts/ 2>/dev/null || true
+              fi
+              if [[ -f /workspace/lightspeed-stack/tests/e2e-prow/rhoai/.e2e_exit_code ]]; then
+                cp -a /workspace/lightspeed-stack/tests/e2e-prow/rhoai/.e2e_exit_code /workspace/artifacts/ 2>/dev/null || true
+              fi
               exit $PIPELINE_EXIT
-          # - name: gather-cluster-resources
-          #   onError: continue
-          #   ref:
-          #     resolver: git
-          #     params:
-          #       - name: url
-          #         value: https://github.com/konflux-ci/tekton-integration-catalog
-          #       - name: revision
-          #         value: main
-          #       - name: pathInRepo
-          #         value: stepactions/gather-cluster-resources/0.1/gather-cluster-resources.yaml
-          #   params:
-          #     - name: credentials
-          #       value: "credentials"
-          #     - name: kubeconfig
-          #       value: "$(steps.get-kubeconfig.results.kubeconfig)"
-          #     - name: artifact-dir
-          #       value: "/workspace/konflux-artifacts"
-          # # validate that the cluster resources are available in another tekton step
-          # - name: list-artifacts
-          #   onError: continue
-          #   image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
-          #   workingDir: "/workspace"
-          #   script: |
-          #     #!/bin/bash
-          #     ls -la /workspace
+          - name: gather-cluster-resources
+            onError: continue
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/tekton-integration-catalog.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/gather-cluster-resources/0.1/gather-cluster-resources.yaml
+            params:
+              - name: credentials
+                value: credentials
+              - name: kubeconfig
+                value: "$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: artifact-dir
+                value: /workspace/konflux-artifacts
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+          - name: list-artifacts
+            onError: continue
+            image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+            workingDir: /workspace
+            script: |
+              #!/bin/bash
+              set +e
+              echo "========== Integration run artifact layout under /workspace =========="
+              ls -la /workspace
+              echo "========== Disk use (top-level) =========="
+              for d in /workspace/artifacts /workspace/konflux-artifacts /workspace/lightspeed-stack; do
+                if [[ -d "$d" ]]; then
+                  echo "--- du -sh $d ---"
+                  du -sh "$d" 2>/dev/null || true
+                  echo "--- find $d (maxdepth 4, first 250 files) ---"
+                  find "$d" -maxdepth 4 -type f 2>/dev/null | head -250
+                else
+                  echo "--- $d (missing) ---"
+                fi
+              done
+              echo "========== Total files under /workspace =========="
+              find /workspace -type f 2>/dev/null | wc -l
+              echo "========== End artifact listing =========="
+          # Optional: push /workspace to OCI (add Secret + workload volume ols-konflux-artifacts-bot-creds first).
           # - name: push-artifacts
-          #   (requires volume ols-konflux-artifacts-bot-creds + Secret ols-konflux-artifacts-bot)
           #   onError: continue
           #   ref:
           #     resolver: git
@@ -333,13 +358,13 @@ spec:
           #       value: "quay.io/openshift-lightspeed/ols-service-artifacts:$(params.commit)"
           #     - name: credentials-volume-name
           #       value: ols-konflux-artifacts-bot-creds
-          # - name: fail-if-any-step-failed
-          #   ref:
-          #     resolver: git
-          #     params:
-          #       - name: url
-          #         value: https://github.com/konflux-ci/tekton-integration-catalog.git
-          #       - name: revision
-          #         value: main
-          #       - name: pathInRepo
-          #         value: stepactions/fail-if-any-step-failed/0.1/fail-if-any-step-failed.yaml
+          - name: fail-if-any-step-failed
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/tekton-integration-catalog.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/fail-if-any-step-failed/0.1/fail-if-any-step-failed.yaml
