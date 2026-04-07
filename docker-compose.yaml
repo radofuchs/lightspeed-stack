@@ -70,6 +70,8 @@ services:
       - LLAMA_STACK_LOGGING=${LLAMA_STACK_LOGGING:-}
       # FAISS test
       - FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}
+      #required for enrichment
+      - E2E_LLAMA_HOSTNAME=${E2E_LLAMA_HOSTNAME:-llama-stack}
     networks:
       - lightspeednet
     healthcheck:
