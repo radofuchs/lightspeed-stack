@@ -98,6 +98,9 @@ services:
       - CLIENT_SECRET=${CLIENT_SECRET:-}
       # FAISS vector store ID (used by inline RAG config)
       - FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}
+      # Substituted in mounted lightspeed-stack.yaml (llama_stack.url); GitHub Actions sets via vars
+      - E2E_LLAMA_HOSTNAME=${E2E_LLAMA_HOSTNAME:-llama-stack}
+      - E2E_LLAMA_PORT=${E2E_LLAMA_PORT:-8321}
     depends_on:
         llama-stack:
           condition: service_healthy
