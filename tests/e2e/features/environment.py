@@ -22,8 +22,8 @@ from tests.e2e.utils.llama_stack_utils import (
     unregister_shield,
 )
 from tests.e2e.utils.prow_utils import (
-    restore_llama_stack_pod,
     restart_pod,
+    restore_llama_stack_pod,
 )
 from tests.e2e.utils.utils import (
     clear_llama_stack_storage,
