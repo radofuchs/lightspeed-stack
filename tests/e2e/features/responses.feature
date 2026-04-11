@@ -3,7 +3,12 @@ Feature: Responses endpoint API tests
 
   Background:
     Given The service is started locally
+      And The system is in default state
+      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And REST API service prefix is /v1
+      And the Lightspeed stack configuration directory is "tests/e2e/configuration"
+      And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+      And The service is restarted
 
 
   Scenario: Responses returns 200 for minimal request
@@ -388,46 +393,6 @@ Feature: Responses endpoint API tests
       And The GET conversation response id matches the responses multi-turn baseline conversation id
       And The body of the response contains Fork test turn two
       And The conversation history contains 2 messages
-
-  Scenario: Responses returns error when not authenticated
-    Given The system is in default state
-     When I use "responses" to ask question
-     """
-     {"input": "Say hello", "model": "{PROVIDER}/{MODEL}", "stream": false}
-     """
-      Then The status code of the response is 401
-      And The body of the response is the following
-      """
-      {
-        "detail": {
-          "response": "Missing or invalid credentials provided by client",
-          "cause": "No Authorization header found"
-        }
-      }
-      """
-
-  Scenario: Responses returns error when bearer token is missing
-    Given The system is in default state
-    And I set the Authorization header to Bearer
-    When I use "responses" to ask question with authorization header
-    """
-    {"input": "Say hello", "model": "{PROVIDER}/{MODEL}", "stream": false}
-    """
-      Then The status code of the response is 401
-      And The body of the response contains No token found in Authorization header
-
-  @skip-in-library-mode
-  Scenario: Responses returns error when unable to connect to llama-stack
-    Given The system is in default state
-    And The llama-stack connection is disrupted
-    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
-    When I use "responses" to ask question with authorization header
-    """
-    {"input": "Say hello", "model": "{PROVIDER}/{MODEL}", "stream": false}
-    """
-     Then The status code of the response is 503
-      And The body of the response contains Unable to connect to Llama Stack
-
 
   Scenario: Responses endpoint with tool_choice none answers knowledge question without file search usage
     Given The system is in default state

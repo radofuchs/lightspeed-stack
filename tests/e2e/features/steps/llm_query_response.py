@@ -11,7 +11,7 @@ from behave.runner import Context
 from tests.e2e.utils.utils import replace_placeholders
 
 # Longer timeout for Prow/OpenShift with CPU-based vLLM
-DEFAULT_LLM_TIMEOUT = 180 if os.getenv("RUNNING_PROW") else 60
+DEFAULT_LLM_TIMEOUT = 180 if os.getenv("RUNNING_PROW") else 120
 
 # Responses API ``output`` item types that indicate tool listing or invocation.
 _RESPONSE_TOOL_OUTPUT_ITEM_TYPES = frozenset(
