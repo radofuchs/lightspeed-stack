@@ -1,4 +1,5 @@
 """Implementation of common test steps."""
+
 import os
 import time
 
@@ -70,7 +71,11 @@ def configure_service(context: Context, config_name: str) -> None:
     state, not only ``context``, so it survives per-scenario context resets),
     returns immediately: no backup, no copy, and sets
     ``context.lightspeed_stack_skip_restart`` so the next ``The service is
-    restarted`` step can no-op. Otherwise creates the backup on first use,
+    restarted`` step can no-op—except after library-mode ``~/.llama`` was
+    cleared by ``MCP toolgroups are reset for a new MCP configuration``, in
+    which case the restart is not skipped so embedded Llama Stack can recreate
+    SQLite schema. When the basename differs from the last apply, creates the
+    backup on first use,
     copies the YAML, updates ``context.feature_config`` / override flags, and
     stores the basename for the next check. Cleared in ``before_feature`` so a
     new feature file always applies at least once.
@@ -88,7 +93,14 @@ def configure_service(context: Context, config_name: str) -> None:
     """
     config_name = config_name.strip()
     if _active_lightspeed_stack_config_basename["basename"] == config_name:
-        context.lightspeed_stack_skip_restart = True
+        # ``MCP toolgroups are reset for a new MCP configuration`` may have run
+        # ``rm -rf ~/.llama`` in library mode; the next restart must not be
+        # skipped or the process keeps stale handles / missing SQLite tables.
+        if getattr(context, "force_lightspeed_restart_after_mcp_storage_clear", False):
+            context.lightspeed_stack_skip_restart = False
+            context.force_lightspeed_restart_after_mcp_storage_clear = False
+        else:
+            context.lightspeed_stack_skip_restart = True
         return
 
     had_backup_before = os.path.exists("lightspeed-stack.yaml.backup")
@@ -135,10 +147,14 @@ def reset_mcp_toolgroups_for_new_configuration(context: Context) -> None:
     """Clear MCP toolgroups on Llama Stack (server) or ~/.llama storage (library).
 
     Run before applying a different MCP-related ``lightspeed-stack-*.yaml`` in a
-    scenario so tool registration matches the new config.
+    scenario so tool registration matches the new config. In library mode,
+    clearing ``~/.llama`` forces the next ``The service uses ...`` / restart
+    path to run a real container restart so conversation tables are recreated.
     """
     if context.is_library_mode:
         clear_llama_stack_storage()
+        context.force_lightspeed_restart_after_mcp_storage_clear = True
+        context.lightspeed_stack_skip_restart = False
     else:
         unregister_mcp_toolgroups()
 
