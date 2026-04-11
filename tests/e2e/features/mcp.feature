@@ -224,52 +224,8 @@ Feature: MCP tests
         }
     """
 
-# Client-provided — lightspeed-stack-mcp-client-auth.yaml
-  @MCPClientAuthConfig
-  Scenario: Check if tools endpoint succeeds by skipping when MCP client-provided auth token is omitted
-    Given MCP toolgroups are reset for a new MCP configuration
-      And The service uses the lightspeed-stack-mcp-client-auth.yaml configuration
-      And The service is restarted
-    When I access REST API endpoint "tools" using HTTP GET method
-    Then The status code of the response is 200
-    And The body of the response does not contain mcp-client
-
-  @MCPClientAuthConfig
-  Scenario: Check if query endpoint succeeds by skipping when MCP client-provided auth token is omitted
-    Given MCP toolgroups are reset for a new MCP configuration
-      And The service uses the lightspeed-stack-mcp-client-auth.yaml configuration
-      And The service is restarted
-    And I capture the current token metrics
-    When I use "query" to ask question
-    """
-    {"query": "Say hello", "model": "{MODEL}", "provider": "{PROVIDER}"}
-    """
-    Then The status code of the response is 200
-    And The body of the response does not contain mcp-client
-    And The response should contain following fragments
-        | Fragments in LLM response |
-        | Hello                     |
-    And The token metrics should have increased
-
-  @MCPClientAuthConfig
-  Scenario: Check if streaming_query endpoint succeeds by skipping when MCP client-provided auth token is omitted
-    Given MCP toolgroups are reset for a new MCP configuration
-      And The service uses the lightspeed-stack-mcp-client-auth.yaml configuration
-      And The service is restarted
-    And I capture the current token metrics
-    When I use "streaming_query" to ask question
-    """
-    {"query": "Say hello", "model": "{MODEL}", "provider": "{PROVIDER}"}
-    """
-    When I wait for the response to be completed
-    Then The status code of the response is 200
-    And The body of the response does not contain mcp-client
-    And The streamed response should contain following fragments
-        | Fragments in LLM response |
-        | Hello                     |
-    And The token metrics should have increased
-
-  @MCPClientAuthConfig
+# Client-provided — lightspeed-stack-mcp-clientauth.yaml
+@MCPClientAuthConfig
   Scenario: Check if tools endpoint succeeds when MCP client-provided auth token is passed
     Given MCP toolgroups are reset for a new MCP configuration
       And The service uses the lightspeed-stack-mcp-client-auth.yaml configuration
@@ -318,6 +274,50 @@ Feature: MCP tests
     """
     When I wait for the response to be completed
     Then The status code of the response is 200
+    And The streamed response should contain following fragments
+        | Fragments in LLM response |
+        | Hello                     |
+    And The token metrics should have increased
+
+  @MCPClientAuthConfig
+  Scenario: Check if tools endpoint succeeds by skipping when MCP client-provided auth token is omitted
+    Given MCP toolgroups are reset for a new MCP configuration
+      And The service uses the lightspeed-stack-mcp-client-auth.yaml configuration
+      And The service is restarted
+    When I access REST API endpoint "tools" using HTTP GET method
+    Then The status code of the response is 200
+    And The body of the response does not contain mcp-client
+
+  @MCPClientAuthConfig
+  Scenario: Check if query endpoint succeeds by skipping when MCP client-provided auth token is omitted
+    Given MCP toolgroups are reset for a new MCP configuration
+      And The service uses the lightspeed-stack-mcp-client-auth.yaml configuration
+      And The service is restarted
+    And I capture the current token metrics
+    When I use "query" to ask question
+    """
+    {"query": "Say hello", "model": "{MODEL}", "provider": "{PROVIDER}"}
+    """
+    Then The status code of the response is 200
+    And The body of the response does not contain mcp-client
+    And The response should contain following fragments
+        | Fragments in LLM response |
+        | Hello                     |
+    And The token metrics should have increased
+
+  @MCPClientAuthConfig
+  Scenario: Check if streaming_query endpoint succeeds by skipping when MCP client-provided auth token is omitted
+    Given MCP toolgroups are reset for a new MCP configuration
+      And The service uses the lightspeed-stack-mcp-client-auth.yaml configuration
+      And The service is restarted
+    And I capture the current token metrics
+    When I use "streaming_query" to ask question
+    """
+    {"query": "Say hello", "model": "{MODEL}", "provider": "{PROVIDER}"}
+    """
+    When I wait for the response to be completed
+    Then The status code of the response is 200
+    And The body of the response does not contain mcp-client
     And The streamed response should contain following fragments
         | Fragments in LLM response |
         | Hello                     |
