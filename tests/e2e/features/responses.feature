@@ -13,7 +13,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 200 for minimal request
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Say hello", "model": "{PROVIDER}/{MODEL}", "stream": false}
@@ -25,7 +24,6 @@ Feature: Responses endpoint API tests
   @skip
   Scenario: Responses accepts passthrough parameters with valid types
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {
@@ -72,7 +70,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 422 for unknown JSON fields on the request body
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Hi", "model": "{PROVIDER}/{MODEL}", "not_a_valid_field": true}
@@ -93,7 +90,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 422 when input is a bare JSON array
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": ["plain", "strings", "list"], "model": "{PROVIDER}/{MODEL}"}
@@ -114,7 +110,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses accepts string input
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Reply with the single word: ok.", "model": "{PROVIDER}/{MODEL}", "stream": false}
@@ -155,7 +150,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses omits model and auto-selects when only input is sent
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Say hello", "stream": false}
@@ -165,7 +159,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 404 for unknown model segment in provider slash model id
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Say hello", "model": "{PROVIDER}/unknown-model-id", "stream": false}
@@ -183,7 +176,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 404 for unknown provider segment in provider slash model id
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Say hello", "model": "unknown-provider/{MODEL}", "stream": false}
@@ -201,7 +193,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 422 when conversation and previous_response_id are both set
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {
@@ -228,7 +219,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 422 for malformed conversation id
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Hi", "model": "{PROVIDER}/{MODEL}", "conversation": "short-id", "stream": false}
@@ -250,7 +240,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 422 when previous_response_id looks like a moderation id
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Hi", "model": "{PROVIDER}/{MODEL}", "previous_response_id": "modr_foo", "stream": false}
@@ -272,7 +261,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses returns 404 for unknown existing-format conversation id
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {
@@ -295,7 +283,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses continues a thread using previous_response_id from latest turn
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "First turn: say alpha.", "model": "{PROVIDER}/{MODEL}", "stream": false}
@@ -327,7 +314,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses continues a thread using conversation id
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "First turn: say alpha.", "model": "{PROVIDER}/{MODEL}", "stream": false}
@@ -350,7 +336,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Responses forks to a new conversation when previous_response_id is not the latest turn
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     When I use "responses" to ask question with authorization header
     """
     {"input": "Fork test turn one.", "model": "{PROVIDER}/{MODEL}", "stream": false}
@@ -414,7 +399,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Check if responses endpoint with tool_choice auto answers a knowledge question using file search
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And I capture the current token metrics
     When I use "responses" to ask question with authorization header
     """
@@ -435,7 +419,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Check if responses endpoint with tool_choice required still invokes document search for a basic question
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And I capture the current token metrics
     When I use "responses" to ask question with authorization header
     """
@@ -452,7 +435,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Check if responses endpoint with file search as the chosen tool answers using file search
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And I capture the current token metrics
     When I use "responses" to ask question with authorization header
     """
@@ -473,7 +455,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Check if responses endpoint with allowed tools in automatic mode answers knowledge question using file search
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And I capture the current token metrics
     When I use "responses" to ask question with authorization header
     """
@@ -498,7 +479,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Check if responses endpoint with allowed tools in required mode invokes file search for a basic question
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And I capture the current token metrics
     When I use "responses" to ask question with authorization header
     """
@@ -519,7 +499,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Allowed tools auto mode with only MCP in allowlist does not use file search for knowledge question
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And I capture the current token metrics
     When I use "responses" to ask question with authorization header
     """
@@ -541,7 +520,6 @@ Feature: Responses endpoint API tests
 
   Scenario: Required allowed_tools with invalid filter returns no tool invocations on knowledge question
     Given The system is in default state
-      And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And I capture the current token metrics
     When I use "responses" to ask question with authorization header
     """

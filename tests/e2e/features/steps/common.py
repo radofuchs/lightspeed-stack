@@ -1,7 +1,6 @@
 """Implementation of common test steps."""
 
 import os
-import time
 
 from behave import given  # pyright: ignore[reportAttributeAccessIssue]
 from behave.runner import Context
