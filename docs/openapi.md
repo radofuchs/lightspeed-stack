@@ -62,7 +62,11 @@ Lightspeed Core Service (LCS) service API specification.
 
 Handle GET requests to the root ("/") endpoint and returns the static HTML index page.
 
-Returns:
+### Parameters:
+    - request: The incoming HTTP request.
+    - auth: Authentication tuple from the auth dependency.
+
+### Returns:
     HTMLResponse: The HTML content of the index page, including a heading,
     embedded image with the service icon, and links to the API documentation
     via Swagger UI and ReDoc.
@@ -117,13 +121,17 @@ Handle request to the /info endpoint.
 Process GET requests to the /info endpoint, returning the
 service name, version and Llama-stack version.
 
-Raises:
+### Parameters:
+    - request: The incoming HTTP request.
+    - auth: Authentication tuple from the auth dependency.
+
+### Raises:
     HTTPException: with status 500 and a detail object
     containing `response` and `cause` when unable to connect to
     Llama Stack. It can also return status 401 or 403 for
     unauthorized access.
 
-Returns:
+### Returns:
     InfoResponse: An object containing the service's name and version.
 
 
@@ -248,9 +256,9 @@ The "model_type" query parameter is optional. When not specified, all models
 will be returned.
 
 ### Parameters:
-    request: The incoming HTTP request.
-    auth: Authentication tuple from the auth dependency.
-    model_type: Optional filter to return only models matching this type.
+    - request: The incoming HTTP request.
+    - auth: Authentication tuple from the auth dependency.
+    - model_type: Optional filter to return only models matching this type.
 
 ### Raises:
     HTTPException: If unable to connect to the Llama Stack server or if
@@ -863,10 +871,14 @@ Examples
 
 List all available providers grouped by API type.
 
-Returns:
+### Parameters:
+    - request: The incoming HTTP request.
+    - auth: Authentication tuple from the auth dependency.
+
+### Returns:
     ProvidersListResponse: Mapping from API type to list of providers.
 
-Raises:
+### Raises:
     HTTPException:
         - 401: Authentication failed
         - 403: Authorization failed
@@ -948,10 +960,15 @@ Examples
 
 Retrieve a single provider identified by its unique ID.
 
-Returns:
+### Parameters:
+    - request: The incoming HTTP request.
+    - provider_id: Provider identification string
+    - auth: Authentication tuple from the auth dependency.
+
+### Returns:
     ProviderResponse: Provider details.
 
-Raises:
+### Raises:
     HTTPException:
         - 401: Authentication failed
         - 403: Authorization failed
@@ -1889,7 +1906,11 @@ current service configuration.
 
 Ensures the application configuration is loaded before returning it.
 
-Returns:
+### Parameters:
+    - request: The incoming HTTP request.
+    - auth: Authentication tuple from the auth dependency.
+
+### Returns:
     ConfigurationResponse: The loaded service configuration response.
 
 
@@ -4463,6 +4484,7 @@ Global service configuration.
 | a2a_state |  | Configuration for A2A protocol persistent state storage. |
 | quota_handlers |  | Quota handlers configuration |
 | azure_entra_id |  |  |
+| rlsapi_v1 |  | Configuration for the rlsapi v1 /infer endpoint used by the RHEL Lightspeed Command Line Assistant (CLA). |
 | splunk |  | Splunk HEC configuration for sending telemetry events. |
 | deployment_environment | string | Deployment environment name (e.g., 'development', 'staging', 'production'). Used in telemetry events. |
 | rag |  | Configuration for all RAG strategies (inline and tool-based). |
@@ -4727,7 +4749,6 @@ Service customization.
 | agent_card_path |  |  |
 | agent_card_config |  |  |
 | custom_profile |  |  |
-| allow_verbose_infer | boolean |  |
 
 
 ## DatabaseConfiguration
@@ -5467,7 +5488,7 @@ This represents the output of a function call that gets passed back to the model
 | Field | Type | Description |
 |-------|------|-------------|
 | call_id | string |  |
-| output | string |  |
+| output |  |  |
 | type | string |  |
 | id |  |  |
 | status |  |  |
@@ -6659,6 +6680,22 @@ Attributes:
 |-------|------|-------------|
 | nevra | string | CLA NEVRA identifier |
 | version | string | Command line assistant version |
+
+
+## RlsapiV1Configuration
+
+
+Configuration for the rlsapi v1 /infer endpoint.
+
+Settings specific to the RHEL Lightspeed Command Line Assistant (CLA)
+stateless inference endpoint. Kept separate from shared configuration
+sections so that CLA-specific options do not affect other endpoints.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| allow_verbose_infer | boolean | Allow /v1/infer to return extended metadata (tool_calls, rag_chunks, token_usage) when the client sends "include_metadata": true. Should NOT be enabled in production. If production use is needed, consider RBAC-based access control via an Action.RLSAPI_V1_INFER authorization rule. |
+| quota_subject |  | Identity field used as the quota subject for /v1/infer. When set, token quota enforcement is enabled for this endpoint. Requires quota_handlers to be configured. "org_id" and "system_id" require rh-identity authentication; falls back to user_id when rh-identity data is unavailable. |
 
 
 ## RlsapiV1Context
