@@ -70,10 +70,10 @@ def configure_service(context: Context, config_name: str) -> None:
     state, not only ``context``, so it survives per-scenario context resets),
     returns immediately: no backup, no copy, and sets
     ``context.lightspeed_stack_skip_restart`` so the next ``The service is
-    restarted`` step can no-op—except after library-mode ``~/.llama`` was
-    cleared by ``MCP toolgroups are reset for a new MCP configuration``, in
-    which case the restart is not skipped so embedded Llama Stack can recreate
-    SQLite schema. When the basename differs from the last apply, creates the
+    restarted`` step can no-op—except after ``MCP toolgroups are reset for a new
+    MCP configuration`` (library ``~/.llama`` clear or server-mode unregister),
+    in which case the restart is not skipped so Lightspeed reloads config and
+    Llama MCP state stays consistent. When the basename differs from the last apply, creates the
     backup on first use,
     copies the YAML, updates ``context.feature_config`` / override flags, and
     stores the basename for the next check. Cleared in ``before_feature`` so a
@@ -93,11 +93,14 @@ def configure_service(context: Context, config_name: str) -> None:
     config_name = config_name.strip()
     if _active_lightspeed_stack_config_basename["basename"] == config_name:
         # ``MCP toolgroups are reset for a new MCP configuration`` may have run
-        # ``rm -rf ~/.llama`` in library mode; the next restart must not be
-        # skipped or the process keeps stale handles / missing SQLite tables.
-        if getattr(context, "force_lightspeed_restart_after_mcp_storage_clear", False):
+        # (library: clear ``~/.llama``; server: unregister toolgroups). The next
+        # restart must not be skipped or SQLite handles / MCP registration state
+        # diverges from the running process.
+        if getattr(
+            context, "force_lightspeed_restart_after_mcp_toolgroup_reset", False
+        ):
             context.lightspeed_stack_skip_restart = False
-            context.force_lightspeed_restart_after_mcp_storage_clear = False
+            context.force_lightspeed_restart_after_mcp_toolgroup_reset = False
         else:
             context.lightspeed_stack_skip_restart = True
         return
@@ -139,6 +142,7 @@ def configure_service(context: Context, config_name: str) -> None:
     _active_lightspeed_stack_config_basename["basename"] = config_name
     context.active_lightspeed_stack_config_basename = config_name
     context.lightspeed_stack_skip_restart = False
+    context.force_lightspeed_restart_after_mcp_toolgroup_reset = False
 
 
 @given("MCP toolgroups are reset for a new MCP configuration")
@@ -146,14 +150,17 @@ def reset_mcp_toolgroups_for_new_configuration(context: Context) -> None:
     """Clear MCP toolgroups on Llama Stack (server) or ~/.llama storage (library).
 
     Run before applying a different MCP-related ``lightspeed-stack-*.yaml`` in a
-    scenario so tool registration matches the new config. In library mode,
-    clearing ``~/.llama`` forces the next ``The service uses ...`` / restart
-    path to run a real container restart so conversation tables are recreated.
+    scenario so tool registration matches the new config. Sets
+    ``force_lightspeed_restart_after_mcp_toolgroup_reset`` so the next
+    ``The service uses ...`` step cannot skip ``The service is restarted`` when
+    the YAML basename is unchanged—library mode needs a real restart after
+    clearing ``~/.llama`` (SQLite); server mode needs it after unregister so
+    Lightspeed re-registers MCP toolgroups on startup.
     """
+    context.force_lightspeed_restart_after_mcp_toolgroup_reset = True
+    context.lightspeed_stack_skip_restart = False
     if context.is_library_mode:
         clear_llama_stack_storage()
-        context.force_lightspeed_restart_after_mcp_storage_clear = True
-        context.lightspeed_stack_skip_restart = False
     else:
         unregister_mcp_toolgroups()
 
