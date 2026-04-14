@@ -256,9 +256,7 @@ def check_fragments_in_responses_output_text(context: Context) -> None:
 
     for fragment in context.table:
         expected = fragment["Fragments in LLM response"]
-        assert _response_contains_fragment(
-            output_text, expected
-        ), (
+        assert _response_contains_fragment(output_text, expected), (
             f"Fragment {expected!r} not found in output_text (case-insensitive): "
             f"{output_text!r}"
         )
@@ -297,9 +295,7 @@ def check_fragments_in_response(context: Context) -> None:
 
     for fragment in context.table:
         expected = fragment["Fragments in LLM response"]
-        assert _response_contains_fragment(
-            response, expected
-        ), (
+        assert _response_contains_fragment(response, expected), (
             f"Fragment {expected!r} not found in LLM response (case-insensitive): "
             f"{response!r}"
         )
@@ -323,9 +319,7 @@ def check_streamed_fragments_in_response(context: Context) -> None:
 
     for fragment in context.table:
         expected = fragment["Fragments in LLM response"]
-        assert _response_contains_fragment(
-            response, expected
-        ), (
+        assert _response_contains_fragment(response, expected), (
             f"Fragment {expected!r} not found in streamed LLM response "
             f"(case-insensitive): {response!r}"
         )
