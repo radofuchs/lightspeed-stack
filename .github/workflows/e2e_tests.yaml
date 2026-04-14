@@ -11,7 +11,7 @@ jobs:
       matrix:
         mode: ["server", "library"]
         environment: ["ci"]
-    
+
     name: "E2E: ${{ matrix.mode }} mode / ${{ matrix.environment }}"
     
     env:
