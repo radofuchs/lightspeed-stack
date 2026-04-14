@@ -366,6 +366,7 @@ def before_feature(context: Context, feature: Feature) -> None:
     ``_E2E_FLAKY_MAX_ATTEMPTS`` and can be overridden with the
     ``E2E_FLAKY_MAX_ATTEMPTS`` environment variable.
     """
+    setattr(feature, _E2E_FEATURE_PERF_START_ATTR, time.perf_counter())
     reset_active_lightspeed_stack_config_basename()
     context.active_lightspeed_stack_config_basename = None
     # One real Llama disruption per feature (module-level flag; survives context resets)
@@ -423,3 +424,19 @@ def after_feature(context: Context, feature: Feature) -> None:
 
         _stop_proxy(context, "tunnel_proxy", "proxy_loop")
         _stop_proxy(context, "interception_proxy", "interception_proxy_loop")
+
+    start = getattr(feature, _E2E_FEATURE_PERF_START_ATTR, None)
+    if start is not None:
+        elapsed_s = time.perf_counter() - start
+        try:
+            delattr(feature, _E2E_FEATURE_PERF_START_ATTR)
+        except AttributeError:
+            pass
+        feat_path = getattr(feature, "filename", "") or ""
+        label = os.path.basename(feat_path) if feat_path else feature.name
+        print(f"[e2e feature timing] {elapsed_s:.2f}s  {label}", flush=True)
+
+
+# Behave captures hook stdout by default; output is only shown in some failure paths.
+# Disable capture so feature timing lines always appear on the real console/CI log.
+after_feature.capture = False  # type: ignore[attr-defined]
