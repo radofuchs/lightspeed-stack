@@ -10,8 +10,8 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release/0.5"
   creationTimestamp:
   labels:
-    appstudio.openshift.io/application: lightspeed-stack
-    appstudio.openshift.io/component: lightspeed-stack
+    appstudio.openshift.io/application: lightspeed-stack-0.5.1
+    appstudio.openshift.io/component: lightspeed-stack-0.5.1
     pipelines.appstudio.openshift.io/type: build
   name: lightspeed-stack-on-push
   namespace: lightspeed-core-tenant
