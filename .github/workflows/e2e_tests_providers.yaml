@@ -20,6 +20,7 @@ jobs:
         # | azure       | gpt-4o-mini                         | azure         |
         # | vertexai    | google/gemini-2.5-flash             | google-vertex |
         # | watsonx     | meta-llama/llama-3-3-70b-instruct   | watsonx       |
+        # | bedrock     | deepseek.v3-v1:0                    | aws-bedrock   |
         include:
           - environment: azure
             e2e_default_model: gpt-4o-mini
@@ -31,8 +32,8 @@ jobs:
             e2e_default_model: meta-llama/llama-3-3-70b-instruct
             e2e_default_provider: watsonx
           - environment: bedrock
-            e2e_default_model: meta-llama/llama-3-3-70b-instruct
-            e2e_default_provider: bedrock
+            e2e_default_model: deepseek.v3-v1:0
+            e2e_default_provider: aws-bedrock
     
     name: "E2E: ${{ matrix.mode }} mode / ${{ matrix.environment }}"
     
