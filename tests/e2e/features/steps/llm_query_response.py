@@ -36,7 +36,7 @@ def _collect_output_item_types(response_body: dict[str, Any]) -> list[str]:
     return [item["type"] for item in output]
 
 
-@then("The responses output do not include any tool invocation item types")
+@then("The responses output does not include any tool invocation item types")
 def responses_output_should_not_include_tool_items(context: Context) -> None:
     """Assert no tool-related items appear in the Responses JSON ``output`` array."""
     assert context.response is not None, "Request needs to be performed first"

@@ -403,7 +403,7 @@ Feature: Responses endpoint API tests
     }
     """
     Then The status code of the response is 200
-      And The responses output do not include any tool invocation item types
+      And The responses output does not include any tool invocation item types
       And The token metrics have increased
 
   Scenario: Check if responses endpoint with tool_choice auto answers a knowledge question using file search
@@ -546,5 +546,5 @@ Feature: Responses endpoint API tests
     }
     """
     Then The status code of the response is 200
-      And The responses output do not include any tool invocation item types
+      And The responses output does not include any tool invocation item types
       And The token metrics have increased
