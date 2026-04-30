@@ -291,8 +291,10 @@ for i in $(seq 1 36); do
     break
   fi
   if [ $i -eq 36 ]; then
-    echo "❌ Port-forward to lightspeed-stack never became ready (3 min)"
-    echo "[e2e] ========== diagnostics: pod logs after port-forward timeout =========="
+    echo "❌ Port-forward to lightspeed-stack never became ready (3 min)" | tee /dev/stderr
+    echo "[e2e] ========== diagnostics: pod logs after port-forward timeout ==========" | tee /dev/stderr
+    trap - ERR
+    set +e
     e2e_echo_pod_logs 250
     echo "[e2e] ========== diagnostics: recent events =========="
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -320,8 +322,10 @@ for i in $(seq 1 36); do
     break
   fi
   if [ $i -eq 36 ]; then
-    echo "❌ Port-forward to llama-stack never became healthy (3 min)"
-    e2e_echo_pod_logs 200
+    echo "❌ Port-forward to llama-stack never became healthy (3 min)" | tee /dev/stderr
+    trap - ERR
+    set +e
+    e2e_echo_pod_logs 250
     kill $PF_LCS_PID 2>/dev/null || true
     kill $PF_JWKS_PID 2>/dev/null || true
     kill $PF_LLAMA_PID 2>/dev/null || true
