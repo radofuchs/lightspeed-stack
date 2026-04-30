@@ -63,7 +63,6 @@ from models.config import ByokRag, ModelContextProtocolServer
 from models.requests import QueryRequest
 from utils.responses import (
     _build_chunk_attributes,
-    _increment_llm_call_metric,
     _merge_tools,
     _resolve_source_for_result,
     build_mcp_tool_call_from_arguments_done,
@@ -1084,6 +1083,7 @@ class TestResolveToolChoice:
         )
         prepared, choice = await resolve_tool_choice(tools, allowed, "token")
         assert prepared is not None and len(prepared) == 1
+        assert isinstance(prepared[0], InputToolFunction)
         assert prepared[0].name == "keep_fn"
         assert choice == ToolChoiceMode.required
 
@@ -1276,6 +1276,7 @@ class TestFilterToolsByAllowedEntries:
         )
         assert out is not None
         assert len(out) == 1
+        assert isinstance(out[0], InputToolMCP)
         assert out[0].server_label == "keep"
 
     def test_function_type_and_name(self) -> None:
@@ -1293,6 +1294,7 @@ class TestFilterToolsByAllowedEntries:
         )
         assert out is not None
         assert len(out) == 1
+        assert isinstance(out[0], InputToolFunction)
         assert out[0].name == "fn_b"
 
     def test_web_search_type_literal_must_match(self) -> None:
@@ -1361,6 +1363,7 @@ class TestFilterToolsByAllowedEntries:
         )
         assert out is not None
         assert len(out) == 1
+        assert isinstance(out[0], InputToolMCP)
         assert out[0].allowed_tools == ["alpha"]
 
     def test_mcp_allowed_tools_none_projects_to_entry_names(self) -> None:
@@ -1381,6 +1384,7 @@ class TestFilterToolsByAllowedEntries:
         )
         assert out is not None
         assert len(out) == 1
+        assert isinstance(out[0], InputToolMCP)
         assert out[0].allowed_tools == ["gamma"]
 
     def test_mcp_server_without_name_in_allowlist_skips_projection(self) -> None:
@@ -1404,6 +1408,7 @@ class TestFilterToolsByAllowedEntries:
         )
         assert out is not None
         assert len(out) == 1
+        assert isinstance(out[0], InputToolMCP)
         assert out[0].allowed_tools == ["a", "b"]
 
     def test_mcp_allowed_tools_filter_tool_names_none(self) -> None:
@@ -1424,6 +1429,7 @@ class TestFilterToolsByAllowedEntries:
         )
         assert out is not None
         assert len(out) == 1
+        assert isinstance(out[0], InputToolMCP)
         assert out[0].allowed_tools == ["z"]
 
     def test_mcp_allowed_tools_filter_intersects_with_grouped_names(self) -> None:
@@ -1444,6 +1450,7 @@ class TestFilterToolsByAllowedEntries:
         )
         assert out is not None
         assert len(out) == 1
+        assert isinstance(out[0], InputToolMCP)
         assert out[0].allowed_tools == ["alpha"]
 
     def test_mcp_name_not_permitted_drops_tool(self) -> None:
@@ -1501,6 +1508,7 @@ class TestPrepareTools:
         result = await prepare_tools(mock_client, None, False, "token")
         assert result is not None
         assert len(result) == 1
+        assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["vs1", "vs2"]
 
     @pytest.mark.asyncio
@@ -1583,6 +1591,10 @@ class TestResolveVectorStoreIds:
             rag_id=rag_id,
             vector_db_id=vector_db_id,
             db_path="tests/configuration/rag.txt",
+            rag_type="rag",
+            embedding_model="model",
+            embedding_dimension=768,
+            score_multiplier=1.0,
         )
 
     def test_translates_customer_facing_ids_to_internal(self) -> None:
@@ -1671,6 +1683,7 @@ class TestPrepareToolsTranslatesVectorStoreIds:
 
         result = await prepare_tools(mock_client, ["raw-internal-id"], False, "token")
         assert result is not None
+        assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["raw-internal-id"]
 
     @pytest.mark.asyncio
@@ -1702,6 +1715,7 @@ class TestPrepareToolsTranslatesVectorStoreIds:
         result = await prepare_tools(mock_client, None, False, "token")
         assert result is not None
         # The IDs from llama-stack should be used as-is (no BYOK translation on None path)
+        assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["vs-internal"]
 
 
@@ -1750,6 +1764,7 @@ class TestPrepareToolsVectorStoreResolution:
         result = await prepare_tools(mock_client, None, False, "token")
 
         assert result is not None
+        assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["vs-001"]
         mock_client.vector_stores.list.assert_not_called()
 
@@ -1790,6 +1805,7 @@ class TestPrepareToolsVectorStoreResolution:
         result = await prepare_tools(mock_client, ["request-id-1"], False, "token")
 
         assert result is not None
+        assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["request-id-1"]
         mock_client.vector_stores.list.assert_not_called()
 
@@ -1815,6 +1831,7 @@ class TestPrepareToolsVectorStoreResolution:
         result = await prepare_tools(mock_client, None, False, "token")
 
         assert result is not None
+        assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["vs-registered"]
         mock_client.vector_stores.list.assert_called_once()
 
@@ -2225,14 +2242,19 @@ class TestExtractTokenUsage:
             "utils.responses.extract_provider_and_model_from_model_id",
             return_value=("provider1", "model1"),
         )
-        mocker.patch("utils.responses.metrics.llm_token_sent_total")
-        mocker.patch("utils.responses.metrics.llm_token_received_total")
-        mocker.patch("utils.responses._increment_llm_call_metric")
+        mock_token_usage = mocker.patch(
+            "utils.responses.recording.record_llm_token_usage"
+        )
+        mock_llm_call = mocker.patch("utils.responses.recording.record_llm_call")
 
-        result = extract_token_usage(mock_usage, "provider1/model1")
+        result = extract_token_usage(mock_usage, "provider1/model1", "/test-endpoint")
         assert result.input_tokens == input_tokens
         assert result.output_tokens == output_tokens
         assert result.llm_calls == 1
+        mock_token_usage.assert_called_once_with(
+            "provider1", "model1", input_tokens, output_tokens, "/test-endpoint"
+        )
+        mock_llm_call.assert_called_once_with("provider1", "model1", "/test-endpoint")
 
     def test_extract_token_usage_no_usage(self, mocker: MockerFixture) -> None:
         """Test extracting token usage when usage is None."""
@@ -2240,12 +2262,13 @@ class TestExtractTokenUsage:
             "utils.responses.extract_provider_and_model_from_model_id",
             return_value=("provider1", "model1"),
         )
-        mocker.patch("utils.responses._increment_llm_call_metric")
+        mock_llm_call = mocker.patch("utils.responses.recording.record_llm_call")
 
-        result = extract_token_usage(None, "provider1/model1")
+        result = extract_token_usage(None, "provider1/model1", "/test-endpoint")
         assert result.input_tokens == 0
         assert result.output_tokens == 0
         assert result.llm_calls == 1
+        mock_llm_call.assert_called_once_with("provider1", "model1", "/test-endpoint")
 
     def test_extract_token_usage_zero_tokens(self, mocker: MockerFixture) -> None:
         """Test extracting token usage when tokens are 0."""
@@ -2257,11 +2280,18 @@ class TestExtractTokenUsage:
             "utils.responses.extract_provider_and_model_from_model_id",
             return_value=("provider1", "model1"),
         )
-        mocker.patch("utils.responses._increment_llm_call_metric")
+        mock_token_usage = mocker.patch(
+            "utils.responses.recording.record_llm_token_usage"
+        )
+        mock_llm_call = mocker.patch("utils.responses.recording.record_llm_call")
 
-        result = extract_token_usage(mock_usage, "provider1/model1")
+        result = extract_token_usage(mock_usage, "provider1/model1", "/test-endpoint")
         assert result.input_tokens == 0
         assert result.output_tokens == 0
+        mock_token_usage.assert_called_once_with(
+            "provider1", "model1", 0, 0, "/test-endpoint"
+        )
+        mock_llm_call.assert_called_once_with("provider1", "model1", "/test-endpoint")
 
     def test_extract_token_usage_none_response(self, mocker: MockerFixture) -> None:
         """Test extracting token usage with None response."""
@@ -2269,36 +2299,12 @@ class TestExtractTokenUsage:
             "utils.responses.extract_provider_and_model_from_model_id",
             return_value=("provider1", "model1"),
         )
-        mocker.patch("utils.responses._increment_llm_call_metric")
+        mock_llm_call = mocker.patch("utils.responses.recording.record_llm_call")
 
-        result = extract_token_usage(None, "provider1/model1")
+        result = extract_token_usage(None, "provider1/model1", "/test-endpoint")
         assert result.input_tokens == 0
         assert result.output_tokens == 0
-
-    def test_extract_token_usage_metrics_error(self, mocker: MockerFixture) -> None:
-        """Test extracting token usage handles errors when updating metrics."""
-        mock_usage = mocker.Mock()
-        mock_usage.input_tokens = 100
-        mock_usage.output_tokens = 50
-
-        mocker.patch(
-            "utils.responses.extract_provider_and_model_from_model_id",
-            return_value=("provider1", "model1"),
-        )
-        # Make metrics raise an error
-        mock_metric = mocker.Mock()
-        mock_metric.labels.return_value.inc = mocker.Mock(
-            side_effect=AttributeError("No attribute")
-        )
-        mocker.patch("utils.responses.metrics.llm_token_sent_total", mock_metric)
-        mocker.patch("utils.responses.metrics.llm_token_received_total", mock_metric)
-        mocker.patch("utils.responses.logger")
-        mocker.patch("utils.responses._increment_llm_call_metric")
-
-        # Should not raise, just log warning
-        result = extract_token_usage(mock_usage, "provider1/model1")
-        assert result.input_tokens == 100
-        assert result.output_tokens == 50
+        mock_llm_call.assert_called_once_with("provider1", "model1", "/test-endpoint")
 
 
 class TestBuildToolCallSummary:
@@ -2539,58 +2545,6 @@ class TestParseArgumentsString:
         """Test parsing empty string."""
         result = parse_arguments_string("")
         assert result == {"args": ""}
-
-
-class TestIncrementLlmCallMetric:
-    """Tests for _increment_llm_call_metric function."""
-
-    def test_increment_llm_call_metric_success(self, mocker: MockerFixture) -> None:
-        """Test successful metric increment."""
-        mock_metric = mocker.Mock()
-        mock_metric.labels.return_value.inc = mocker.Mock()
-        mocker.patch("utils.responses.metrics.llm_calls_total", mock_metric)
-
-        _increment_llm_call_metric("provider1", "model1")
-
-        mock_metric.labels.assert_called_once_with("provider1", "model1")
-        mock_metric.labels.return_value.inc.assert_called_once()
-
-    def test_increment_llm_call_metric_attribute_error(
-        self, mocker: MockerFixture
-    ) -> None:
-        """Test metric increment handles AttributeError."""
-        mocker.patch(
-            "utils.responses.metrics.llm_calls_total",
-            side_effect=AttributeError("No attribute"),
-        )
-        mocker.patch("utils.responses.logger")
-
-        # Should not raise exception
-        _increment_llm_call_metric("provider1", "model1")
-
-    def test_increment_llm_call_metric_type_error(self, mocker: MockerFixture) -> None:
-        """Test metric increment handles TypeError."""
-        mock_metric = mocker.Mock()
-        mock_metric.labels.return_value.inc = mocker.Mock(
-            side_effect=TypeError("Invalid type")
-        )
-        mocker.patch("utils.responses.metrics.llm_calls_total", mock_metric)
-        mocker.patch("utils.responses.logger")
-
-        # Should not raise exception
-        _increment_llm_call_metric("provider1", "model1")
-
-    def test_increment_llm_call_metric_value_error(self, mocker: MockerFixture) -> None:
-        """Test metric increment handles ValueError."""
-        mock_metric = mocker.Mock()
-        mock_metric.labels.return_value.inc = mocker.Mock(
-            side_effect=ValueError("Invalid value")
-        )
-        mocker.patch("utils.responses.metrics.llm_calls_total", mock_metric)
-        mocker.patch("utils.responses.logger")
-
-        # Should not raise exception
-        _increment_llm_call_metric("provider1", "model1")
 
 
 class TestBuildMCPToolCallFromArgumentsDone:

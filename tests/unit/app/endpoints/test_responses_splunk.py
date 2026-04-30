@@ -16,6 +16,7 @@ from pytest_mock import MockerFixture
 
 from app.endpoints.responses import (
     _background_splunk_tasks,
+    _get_user_agent,
     _queue_responses_splunk_event,
     handle_non_streaming_response,
     handle_streaming_response,
@@ -23,6 +24,7 @@ from app.endpoints.responses import (
 from configuration import AppConfig
 from models.requests import ResponsesRequest
 from observability.formats.responses import ResponsesEventData
+from tests.unit.app.endpoints.test_responses import build_api_params_and_context
 from utils.types import RAGContext, TurnSummary
 
 MODULE = "app.endpoints.responses"
@@ -256,10 +258,9 @@ class TestSplunkTelemetryHooks:
         )
         mock_queue = mocker.patch(f"{MODULE}._queue_responses_splunk_event")
 
-        await handle_non_streaming_response(
-            client=mock_client,
-            original_request=request,
+        api_params, context = build_api_params_and_context(
             updated_request=request,
+            client=mock_client,
             auth=MOCK_AUTH,
             input_text="Bad input",
             started_at=datetime.now(UTC),
@@ -267,6 +268,11 @@ class TestSplunkTelemetryHooks:
             inline_rag_context=RAGContext(),
             background_tasks=mock_background_tasks,
             rh_identity_context=("org1", "sys1"),
+        )
+        await handle_non_streaming_response(
+            original_request=request,
+            api_params=api_params,
+            context=context,
         )
 
         mock_queue.assert_called_once()
@@ -333,10 +339,9 @@ class TestSplunkTelemetryHooks:
         mock_queue = mocker.patch(f"{MODULE}._queue_responses_splunk_event")
 
         with pytest.raises(HTTPException):
-            await handle_non_streaming_response(
-                client=mock_client,
-                original_request=request,
+            api_params, context = build_api_params_and_context(
                 updated_request=request,
+                client=mock_client,
                 auth=MOCK_AUTH,
                 input_text="Hello",
                 started_at=datetime.now(UTC),
@@ -344,6 +349,11 @@ class TestSplunkTelemetryHooks:
                 inline_rag_context=RAGContext(),
                 background_tasks=mock_background_tasks,
                 rh_identity_context=("org1", "sys1"),
+            )
+            await handle_non_streaming_response(
+                original_request=request,
+                api_params=api_params,
+                context=context,
             )
 
         mock_queue.assert_called_once()
@@ -412,10 +422,9 @@ class TestSplunkTelemetryHooks:
 
         mock_queue = mocker.patch(f"{MODULE}._queue_responses_splunk_event")
 
-        await handle_non_streaming_response(
-            client=mock_client,
-            original_request=request,
+        api_params, context = build_api_params_and_context(
             updated_request=request,
+            client=mock_client,
             auth=MOCK_AUTH,
             input_text="Hello",
             started_at=datetime.now(UTC),
@@ -423,6 +432,11 @@ class TestSplunkTelemetryHooks:
             inline_rag_context=RAGContext(),
             background_tasks=mock_background_tasks,
             rh_identity_context=("org1", "sys1"),
+        )
+        await handle_non_streaming_response(
+            original_request=request,
+            api_params=api_params,
+            context=context,
         )
 
         # The success hook fires once (blocked hook is skipped because decision != "blocked")
@@ -469,10 +483,9 @@ class TestSplunkTelemetryHooks:
 
         mock_queue = mocker.patch(f"{MODULE}._queue_responses_splunk_event")
 
-        response = await handle_streaming_response(
-            client=mock_client,
-            original_request=request,
+        api_params, context = build_api_params_and_context(
             updated_request=request,
+            client=mock_client,
             auth=MOCK_AUTH,
             input_text="Bad",
             started_at=datetime.now(UTC),
@@ -480,6 +493,11 @@ class TestSplunkTelemetryHooks:
             inline_rag_context=RAGContext(),
             background_tasks=mock_background_tasks,
             rh_identity_context=("org1", "sys1"),
+        )
+        response = await handle_streaming_response(
+            original_request=request,
+            api_params=api_params,
+            context=context,
         )
 
         assert isinstance(response, StreamingResponse)
@@ -547,10 +565,9 @@ class TestSplunkTelemetryHooks:
         mock_queue = mocker.patch(f"{MODULE}._queue_responses_splunk_event")
 
         with pytest.raises(HTTPException):
-            await handle_streaming_response(
-                client=mock_client,
-                original_request=request,
+            api_params, context = build_api_params_and_context(
                 updated_request=request,
+                client=mock_client,
                 auth=MOCK_AUTH,
                 input_text="Hello",
                 started_at=datetime.now(UTC),
@@ -558,6 +575,11 @@ class TestSplunkTelemetryHooks:
                 inline_rag_context=RAGContext(),
                 background_tasks=mock_background_tasks,
                 rh_identity_context=("org1", "sys1"),
+            )
+            await handle_streaming_response(
+                original_request=request,
+                api_params=api_params,
+                context=context,
             )
 
         mock_queue.assert_called_once()
@@ -628,10 +650,9 @@ class TestSplunkTelemetryHooks:
 
         mock_queue = mocker.patch(f"{MODULE}._queue_responses_splunk_event")
 
-        response = await handle_streaming_response(
-            client=mock_client,
-            original_request=request,
+        api_params, context = build_api_params_and_context(
             updated_request=request,
+            client=mock_client,
             auth=MOCK_AUTH,
             input_text="Hi",
             started_at=datetime.now(UTC),
@@ -639,6 +660,11 @@ class TestSplunkTelemetryHooks:
             inline_rag_context=RAGContext(),
             background_tasks=mock_background_tasks,
             rh_identity_context=("org1", "sys1"),
+        )
+        response = await handle_streaming_response(
+            original_request=request,
+            api_params=api_params,
+            context=context,
         )
 
         assert isinstance(response, StreamingResponse)
@@ -700,10 +726,9 @@ class TestSplunkTelemetryHooks:
         mock_queue = mocker.patch(f"{MODULE}._queue_responses_splunk_event")
 
         # background_tasks=None (the default) means Splunk is disabled
-        await handle_non_streaming_response(
-            client=mock_client,
-            original_request=request,
+        api_params, context = build_api_params_and_context(
             updated_request=request,
+            client=mock_client,
             auth=MOCK_AUTH,
             input_text="Bad input",
             started_at=datetime.now(UTC),
@@ -712,6 +737,66 @@ class TestSplunkTelemetryHooks:
             background_tasks=None,
             rh_identity_context=("org1", "sys1"),
         )
+        await handle_non_streaming_response(
+            original_request=request,
+            api_params=api_params,
+            context=context,
+        )
 
         mock_queue.assert_called_once()
         assert mock_queue.call_args[1]["background_tasks"] is None
+
+
+class TestGetUserAgent:
+    """Tests for _get_user_agent header extraction and sanitization."""
+
+    def test_returns_user_agent_from_header(self, mocker: MockerFixture) -> None:
+        """Test that a valid User-Agent header is returned as-is."""
+        request = mocker.MagicMock()
+        request.headers.get.return_value = "goose/1.0.0"
+
+        result = _get_user_agent(request)
+
+        assert result == "goose/1.0.0"
+
+    def test_returns_none_when_header_absent(self, mocker: MockerFixture) -> None:
+        """Test that None is returned when User-Agent header is empty."""
+        request = mocker.MagicMock()
+        request.headers.get.return_value = ""
+
+        result = _get_user_agent(request)
+
+        assert result is None
+
+    def test_strips_control_characters(self, mocker: MockerFixture) -> None:
+        """Test that control characters and newlines are stripped from User-Agent."""
+        request = mocker.MagicMock()
+        request.headers.get.return_value = "goose/1.0.0\r\nX-Injected: evil"
+
+        result: str = _get_user_agent(request) or ""
+
+        assert result != ""
+        assert "\r" not in result
+        assert "\n" not in result
+        assert "goose/1.0.0" in result
+
+    def test_truncates_to_128_characters(self, mocker: MockerFixture) -> None:
+        """Test that User-Agent is truncated to 128 characters."""
+        request = mocker.MagicMock()
+        request.headers.get.return_value = "a" * 200
+
+        result = _get_user_agent(request)
+
+        assert isinstance(result, str)
+        assert len(result) == 128
+
+    def test_returns_none_for_only_control_characters(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that None is returned when User-Agent contains only control characters."""
+        request = mocker.MagicMock()
+        request.headers.get.return_value = "\r\n\x01\x02"
+
+        result = _get_user_agent(request)
+
+        assert result is None

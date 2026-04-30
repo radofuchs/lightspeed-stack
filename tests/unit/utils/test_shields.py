@@ -54,8 +54,8 @@ class TestDetectShieldViolations:
         self, mocker: MockerFixture
     ) -> None:
         """Test that detect_shield_violations returns True when refusal is present."""
-        mock_metric = mocker.patch(
-            "utils.shields.metrics.llm_calls_validation_errors_total"
+        mock_record_error = mocker.patch(
+            "utils.shields.recording.record_llm_validation_error"
         )
 
         output_item = mocker.Mock(type="message", refusal="Content blocked")
@@ -64,12 +64,12 @@ class TestDetectShieldViolations:
         result = detect_shield_violations(output_items)
 
         assert result is True
-        mock_metric.inc.assert_called_once()
+        mock_record_error.assert_called_once()
 
     def test_returns_false_when_no_violation(self, mocker: MockerFixture) -> None:
         """Test that detect_shield_violations returns False when no refusal."""
-        mock_metric = mocker.patch(
-            "utils.shields.metrics.llm_calls_validation_errors_total"
+        mock_record_error = mocker.patch(
+            "utils.shields.recording.record_llm_validation_error"
         )
 
         output_item = mocker.Mock(type="message", refusal=None)
@@ -78,12 +78,12 @@ class TestDetectShieldViolations:
         result = detect_shield_violations(output_items)
 
         assert result is False
-        mock_metric.inc.assert_not_called()
+        mock_record_error.assert_not_called()
 
     def test_returns_false_for_non_message_items(self, mocker: MockerFixture) -> None:
         """Test that detect_shield_violations ignores non-message items."""
-        mock_metric = mocker.patch(
-            "utils.shields.metrics.llm_calls_validation_errors_total"
+        mock_record_error = mocker.patch(
+            "utils.shields.recording.record_llm_validation_error"
         )
 
         output_item = mocker.Mock(type="tool_call", refusal="Content blocked")
@@ -92,18 +92,18 @@ class TestDetectShieldViolations:
         result = detect_shield_violations(output_items)
 
         assert result is False
-        mock_metric.inc.assert_not_called()
+        mock_record_error.assert_not_called()
 
     def test_returns_false_for_empty_list(self, mocker: MockerFixture) -> None:
         """Test that detect_shield_violations returns False for empty list."""
-        mock_metric = mocker.patch(
-            "utils.shields.metrics.llm_calls_validation_errors_total"
+        mock_record_error = mocker.patch(
+            "utils.shields.recording.record_llm_validation_error"
         )
 
         result = detect_shield_violations([])
 
         assert result is False
-        mock_metric.inc.assert_not_called()
+        mock_record_error.assert_not_called()
 
 
 class TestRunShieldModeration:
@@ -118,7 +118,9 @@ class TestRunShieldModeration:
         mock_client.shields.list = mocker.AsyncMock(return_value=[])
         mock_client.models.list = mocker.AsyncMock(return_value=[])
 
-        result = await run_shield_moderation(mock_client, "test input")
+        result = await run_shield_moderation(
+            mock_client, "test input", "/test-endpoint"
+        )
 
         assert result.decision == "passed"
 
@@ -147,7 +149,9 @@ class TestRunShieldModeration:
             return_value=moderation_result
         )
 
-        result = await run_shield_moderation(mock_client, "safe input")
+        result = await run_shield_moderation(
+            mock_client, "safe input", "/test-endpoint"
+        )
 
         assert result.decision == "passed"
         mock_client.moderations.create.assert_called_once_with(
@@ -159,8 +163,8 @@ class TestRunShieldModeration:
         self, mocker: MockerFixture
     ) -> None:
         """Test that run_shield_moderation returns blocked when content is flagged."""
-        mock_metric = mocker.patch(
-            "utils.shields.metrics.llm_calls_validation_errors_total"
+        mock_record_error = mocker.patch(
+            "utils.shields.recording.record_llm_validation_error"
         )
         mock_client = mocker.Mock()
 
@@ -187,18 +191,22 @@ class TestRunShieldModeration:
             return_value=moderation_result
         )
 
-        result = await run_shield_moderation(mock_client, "violent content")
+        result = await run_shield_moderation(
+            mock_client, "violent content", "/test-endpoint"
+        )
 
         assert result.decision == "blocked"
         assert result.message == "Content blocked for violence"
-        mock_metric.inc.assert_called_once()
+        mock_record_error.assert_called_once_with("/test-endpoint")
 
     @pytest.mark.asyncio
     async def test_returns_blocked_with_default_message_when_no_user_message(
         self, mocker: MockerFixture
     ) -> None:
         """Test that run_shield_moderation uses default message when user_message is None."""
-        mocker.patch("utils.shields.metrics.llm_calls_validation_errors_total")
+        mock_record_error = mocker.patch(
+            "utils.shields.recording.record_llm_validation_error"
+        )
         mock_client = mocker.Mock()
 
         # Setup shield
@@ -224,10 +232,13 @@ class TestRunShieldModeration:
             return_value=moderation_result
         )
 
-        result = await run_shield_moderation(mock_client, "spam content")
+        result = await run_shield_moderation(
+            mock_client, "spam content", "/test-endpoint"
+        )
 
         assert result.decision == "blocked"
         assert result.message == DEFAULT_VIOLATION_MESSAGE
+        mock_record_error.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_skips_model_check_for_non_llama_guard_shields(
@@ -253,7 +264,9 @@ class TestRunShieldModeration:
             return_value=moderation_result
         )
 
-        result = await run_shield_moderation(mock_client, "test input")
+        result = await run_shield_moderation(
+            mock_client, "test input", "/test-endpoint"
+        )
 
         assert result.decision == "passed"
         mock_client.moderations.create.assert_called_once_with(
@@ -280,7 +293,7 @@ class TestRunShieldModeration:
         mock_client.models.list = mocker.AsyncMock(return_value=[model])
 
         with pytest.raises(HTTPException) as exc_info:
-            await run_shield_moderation(mock_client, "test input")
+            await run_shield_moderation(mock_client, "test input", "/test-endpoint")
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         assert "missing-model" in exc_info.value.detail["cause"]  # type: ignore
@@ -302,7 +315,7 @@ class TestRunShieldModeration:
         mock_client.models.list = mocker.AsyncMock(return_value=[])
 
         with pytest.raises(HTTPException) as exc_info:
-            await run_shield_moderation(mock_client, "test input")
+            await run_shield_moderation(mock_client, "test input", "/test-endpoint")
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
@@ -317,7 +330,9 @@ class TestRunShieldModeration:
         mock_client.shields.list = mocker.AsyncMock(return_value=[shield])
         mock_client.models.list = mocker.AsyncMock(return_value=[])
 
-        result = await run_shield_moderation(mock_client, "test input", shield_ids=[])
+        result = await run_shield_moderation(
+            mock_client, "test input", "/test-endpoint", shield_ids=[]
+        )
 
         assert result.decision == "passed"
 
@@ -333,7 +348,7 @@ class TestRunShieldModeration:
 
         with pytest.raises(HTTPException) as exc_info:
             await run_shield_moderation(
-                mock_client, "test input", shield_ids=["typo-shield"]
+                mock_client, "test input", "/test-endpoint", shield_ids=["typo-shield"]
             )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
@@ -366,7 +381,7 @@ class TestRunShieldModeration:
         )
 
         result = await run_shield_moderation(
-            mock_client, "test input", shield_ids=["shield-1"]
+            mock_client, "test input", "/test-endpoint", shield_ids=["shield-1"]
         )
 
         assert result.decision == "passed"

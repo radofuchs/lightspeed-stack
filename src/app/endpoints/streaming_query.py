@@ -40,7 +40,6 @@ from llama_stack_client import (
 )
 from openai._exceptions import APIStatusError as OpenAIAPIStatusError
 
-import metrics
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.azure_token_manager import AzureEntraIDManager
@@ -59,6 +58,8 @@ from constants import (
     TOPIC_SUMMARY_INTERRUPT_TIMEOUT_SECONDS,
 )
 from log import get_logger
+from metrics import recording
+from models.common.responses.responses_api_params import ResponsesApiParams
 from models.config import Action
 from models.context import ResponseGeneratorContext
 from models.requests import QueryRequest
@@ -115,7 +116,7 @@ from utils.shields import (
 from utils.stream_interrupts import get_stream_interrupt_registry
 from utils.suid import get_suid, normalize_conversation_id
 from utils.token_counter import TokenCounter
-from utils.types import ReferencedDocument, ResponsesApiParams, TurnSummary
+from utils.types import ReferencedDocument, TurnSummary
 from utils.vector_search import build_rag_context
 
 logger = get_logger(__name__)
@@ -226,8 +227,9 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     # Moderation input is the raw user content (query + attachments) without injected RAG
     # context, to avoid false positives from retrieved document content.
     moderation_input = prepare_input(query_request)
+    endpoint_path = "/v1/streaming_query"
     moderation_result = await run_shield_moderation(
-        client, moderation_input, query_request.shield_ids
+        client, moderation_input, endpoint_path, query_request.shield_ids
     )
 
     # Build RAG context from Inline RAG sources
@@ -283,11 +285,12 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     provider_id, model_id = extract_provider_and_model_from_model_id(
         responses_params.model
     )
-    metrics.llm_calls_total.labels(provider_id, model_id).inc()
+    recording.record_llm_call(provider_id, model_id, endpoint_path)
 
     generator, turn_summary = await retrieve_response_generator(
         responses_params=responses_params,
         context=context,
+        endpoint_path=endpoint_path,
     )
 
     # Combine inline RAG results (BYOK + Solr) with tool-based results
@@ -316,6 +319,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
 async def retrieve_response_generator(
     responses_params: ResponsesApiParams,
     context: ResponseGeneratorContext,
+    endpoint_path: str,
 ) -> tuple[AsyncIterator[str], TurnSummary]:
     """
     Retrieve the appropriate response generator.
@@ -327,6 +331,7 @@ async def retrieve_response_generator(
     Args:
         responses_params: The Responses API parameters
         context: The response generator context
+        endpoint_path: API endpoint path used for metric labeling.
     Returns:
         tuple[AsyncIterator[str], TurnSummary]: The response generator and turn summary
 
@@ -360,6 +365,7 @@ async def retrieve_response_generator(
                 response,
                 context,
                 turn_summary,
+                endpoint_path,
             ),
             turn_summary,
         )
@@ -685,6 +691,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
     turn_response: AsyncIterator[OpenAIResponseObjectStream],
     context: ResponseGeneratorContext,
     turn_summary: TurnSummary,
+    endpoint_path: str,
 ) -> AsyncIterator[str]:
     """Generate SSE formatted streaming response.
 
@@ -696,6 +703,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
         turn_response: The streaming response from Llama Stack
         context: The response generator context
         turn_summary: TurnSummary to populate during streaming
+        endpoint_path: API endpoint path used for metric labeling.
 
     Yields:
         SSE-formatted strings for tokens, tool calls, tool results,
@@ -862,7 +870,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
         return
 
     turn_summary.token_usage = extract_token_usage(
-        latest_response_object.usage, context.model_id
+        latest_response_object.usage, context.model_id, endpoint_path
     )
     # Parse tool-based referenced documents from the final response object
     tool_rag_docs = parse_referenced_documents(

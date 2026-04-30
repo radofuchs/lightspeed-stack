@@ -86,11 +86,12 @@ from llama_stack_api.openai_responses import (
 from llama_stack_client import APIConnectionError, APIStatusError, AsyncLlamaStackClient
 
 import constants
-import metrics
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from constants import DEFAULT_RAG_TOOL
 from log import get_logger
+from metrics import recording
+from models.common.responses.responses_api_params import ResponsesApiParams
 from models.config import ByokRag
 from models.database.conversations import UserConversation
 from models.requests import QueryRequest
@@ -118,7 +119,6 @@ from utils.types import (
     ReferencedDocument,
     ResponseInput,
     ResponseItem,
-    ResponsesApiParams,
     ToolCallSummary,
     ToolResultSummary,
     TurnSummary,
@@ -907,12 +907,15 @@ def parse_rag_chunks(
     return rag_chunks
 
 
-def extract_token_usage(usage: Optional[ResponseUsage], model: str) -> TokenCounter:
+def extract_token_usage(
+    usage: Optional[ResponseUsage], model: str, endpoint_path: str
+) -> TokenCounter:
     """Extract token usage from Responses API usage object and update metrics.
 
     Args:
         usage: ResponseUsage from the Responses API response, or None if not available.
         model: The model identifier in "provider/model" format
+        endpoint_path: The API endpoint path for metric labeling.
 
     Returns:
         TokenCounter with input_tokens and output_tokens
@@ -922,7 +925,7 @@ def extract_token_usage(usage: Optional[ResponseUsage], model: str) -> TokenCoun
         logger.debug(
             "No usage information in Responses API response, token counts will be 0"
         )
-        _increment_llm_call_metric(provider_id, model_id)
+        recording.record_llm_call(provider_id, model_id, endpoint_path)
         return TokenCounter(llm_calls=1)
 
     token_counter = TokenCounter(
@@ -934,18 +937,15 @@ def extract_token_usage(usage: Optional[ResponseUsage], model: str) -> TokenCoun
         token_counter.output_tokens,
     )
 
-    # Update Prometheus metrics only when we have actual usage data
-    try:
-        metrics.llm_token_sent_total.labels(provider_id, model_id).inc(
-            token_counter.input_tokens
-        )
-        metrics.llm_token_received_total.labels(provider_id, model_id).inc(
-            token_counter.output_tokens
-        )
-    except (AttributeError, TypeError, ValueError) as e:
-        logger.warning("Failed to update token metrics: %s", e)
-
-    _increment_llm_call_metric(provider_id, model_id)
+    # Update Prometheus metrics only when we have actual usage data.
+    recording.record_llm_token_usage(
+        provider_id,
+        model_id,
+        token_counter.input_tokens,
+        token_counter.output_tokens,
+        endpoint_path,
+    )
+    recording.record_llm_call(provider_id, model_id, endpoint_path)
     return token_counter
 
 
@@ -1251,14 +1251,6 @@ def extract_rag_chunks_from_file_search_item(
     return rag_chunks
 
 
-def _increment_llm_call_metric(provider: str, model: str) -> None:
-    """Safely increment LLM call metric."""
-    try:
-        metrics.llm_calls_total.labels(provider, model).inc()
-    except (AttributeError, TypeError, ValueError) as e:
-        logger.warning("Failed to update LLM call metric: %s", e)
-
-
 def parse_arguments_string(arguments_str: str) -> dict[str, Any]:
     """Parse an arguments string into a dictionary.
 
@@ -1444,9 +1436,10 @@ def is_server_deployed_output(output_item: ResponseOutput) -> bool:
     return True
 
 
-def build_turn_summary(
+def build_turn_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     response: Optional[OpenAIResponseObject],
     model: str,
+    endpoint_path: str,
     vector_store_ids: Optional[list[str]] = None,
     rag_id_mapping: Optional[dict[str, str]] = None,
     filter_server_tools: bool = False,
@@ -1456,6 +1449,7 @@ def build_turn_summary(
     Args:
         response: The ResponseObject to build the turn summary from, or None
         model: The model identifier in "provider/model" format
+        endpoint_path: The API endpoint path for metric labeling.
         vector_store_ids: Vector store IDs used in the query for source resolution.
         rag_id_mapping: Mapping from vector_db_id to user-facing rag_id.
         filter_server_tools: When True, skip client-provided tool output items
@@ -1490,7 +1484,7 @@ def build_turn_summary(
             summary.tool_results.append(tool_result)
 
     summary.rag_chunks = parse_rag_chunks(response, vector_store_ids, rag_id_mapping)
-    summary.token_usage = extract_token_usage(response.usage, model)
+    summary.token_usage = extract_token_usage(response.usage, model, endpoint_path)
     return summary
 
 
