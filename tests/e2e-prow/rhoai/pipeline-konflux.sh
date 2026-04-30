@@ -69,7 +69,7 @@ create_secret() {
 
 create_secret openai-api-key-secret --from-literal=key="$OPENAI_API_KEY"
 
-# MCPFileAuth E2E: file at /tmp/mcp-secret-token in LCS pod (docker-compose mounts tests/e2e/secrets/mcp-token)
+# MCPFileAuth E2E: secret mounted at /tmp/mcp-token in LCS pod (same as docker-compose)
 if [ -f "$REPO_ROOT/tests/e2e/secrets/mcp-token" ]; then
   oc create secret generic mcp-file-auth-token -n "$NAMESPACE" \
     --from-file=token="$REPO_ROOT/tests/e2e/secrets/mcp-token" \
@@ -204,6 +204,7 @@ progress "Waiting for lightspeed-stack and llama-stack pods"
 if ! oc wait pod/lightspeed-stack-service pod/llama-stack-service \
     -n "$NAMESPACE" --for=condition=Ready --timeout=600s; then
   progress "❌ One or both service pods failed to become ready within timeout"
+  e2e_echo_pod_logs 200
   exit 1
 fi
 log "✅ Both service pods are ready"
