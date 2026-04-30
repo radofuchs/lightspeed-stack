@@ -13,9 +13,6 @@ from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoiceAllowedTools,
 )
 from llama_stack_api.openai_responses import (
-    OpenAIResponseInputTool as InputTool,
-)
-from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoiceFileSearch as ToolChoiceFileSearch,
 )
 from llama_stack_api.openai_responses import (
@@ -26,9 +23,6 @@ from llama_stack_api.openai_responses import (
 )
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolFunction as InputToolFunction,
-)
-from llama_stack_api.openai_responses import (
-    OpenAIResponseInputToolMCP as InputToolMCP,
 )
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolWebSearch as InputToolWebSearch,
@@ -60,6 +54,7 @@ from pytest_mock import MockerFixture
 
 import constants
 from models.api.requests import QueryRequest
+from models.common.responses.types import InputTool, InputToolMCP
 from models.config import ByokRag, ModelContextProtocolServer
 from utils.responses import (
     _build_chunk_attributes,

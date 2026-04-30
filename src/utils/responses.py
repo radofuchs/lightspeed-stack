@@ -21,9 +21,6 @@ from llama_stack_api.openai_responses import (
     OpenAIResponseInputMessageContentText as InputTextPart,
 )
 from llama_stack_api.openai_responses import (
-    OpenAIResponseInputTool as InputTool,
-)
-from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoice as ToolChoice,
 )
 from llama_stack_api.openai_responses import (
@@ -34,9 +31,6 @@ from llama_stack_api.openai_responses import (
 )
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolFileSearch as InputToolFileSearch,
-)
-from llama_stack_api.openai_responses import (
-    OpenAIResponseInputToolMCP as InputToolMCP,
 )
 from llama_stack_api.openai_responses import (
     OpenAIResponseMCPApprovalRequest as MCPApprovalRequest,
@@ -99,7 +93,12 @@ from models.api.responses.error import (
     ServiceUnavailableResponse,
 )
 from models.common.responses.responses_api_params import ResponsesApiParams
-from models.common.responses.types import ResponseInput, ResponseItem
+from models.common.responses.types import (
+    InputTool,
+    InputToolMCP,
+    ResponseInput,
+    ResponseItem,
+)
 from models.common.turn_summary import (
     RAGChunk,
     ReferencedDocument,
