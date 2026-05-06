@@ -84,9 +84,29 @@ The first two stubs below are required-by-default per project convention
 or remove if explicitly not applicable; document the removal rationale in
 `Out of scope` above.
 
+JIRAs are grouped by Epic. Each `### Epic: <name>` H3 sub-section becomes
+a JIRA Epic when filed; each `#### LCORE-???? <title>` H4 sub-sub-section
+becomes a child of that Epic. For simple features, one Epic block covers
+everything. For larger features, group by aspect (Implementation, Docs,
+Tests, etc.). The prose under each `### Epic:` heading (Goals, Scope,
+Success criteria) becomes the Epic's filed description.
+
+### Epic: Implement TODO feature
+
+TODO: Brief prose describing what this Epic groups. Convention: include
+**Goals** (outcomes when the Epic is complete) and optionally **Scope**
+(what's in / out) and **Success criteria** (observable outcomes).
+Pattern follows existing LCORE Epics (e.g., LCORE-1623, LCORE-1631).
+
+**Goals**:
+- TODO
+
+**Scope**:
+- TODO
+
 <!-- type: Story -->
 <!-- key: LCORE-???? -->
-### LCORE-???? E2E feature files for TODO feature (no step implementation)
+#### LCORE-???? E2E feature files for TODO feature (no step implementation)
 
 **User story**: As a Lightspeed Core e2e engineer, I want the behave
 feature files for TODO feature scenarios written before the feature
@@ -125,7 +145,7 @@ additions to tests/e2e/test_list.txt. Do NOT create step definitions.
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
-### LCORE-???? Implement behave step definitions for TODO feature files
+#### LCORE-???? Implement behave step definitions for TODO feature files
 
 **Description**: Implement Python step definitions under
 `tests/e2e/features/steps/` for the `.feature` files authored in
@@ -149,7 +169,7 @@ To verify: `uv run make test-e2e` runs every new scenario green.
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
-### LCORE-???? TODO fill in title
+#### LCORE-???? TODO fill in title
 
 TODO: Use the format from `docs/contributing/templates/jira-ticket-template.md`. Change type above to Story if user-facing.
 
@@ -169,6 +189,22 @@ TODO: Use the format from `docs/contributing/templates/jira-ticket-template.md`.
 Read the "[section]" section in docs/design/<feature>/<feature>.md.
 Key files: [files].
 ```
+
+<!-- Add another Epic block below by starting a new `### Epic: <name>`
+heading; or keep all JIRAs under the single Epic above.
+
+Example multi-Epic shape (uncomment and adapt):
+
+### Epic: Documentation
+
+**Goals**:
+- TODO
+
+#### LCORE-???? Migrate docs to TODO feature
+
+[body following the same pattern as the kickoff/step-defs stubs above]
+
+-->
 
 ## Proposed incidental JIRAs
 
