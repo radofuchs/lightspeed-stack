@@ -8,7 +8,7 @@ This document is the deliverable for LCORE-1314. It presents the design options 
 
 **PoC validation**: A working proof-of-concept was built and tested with 50 queries across 4 compaction cycles. Results in [PoC results](#poc-results).
 
-# Decisions for @ptisnovs and @sbunciak
+# Strategic decisions — for @ptisnovs and @sbunciak
 
 These are the high-level decisions that determine scope, approach, and cost. Each has a recommendation — please confirm or override.
 
@@ -38,6 +38,8 @@ turns]`. Preserves fidelity of each chunk. Total summary size grows linearly, an
 See [PoC results](#poc-results) for the experimental evidence.
 
 **Recommendation**: **Additive**, with recursive as a fallback when total summary size approaches the context limit.
+
+**Confidence**: 85%.
 
 ## Decision 3: Which model for summarization?
 
@@ -83,7 +85,7 @@ Example for a 128K context window at 70% threshold:
 
 **Recommendation**: **A**. lightspeed-stack controls the conversation flow, has the domain knowledge (Red Hat support), and doesn't require upstream coordination. Llama Stack upstream has no active work here — see [Appendix A](#llama-stack-upstream).
 
-# Technical decisions for @ptisnovs
+# Technical decisions — for @ptisnovs
 
 These are implementation-level decisions. They don't affect scope or cost significantly but determine how the code is structured.
 
@@ -174,7 +176,127 @@ Should the client be notified that compaction is in progress (before the summari
 
 Each JIRA includes an agentic tool instruction that an assignee can optionally feed to Claude Code or similar.
 
-### LCORE-????: Add token estimation to lightspeed-stack
+<!-- type: Story -->
+<!-- key: LCORE-???? -->
+### LCORE-???? E2E feature files for conversation compaction (no step implementation)
+
+**User story**: As a Lightspeed Core e2e engineer, I want the behave
+feature files for conversation-compaction scenarios written before the
+feature implementation lands, so that the test shape reflects the
+feature's intended behavior rather than the chosen implementation, and
+any architectural gaps surface early.
+
+**Description**: Author behave `.feature` files under `tests/e2e/features/`
+that describe the behaviors required of conversation compaction. Step
+definitions (Python glue) are explicitly **not** part of this ticket —
+they are covered by a later sibling ticket (LCORE-???? — Implement step
+definitions). The feature files can be submitted for review and land
+before implementation of the feature itself begins.
+
+**Scope**:
+- `.feature` files covering, at minimum, these acceptance-criteria
+  surfaces from the spec doc:
+  - When estimated tokens approach the context window limit, older
+    messages are summarized (not just truncated).
+  - Summary preserves user/assistant attribution.
+  - Summarization threshold is configurable or auto-determined based
+    on model context window.
+  - Summarization is incremental (summary updated, not recomputed
+    from scratch).
+  - Full conversation history remains accessible (UI/audit) — only
+    LLM context uses the summary.
+  - Assistant correctly recalls and references prior context after
+    summarization.
+  - `context_status` field on responses reflects `"full"` vs
+    `"summarized"`.
+- Additions to `tests/e2e/test_list.txt` so behave discovers the new
+  files.
+- Gherkin scenarios authored from the spec doc only; author must avoid
+  reading the implementation JIRAs' scope sections while drafting
+  scenarios.
+
+**Acceptance criteria**:
+- behave parses every new `.feature` file without syntax errors.
+- behave marks all new scenario steps as `undefined` (step definitions
+  land in LCORE-????).
+- `uv run make test-e2e` remains green (new scenarios are skipped or
+  reported undefined, not failing).
+- Any ambiguity or architectural tension uncovered while authoring is
+  captured either as a comment in the spec doc or as a new sub-JIRA.
+
+**Blocks**: LCORE-???? (Implement behave step definitions for
+conversation compaction feature files).
+
+**Agentic tool instruction**:
+```text
+Read "Acceptance Criteria" and the relevant decisions sections in
+docs/design/conversation-compaction/conversation-compaction.md and this
+spike doc.
+Do NOT read the other JIRAs' scope sections or the implementation code
+while authoring; the point of this ticket is to produce feature files
+uncontaminated by implementation detail.
+Key files to create: tests/e2e/features/conversation-compaction-*.feature
+plus additions to tests/e2e/test_list.txt. Do NOT create step
+definitions in tests/e2e/features/steps/.
+To verify: `uv run behave --dry-run tests/e2e/features/conversation-compaction-*.feature`
+parses successfully; `uv run make test-e2e` still green with the new
+scenarios reported as undefined.
+```
+
+<!-- type: Task -->
+<!-- key: LCORE-???? -->
+### LCORE-???? Implement behave step definitions for conversation compaction feature files
+
+**Description**: Implement the Python step definitions
+(`@given`/`@when`/`@then` functions) under `tests/e2e/features/steps/`
+for the `.feature` files authored in LCORE-???? (E2E feature files
+kickoff). After this ticket lands, the scenarios transition from
+`undefined` to fully executing.
+
+The feature files are taken as-is — do not modify the Gherkin to make
+implementation easier. If a scenario cannot be implemented faithfully,
+raise it against the spec doc (and possibly back to LCORE-???? kickoff)
+rather than quietly weakening the test.
+
+**Scope**:
+- Step definitions for every step pattern in the new `.feature` files.
+- Fixtures or helpers under `tests/e2e/features/steps/` as needed
+  (e.g., temp-dir config authoring, subprocess start/stop for LCORE,
+  HTTP client helpers reusing existing `tests/e2e/` patterns,
+  conversation-state manipulation to simulate near-threshold contexts).
+- CI wiring so the new scenarios run as part of `uv run make test-e2e`.
+
+**Acceptance criteria**:
+- behave reports zero `undefined` steps across the new `.feature`
+  files.
+- `uv run make test-e2e` runs the new scenarios and they pass.
+- No Gherkin edit was made to accommodate implementation constraints
+  (or if any edit was made, it is documented in a PR comment with
+  explicit rationale).
+
+**Blocked by**:
+- LCORE-???? (E2E feature files for conversation compaction — the
+  `.feature` files being implemented against).
+- LCORE-1569 (Add token estimation), LCORE-1570 (Implement conversation
+  summarization module), LCORE-1571 (Extend conversation cache for
+  summaries), LCORE-1572 (Integrate compaction into the query flow),
+  LCORE-1573 (Update response model and API) — the feature under test
+  must exist.
+
+**Agentic tool instruction**:
+```text
+Read "Architecture" and "Requirements" in
+docs/design/conversation-compaction/conversation-compaction.md.
+Key files to create: tests/e2e/features/steps/conversation-compaction*.py
+(or extend existing step-definition modules if patterns reuse cleanly).
+Do not modify tests/e2e/features/conversation-compaction-*.feature —
+take the Gherkin as-is. If a scenario genuinely cannot be implemented
+faithfully, file a sub-ticket rather than changing the Gherkin quietly.
+To verify: `uv run make test-e2e` runs every new scenario green and
+behave reports zero undefined steps.
+```
+
+### LCORE-1569: Add token estimation to lightspeed-stack
 
 **Description**: Add the ability to estimate token counts before sending requests to the LLM. This is the prerequisite for the compaction trigger — we need to know when conversation history is approaching the context window limit.
 
@@ -200,7 +322,7 @@ Add config fields following the pattern in models/config.py around line 1418
 (ConversationHistoryConfiguration).
 ```
 
-### LCORE-????: Implement conversation summarization module
+### LCORE-1570: Implement conversation summarization module
 
 **Description**: Create the core summarization logic — given a list of conversation turns and a prompt, call the LLM and return a summary string. Includes the domain-specific summarization prompt for Red Hat product support.
 
@@ -228,7 +350,7 @@ docs/design/conversation-compaction/conversation-compaction.md.
 Key files: src/utils/ (new module), src/models/config.py.
 ```
 
-### LCORE-????: Extend conversation cache for summaries
+### LCORE-1571: Extend conversation cache for summaries
 
 **Description**: Add summary storage to the conversation cache so summaries persist across requests and survive restarts.
 
@@ -255,7 +377,7 @@ Key files: src/cache/, src/models/.
 Follow existing cache backend patterns (test_sqlite_cache.py, test_postgres_cache.py).
 ```
 
-### LCORE-????: Integrate compaction into the query flow
+### LCORE-1572: Integrate compaction into the query flow
 
 **Description**: Wire the token estimator, summarization module, and summary cache into the actual request path so compaction triggers automatically.
 
@@ -288,7 +410,7 @@ The insertion point is in prepare_responses_params(), after conversation_id is
 resolved but before ResponsesApiParams is built.
 ```
 
-### LCORE-????: Update response model and API
+### LCORE-1573: Update response model and API
 
 **Description**: Add a `context_status` field (or equivalent, per Decision 7) to the response so clients know whether compaction occurred.
 
@@ -312,34 +434,32 @@ docs/design/conversation-compaction/conversation-compaction.md.
 Key files: src/models/responses.py (around line 410, the existing truncated field).
 ```
 
-### LCORE-????: Verify test coverage for compaction
+### LCORE-1574: Integration tests for conversation compaction
 
-**Description**: Review all compaction-related code and verify that unit tests, integration tests, and E2E tests cover the critical paths. Add any missing tests.
+**Description**: Integration tests covering the compaction flow with mocked Llama Stack.
 
 **Scope**:
 
-- Review all compaction-related code for test gaps.
-- Add missing unit tests: trigger logic, token estimation, partitioning, summarization, summary storage.
-- Add missing integration tests: full compaction flow with mocked Llama Stack.
-- Add missing E2E tests: conversations that exceed context window, verify compaction kicks in.
+- Test compaction trigger logic with mocked Llama Stack client.
+- Test summary injection as marked conversation item.
+- Test additive summarization (multiple compaction cycles).
+- Test per-conversation blocking lock behavior.
 
 **Acceptance criteria**:
 
-- Every public function in `token_estimator.py` and `compaction.py` has at least one unit test.
-- At least one integration test exercises the full compaction flow end-to-end.
-- At least one E2E test verifies that a long conversation triggers compaction and continues.
+- Full compaction flow exercised end-to-end with mocked Llama Stack.
+- Tests cover trigger, partitioning, summarization, marker injection, and context selection.
 
 **Agentic tool instruction**:
 
 ```
-Read the "Appendix A: PoC Evidence" section in
-docs/design/conversation-compaction/conversation-compaction.md
-and the full experiment data in docs/design/conversation-compaction/poc-results/.
-Key test files: tests/unit/utils/, tests/integration/endpoints/,
-tests/e2e/features/.
+Read the "Architecture" section in
+docs/design/conversation-compaction/conversation-compaction.md.
+Key files to create or modify: tests/integration/endpoints/.
+To verify: run pytest tests/integration/ -k compaction and confirm all pass.
 ```
 
-### LCORE-????: Coordinate with UI team on compaction indicator
+### LCORE-1575: Coordinate with UI team on compaction indicator
 
 **Description**: Define the API contract for communicating compaction status to the UI. Two signals: (1) `context_status` field in the response, and (2) a `compaction_started` streaming event emitted before the summarization call.
 
