@@ -19,3 +19,11 @@ The user may also provide a spike doc path or feature description directly.
 
 Place the spec doc at `docs/design/<feature>/<feature>.md`.  Confirm the
 feature name and path with the user.
+
+## Keep spike doc and spec doc coupled
+
+If a corresponding spike doc exists, treat the two as a coupled pair.
+Whenever you make a non-trivial update to the spec doc — a decision
+recommendation changes, an open question gets resolved, a reviewer
+comment is incorporated — **check whether the spike doc needs a
+corresponding update**. If yes, propose the update in the same turn.

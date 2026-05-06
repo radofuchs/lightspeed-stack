@@ -120,6 +120,21 @@ are tied to it.
 
 Non-obvious ways the feature can fail, and what happens when it does.
 
+### Migration tool patterns
+
+If the feature changes a user-facing artifact (config file shape, data
+schema, API contract), describe any migration tool that ships with the
+feature: invocation, semantics (lossless vs lossy), what it does and
+doesn't migrate, and the deprecation timeline for the old form.
+
+### Rollout / deployment plan
+
+If the feature is being rolled out gradually, describe the rollout shape:
+phased enablement, feature flags, canary deployment, rollback procedure,
+who is notified at each stage. Distinct from `Feature flags / rollout`
+above which is about the *flag mechanism*; this is about the *rollout
+sequence*.
+
 ### Telemetry / data privacy
 
 What data is collected, where it goes, how user privacy is preserved.
@@ -161,21 +176,21 @@ TODO: Where the feature hooks into existing code — function name, what's avail
 
 ### Config pattern
 
-All config classes extend `ConfigurationBase` which sets `extra="forbid"`.
-Use `Field()` with defaults, title, and description.  Add
-`@model_validator(mode="after")` for cross-field validation if needed.
-
-Example config files go in `examples/`.
+Follow the project's Configuration conventions (see
+[CLAUDE.md](../../../CLAUDE.md) — Configuration section). Document
+feature-specific config schemas (Pydantic classes, YAML examples) in
+this section.
 
 ### Test patterns
 
-- Framework: pytest + pytest-asyncio + pytest-mock.  unittest is banned by ruff.
-- Mock Llama Stack client: `mocker.AsyncMock(spec=AsyncLlamaStackClient)`.
-- Patch at module level: `mocker.patch("utils.module.function_name", ...)`.
-- Async mocking pattern: see `tests/unit/utils/test_shields.py`.
-- Config validation tests: see `tests/unit/models/config/`.
+Follow the project's Testing Framework Requirements (see
+[CLAUDE.md](../../../CLAUDE.md) — Testing Framework section). Document
+**only feature-specific test considerations** here — e.g., tests that
+need a running service, special fixtures, concurrency testing,
+property-based tests for a particular invariant.
 
-TODO: Describe any feature-specific test considerations (e.g., tests that need a running service, special fixtures, concurrency testing).
+TODO: feature-specific test considerations (delete this section if
+there are none beyond the project defaults).
 
 ## Open Questions for Future Work
 

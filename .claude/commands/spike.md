@@ -81,6 +81,14 @@ Use `TaskCreate` / `TaskUpdate` to track the spike phases (set up →
 research → design alternatives → PoC → spike doc → spec doc → JIRAs).
 Spikes are multi-phase; tracking improves continuity and reviewability.
 
+## Keep spike doc and spec doc coupled
+
+Treat the spike doc and the spec doc as a coupled pair. Whenever you make
+a non-trivial update to one — a decision recommendation changes, a PoC
+finding is integrated, the user overrides a default, a reviewer comment
+is incorporated — **check whether the other needs a corresponding
+update**. If yes, propose the update in the same turn.
+
 ## End-of-session reminder
 
 When the spike PR is opened (step 7 of the howto), remind the user that

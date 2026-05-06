@@ -36,8 +36,10 @@ A spike produces:
 
 ### 1. Set up
 
-- Create a feature branch: `lcore-XXXX-spike-short-description` off
-  `upstream/main`.
+- Create a feature branch following `branch_name_pattern` from
+  [`feature-design.config`](feature-design.config) (default
+  `lcore-{ticket}-spike-{short-description}`) off `branch_off` (default
+  `upstream/main`).
 
 ### 2. Research
 
