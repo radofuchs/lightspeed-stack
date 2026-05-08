@@ -32,7 +32,10 @@ rest_api_calls_total = Counter(
 # Histogram to measure response durations
 # This will be used to track how long it takes to handle requests
 response_duration_seconds = Histogram(
-    "ls_response_duration_seconds", "Response durations", ["path"]
+    "ls_response_duration_seconds",
+    "Response durations",
+    ["path"],
+    buckets=LLM_INFERENCE_DURATION_BUCKETS,
 )
 
 # Metric that indicates what provider + model customers are using so we can
