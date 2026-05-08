@@ -309,6 +309,87 @@ def parse_proposed_section(section_text):
 epic_blocks, parse_mode = parse_proposed_section(proposed_section)
 
 
+# --- Structure linter ---
+# Warns about likely-mistakes in the spike doc's Proposed JIRAs shape.
+# Errors (which exit non-zero) are reserved for unparseable structure;
+# warnings (which print and continue) are for inconsistencies the user
+# should know about.
+
+def lint_proposed_section(section_text, epic_blocks, parse_mode):
+    """Emit warnings to stderr; return True on success, False on error."""
+    issues = []  # list of (severity, message)
+
+    # Mixed shape: both `### Epic:` and `### LCORE-` at H3 level
+    epic_count = len(re.findall(r'^###\s+Epic:\s+', section_text, re.MULTILINE))
+    h3_lcore_count = len(re.findall(r'^###\s+LCORE-[\d?]+', section_text, re.MULTILINE))
+    if epic_count > 0 and h3_lcore_count > 0:
+        issues.append((
+            "WARNING",
+            f"Mixed shape detected: {epic_count} `### Epic:` boundaries plus "
+            f"{h3_lcore_count} flat `### LCORE-...` H3 stubs. The flat ones "
+            f"will not be parsed under any Epic; demote them to `#### LCORE-...` "
+            f"under an `### Epic:` heading or remove the Epic boundaries."
+        ))
+
+    # Epic with zero children
+    for epic_name, _, children in epic_blocks:
+        if not children:
+            issues.append((
+                "WARNING",
+                f"Epic '{epic_name}' has no child JIRAs (no `#### LCORE-...` "
+                f"H4 sub-headings under it). Either add children or remove "
+                f"the empty Epic block."
+            ))
+
+    # Duplicate child titles within or across Epics
+    all_titles = []
+    for epic_name, _, children in epic_blocks:
+        for heading, _, _ in children:
+            clean = re.sub(r'^LCORE-[\d?]+\s*:?\s*', '', heading).strip().lower()
+            all_titles.append((epic_name, clean))
+    seen = {}
+    for epic_name, title in all_titles:
+        if title in seen:
+            issues.append((
+                "WARNING",
+                f"Duplicate JIRA title '{title}' (in Epic '{seen[title]}' and "
+                f"Epic '{epic_name}'). Each child JIRA should have a unique "
+                f"title; the parser uses titles for filename generation."
+            ))
+        else:
+            seen[title] = epic_name
+
+    # No JIRAs at all
+    total_children = sum(len(c) for _, _, c in epic_blocks)
+    if total_children == 0:
+        issues.append((
+            "ERROR",
+            "Proposed JIRAs section parsed zero JIRAs. Expected at least one "
+            "`### LCORE-...` (legacy) or `#### LCORE-...` under `### Epic:` (new)."
+        ))
+
+    # Print issues
+    for severity, msg in issues:
+        prefix = "  [LINT-{}]".format(severity)
+        # Wrap long messages for readability
+        words = msg.split(' ')
+        line = prefix
+        for w in words:
+            if len(line) + 1 + len(w) > 100:
+                print(line, file=sys.stderr)
+                line = "    " + w
+            else:
+                line = line + " " + w
+        if line.strip():
+            print(line, file=sys.stderr)
+
+    return not any(s == "ERROR" for s, _ in issues)
+
+
+if not lint_proposed_section(proposed_section, epic_blocks, parse_mode):
+    sys.exit(1)
+
+
 def parse_incidental_section(section_text):
     """Parse incidental section (always flat ### LCORE-)."""
     if not section_text:
