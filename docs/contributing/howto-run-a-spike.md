@@ -114,6 +114,16 @@ Key principles:
   Description, Scope, Acceptance Criteria, and an Agentic tool instruction
   pointing to the spec doc.  Use
   [jira-ticket-template.md](templates/jira-ticket-template.md).
+- **JIRAs are grouped by Epic.** Each `### Epic: <name>` H3 sub-section
+  becomes a JIRA Epic when filed; each `#### LCORE-???? <title>` H4
+  sub-sub-section becomes a child of that Epic. The prose under the
+  Epic heading (Goals, optional Scope and Success criteria) becomes
+  the Epic's filed description. Single-Epic features keep one Epic
+  block; larger features group by aspect (Implementation, Docs,
+  Tests, ...). The spike-template demonstrates the shape; `file-jiras.sh`
+  parses and files accordingly. Backward-compat: the old flat shape
+  (no `### Epic:` boundaries; `### LCORE-...` H3 stubs directly under
+  Proposed JIRAs) still parses, with a single auto-generated Epic.
 - **The first proposed JIRA is the e2e kickoff Story** — write the behave
   `.feature` files for the feature, no step implementation. This kicks off
   the work *before* implementation lands so the test shape isn't shaped by
