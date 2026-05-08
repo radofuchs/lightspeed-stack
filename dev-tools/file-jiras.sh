@@ -96,6 +96,20 @@ get_key() {
     grep -o '<!-- key: [A-Z]*-[0-9]* -->' "$f" 2>/dev/null | head -1 | sed 's/<!-- key: //;s/ -->//' || true
 }
 
+get_parent_epic_file() {
+    # Returns the parent_epic_file slug (filename without .md) for a child
+    # ticket file, or empty string if not present (legacy / Epic / incidental).
+    local f="$1"
+    grep -o '<!-- parent_epic_file: [^ ]* -->' "$f" 2>/dev/null | head -1 | sed 's/<!-- parent_epic_file: //;s/ -->//' || true
+}
+
+is_incidental() {
+    # Returns 0 if this ticket file is marked incidental (no Epic parent;
+    # files under FEATURE_TICKET directly).
+    local f="$1"
+    grep -q '<!-- incidental: true -->' "$f" 2>/dev/null
+}
+
 # Portable sed -i (macOS requires '' argument, GNU doesn't)
 _sed_i() {
     if sed --version 2>/dev/null | grep -q GNU; then
@@ -133,6 +147,7 @@ rm -rf "$JIRA_DIR"
 mkdir -p "$JIRA_DIR"
 
 python3 - "$SPIKE_DOC" "$JIRA_DIR" "$FEATURE_TICKET" << 'PYEOF'
+import json
 import re
 import sys
 from pathlib import Path
@@ -141,87 +156,259 @@ spike_doc = Path(sys.argv[1]).read_text()
 out_dir = Path(sys.argv[2])
 feature_ticket = sys.argv[3]
 
-# --- Extract spike ticket key from metadata table or first paragraph ---
-spike_key_match = re.search(r'\*\*Spike\*\*.*?(LCORE-\d+)', spike_doc)
+
+def strip_multiline_comments(text):
+    """Strip HTML comment blocks that span multiple lines.
+
+    Single-line metadata comments like <!-- type: Task --> or
+    <!-- key: LCORE-1234 --> are preserved (no newlines inside).
+    Multi-line commented-out examples in templates (e.g., the
+    `### Epic: Documentation` example block in the spike-template)
+    are stripped so the parser doesn't pick them up as real headings.
+    """
+    def replace(m):
+        return '' if '\n' in m.group(0) else m.group(0)
+    return re.sub(r'<!--[\s\S]*?-->', replace, text)
+
+
+def slugify(text, max_words=8):
+    """Convert text to lowercase dash-separated slug, truncated to max_words."""
+    words = re.findall(r'[a-z0-9]+', text.lower())
+    if not words:
+        return 'ticket'
+    return '-'.join(words[:max_words])
+
+
+def extract_type(preceding_text):
+    """Extract <!-- type: X --> from the last few lines of preceding text."""
+    for line in preceding_text.strip().split('\n')[-5:]:
+        m = re.search(r'<!--\s*type:\s*(\w+)\s*-->', line)
+        if m:
+            return m.group(1)
+    return "Task"
+
+
+def strip_leaked_metadata(body):
+    """Remove trailing <!-- type/key/parent_epic_file --> that leaks into body
+    from the next ticket's heading area."""
+    body = re.sub(r'\n<!--\s*type:\s*\w+\s*-->\s*$', '', body)
+    body = re.sub(r'\n<!--\s*key:\s*[\w-]+\s*-->\s*$', '', body)
+    body = re.sub(r'\n<!--\s*parent_epic_file:[^>]*-->\s*$', '', body)
+    return body.strip()
+
+
+# Pre-process: strip multi-line HTML comments
+clean_doc = strip_multiline_comments(spike_doc)
+
+# --- Extract spike ticket key (unchanged behavior) ---
+spike_key_match = re.search(r'\*\*Spike\*\*.*?(LCORE-\d+)', clean_doc)
 if not spike_key_match:
-    # Try "deliverable for LCORE-XXXX" pattern
-    spike_key_match = re.search(r'deliverable for (LCORE-\d+)', spike_doc)
+    spike_key_match = re.search(r'deliverable for (LCORE-\d+)', clean_doc)
 if not spike_key_match:
-    # Try first LCORE- reference in the first 500 chars
-    spike_key_match = re.search(r'(LCORE-\d+)', spike_doc[:500])
+    spike_key_match = re.search(r'(LCORE-\d+)', clean_doc[:500])
 spike_key = spike_key_match.group(1) if spike_key_match else ""
 
-# --- Extract one-line problem statement for Epic description ---
-problem_match = re.search(r'\*\*The problem\*\*:\s*(.+?)(?:\n\n|\n\*\*)', spike_doc, re.DOTALL)
-problem_line = problem_match.group(1).strip().split('\n')[0] if problem_match else ""
 
-# --- Generate Epic stub ---
-# Derive Epic title from the spike doc's parent directory name
-spike_path = Path(sys.argv[1])
-feature_dir = spike_path.parent.name
-if feature_dir and feature_dir not in ('design', 'docs', '.'):
-    epic_title = f"Implement {feature_dir.replace('-', ' ')}"
-else:
-    epic_title = "TODO: Epic title"
+# --- Locate Proposed JIRAs section (accepts H1 or H2 — older spikes used H1) ---
+proposed_match = re.search(
+    r'^#{1,2}\s+Proposed JIRAs\s*$\n(.*?)(?=^#{1,2}\s|\Z)',
+    clean_doc,
+    re.MULTILINE | re.DOTALL,
+)
+if not proposed_match:
+    print(f"Error: 'Proposed JIRAs' section not found in {sys.argv[1]}", file=sys.stderr)
+    sys.exit(1)
+proposed_section = proposed_match.group(1)
 
-epic_content = f"<!-- type: Epic -->\n<!-- key: LCORE-xxxx -->\n### {epic_title}\n"
 
-(out_dir / "00-epic.md").write_text(epic_content)
+# --- Locate Proposed incidental JIRAs section (optional, H1 or H2) ---
+incidental_match = re.search(
+    r'^#{1,2}\s+Proposed incidental JIRAs\s*$\n(.*?)(?=^#{1,2}\s|\Z)',
+    clean_doc,
+    re.MULTILINE | re.DOTALL,
+)
+incidental_section = incidental_match.group(1) if incidental_match else ""
 
-# --- Parse JIRA sections ---
-pattern = r'^### (LCORE-\?{4}.*?)$'
-sections = re.split(pattern, spike_doc, flags=re.MULTILINE)
 
-count = 0
-for i in range(1, len(sections), 2):
-    heading = sections[i].strip()
-    body = sections[i + 1].strip() if i + 1 < len(sections) else ""
+def parse_proposed_section(section_text):
+    """Parse the Proposed JIRAs section into (epic_blocks, parse_mode).
 
-    if not heading.startswith("LCORE-"):
-        break
+    epic_blocks is a list of (epic_name, epic_prose, [(child_heading,
+    child_body, child_type), ...]).
 
-    count += 1
+    parse_mode is 'epic_grouped' (new shape: ### Epic + #### LCORE) or
+    'legacy_flat' (old shape: ### LCORE flat) or 'empty'.
+    """
+    epic_pattern = re.compile(r'^###\s+Epic:\s*(.+?)\s*$', re.MULTILINE)
+    epic_matches = list(epic_pattern.finditer(section_text))
 
-    # Truncate body at the first # or ## heading (end of JIRAs section)
-    end_match = re.search(r'^#{1,2}\s', body, flags=re.MULTILINE)
-    if end_match:
-        body = body[:end_match.start()].strip()
+    if epic_matches:
+        epic_blocks = []
+        for i, em in enumerate(epic_matches):
+            epic_name = em.group(1).strip()
+            start = em.end()
+            end = (epic_matches[i + 1].start()
+                   if i + 1 < len(epic_matches) else len(section_text))
+            epic_text = section_text[start:end]
 
-    # Strip "LCORE-????: " prefix to get clean title
-    clean_title = re.sub(r'^LCORE-\?+:?\s*', '', heading).strip()
+            # Children at H4 — match both LCORE-???? (placeholder) and
+            # LCORE-NNNN (real key, for re-syncing already-filed tickets)
+            child_pattern = re.compile(r'^####\s+(LCORE-[\d?]+.*?)$', re.MULTILINE)
+            child_matches = list(child_pattern.finditer(epic_text))
 
-    # Extract type: look in the preceding section's last line (the comment
-    # sits on the line before the ### heading), then fall back to body.
-    ticket_type = "Task"
-    if i > 0:
-        preceding = sections[i - 1] if i - 1 >= 0 else ""
-        for line in preceding.strip().split('\n')[-3:]:
-            m = re.search(r'<!--\s*type:\s*(\w+)\s*-->', line)
-            if m:
-                ticket_type = m.group(1)
-                break
+            epic_prose = (
+                epic_text[:child_matches[0].start()].strip()
+                if child_matches else epic_text.strip()
+            )
 
-    # Strip any <!-- type: ... --> that leaked into body from the next ticket
-    body = re.sub(r'\n<!--\s*type:\s*\w+\s*-->\s*$', '', body).strip()
+            children = []
+            for j, cm in enumerate(child_matches):
+                child_heading = cm.group(1).strip()
+                cstart = cm.end()
+                cend = (child_matches[j + 1].start()
+                        if j + 1 < len(child_matches) else len(epic_text))
+                child_body = epic_text[cstart:cend].strip()
+                preceding = epic_text[:cm.start()]
+                ticket_type = extract_type(preceding[-300:])
+                child_body = strip_leaked_metadata(child_body)
+                children.append((child_heading, child_body, ticket_type))
 
-    # Extract short name for filename
-    short_name = re.sub(r'[^a-z0-9]+', '-', clean_title.lower()).strip('-')
-    if not short_name:
-        short_name = f"ticket-{count}"
+            epic_blocks.append((epic_name, epic_prose, children))
+        return epic_blocks, "epic_grouped"
 
-    filename = f"{count:02d}-{short_name}.md"
+    # Backward compat: flat ### LCORE-... children, no Epic boundaries.
+    # Match both LCORE-???? (placeholder) and LCORE-NNNN (real key).
+    legacy_pattern = re.compile(r'^###\s+(LCORE-[\d?]+.*?)$', re.MULTILINE)
+    legacy_matches = list(legacy_pattern.finditer(section_text))
+    if not legacy_matches:
+        return [], "empty"
 
-    # Write with type and key metadata at top
-    content = f"<!-- type: {ticket_type} -->\n<!-- key: LCORE-xxxx -->\n### {clean_title}\n\n{body}\n"
+    children = []
+    for i, m in enumerate(legacy_matches):
+        heading = m.group(1).strip()
+        cstart = m.end()
+        cend = (legacy_matches[i + 1].start()
+                if i + 1 < len(legacy_matches) else len(section_text))
+        body = section_text[cstart:cend].strip()
+        preceding = section_text[:m.start()]
+        ticket_type = extract_type(preceding[-300:])
+        body = strip_leaked_metadata(body)
+        children.append((heading, body, ticket_type))
 
-    (out_dir / filename).write_text(content)
+    # Auto-generate Epic name from spike-doc parent dir
+    spike_path = Path(sys.argv[1])
+    feature_dir = spike_path.parent.name
+    if feature_dir and feature_dir not in ('design', 'docs', '.'):
+        epic_name = f"Implement {feature_dir.replace('-', ' ')}"
+    else:
+        epic_name = "TODO: Epic title"
 
-# Write metadata file for the script to read
-meta = {"spike_ticket": spike_key, "count": count}
-import json
+    return [(epic_name, "", children)], "legacy_flat"
+
+
+epic_blocks, parse_mode = parse_proposed_section(proposed_section)
+
+
+def parse_incidental_section(section_text):
+    """Parse incidental section (always flat ### LCORE-)."""
+    if not section_text:
+        return []
+    pattern = re.compile(r'^###\s+(LCORE-[\d?]+.*?)$', re.MULTILINE)
+    matches = list(pattern.finditer(section_text))
+    out = []
+    for i, m in enumerate(matches):
+        heading = m.group(1).strip()
+        cstart = m.end()
+        cend = (matches[i + 1].start()
+                if i + 1 < len(matches) else len(section_text))
+        body = section_text[cstart:cend].strip()
+        preceding = section_text[:m.start()]
+        ticket_type = extract_type(preceding[-300:])
+        body = strip_leaked_metadata(body)
+        out.append((heading, body, ticket_type))
+    return out
+
+
+incidental_tickets = parse_incidental_section(incidental_section)
+
+
+# --- Write parsed files ---
+file_count = 0
+total_jiras = 0
+total_epics = 0
+
+for epic_name, epic_prose, children in epic_blocks:
+    epic_slug = slugify(epic_name)
+    epic_filename = f"{file_count:02d}-epic-{epic_slug}.md"
+    epic_content = (
+        f"<!-- type: Epic -->\n"
+        f"<!-- key: LCORE-xxxx -->\n"
+        f"### {epic_name}\n"
+        f"\n"
+        f"{epic_prose}\n"
+    )
+    (out_dir / epic_filename).write_text(epic_content)
+    parent_epic_stub = epic_filename.rsplit('.md', 1)[0]
+    file_count += 1
+    total_epics += 1
+
+    for child_heading, child_body, ticket_type in children:
+        # Detect real ticket key in heading (e.g., "LCORE-1569: Add ...")
+        # vs placeholder ("LCORE-???? E2E ..."). Real keys are preserved
+        # so the script PUT-updates the existing ticket rather than POSTing
+        # a duplicate.
+        key_match = re.match(r'LCORE-(\d+)\s*:?\s*', child_heading)
+        ticket_key = f"LCORE-{key_match.group(1)}" if key_match else "LCORE-xxxx"
+        clean_title = re.sub(r'^LCORE-[\d?]+\s*:?\s*', '', child_heading).strip()
+        short_name = slugify(clean_title)
+        child_filename = f"{file_count:02d}-{short_name}.md"
+        child_content = (
+            f"<!-- type: {ticket_type} -->\n"
+            f"<!-- key: {ticket_key} -->\n"
+            f"<!-- parent_epic_file: {parent_epic_stub} -->\n"
+            f"### {clean_title}\n"
+            f"\n"
+            f"{child_body}\n"
+        )
+        (out_dir / child_filename).write_text(child_content)
+        file_count += 1
+        total_jiras += 1
+
+# Incidental tickets — file under FEATURE_TICKET directly (no Epic parent)
+for heading, body, ticket_type in incidental_tickets:
+    key_match = re.match(r'LCORE-(\d+)\s*:?\s*', heading)
+    ticket_key = f"LCORE-{key_match.group(1)}" if key_match else "LCORE-xxxx"
+    clean_title = re.sub(r'^LCORE-[\d?]+\s*:?\s*', '', heading).strip()
+    short_name = slugify(clean_title)
+    inc_filename = f"{file_count:02d}-incidental-{short_name}.md"
+    inc_content = (
+        f"<!-- type: {ticket_type} -->\n"
+        f"<!-- key: {ticket_key} -->\n"
+        f"<!-- incidental: true -->\n"
+        f"### {clean_title}\n"
+        f"\n"
+        f"{body}\n"
+    )
+    (out_dir / inc_filename).write_text(inc_content)
+    file_count += 1
+    total_jiras += 1
+
+
+# --- Metadata file ---
+meta = {
+    "spike_ticket": spike_key,
+    "epic_count": total_epics,
+    "jira_count": total_jiras,
+    "incidental_count": len(incidental_tickets),
+    "parse_mode": parse_mode,
+}
 (out_dir / ".meta.json").write_text(json.dumps(meta))
 
-print(f"Parsed {count} JIRAs + 1 Epic from {sys.argv[1]}")
+inc_str = f", {len(incidental_tickets)} incidental" if incidental_tickets else ""
+print(
+    f"Parsed {total_epics} Epic(s) + {total_jiras - len(incidental_tickets)} JIRA(s)"
+    f"{inc_str} from {sys.argv[1]} (mode: {parse_mode})"
+)
 if spike_key:
     print(f"Spike ticket: {spike_key}")
 PYEOF
@@ -261,17 +448,39 @@ show_summary() {
         fi
         if [ "$ttype" = "Epic" ]; then
             parent="$FEATURE_TICKET"
-        elif [ -n "$EPIC_KEY" ] && [ "$EPIC_KEY" != "__NONE__" ]; then
-            parent="$EPIC_KEY"
+        elif is_incidental "$f"; then
+            parent="$FEATURE_TICKET (incidental)"
         else
-            parent="Epic #0"
+            local parent_epic_file
+            parent_epic_file=$(get_parent_epic_file "$f")
+            if [ -n "$parent_epic_file" ]; then
+                local epic_path="$JIRA_DIR/${parent_epic_file}.md"
+                if [ -f "$epic_path" ]; then
+                    local pk
+                    pk=$(get_key "$epic_path")
+                    if [ -n "$pk" ]; then
+                        parent="$pk"
+                    else
+                        parent="(unfiled: $parent_epic_file)"
+                    fi
+                else
+                    parent="(missing: $parent_epic_file)"
+                fi
+            else
+                # Legacy / fallback (no parent_epic_file metadata)
+                if [ -n "$EPIC_KEY" ] && [ "$EPIC_KEY" != "__NONE__" ]; then
+                    parent="$EPIC_KEY"
+                else
+                    parent="(no epic)"
+                fi
+            fi
         fi
         printf "  %-3d %-7s %-13s %-35s %s\n" "$i" "$ttype" "$status" "$title" "$parent"
         i=$((i + 1))
     done
     echo ""
     if [ -n "$SPIKE_TICKET_KEY" ]; then
-        echo "  Spike ticket $SPIKE_TICKET_KEY will be linked to Epic with \"Informs\""
+        echo "  Spike ticket $SPIKE_TICKET_KEY will be linked to first filed Epic with \"Informs\""
     fi
     echo ""
 }
@@ -577,26 +786,55 @@ file_ticket() {
     ttype=$(get_type "$ticket_file")
 
     if [ "$ttype" = "Epic" ]; then
-        # Check if Epic already has a key (pre-existing)
-        local epic_existing
-        epic_existing=$(get_key "$ticket_file")
-        if [ -n "$epic_existing" ]; then
-            EPIC_KEY="$epic_existing"
-        fi
+        # File Epic under FEATURE_TICKET. With multi-Epic support, each Epic
+        # is filed independently; we capture the FIRST filed Epic into
+        # EPIC_KEY so the spike-to-Epic "Informs" link uses it (per
+        # convention: link to the primary/first Epic).
         local filed_key
         filed_key=$(file_single_ticket "$ticket_file" "Epic" "$FEATURE_TICKET")
-        if [ -n "$filed_key" ]; then
+        if [ -z "$filed_key" ]; then
+            return 1
+        fi
+        if [ -z "$EPIC_KEY" ] || [ "$EPIC_KEY" = "__NONE__" ]; then
             EPIC_KEY="$filed_key"
+            if [ -n "$SPIKE_TICKET_KEY" ]; then
+                link_spike_to_epic
+            fi
         fi
-        if [ -n "$EPIC_KEY" ] && [ -n "$SPIKE_TICKET_KEY" ]; then
-            link_spike_to_epic
+        echo "$filed_key"
+        return 0
+    fi
+
+    if is_incidental "$ticket_file"; then
+        # Incidental tickets file directly under FEATURE_TICKET (no Epic).
+        file_single_ticket "$ticket_file" "$ttype" "$FEATURE_TICKET"
+        return $?
+    fi
+
+    # Regular child: route to its parent_epic_file's filed key.
+    local parent_epic_file
+    parent_epic_file=$(get_parent_epic_file "$ticket_file")
+
+    local parent
+    if [ -n "$parent_epic_file" ]; then
+        local epic_path="$JIRA_DIR/${parent_epic_file}.md"
+        if [ ! -f "$epic_path" ]; then
+            echo "  Error: parent_epic_file '$parent_epic_file' not found at $epic_path" >&2
+            return 1
         fi
-        echo "$EPIC_KEY"
+        parent=$(get_key "$epic_path")
+        if [ -z "$parent" ]; then
+            echo "  Error: parent epic '$parent_epic_file' has not been filed yet (no key)." >&2
+            echo "  File the Epic first, then retry filing this ticket." >&2
+            return 1
+        fi
     else
-        # Need an Epic key for children — refresh from Epic file if not set
+        # Legacy fallback: no parent_epic_file metadata. Use single-Epic
+        # flow with the global EPIC_KEY (refresh from any epic file in the
+        # directory if not yet set).
         if [ -z "$EPIC_KEY" ] || [ "$EPIC_KEY" = "__NONE__" ]; then
             local epic_file
-            epic_file=$(find "$JIRA_DIR" -maxdepth 1 -name '00-epic.md' 2>/dev/null | head -1)
+            epic_file=$(find "$JIRA_DIR" -maxdepth 1 \( -name '*-epic-*.md' -o -name '00-epic.md' \) 2>/dev/null | sort | head -1)
             if [ -n "$epic_file" ]; then
                 local ek
                 ek=$(get_key "$epic_file")
@@ -609,12 +847,13 @@ file_ticket() {
             ensure_epic_key || return 1
         fi
         if [ "$EPIC_KEY" = "__NONE__" ]; then
-            # Fallback: Blocks link (filed as standalone Task linked to feature)
-            file_single_ticket "$ticket_file" "$ttype" "$FEATURE_TICKET"
+            parent="$FEATURE_TICKET"
         else
-            file_single_ticket "$ticket_file" "$ttype" "$EPIC_KEY"
+            parent="$EPIC_KEY"
         fi
     fi
+
+    file_single_ticket "$ticket_file" "$ttype" "$parent"
 }
 
 # --- Interactive loop ---
