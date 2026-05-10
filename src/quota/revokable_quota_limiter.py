@@ -109,7 +109,8 @@ class RevokableQuotaLimiter(QuotaLimiter):
             self._init_quota(subject_id)
             return self.initial_quota
         cursor.close()
-        return value[0]
+        # help type linters to infer return value type
+        return int(value[0])
 
     @connection
     def revoke_quota(self, subject_id: str = "") -> None:
