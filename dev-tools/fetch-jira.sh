@@ -17,17 +17,43 @@ set -euo pipefail
 # shellcheck disable=SC1091
 . "$(dirname "$0")/jira-common.sh"
 
-if [ $# -lt 1 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: fetch-jira.sh <ticket> [additional-tickets...]"
+show_help() {
+    echo "Usage: fetch-jira.sh [--comments] <ticket> [additional-tickets...]"
     echo ""
     echo "Fetches JIRA ticket content including description, status, and child issues."
     echo "Bare numbers default to LCORE- prefix."
+    echo ""
+    echo "Options:"
+    echo "  --comments         Also fetch and print the ticket's comment thread."
+    echo "                     Comments often contain critical decisions ('we decided"
+    echo "                     in standup to defer X') that the description doesn't"
+    echo "                     capture. Off by default."
+    echo "  --help             Show this help"
     echo ""
     echo "Examples:"
     echo "  fetch-jira.sh 1234              Fetch LCORE-1234"
     echo "  fetch-jira.sh LCORE-1234        Same"
     echo "  fetch-jira.sh 836 509 777       Fetch multiple tickets"
-    if [ $# -lt 1 ]; then exit 1; else exit 0; fi
+    echo "  fetch-jira.sh --comments 1234   Fetch LCORE-1234 with comments"
+}
+
+if [ $# -lt 1 ]; then
+    show_help; exit 1
+fi
+
+# Parse flags (must come before any positional ticket arg)
+FETCH_COMMENTS=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --comments) FETCH_COMMENTS=1; shift ;;
+        --help|-h) show_help; exit 0 ;;
+        --*) echo "Unknown flag: $1"; show_help; exit 1 ;;
+        *) break ;;  # first positional → ticket key
+    esac
+done
+
+if [ $# -lt 1 ]; then
+    echo "Error: no ticket specified"; show_help; exit 1
 fi
 
 ensure_jira_credentials
@@ -47,12 +73,22 @@ fetch_ticket() {
         -u "$JIRA_EMAIL:$JIRA_TOKEN" \
         "$JIRA_INSTANCE/rest/api/3/issue/$key?fields=summary,status,issuetype,description,issuelinks,subtasks,parent" 2>/dev/null)
 
+    # Optional: fetch comments (only if --comments was passed). Empty
+    # JSON object signals "no comments fetched" to the Python printer.
+    local comments_data='{}'
+    if [ "$FETCH_COMMENTS" -eq 1 ]; then
+        comments_data=$(curl -sS --connect-timeout 10 --max-time 30 \
+            -u "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_INSTANCE/rest/api/3/issue/$key/comment" 2>/dev/null) || comments_data='{}'
+    fi
+
     if echo "$data" | python3 -c "import sys,json; json.load(sys.stdin)['key']" >/dev/null 2>&1; then
         python3 -c "
 import json, sys, textwrap
 
 data = json.loads(sys.argv[1])
 indent = sys.argv[2]
+comments_data = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
 key = data['key']
 fields = data['fields']
 summary = fields['summary']
@@ -67,51 +103,54 @@ if parent_key:
     print(f'{indent}Parent: {parent_key}')
 print()
 
+
+# ADF (Atlassian Document Format) → markdown-ish text extractor.
+# Hoisted to top-level so both description and comments can use it.
+def extract_text(node, depth=0):
+    lines = []
+    if isinstance(node, dict):
+        ntype = node.get('type', '')
+        if ntype == 'text':
+            text = node.get('text', '')
+            marks = node.get('marks', [])
+            for m in marks:
+                if m.get('type') == 'strong':
+                    text = f'**{text}**'
+                elif m.get('type') == 'code':
+                    text = f'\`{text}\`'
+            return [text]
+        if ntype == 'hardBreak':
+            return ['\n']
+        if ntype == 'listItem':
+            child_text = []
+            for c in node.get('content', []):
+                child_text.extend(extract_text(c, depth))
+            return ['  ' * depth + '- ' + ''.join(child_text).strip()]
+        if ntype in ('bulletList', 'orderedList'):
+            for c in node.get('content', []):
+                lines.extend(extract_text(c, depth + 1))
+            return lines
+        if ntype == 'heading':
+            level = node.get('attrs', {}).get('level', 1)
+            child_text = []
+            for c in node.get('content', []):
+                child_text.extend(extract_text(c, depth))
+            return ['#' * level + ' ' + ''.join(child_text).strip()]
+        if ntype == 'codeBlock':
+            child_text = []
+            for c in node.get('content', []):
+                child_text.extend(extract_text(c, depth))
+            return ['\`\`\`\n' + ''.join(child_text) + '\n\`\`\`']
+        for c in node.get('content', []):
+            lines.extend(extract_text(c, depth))
+        if ntype == 'paragraph' and lines:
+            lines.append('')
+    return lines
+
+
 # Description
 desc = fields.get('description')
 if desc and isinstance(desc, dict):
-    # ADF format — extract text
-    def extract_text(node, depth=0):
-        lines = []
-        if isinstance(node, dict):
-            ntype = node.get('type', '')
-            if ntype == 'text':
-                text = node.get('text', '')
-                marks = node.get('marks', [])
-                for m in marks:
-                    if m.get('type') == 'strong':
-                        text = f'**{text}**'
-                    elif m.get('type') == 'code':
-                        text = f'\`{text}\`'
-                return [text]
-            if ntype == 'hardBreak':
-                return ['\n']
-            if ntype == 'listItem':
-                child_text = []
-                for c in node.get('content', []):
-                    child_text.extend(extract_text(c, depth))
-                return ['  ' * depth + '- ' + ''.join(child_text).strip()]
-            if ntype in ('bulletList', 'orderedList'):
-                for c in node.get('content', []):
-                    lines.extend(extract_text(c, depth + 1))
-                return lines
-            if ntype == 'heading':
-                level = node.get('attrs', {}).get('level', 1)
-                child_text = []
-                for c in node.get('content', []):
-                    child_text.extend(extract_text(c, depth))
-                return ['#' * level + ' ' + ''.join(child_text).strip()]
-            if ntype == 'codeBlock':
-                child_text = []
-                for c in node.get('content', []):
-                    child_text.extend(extract_text(c, depth))
-                return ['\`\`\`\n' + ''.join(child_text) + '\n\`\`\`']
-            for c in node.get('content', []):
-                lines.extend(extract_text(c, depth))
-            if ntype == 'paragraph' and lines:
-                lines.append('')
-        return lines
-
     text_lines = extract_text(desc)
     desc_text = '\n'.join(text_lines).strip()
     if desc_text:
@@ -149,7 +188,31 @@ if subtasks:
         sstatus = st['fields']['status']['name']
         print(f'{indent}  {skey} — {ssummary} [{sstatus}]')
     print()
-" "$data" "$indent"
+
+# Comments (only when --comments was requested upstream; otherwise
+# comments_data is the empty {} sentinel.)
+comments = comments_data.get('comments', []) if isinstance(comments_data, dict) else []
+if comments:
+    print(f'{indent}Comments ({len(comments)}):')
+    for c in comments:
+        author = c.get('author', {}).get('displayName') or c.get('author', {}).get('emailAddress') or 'unknown'
+        created = c.get('created', '')[:10]  # YYYY-MM-DD
+        body = c.get('body')
+        print(f'{indent}  --- {author} ({created}) ---')
+        if isinstance(body, dict):
+            # Reuse the same ADF extractor used for descriptions.
+            text_lines = extract_text(body)
+            text = '\n'.join(text_lines).strip()
+            if not text:
+                text = '(comment body in ADF format; no text extracted)'
+        elif isinstance(body, str):
+            text = body
+        else:
+            text = '(comment has no body)'
+        for line in text.split('\n'):
+            print(f'{indent}    {line}')
+        print()
+" "$data" "$indent" "$comments_data"
     else
         echo "${indent}Error fetching $key"
         echo "$data" | head -3

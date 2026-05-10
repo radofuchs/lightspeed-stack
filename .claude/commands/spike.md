@@ -36,6 +36,11 @@ fetch the ticket content by running `sh dev-tools/fetch-jira.sh <number>`.
 The output includes child issues — decide which linked tickets to fetch
 for additional context.
 
+Pass `--comments` (e.g., `sh dev-tools/fetch-jira.sh --comments 1234`)
+when ticket comments may carry decisions or context not present in the
+description (common for older feature tickets where the spike scope was
+negotiated in comments). Off by default to keep output short.
+
 Otherwise, the user will provide context about the feature directly.
 
 ## Branch and working tree

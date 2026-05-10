@@ -173,7 +173,7 @@ Personal overrides go in `.feature-design.config.local` at the repo root
 at the start of each session and announce which files were loaded.
 
 **CLI tools** (work without Claude Code):
-- `dev-tools/fetch-jira.sh <ticket>` — fetch JIRA ticket content and child issues
+- `dev-tools/fetch-jira.sh [--comments] <ticket>` — fetch JIRA ticket content and child issues; `--comments` also includes the comment thread (useful when scope decisions live in comments rather than the description)
 - `dev-tools/file-jiras.sh --spike-doc <path> --feature-ticket <key>` — parse and file JIRAs
 
 ## AI assistants
