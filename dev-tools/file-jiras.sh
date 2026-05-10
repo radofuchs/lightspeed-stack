@@ -754,7 +754,66 @@ def make_paragraph(text):
     return {"type": "paragraph", "content": parse_inline(text)}
 
 
+def is_table_paragraph(para):
+    """Detect a GitHub-flavored markdown table.
+
+    A markdown table is at least 2 contiguous lines:
+      Line 1: starts with `|` and has cell content
+      Line 2: separator with only `|`, `-`, `:`, and whitespace
+              (e.g., `|---|---|` or `|:---|---:|`)
+    """
+    lines = para.strip().split('\n')
+    if len(lines) < 2:
+        return False
+    if not lines[0].lstrip().startswith('|'):
+        return False
+    sep = lines[1].strip()
+    return bool(re.match(r'^\|[\s\-:|]+\|?\s*$', sep))
+
+
+def parse_table_row(line, cell_kind):
+    """Parse a single `| a | b | c |` line into a tableRow ADF node."""
+    s = line.strip()
+    if s.startswith('|'):
+        s = s[1:]
+    if s.endswith('|'):
+        s = s[:-1]
+    cells_text = s.split('|')
+    cells = []
+    for ct in cells_text:
+        text = ct.strip()
+        # ADF cells require at least one block-level node — use an empty
+        # paragraph for empty cells.
+        if text:
+            content = [make_paragraph(text)]
+        else:
+            content = [{"type": "paragraph", "content": []}]
+        cells.append({"type": cell_kind, "attrs": {}, "content": content})
+    return {"type": "tableRow", "content": cells}
+
+
+def parse_table(para):
+    """Convert a markdown-table paragraph into an ADF table node."""
+    lines = para.strip().split('\n')
+    header_line = lines[0]
+    # lines[1] is the separator — skipped (no semantic content)
+    body_lines = lines[2:] if len(lines) > 2 else []
+
+    rows = [parse_table_row(header_line, cell_kind="tableHeader")]
+    for bl in body_lines:
+        if bl.strip():
+            rows.append(parse_table_row(bl, cell_kind="tableCell"))
+
+    return {
+        "type": "table",
+        "attrs": {"isNumberColumnEnabled": False, "layout": "default"},
+        "content": rows,
+    }
+
+
 def parse_block(para):
+    if is_table_paragraph(para):
+        return parse_table(para)
     m = re.match(r'^(#{1,6})\s+(.*)', para)
     if m:
         level = len(m.group(1))
