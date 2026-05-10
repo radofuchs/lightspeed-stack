@@ -1192,3 +1192,230 @@ def test_score_multiplier_mapping_not_loaded() -> None:
     cfg._configuration = None
     with pytest.raises(LogicError):
         _ = cfg.score_multiplier_mapping
+
+
+def test_init_from_dict_fake_data() -> None:
+    """Test the configuration initialization from dictionary with config values."""
+    config_dict: dict[str, Any] = {
+        "name": "Colin Adams",
+        "service": {
+            "host": "Serve control majority quite approach step.",
+            "port": 378,
+            "base_url": "Or blood represent beat.",
+            "auth_enabled": False,
+            "workers": 896,
+            "color_log": True,
+            "access_log": True,
+            "tls_config": {
+                "tls_certificate_path": None,
+                "tls_key_path": None,
+                "tls_key_password": None,
+            },
+            "root_path": "Word especially structure.",
+            "cors": {
+                "allow_origins": [
+                    "Last drop work less really sister.",
+                    "Body light risk edge.",
+                ],
+                "allow_credentials": True,
+                "allow_methods": ["Great teach very staff."],
+                "allow_headers": [
+                    "Avoid eye space tree minute.",
+                    "Wall they realize. Data teach which seek policy ri",
+                    "New week public how. Room of line good fire leave.",
+                ],
+            },
+        },
+        "llama_stack": {
+            "url": "https://www.west.com/",
+            "api_key": "unsupported_type_<class 'pydantic.types.SecretStr'>",
+            "use_as_library_client": False,
+            "library_client_config_path": "Strategy stand return catch range professor.",
+            "timeout": 486,
+        },
+        "user_data_collection": {
+            "feedback_enabled": True,
+            "feedback_storage": None,
+            "transcripts_enabled": True,
+            "transcripts_storage": "Must risk kid just.",
+        },
+        "database": {
+            "sqlite": {"db_path": "Shake stuff particularly move. Military center sug"},
+            "postgres": {
+                "host": "Rock either measure leg carry.",
+                "port": 91,
+                "db": "Institution.",
+                "user": "Action production item hour option reflect.",
+                "password": "3+37w9K!#3Bk",
+                "namespace": None,
+                "ssl_mode": "Seek very sell whom. Order dog ready away.",
+                "gss_encmode": "A pressure leave but past drive some.",
+                "ca_cert_path": None,
+            },
+        },
+        "mcp_servers": [
+            {
+                "name": "Sherry Greene",
+                "provider_id": "Stage tell north despite tell. Such institution ra",
+                "url": "https://wilkins.net/",
+                "authorization_headers": {
+                    "their": "Size right huge both wall financial."
+                },
+                "headers": [
+                    "Throughout speak next.",
+                    "Least may discuss name. Whatever bad take.",
+                ],
+                "timeout": "unsupported_type_typing.Annotated[int, Gt(gt=0)]",
+            },
+            {
+                "name": "Christopher Cain",
+                "provider_id": "Hair raise risk career traditional.",
+                "url": "https://cruz.com/",
+                "authorization_headers": {
+                    "surface": "Whose over special suddenly why. Candidate nearly ",
+                    "general": "Others effort analysis significant car maintain.",
+                    "return": "Wide enter ago name vote.",
+                },
+                "headers": ["Him keep finally."],
+                "timeout": "unsupported_type_typing.Annotated[int, Gt(gt=0)]",
+            },
+            {
+                "name": "Eric Martin",
+                "provider_id": "Food assume per stop fear lay.",
+                "url": "https://solis-porter.com/",
+                "authorization_headers": {
+                    "us": "Wall building officer father success.",
+                    "PM": "Medical perhaps him impact affect.",
+                },
+                "headers": [
+                    "Test owner too side.",
+                    "Girl year process team.",
+                    "Able computer anyone keep must back finish century",
+                ],
+                "timeout": "unsupported_type_typing.Annotated[int, Gt(gt=0)]",
+            },
+        ],
+        "authentication": {
+            "module": "Fast learn describe.",
+            "skip_tls_verification": True,
+            "skip_for_health_probes": False,
+            "skip_for_metrics": True,
+            "k8s_cluster_api": "unsupported_type_<class 'pydantic.networks.AnyHttpUrl'>",
+            "k8s_ca_cert_path": None,
+            "jwk_config": None,
+            "api_key_config": {
+                "api_key": "unsupported_type_<class 'pydantic.types.SecretStr'>"
+            },
+            "rh_identity_config": None,
+        },
+        "authorization": None,
+        "customization": None,
+        "inference": {
+            "default_model": "Exist important land left peace.",
+            "default_provider": "Much us fight suggest.",
+        },
+        "conversation_cache": {
+            "type": None,
+            "memory": {"max_entries": 447},
+            "sqlite": None,
+            "postgres": {
+                "host": "View price final number individual. Under directio",
+                "port": 343,
+                "db": "Quickly lay health stock whose gas born.",
+                "user": "From bill attack none.",
+                "password": "#4$uLlS2CNSP",
+                "namespace": "Task to including nice author.",
+                "ssl_mode": "His yard question issue attorney.",
+                "gss_encmode": "Decision ability else base pay.",
+                "ca_cert_path": "file",
+            },
+        },
+        "byok_rag": [
+            {
+                "rag_id": "Weight message strong wind land bar.",
+                "rag_type": "Learn person tell increase dog even.",
+                "embedding_model": "By our television. Southern full a course.",
+                "embedding_dimension": 753,
+                "vector_db_id": "Indicate see door specific hard region one.",
+                "db_path": "A none owner visit wish medical cut Mrs. Later nig",
+                "score_multiplier": 388.45,
+            }
+        ],
+        "a2a_state": {"sqlite": None, "postgres": None},
+        "quota_handlers": {
+            "sqlite": {"db_path": "Experience five able citizen work member call cond"},
+            "postgres": {
+                "host": "Name garden ready finally century.",
+                "port": 722,
+                "db": "Fire into list can or.",
+                "user": "Collection scientist evening consumer suddenly fac",
+                "password": "&#drK6YgvGNh",
+                "namespace": "Technology chance quality parent.",
+                "ssl_mode": "Simple safe ten general along pull.",
+                "gss_encmode": "Listen population.",
+                "ca_cert_path": None,
+            },
+            "limiters": [
+                {
+                    "type": "user_limiter",
+                    "name": "Katelyn Everett",
+                    "initial_quota": 651,
+                    "quota_increase": 427,
+                    "period": "Coach develop ever happen.",
+                },
+                {
+                    "type": "user_limiter",
+                    "name": "Alec Sullivan",
+                    "initial_quota": 819,
+                    "quota_increase": 13,
+                    "period": "Enough table best. Work final imagine learn tax su",
+                },
+            ],
+            "scheduler": {
+                "period": 415,
+                "database_reconnection_count": 545,
+                "database_reconnection_delay": 150,
+            },
+            "enable_token_history": True,
+        },
+        "azure_entra_id": {
+            "tenant_id": "tenant_id",
+            "client_id": "client_id",
+            "client_secret": "client_secret",
+            "scope": "Because its own above.",
+        },
+        "rlsapi_v1": {
+            "allow_verbose_infer": False,
+            "quota_subject": "user_id",
+        },
+        "splunk": {
+            "enabled": False,
+            "url": "https://cordova-moss.net/",
+            "token_path": None,
+            "index": "Company but couple or.",
+            "source": "Page cell data mission you player. Leg development",
+            "timeout": 187,
+            "verify_ssl": False,
+        },
+        "deployment_environment": "Second say body know music while.",
+        "rag": {
+            "inline": [
+                "Local authority pressure pretty. Travel something ",
+                "Watch meet able such.",
+                "Different apply size.",
+            ],
+            "tool": [
+                "Full develop under his.",
+                "Black political father project become.",
+                "Once however son place.",
+            ],
+        },
+        "okp": {
+            "rhokp_url": None,
+            "offline": True,
+            "chunk_filter_query": "Foreign space system.",
+        },
+    }
+    with pytest.raises(ValueError):
+        cfg = AppConfig()
+        cfg.init_from_dict(config_dict)
