@@ -27,12 +27,16 @@ SPIKE_TICKET_KEY=""
 # --- Argument parsing ---
 
 show_help() {
-    echo "Usage: file-jiras.sh --spike-doc <path> --feature-ticket <key> [--output-dir <path>]"
+    echo "Usage: file-jiras.sh --spike-doc <path> --feature-ticket <key> [--output-dir <path>] [--parse-only]"
     echo ""
     echo "Options:"
     echo "  --spike-doc        Path to the spike doc containing proposed JIRAs"
     echo "  --feature-ticket   Parent feature ticket (e.g., LCORE-1311 or 1311)"
     echo "  --output-dir       Directory for parsed ticket files (default: <spike-doc-dir>/jiras/)"
+    echo "  --parse-only       Parse the spike doc into ticket files and exit;"
+    echo "                     skip the interactive filing loop and credentials check."
+    echo "                     Useful for inspecting parsed output, pre-commit hooks,"
+    echo "                     and CI validation."
     echo "  --help             Show this help"
     echo ""
     echo "Example:"
@@ -42,6 +46,7 @@ show_help() {
 SPIKE_DOC=""
 FEATURE_TICKET=""
 JIRA_DIR=""
+PARSE_ONLY=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -54,6 +59,8 @@ while [ $# -gt 0 ]; do
         --output-dir)
             [ $# -ge 2 ] || { echo "Error: --output-dir requires a value"; exit 1; }
             JIRA_DIR="$2"; shift 2 ;;
+        --parse-only|--dry-run)
+            PARSE_ONLY=1; shift ;;
         --help|-h) show_help; exit 0 ;;
         *) echo "Unknown argument: $1"; show_help; exit 1 ;;
     esac
@@ -80,7 +87,13 @@ if [ -z "$JIRA_DIR" ]; then
     JIRA_DIR="$SPIKE_DIR/jiras"
 fi
 
-ensure_jira_credentials
+# Credentials are only required for actual filing (POST/PUT to JIRA).
+# In --parse-only mode the script writes parsed files locally and exits;
+# skip the credential prompt so the parser can run without a configured
+# Jira account (useful for CI / pre-commit hooks / agent inspection).
+if [ "$PARSE_ONLY" -eq 0 ]; then
+    ensure_jira_credentials
+fi
 
 PROJECT_KEY="${FEATURE_TICKET%%-*}"
 
@@ -936,6 +949,18 @@ file_ticket() {
 
     file_single_ticket "$ticket_file" "$ttype" "$parent"
 }
+
+# --- Parse-only short-circuit ---
+# In --parse-only mode the parsed files are already written by the parse
+# step above. Skip the interactive loop and exit cleanly.
+if [ "$PARSE_ONLY" -eq 1 ]; then
+    echo ""
+    echo "Parsed files in $JIRA_DIR/"
+    ls -1 "$JIRA_DIR" 2>/dev/null
+    echo ""
+    echo "(--parse-only: skipping interactive filing loop and exiting.)"
+    exit 0
+fi
 
 # --- Interactive loop ---
 

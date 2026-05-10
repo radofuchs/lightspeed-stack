@@ -59,9 +59,11 @@ under the feature ticket directly, not under any Epic.
 
 ## Process
 
-1. Run `dev-tools/file-jiras.sh --spike-doc <path> --feature-ticket <key>`
-   with `echo "quit"` piped in, so it parses and exits without filing.
-   (Once `--parse-only` lands as a script flag, switch to that.)
+1. Run `dev-tools/file-jiras.sh --spike-doc <path> --feature-ticket <key> --parse-only`
+   to parse the spike doc into ticket files and exit. `--parse-only` skips
+   the interactive filing loop and the credentials check, so it works
+   even on machines without Jira credentials configured (CI, agent
+   inspection, pre-commit hooks).
 
 2. Read every file in the output directory (default: `docs/design/<feature>/jiras/`).
    For each, verify:
