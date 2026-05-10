@@ -82,7 +82,7 @@ class K8sClientSingleton:
     _api_client = None
     _authn_api: kubernetes.client.AuthenticationV1Api
     _authz_api: kubernetes.client.AuthorizationV1Api
-    _cluster_id = None
+    _cluster_id: Optional[str] = None
     _custom_objects_api: kubernetes.client.CustomObjectsApi
 
     def __new__(cls: type[Self]) -> Self:
