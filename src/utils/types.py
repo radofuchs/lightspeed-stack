@@ -25,7 +25,8 @@ def content_to_str(content: Any) -> str:
         case str():
             return content
         case TextContentItem():
-            return content.text
+            # help the type checkers to infer return data type
+            return str(content.text)
         case ImageContentItem():
             return "<image>"
         case list():

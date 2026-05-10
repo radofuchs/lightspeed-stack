@@ -104,7 +104,7 @@ async def _register_mcp_toolgroups_async(
             logger.debug("MCP server %s registered successfully", mcp.name)
 
 
-def run_once_async(func: Callable) -> Callable:
+def run_once_async(func: Callable[..., Any]) -> Callable[..., Any]:
     """
     Ensure that an async function is executed only once.
 

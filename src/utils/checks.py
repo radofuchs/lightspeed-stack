@@ -13,7 +13,7 @@ class InvalidConfigurationError(Exception):
     """Lightspeed configuration is invalid."""
 
 
-def get_attribute_from_file(data: dict, file_name_key: str) -> Optional[str]:
+def get_attribute_from_file(data: dict[str, str], file_name_key: str) -> Optional[str]:
     """
     Return the contents of a file whose path is stored in the given mapping.
 
