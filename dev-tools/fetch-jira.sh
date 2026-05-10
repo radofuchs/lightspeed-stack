@@ -18,7 +18,7 @@ set -euo pipefail
 . "$(dirname "$0")/jira-common.sh"
 
 show_help() {
-    echo "Usage: fetch-jira.sh [--comments] <ticket> [additional-tickets...]"
+    echo "Usage: fetch-jira.sh [--comments] [--linked-depth N] <ticket> [additional-tickets...]"
     echo ""
     echo "Fetches JIRA ticket content including description, status, and child issues."
     echo "Bare numbers default to LCORE- prefix."
@@ -28,13 +28,20 @@ show_help() {
     echo "                     Comments often contain critical decisions ('we decided"
     echo "                     in standup to defer X') that the description doesn't"
     echo "                     capture. Off by default."
+    echo "  --linked-depth N   Recurse N levels deep into subtasks, linked issues,"
+    echo "                     and parent-relation children. Default 0 (no recursion;"
+    echo "                     just lists related-ticket keys/summaries). N=1 fetches"
+    echo "                     the full content of immediate relations; N=2 fetches"
+    echo "                     their relations too. Capped at 3 to avoid runaway"
+    echo "                     fetches. Already-seen keys are skipped (cycle-safe)."
     echo "  --help             Show this help"
     echo ""
     echo "Examples:"
-    echo "  fetch-jira.sh 1234              Fetch LCORE-1234"
-    echo "  fetch-jira.sh LCORE-1234        Same"
-    echo "  fetch-jira.sh 836 509 777       Fetch multiple tickets"
-    echo "  fetch-jira.sh --comments 1234   Fetch LCORE-1234 with comments"
+    echo "  fetch-jira.sh 1234                   Fetch LCORE-1234"
+    echo "  fetch-jira.sh LCORE-1234             Same"
+    echo "  fetch-jira.sh 836 509 777            Fetch multiple tickets"
+    echo "  fetch-jira.sh --comments 1234        Fetch LCORE-1234 with comments"
+    echo "  fetch-jira.sh --linked-depth 1 1311  Fetch LCORE-1311 + immediate relations"
 }
 
 if [ $# -lt 1 ]; then
@@ -43,9 +50,20 @@ fi
 
 # Parse flags (must come before any positional ticket arg)
 FETCH_COMMENTS=0
+LINKED_DEPTH=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --comments) FETCH_COMMENTS=1; shift ;;
+        --linked-depth)
+            [ $# -ge 2 ] || { echo "Error: --linked-depth requires a value"; exit 1; }
+            LINKED_DEPTH="$2"
+            if ! echo "$LINKED_DEPTH" | grep -qE '^[0-9]+$'; then
+                echo "Error: --linked-depth must be a non-negative integer"; exit 1
+            fi
+            if [ "$LINKED_DEPTH" -gt 3 ]; then
+                echo "Error: --linked-depth capped at 3 to avoid runaway fetches"; exit 1
+            fi
+            shift 2 ;;
         --help|-h) show_help; exit 0 ;;
         --*) echo "Unknown flag: $1"; show_help; exit 1 ;;
         *) break ;;  # first positional → ticket key
@@ -64,9 +82,20 @@ if echo "$TICKET" | grep -qE '^[0-9]+$'; then
     TICKET="LCORE-$TICKET"
 fi
 
+# Tracks already-fetched keys across recursion (space-delimited, with
+# leading and trailing spaces so substring matching works cleanly).
+FETCHED_KEYS=" "
+
 fetch_ticket() {
     local key="$1"
     local indent="${2:-}"
+    local depth="${3:-0}"
+
+    # Cycle / dup protection
+    case "$FETCHED_KEYS" in
+        *" $key "*) return 0 ;;
+    esac
+    FETCHED_KEYS="$FETCHED_KEYS$key "
 
     local data
     data=$(curl -sS --connect-timeout 10 --max-time 30 \
@@ -216,17 +245,67 @@ if comments:
     else
         echo "${indent}Error fetching $key"
         echo "$data" | head -3
+        return 1
+    fi
+
+    # Recurse into related tickets if depth > 0
+    if [ "$depth" -gt 0 ]; then
+        # Extract subtask + linked-issue keys from already-fetched data
+        local related_keys
+        related_keys=$(echo "$data" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    fields = d.get('fields', {})
+    out = []
+    for st in fields.get('subtasks', []):
+        out.append(st['key'])
+    for link in fields.get('issuelinks', []):
+        if 'outwardIssue' in link:
+            out.append(link['outwardIssue']['key'])
+        elif 'inwardIssue' in link:
+            out.append(link['inwardIssue']['key'])
+    print(' '.join(out))
+except Exception:
+    pass
+" 2>/dev/null)
+
+        # Also fetch JQL parent= children
+        local jql_kids
+        jql_kids=$(curl -sS --connect-timeout 10 --max-time 30 \
+            -u "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_INSTANCE/rest/api/3/search/jql?jql=parent%3D${key}&fields=key&maxResults=20" 2>/dev/null | \
+            python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    for issue in d.get('issues', []):
+        print(issue['key'])
+except Exception:
+    pass
+" 2>/dev/null | tr '\n' ' ')
+
+        local rk
+        for rk in $related_keys $jql_kids; do
+            [ -z "$rk" ] && continue
+            echo
+            fetch_ticket "$rk" "${indent}  " $((depth - 1))
+        done
     fi
 }
 
-# Fetch main ticket
-fetch_ticket "$TICKET"
+# Fetch main ticket (with depth recursion if requested)
+fetch_ticket "$TICKET" "" "$LINKED_DEPTH"
 
-# Search for child issues via parent= JQL (Jira Cloud hierarchy)
-CHILD_KEYS=$(curl -sS --connect-timeout 10 --max-time 30 \
-    -u "$JIRA_EMAIL:$JIRA_TOKEN" \
-    "$JIRA_INSTANCE/rest/api/3/search/jql?jql=parent%3D${TICKET}&fields=key,summary,status,issuetype&maxResults=20" 2>/dev/null | \
-    python3 -c "
+# At depth 0, also list JQL parent= children as a flat summary (legacy
+# behavior — useful as a quick "what's underneath" overview without
+# fetching each one). At depth > 0, the recursive fetch_ticket already
+# pulled them in, so skip this listing to avoid duplication.
+if [ "$LINKED_DEPTH" -eq 0 ]; then
+    CHILD_KEYS=$(curl -sS --connect-timeout 10 --max-time 30 \
+        -u "$JIRA_EMAIL:$JIRA_TOKEN" \
+        "$JIRA_INSTANCE/rest/api/3/search/jql?jql=parent%3D${TICKET}&fields=key,summary,status,issuetype&maxResults=20" 2>/dev/null | \
+        python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
@@ -240,12 +319,13 @@ except Exception:
     pass
 " 2>/dev/null)
 
-if [ -n "$CHILD_KEYS" ]; then
-    echo "Child issues:"
-    echo "$CHILD_KEYS" | while read -r line; do
-        echo "  $line"
-    done
-    echo ""
+    if [ -n "$CHILD_KEYS" ]; then
+        echo "Child issues:"
+        echo "$CHILD_KEYS" | while read -r line; do
+            echo "  $line"
+        done
+        echo ""
+    fi
 fi
 
 # If additional ticket keys are passed as arguments, fetch those too
@@ -256,5 +336,5 @@ for extra in "$@"; do
     fi
     echo "────────────────────────────────────────────────────────"
     echo ""
-    fetch_ticket "$extra"
+    fetch_ticket "$extra" "" "$LINKED_DEPTH"
 done

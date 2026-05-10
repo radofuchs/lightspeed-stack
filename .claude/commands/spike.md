@@ -41,6 +41,14 @@ when ticket comments may carry decisions or context not present in the
 description (common for older feature tickets where the spike scope was
 negotiated in comments). Off by default to keep output short.
 
+Pass `--linked-depth N` (e.g.,
+`sh dev-tools/fetch-jira.sh --linked-depth 1 1234`) to recurse N levels
+into subtasks, linked issues, and parent-relation children. `N=1` is
+typically what you want at spike kickoff: fetches the requested feature
+ticket plus all its immediate Epics, subtasks, and blocking/blocked-by
+issues in one call. Capped at 3. Cycle-safe (keys seen via multiple
+paths are fetched once). Off by default (depth 0).
+
 Otherwise, the user will provide context about the feature directly.
 
 ## Branch and working tree
