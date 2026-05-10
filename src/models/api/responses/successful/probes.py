@@ -1,5 +1,7 @@
 """Successful probe-related API responses (info, readiness, liveness, status, auth)."""
 
+from typing import Any
+
 from pydantic import Field
 
 from models.api.responses.successful.bases import AbstractSuccessfulResponse
@@ -124,7 +126,7 @@ class StatusResponse(AbstractSuccessfulResponse):
         examples=["feedback"],
     )
 
-    status: dict = Field(
+    status: dict[str, Any] = Field(
         ...,
         description="The status of the service",
         examples=[{"enabled": True}],
