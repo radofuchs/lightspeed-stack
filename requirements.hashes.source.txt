@@ -132,9 +132,9 @@ aiohttp==3.13.5 \
 attrs==26.1.0 \
     --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309 \
     --hash=sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32
-authlib==1.7.1 \
-    --hash=sha256:8470f4aa6b5590ac41bd81d6e6ee12448ce36a0da0af19bbed69fb53fb4e8ad9 \
-    --hash=sha256:8c09b0f9d080c823e594b52316af70f79a1fa4eed64d0363a076233c04ef063a
+authlib==1.7.2 \
+    --hash=sha256:2cea25fefcd4e7173bdf1372c0afc265c8034b23a8cd5dcb6a9164b826c64231 \
+    --hash=sha256:3e1faedc9d87e7d56a164eca3ccb6ace0d61b94abe83e92242f8dc8bba9b4a9f
 autoevals==0.2.0 \
     --hash=sha256:83546e86f716d5bea64de39db2e99f5eaeadd70d3f72481a75b576bc511e21d6 \
     --hash=sha256:dec041989ce85d6043ba30efa959527c213a62f768dc54e77d41364510e1acb6
