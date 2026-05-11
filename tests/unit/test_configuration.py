@@ -1694,6 +1694,188 @@ wrong_configurations = [
         },
         "okp": {"rhokp_url": None, "offline": False, "chunk_filter_query": None},
     },
+    {
+        "name": "Patricia Henderson",
+        "service": {
+            "host": "High politics role market party factor yourself. H",
+            "port": 65,
+            "base_url": "Song list by notice decide politics.",
+            "auth_enabled": True,
+            "workers": 248,
+            "color_log": True,
+            "access_log": False,
+            "tls_config": {
+                "tls_certificate_path": None,
+                "tls_key_path": None,
+                "tls_key_password": "xyzzy",
+            },
+            "root_path": "Another budget miss with my pretty.",
+            "cors": {
+                "allow_origins": ["Edge yes right already."],
+                "allow_credentials": True,
+                "allow_methods": ["Include game information. Become mother today."],
+                "allow_headers": [
+                    "Recent crime seem ten.",
+                    "Yeah fear design few.",
+                    "Information story.",
+                ],
+            },
+        },
+        "llama_stack": {
+            "url": "http://www.cameron.com/",
+            "api_key": "xyzzy",
+            "use_as_library_client": False,
+            "library_client_config_path": "Write past admit hand area surface.",
+            "timeout": 237,
+        },
+        "user_data_collection": {
+            "feedback_enabled": True,
+            "feedback_storage": "Poor have happen.",
+            "transcripts_enabled": True,
+            "transcripts_storage": "Ask sport choice along. Ever concern table traditi",
+        },
+        "database": {"sqlite": None, "postgres": None},
+        "mcp_servers": [
+            {
+                "name": "Colleen Villanueva",
+                "provider_id": "Every present recently.",
+                "url": "https://www.taylor.com/",
+                "authorization_headers": {
+                    "four": "Have camera third when across too.",
+                    "dinner": "Field run hair.",
+                    "machine": "Time find prove war.",
+                },
+                "headers": [
+                    "Author heavy now start allow focus.",
+                    "Eat before by.",
+                    "Serious best talk never.",
+                ],
+                "timeout": None,
+            }
+        ],
+        "authentication": {
+            "module": "Offer to trouble off chance personal.",
+            "skip_tls_verification": False,
+            "skip_for_health_probes": False,
+            "skip_for_metrics": True,
+            "k8s_cluster_api": None,
+            "k8s_ca_cert_path": "xyzzy",
+            "jwk_config": None,
+            "api_key_config": None,
+            "rh_identity_config": None,
+        },
+        "authorization": {
+            "access_rules": [
+                {
+                    "role": "Nothing development house computer.",
+                    "actions": ["xyzzy", "xyzzy", "xyzzy"],
+                },
+                {
+                    "role": "Sea coach without wide audience pretty fine.",
+                    "actions": ["xyzzy", "xyzzy"],
+                },
+                {
+                    "role": "Will Congress style picture deal. Explain set assu",
+                    "actions": ["xyzzy"],
+                },
+            ]
+        },
+        "customization": {
+            "profile_path": None,
+            "disable_query_system_prompt": False,
+            "disable_shield_ids_override": False,
+            "system_prompt_path": "xyzzy",
+            "system_prompt": None,
+            "agent_card_path": "xyzzy",
+            "agent_card_config": None,
+            "custom_profile": None,
+        },
+        "inference": {
+            "default_model": "Television someone about wall join.",
+            "default_provider": None,
+        },
+        "conversation_cache": {
+            "type": None,
+            "memory": None,
+            "sqlite": None,
+            "postgres": None,
+        },
+        "byok_rag": [
+            {
+                "rag_id": "Something worker campaign war through.",
+                "rag_type": "Check simple since next then statement.",
+                "embedding_model": "Class third author series.",
+                "embedding_dimension": 211,
+                "vector_db_id": "Less put site alone amount.",
+                "db_path": "Live child most throughout.",
+                "score_multiplier": 252.41,
+            }
+        ],
+        "a2a_state": {"sqlite": None, "postgres": None},
+        "quota_handlers": {
+            "sqlite": None,
+            "postgres": None,
+            "limiters": [
+                {
+                    "type": "xyzzy",
+                    "name": "Jerry Brown",
+                    "initial_quota": 532,
+                    "quota_increase": 509,
+                    "period": "After determine almost make yeah support. Away tak",
+                },
+                {
+                    "type": "xyzzy",
+                    "name": "James Martin",
+                    "initial_quota": 167,
+                    "quota_increase": 278,
+                    "period": "Book gas exist these.",
+                },
+                {
+                    "type": "xyzzy",
+                    "name": "Mr. Douglas Kelly DDS",
+                    "initial_quota": 210,
+                    "quota_increase": 930,
+                    "period": "Section many southern new.",
+                },
+            ],
+            "scheduler": {
+                "period": 984,
+                "database_reconnection_count": 118,
+                "database_reconnection_delay": 961,
+            },
+            "enable_token_history": False,
+        },
+        "azure_entra_id": {
+            "tenant_id": "xyzzy",
+            "client_id": "xyzzy",
+            "client_secret": "xyzzy",
+            "scope": "Spring billion represent town actually serious mor",
+        },
+        "rlsapi_v1": {"allow_verbose_infer": False, "quota_subject": "xyzzy"},
+        "splunk": {
+            "enabled": False,
+            "url": "http://www.bell.com/",
+            "token_path": "xyzzy",
+            "index": None,
+            "source": "Risk condition boy conference particularly control",
+            "timeout": 398,
+            "verify_ssl": False,
+        },
+        "deployment_environment": "Mouth view form.",
+        "rag": {
+            "inline": [
+                "Interesting during product himself attack Democrat",
+                "Decision I order particularly.",
+                "Couple reflect relate two agree local.",
+            ],
+            "tool": ["Her society move lay.", "Network material like."],
+        },
+        "okp": {
+            "rhokp_url": "xyzzy",
+            "offline": False,
+            "chunk_filter_query": "Beautiful society within.",
+        },
+    },
 ]
 
 
