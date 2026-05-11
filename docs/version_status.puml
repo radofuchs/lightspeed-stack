@@ -1,0 +1,25 @@
+@startgantt
+skin rose
+skinparam dpi 150
+
+title Lightspeed Core Stack
+caption Versions status
+project starts 2026-01-01
+printscale monthly
+
+[0.3] starts 2026-01-01 and ends 2026-01-31 and is colored in #ff8080
+[0.4] starts 2026-02-01 and ends 2026-02-28 and is colored in #ff8080
+[0.5] starts 2026-03-01 and ends 2026-08-31 and is colored in #80ff80
+[0.6rc1] starts 2026-04-01 and ends 2026-04-30 and is colored in yellow
+[0.6rc2] starts 2026-05-01 and ends 2026-05-31 and is colored in yellow
+[0.6rc2] starts after [0.6rc1]'s end
+[0.6] starts 2026-06-01 and ends 2026-11-30 and is colored in yellow
+[0.6] starts after [0.6rc2]'s end
+[0.7rc1] starts 2026-07-01 and ends 2026-07-31 and is colored in yellow
+[0.7rc2] starts 2026-08-01 and ends 2026-08-31 and is colored in yellow
+[0.7rc2] starts after [0.7rc1]'s end
+[0.7] starts 2026-09-01 and ends 2026-12-31 and is colored in yellow
+[0.7] starts after [0.7rc2]'s end
+
+@endgantt
+

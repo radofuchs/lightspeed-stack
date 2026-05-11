@@ -32,6 +32,14 @@ product questions using backend LLM services, agents, and RAG databases.
 
 [Configuration](https://lightspeed-core.github.io/lightspeed-stack/config.html)
 
+## Status of Lightspeed Core Stack versions
+
+[Status of Lightspeed Core Stack versions](https://lightspeed-core.github.io/lightspeed-stack/version_status.html)
+
+[Supported versions](https://lightspeed-core.github.io/lightspeed-stack/versions_supported.html)
+
+[Unsupported versions](https://lightspeed-core.github.io/lightspeed-stack/versions_unsupported.html)
+
 ## Info for developers
 
 [Contributing guide](https://lightspeed-core.github.io/lightspeed-stack/contributing_guide.html)
@@ -53,6 +61,8 @@ product questions using backend LLM services, agents, and RAG databases.
 ## Other features
 
 [Providers](https://lightspeed-core.github.io/lightspeed-stack/providers.html)
+
+[Sentry error tracking](https://lightspeed-core.github.io/lightspeed-stack/sentry.html)
 
 [User data collection](https://lightspeed-core.github.io/lightspeed-stack/user_data_collection.html)
 

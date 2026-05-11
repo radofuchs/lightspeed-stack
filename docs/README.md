@@ -25,6 +25,14 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 
 [Configuration](https://lightspeed-core.github.io/lightspeed-stack/config.html)
 
+## Status of Lightspeed Core Stack versions
+
+[Status of Lightspeed Core Stack versions](https://lightspeed-core.github.io/lightspeed-stack/version_status.html)
+
+[Supported versions](https://lightspeed-core.github.io/lightspeed-stack/versions_supported.html)
+
+[Unsupported versions](https://lightspeed-core.github.io/lightspeed-stack/versions_unsupported.html)
+
 ## Info for developers
 
 [Contributing guide](https://lightspeed-core.github.io/lightspeed-stack/contributing_guide.html)
