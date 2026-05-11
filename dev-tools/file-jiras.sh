@@ -584,17 +584,32 @@ get_file_by_number() {
 }
 
 ensure_epic_key() {
-    # If we already have an Epic key, nothing to do
+    # If we already have an Epic key in this shell, nothing to do
     if [ -n "$EPIC_KEY" ]; then
         return 0
     fi
 
-    echo ""
-    echo "  No Epic filed yet. Children need an Epic parent."
-    echo "    1. File Epic #0 first, then continue"
-    echo "    2. Enter an existing Epic key (e.g., LCORE-1600)"
-    echo "    3. File without Epic (Blocks link to $FEATURE_TICKET instead)"
-    printf "  Choice (1/2/3): "
+    # Try to restore from state file (set in a previous subshell that
+    # had `key=$(file_ticket ...)` capture, so its EPIC_KEY didn't
+    # propagate back to the parent shell).
+    if [ -f "$JIRA_DIR/.epic-key" ]; then
+        EPIC_KEY=$(cat "$JIRA_DIR/.epic-key")
+        if [ -n "$EPIC_KEY" ]; then
+            return 0
+        fi
+    fi
+
+    # All user-facing prompts go to stderr so they're visible even when
+    # this function is called from inside a `$(...)` capture context
+    # (which would otherwise swallow stdout into a variable).
+    {
+        echo ""
+        echo "  No Epic filed yet. Children need an Epic parent."
+        echo "    1. File Epic #0 first, then continue"
+        echo "    2. Enter an existing Epic key (e.g., LCORE-1600)"
+        echo "    3. File without Epic (Blocks link to $FEATURE_TICKET instead)"
+        printf "  Choice (1/2/3): "
+    } >&2
     read -r choice < /dev/tty
 
     case "$choice" in
@@ -618,17 +633,23 @@ ensure_epic_key() {
             fi
             ;;
         2)
-            printf "  Epic key: "
+            printf "  Epic key: " >&2
             read -r EPIC_KEY < /dev/tty
             ;;
         3)
             EPIC_KEY="__NONE__"
             ;;
         *)
-            echo "  Invalid choice."
+            echo "  Invalid choice." >&2
             return 1
             ;;
     esac
+
+    # Persist for subsequent subshells so the user isn't re-prompted for
+    # every ticket in the file loop.
+    if [ -n "$EPIC_KEY" ]; then
+        echo "$EPIC_KEY" > "$JIRA_DIR/.epic-key"
+    fi
 }
 
 link_spike_to_epic() {
@@ -950,6 +971,9 @@ file_ticket() {
         fi
         if [ -z "$EPIC_KEY" ] || [ "$EPIC_KEY" = "__NONE__" ]; then
             EPIC_KEY="$filed_key"
+            # Persist for subsequent subshells (file_ticket runs inside
+            # `key=$(...)` capture; assignments don't propagate back).
+            echo "$EPIC_KEY" > "$JIRA_DIR/.epic-key"
             if [ -n "$SPIKE_TICKET_KEY" ]; then
                 link_spike_to_epic
             fi
@@ -1123,10 +1147,13 @@ while true; do
                 echo ""
                 echo "Done:$created_keys"
             fi
-            # Refresh EPIC_KEY from file (subshell can't propagate variable changes)
-            _epic_file=$(find "$JIRA_DIR" -maxdepth 1 -name '00-epic.md' 2>/dev/null | head -1)
-            if [ -n "$_epic_file" ]; then
-                _ek=$(get_key "$_epic_file")
+            # Refresh EPIC_KEY from the state file. Subshells (`key=$(file_ticket ...)`)
+            # cannot propagate variable assignments back to the parent shell, so
+            # ensure_epic_key and the Epic-filing path persist EPIC_KEY to
+            # $JIRA_DIR/.epic-key. Re-read it here so the parent shell sees the
+            # current value for show_summary and subsequent commands.
+            if [ -f "$JIRA_DIR/.epic-key" ]; then
+                _ek=$(cat "$JIRA_DIR/.epic-key")
                 if [ -n "$_ek" ]; then
                     EPIC_KEY="$_ek"
                 fi
