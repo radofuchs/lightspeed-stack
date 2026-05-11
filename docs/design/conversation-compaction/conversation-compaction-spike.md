@@ -177,8 +177,8 @@ Should the client be notified that compaction is in progress (before the summari
 Each JIRA includes an agentic tool instruction that an assignee can optionally feed to Claude Code or similar.
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-### LCORE-???? E2E feature files for conversation compaction (no step implementation)
+<!-- key: LCORE-1673 -->
+### LCORE-1673: E2E feature files for conversation compaction (no step implementation)
 
 **User story**: As a Lightspeed Core e2e engineer, I want the behave
 feature files for conversation-compaction scenarios written before the
@@ -189,7 +189,7 @@ any architectural gaps surface early.
 **Description**: Author behave `.feature` files under `tests/e2e/features/`
 that describe the behaviors required of conversation compaction. Step
 definitions (Python glue) are explicitly **not** part of this ticket —
-they are covered by a later sibling ticket (LCORE-???? — Implement step
+they are covered by a later sibling ticket (LCORE-2230 — Implement step
 definitions). The feature files can be submitted for review and land
 before implementation of the feature itself begins.
 
@@ -218,13 +218,13 @@ before implementation of the feature itself begins.
 **Acceptance criteria**:
 - behave parses every new `.feature` file without syntax errors.
 - behave marks all new scenario steps as `undefined` (step definitions
-  land in LCORE-????).
+  land in LCORE-2230).
 - `uv run make test-e2e` remains green (new scenarios are skipped or
   reported undefined, not failing).
 - Any ambiguity or architectural tension uncovered while authoring is
   captured either as a comment in the spec doc or as a new sub-JIRA.
 
-**Blocks**: LCORE-???? (Implement behave step definitions for
+**Blocks**: LCORE-2230 (Implement behave step definitions for
 conversation compaction feature files).
 
 **Agentic tool instruction**:
@@ -244,18 +244,18 @@ scenarios reported as undefined.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-### LCORE-???? Implement behave step definitions for conversation compaction feature files
+<!-- key: LCORE-2230 -->
+### LCORE-2230: Implement behave step definitions for conversation compaction feature files
 
 **Description**: Implement the Python step definitions
 (`@given`/`@when`/`@then` functions) under `tests/e2e/features/steps/`
-for the `.feature` files authored in LCORE-???? (E2E feature files
+for the `.feature` files authored in LCORE-1673 (E2E feature files
 kickoff). After this ticket lands, the scenarios transition from
 `undefined` to fully executing.
 
 The feature files are taken as-is — do not modify the Gherkin to make
 implementation easier. If a scenario cannot be implemented faithfully,
-raise it against the spec doc (and possibly back to LCORE-???? kickoff)
+raise it against the spec doc (and possibly back to LCORE-1673 kickoff)
 rather than quietly weakening the test.
 
 **Scope**:
@@ -275,7 +275,7 @@ rather than quietly weakening the test.
   explicit rationale).
 
 **Blocked by**:
-- LCORE-???? (E2E feature files for conversation compaction — the
+- LCORE-1673 (E2E feature files for conversation compaction — the
   `.feature` files being implemented against).
 - LCORE-1569 (Add token estimation), LCORE-1570 (Implement conversation
   summarization module), LCORE-1571 (Extend conversation cache for
