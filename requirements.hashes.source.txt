@@ -1022,9 +1022,9 @@ sentence-transformers==5.4.1 \
 sentry-sdk==2.59.0 \
     --hash=sha256:abcf65ee9a9d9cdebf9ad369782408ecca9c1c792686ef06ba34f5ab233527fe \
     --hash=sha256:cd265808ef8bf3f3edf69b527c0a0b2b6b1322762679e55b8987db2e9584aec1
-sse-starlette==3.3.4 \
-    --hash=sha256:84bb06e58939a8b38d8341f1bc9792f06c2b53f48c608dd207582b664fc8f3c1 \
-    --hash=sha256:aaf92fc067af8a5427192895ac028e947b484ac01edbc3caf00e7e7137c7bef1
+sse-starlette==3.4.2 \
+    --hash=sha256:2f9a7f51ed84395a0427fb9f66cb1ec11f7899d977a72cbc9070b962a2e14489 \
+    --hash=sha256:6ea5d35b7ce979a3de5a0db5f77fe886b1616e4b3e1ad93fba502bd9b5fb662f
 starlette==1.0.0 \
     --hash=sha256:6a4beaf1f81bb472fd19ea9b918b50dc3a77a6f2e190a12954b25e6ed5eea149 \
     --hash=sha256:d3ec55e0bb321692d275455ddfd3df75fff145d009685eb40dc91fc66b03d38b
