@@ -1427,6 +1427,17 @@ class InferenceConfiguration(ConfigurationBase):
         description="Identification of default provider used when no other model is specified.",
     )
 
+    context_windows: dict[str, PositiveInt] = Field(
+        default_factory=dict,
+        title="Per-model context window sizes (tokens)",
+        description="Map of fully-qualified model identifier (e.g., "
+        '"openai/gpt-4o-mini") to context window size in tokens. Used by '
+        "the conversation compaction trigger to decide when older turns "
+        "must be summarized before the input exceeds the window. Models "
+        "absent from this map have no registered window — callers fall "
+        "back to their own default or skip the token-based trigger.",
+    )
+
     @model_validator(mode="after")
     def check_default_model_and_provider(self) -> Self:
         """
@@ -1447,6 +1458,80 @@ class InferenceConfiguration(ConfigurationBase):
                 "Default provider must be specified when default model is set"
             )
         return self
+
+
+class CompactionConfiguration(ConfigurationBase):
+    """Configuration for conversation history compaction.
+
+    Compaction summarizes older conversation turns when their estimated
+    token count approaches the context window limit, keeping the
+    conversation usable instead of failing with HTTP 413. The
+    configuration here controls when compaction triggers and how much
+    recent context is preserved verbatim.
+
+    Attributes:
+        enabled: Master switch. When False, compaction never triggers
+            and other fields are inert.
+        threshold_ratio: Trigger compaction when estimated input tokens
+            exceed this fraction of the model's context window
+            (clamped to 0.0..1.0).
+        token_floor: Minimum estimated token count before compaction
+            can trigger, regardless of threshold_ratio. Prevents
+            triggering on very small context windows.
+        buffer_turns: Initial number of recent turns to keep verbatim.
+            The runtime applies a degrading guard — if these turns
+            exceed the available budget, it reduces buffer_turns by
+            one repeatedly until the budget fits, down to zero.
+        buffer_max_ratio: Hard cap on the fraction of the context
+            window the buffer zone may occupy, regardless of
+            buffer_turns.
+    """
+
+    enabled: bool = Field(
+        False,
+        title="Enable compaction",
+        description="When true, older conversation turns are summarized "
+        "when estimated tokens approach the context window limit.",
+    )
+    threshold_ratio: float = Field(
+        0.7,
+        title="Threshold ratio",
+        description="Trigger compaction when estimated tokens exceed "
+        "this fraction of the model's context window (0.0-1.0).",
+    )
+    token_floor: NonNegativeInt = Field(
+        4096,
+        title="Token floor",
+        description="Minimum token count before compaction can trigger. "
+        "Prevents triggering on very small context windows.",
+    )
+    buffer_turns: NonNegativeInt = Field(
+        4,
+        title="Buffer turns",
+        description="Number of recent turns to keep verbatim.",
+    )
+    buffer_max_ratio: float = Field(
+        0.3,
+        title="Buffer max ratio",
+        description="Maximum fraction of context window the buffer zone "
+        "can occupy, regardless of buffer_turns.",
+    )
+
+    @field_validator("threshold_ratio")
+    @classmethod
+    def _validate_threshold_ratio(cls, value: float) -> float:
+        """Reject threshold ratios outside the inclusive 0..1 range."""
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("threshold_ratio must be between 0.0 and 1.0 (inclusive)")
+        return value
+
+    @field_validator("buffer_max_ratio")
+    @classmethod
+    def _validate_buffer_max_ratio(cls, value: float) -> float:
+        """Reject buffer-max ratios outside the inclusive 0..1 range."""
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("buffer_max_ratio must be between 0.0 and 1.0 (inclusive)")
+        return value
 
 
 class ConversationHistoryConfiguration(ConfigurationBase):
@@ -1919,6 +2004,21 @@ class Configuration(ConfigurationBase):
         ),
         title="Conversation history configuration",
         description="Conversation history configuration.",
+    )
+
+    compaction: CompactionConfiguration = Field(
+        default_factory=lambda: CompactionConfiguration(
+            enabled=False,
+            threshold_ratio=0.7,
+            token_floor=4096,
+            buffer_turns=4,
+            buffer_max_ratio=0.3,
+        ),
+        title="Conversation compaction configuration",
+        description="Controls when conversation history is summarized "
+        "to keep the model's input below the context window limit. "
+        "Disabled by default — when disabled, requests that exceed the "
+        "window continue to surface as HTTP 413.",
     )
 
     byok_rag: list[ByokRag] = Field(
