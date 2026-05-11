@@ -1194,9 +1194,8 @@ def test_score_multiplier_mapping_not_loaded() -> None:
         _ = cfg.score_multiplier_mapping
 
 
-def test_init_from_dict_fake_data() -> None:
-    """Test the configuration initialization from dictionary with config values."""
-    config_dict: dict[str, Any] = {
+wrong_configurations = [
+    {
         "name": "Colin Adams",
         "service": {
             "host": "Serve control majority quite approach step.",
@@ -1228,7 +1227,7 @@ def test_init_from_dict_fake_data() -> None:
         },
         "llama_stack": {
             "url": "https://www.west.com/",
-            "api_key": "unsupported_type_<class 'pydantic.types.SecretStr'>",
+            "api_key": "api_key",
             "use_as_library_client": False,
             "library_client_config_path": "Strategy stand return catch range professor.",
             "timeout": 486,
@@ -1265,7 +1264,7 @@ def test_init_from_dict_fake_data() -> None:
                     "Throughout speak next.",
                     "Least may discuss name. Whatever bad take.",
                 ],
-                "timeout": "unsupported_type_typing.Annotated[int, Gt(gt=0)]",
+                "timeout": "10",
             },
             {
                 "name": "Christopher Cain",
@@ -1277,7 +1276,7 @@ def test_init_from_dict_fake_data() -> None:
                     "return": "Wide enter ago name vote.",
                 },
                 "headers": ["Him keep finally."],
-                "timeout": "unsupported_type_typing.Annotated[int, Gt(gt=0)]",
+                "timeout": "10",
             },
             {
                 "name": "Eric Martin",
@@ -1292,7 +1291,7 @@ def test_init_from_dict_fake_data() -> None:
                     "Girl year process team.",
                     "Able computer anyone keep must back finish century",
                 ],
-                "timeout": "unsupported_type_typing.Annotated[int, Gt(gt=0)]",
+                "timeout": "10",
             },
         ],
         "authentication": {
@@ -1300,12 +1299,10 @@ def test_init_from_dict_fake_data() -> None:
             "skip_tls_verification": True,
             "skip_for_health_probes": False,
             "skip_for_metrics": True,
-            "k8s_cluster_api": "unsupported_type_<class 'pydantic.networks.AnyHttpUrl'>",
+            "k8s_cluster_api": "http://1.2.3.4",
             "k8s_ca_cert_path": None,
             "jwk_config": None,
-            "api_key_config": {
-                "api_key": "unsupported_type_<class 'pydantic.types.SecretStr'>"
-            },
+            "api_key_config": {"api_key": "key"},
             "rh_identity_config": None,
         },
         "authorization": None,
@@ -1416,6 +1413,12 @@ def test_init_from_dict_fake_data() -> None:
             "chunk_filter_query": "Foreign space system.",
         },
     }
+]
+
+
+@pytest.mark.parametrize("config_dict", wrong_configurations)
+def test_init_from_dict_fake_data(config_dict: dict[str, Any]) -> None:
+    """Test the configuration initialization from dictionary with config values."""
     with pytest.raises(ValueError):
         cfg = AppConfig()
         cfg.init_from_dict(config_dict)
