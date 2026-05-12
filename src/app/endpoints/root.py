@@ -24,10 +24,10 @@ router = APIRouter(tags=["root"])
 INDEX_PAGE = """
 <html>
     <head>
-        <title>Lightspeed core service</title>
+        <title>Lightspeed Core Stack</title>
     </head>
     <body style='font-family: sans-serif;text-align:center;'>
-        <h1>Lightspeed core service</h1>
+        <h1>Lightspeed Core Stack</h1>
         <img src="data:image/jpeg;base64,
 /9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEP
 ERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4e

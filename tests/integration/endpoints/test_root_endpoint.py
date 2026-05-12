@@ -71,5 +71,5 @@ async def test_root_endpoint(
     assert response.status_code == status.HTTP_200_OK
     # retrieve response body as a string
     body = response.body.decode("utf-8")
-    assert "<title>Lightspeed core service</title>" in body
-    assert "<h1>Lightspeed core service</h1>" in body
+    assert "<title>Lightspeed Core Stack</title>" in body
+    assert "<h1>Lightspeed Core Stack</h1>" in body

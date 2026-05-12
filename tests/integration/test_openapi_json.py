@@ -115,7 +115,7 @@ def _check_openapi_top_level_info(spec: dict[str, Any]) -> None:
     assert spec.get("openapi") == "3.1.0"
 
     info = spec.get("info") or {}
-    assert info.get("title") == "Lightspeed Core Service (LCS) service - OpenAPI"
+    assert info.get("title") == "Lightspeed Core Stack (LCS) service - OpenAPI"
     assert "version" in info
 
     contact = info.get("contact") or {}
