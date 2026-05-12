@@ -475,6 +475,30 @@ To verify: run pytest tests/integration/ -k compaction and confirm all pass.
 - UI displays a status indicator when `context_status` is `"summarized"`.
 - End-to-end verification: trigger compaction, confirm both indicators work.
 
+### LCORE-1675: Documentation for conversation compaction
+
+**Description**: Update all relevant documentation to reflect the conversation compaction feature.
+
+**Scope**:
+
+- Update API documentation for the `context_status` response field.
+- Update configuration documentation for compaction settings.
+- Add compaction section to the architecture docs.
+
+**Acceptance criteria**:
+
+- All user-facing documentation reflects compaction behavior.
+- OpenAPI spec includes `context_status` field.
+
+**Agentic tool instruction**:
+
+```
+Read the "API response changes" and "Configuration" sections in
+docs/design/conversation-compaction/conversation-compaction.md.
+Key files to create or modify: docs/, docs/openapi.json.
+To verify: check that the docs site renders correctly and OpenAPI spec validates.
+```
+
 # PoC results
 
 A proof-of-concept was built in lightspeed-stack and tested against a real Llama Stack + OpenAI (gpt-4o-mini) setup.
