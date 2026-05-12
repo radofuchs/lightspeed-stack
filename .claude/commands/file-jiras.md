@@ -20,7 +20,7 @@ https://id.atlassian.com/manage-profile/security/api-tokens
 `file-jiras.sh` parses the spike doc's `## Proposed JIRAs` section into
 Epic-grouped tickets:
 
-```
+```markdown
 ## Proposed JIRAs
 
 ### Epic: <epic-name>
