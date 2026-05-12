@@ -6,12 +6,13 @@
 
 set -x
 
+KONFLUX_DIR=".konflux"
 RAW_REQ_FILE="requirements.no_hashes.txt"
-SOURCE_FILE="requirements.source.txt"
-WHEEL_FILE="requirements.wheel.txt"
-SOURCE_HASH_FILE="requirements.hashes.source.txt"
-WHEEL_HASH_FILE="requirements.hashes.wheel.txt"
-BUILD_FILE="requirements-build.txt"
+SOURCE_FILE="${KONFLUX_DIR}/requirements.source.txt"
+WHEEL_FILE="${KONFLUX_DIR}/requirements.wheel.txt"
+SOURCE_HASH_FILE="${KONFLUX_DIR}/requirements.hashes.source.txt"
+WHEEL_HASH_FILE="${KONFLUX_DIR}/requirements.hashes.wheel.txt"
+BUILD_FILE="${KONFLUX_DIR}/requirements-build.txt"
 RHOAI_INDEX_URL="https://console.redhat.com/api/pypi/public-rhai/rhoai/3.3/cpu-ubi9/simple/"
 
 # extra wheels to be included in the wheel list, often come from build-time dependencies

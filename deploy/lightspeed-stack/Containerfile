@@ -32,7 +32,7 @@ RUN pip3.12 install "uv>=0.8.15"
 # Add explicit files and directories
 # (avoid accidental inclusion of local directories or env files or credentials)
 COPY ${LSC_SOURCE_DIR}/src ./src
-COPY ${LSC_SOURCE_DIR}/pyproject.toml ${LSC_SOURCE_DIR}/LICENSE ${LSC_SOURCE_DIR}/README.md ${LSC_SOURCE_DIR}/uv.lock ${LSC_SOURCE_DIR}/requirements.*.txt ./
+COPY ${LSC_SOURCE_DIR}/pyproject.toml ${LSC_SOURCE_DIR}/LICENSE ${LSC_SOURCE_DIR}/README.md ${LSC_SOURCE_DIR}/uv.lock ${LSC_SOURCE_DIR}/.konflux/requirements.*.txt ./
 
 # lightspeed-providers:
 # Fully hermetic — uses prefetched artifact or pinned commit from GitHub
