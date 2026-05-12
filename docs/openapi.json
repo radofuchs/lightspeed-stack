@@ -1,9 +1,9 @@
 {
     "openapi": "3.1.0",
     "info": {
-        "title": "Lightspeed Core Service (LCS) service - OpenAPI",
-        "summary": "Lightspeed Core Service (LCS) service API specification.",
-        "description": "Lightspeed Core Service (LCS) service API specification.",
+        "title": "Lightspeed Core Stack (LCS) service - OpenAPI",
+        "summary": "Lightspeed Core Stack (LCS) service API specification.",
+        "description": "Lightspeed Core Stack (LCS) service API specification.",
         "contact": {
             "name": "Pavel Tisnovsky",
             "url": "https://github.com/tisnik/",

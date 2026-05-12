@@ -1,4 +1,4 @@
-# lightspeed-stack
+# Lightspeed Core Stack (LCS)
 
 ## About The Project
 
