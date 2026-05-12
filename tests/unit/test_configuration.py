@@ -2101,6 +2101,206 @@ wrong_configurations = [
             "chunk_filter_query": "Industry as appear us. Lead dream public compare.",
         },
     },
+    {
+        "name": "Marisa Johnson",
+        "service": {
+            "host": "Service visit sort name. Democratic increase desig",
+            "port": 260,
+            "base_url": "Deal level four maintain yeah arrive.",
+            "auth_enabled": False,
+            "workers": 448,
+            "color_log": True,
+            "access_log": True,
+            "tls_config": {
+                "tls_certificate_path": None,
+                "tls_key_path": "xyzzy",
+                "tls_key_password": None,
+            },
+            "root_path": "War under seem wide itself present.",
+            "cors": {
+                "allow_origins": ["However performance serve city close season."],
+                "allow_credentials": True,
+                "allow_methods": ["Official send ground.", "She sort drug heavy."],
+                "allow_headers": [
+                    "Vote already window four still talk among lawyer.",
+                    "Fly fact then five.",
+                    "Bad factor she sort.",
+                ],
+            },
+        },
+        "llama_stack": {
+            "url": None,
+            "api_key": "xyzzy",
+            "use_as_library_client": True,
+            "library_client_config_path": "Spend difficult identify go.",
+            "timeout": 689,
+        },
+        "user_data_collection": {
+            "feedback_enabled": True,
+            "feedback_storage": "Seem have part movie.",
+            "transcripts_enabled": True,
+            "transcripts_storage": None,
+        },
+        "database": {
+            "sqlite": {"db_path": "Book arrive hair seat popular."},
+            "postgres": None,
+        },
+        "mcp_servers": [
+            {
+                "name": "Pamela Frazier",
+                "provider_id": "Policy kind among effort.",
+                "url": "https://www.austin-richards.biz/",
+                "authorization_headers": {
+                    "indeed": "Design kid official along lead nice trial.",
+                    "spend": "Yourself sit continue.",
+                },
+                "headers": [
+                    "Official end industry challenge system these cell.",
+                    "Others cultural notice friend. Number air you insi",
+                    "Nothing argue use like game.",
+                ],
+                "timeout": None,
+            },
+            {
+                "name": "James Chavez",
+                "provider_id": "May smile develop TV. Trouble child piece same.",
+                "url": "https://www.harper.com/",
+                "authorization_headers": {"month": "Himself coach letter recently."},
+                "headers": ["Ago around car after too.", "Lawyer foot media standard."],
+                "timeout": "xyzzy",
+            },
+        ],
+        "authentication": {
+            "module": "May American industry available. Language off word",
+            "skip_tls_verification": False,
+            "skip_for_health_probes": True,
+            "skip_for_metrics": True,
+            "k8s_cluster_api": "xyzzy",
+            "k8s_ca_cert_path": None,
+            "jwk_config": None,
+            "api_key_config": None,
+            "rh_identity_config": None,
+        },
+        "authorization": {
+            "access_rules": [
+                {
+                    "role": "Oil add these though. Plan nothing dark.",
+                    "actions": ["xyzzy", "xyzzy"],
+                },
+                {
+                    "role": "Sister where owner west policy stop entire. From t",
+                    "actions": ["xyzzy", "xyzzy"],
+                },
+            ]
+        },
+        "customization": {
+            "profile_path": None,
+            "disable_query_system_prompt": False,
+            "disable_shield_ids_override": False,
+            "system_prompt_path": "xyzzy",
+            "system_prompt": None,
+            "agent_card_path": "xyzzy",
+            "agent_card_config": None,
+            "custom_profile": None,
+        },
+        "inference": {
+            "default_model": "Continue try science sense rich name.",
+            "default_provider": "Report whether hear chair.",
+        },
+        "conversation_cache": {
+            "type": "xyzzy",
+            "memory": {"max_entries": 666},
+            "sqlite": {"db_path": "Court size your eye choose."},
+            "postgres": None,
+        },
+        "byok_rag": [
+            {
+                "rag_id": "Authority kind apply arm manager local reveal.",
+                "rag_type": "Seem authority miss.",
+                "embedding_model": "Have news quality.",
+                "embedding_dimension": 310,
+                "vector_db_id": "Education hot full her. Serve mention save executi",
+                "db_path": "Every popular bit.",
+                "score_multiplier": 918.43,
+            },
+            {
+                "rag_id": "Avoid baby miss want education.",
+                "rag_type": "Sing answer rule soon.",
+                "embedding_model": "Year let example you paper develop tough.",
+                "embedding_dimension": 985,
+                "vector_db_id": "Operation conference phone.",
+                "db_path": "All effort True see.",
+                "score_multiplier": 788.57,
+            },
+        ],
+        "a2a_state": {
+            "sqlite": {"db_path": "Green example walk become return front."},
+            "postgres": {
+                "host": "Culture stop finally break.",
+                "port": 854,
+                "db": "Like direction music.",
+                "user": "Newspaper compare color indicate lay.",
+                "password": "(5BuFj&vKMmV",
+                "namespace": "Summer risk where attention music mean recently.",
+                "ssl_mode": "Local run already walk. Manager contain eight rais",
+                "gss_encmode": "Economy picture long level seek. Learn hair foreig",
+                "ca_cert_path": "xyzzy",
+            },
+        },
+        "quota_handlers": {
+            "sqlite": {"db_path": "Good score hospital create son."},
+            "postgres": None,
+            "limiters": [
+                {
+                    "type": "xyzzy",
+                    "name": "Matthew Saunders",
+                    "initial_quota": 987,
+                    "quota_increase": 279,
+                    "period": "Pass style back item.",
+                }
+            ],
+            "scheduler": {
+                "period": 288,
+                "database_reconnection_count": 475,
+                "database_reconnection_delay": 526,
+            },
+            "enable_token_history": False,
+        },
+        "azure_entra_id": {
+            "tenant_id": "xyzzy",
+            "client_id": "xyzzy",
+            "client_secret": "xyzzy",
+            "scope": "Clearly fact general study.",
+        },
+        "rlsapi_v1": {"allow_verbose_infer": True, "quota_subject": "xyzzy"},
+        "splunk": {
+            "enabled": True,
+            "url": None,
+            "token_path": None,
+            "index": "Ok them various ok sit board.",
+            "source": "Interest degree foreign already.",
+            "timeout": 948,
+            "verify_ssl": False,
+        },
+        "deployment_environment": "Consumer center sign skin total.",
+        "rag": {
+            "inline": [
+                "True four lawyer sound. Light fund former art.",
+                "Perhaps theory remain. Marriage person put food.",
+                "Run behind single material else media.",
+            ],
+            "tool": [
+                "Another Congress part seat bit.",
+                "Able main door under. Early consumer speech less c",
+                "Eat read shake three. Development cell mission.",
+            ],
+        },
+        "okp": {
+            "rhokp_url": None,
+            "offline": True,
+            "chunk_filter_query": "And drug brother tell specific realize hit.",
+        },
+    },
 ]
 
 
