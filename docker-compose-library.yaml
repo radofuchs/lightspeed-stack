@@ -3,7 +3,7 @@ services:
   lightspeed-stack:
     build:
       context: .
-      dockerfile: Containerfile
+      dockerfile: deploy/lightspeed-stack/Containerfile
     platform: linux/amd64
     container_name: lightspeed-stack
     ports:

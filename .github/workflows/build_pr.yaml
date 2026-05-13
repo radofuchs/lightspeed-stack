@@ -7,7 +7,7 @@ env:
   IMAGE_NAME: lightspeed-stack
   IMAGE_NAMESPACE: lightspeed-core
   LATEST_TAG: dev-latest
-  CONTAINER_FILE: Containerfile
+  CONTAINER_FILE: deploy/lightspeed-stack/Containerfile
 
 jobs:
   build-pr:

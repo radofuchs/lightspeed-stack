@@ -60,7 +60,7 @@ spec:
   - name: hermetic
     value: 'true'
   - name: dockerfile
-    value: Containerfile
+    value: deploy/lightspeed-stack/Containerfile
   - name: build-args-file
     value: build-args-konflux.conf
   pipelineSpec:

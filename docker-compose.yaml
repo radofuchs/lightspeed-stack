@@ -3,7 +3,7 @@ services:
   llama-stack:
     build:
       context: .
-      dockerfile: test.containerfile
+      dockerfile: deploy/llama-stack/test.containerfile
     platform: linux/amd64
     container_name: llama-stack
     ports:
@@ -70,7 +70,7 @@ services:
   lightspeed-stack:
     build:
       context: .
-      dockerfile: Containerfile
+      dockerfile: deploy/lightspeed-stack/Containerfile
     container_name: lightspeed-stack
     ports:
       - "8080:8080"

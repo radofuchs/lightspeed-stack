@@ -11,7 +11,7 @@ env:
   IMAGE_REGISTRY: quay.io
   GIT_TAG: ${{ github.ref_name }}
   LATEST_TAG: latest
-  CONTAINER_FILE: Containerfile
+  CONTAINER_FILE: deploy/lightspeed-stack/Containerfile
 
 jobs:
   build-and-push-release:

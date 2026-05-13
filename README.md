@@ -936,7 +936,7 @@ docker compose up --build
 
 ### Llama-Stack as Library (Library Mode)
 
-When embedding llama-stack directly in the container, use the existing `Containerfile` directly (this will not build the llama stack service in a separate container). First modify the `lightspeed-stack.yaml` config to use llama stack in library mode.
+When embedding llama-stack directly in the container, use the existing `deploy/lightspeed-stack/Containerfile` directly (this will not build the llama stack service in a separate container). First modify the `lightspeed-stack.yaml` config to use llama stack in library mode.
 
 **Configuration** (`lightspeed-stack.yaml`):
 ```yaml
@@ -948,7 +948,7 @@ llama_stack:
 **Build and run**:
 ```bash
 # Build lightspeed-core with embedded llama-stack
-podman build -f Containerfile -t my-lightspeed-core:latest .
+podman build -f deploy/lightspeed-stack/Containerfile -t my-lightspeed-core:latest .
 
 # Run with embedded llama-stack
 podman run \
@@ -1001,7 +1001,7 @@ dependencies = [
 ]
 ```
 
-2. Create `Containerfile` in top-level directory like following. Update it as needed:
+2. Create a `Containerfile` in your repository root like the following (see `deploy/lightspeed-stack/Containerfile` in this repo for the upstream image definition). Update it as needed:
 ```
 # Latest dev image built from the git main branch (consider pinning a digest for reproducibility)
 FROM quay.io/lightspeed-core/lightspeed-stack:dev-latest
@@ -1328,7 +1328,7 @@ Konflux builds run in **hermetic mode** (air-gapped from the internet), so all d
 
 Update these files when you:
 - Add/remove/update Python packages in the project
-- Add/remove/update RPM packages in the Containerfile
+- Add/remove/update RPM packages in `deploy/lightspeed-stack/Containerfile`
 - Change the base image version
 
 ### Updating Python Dependencies
