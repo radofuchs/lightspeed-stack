@@ -21,6 +21,7 @@ from models.config import (
     QuotaLimiterConfiguration,
     QuotaSchedulerConfiguration,
     ServiceConfiguration,
+    SkillsConfiguration,
     TLSConfiguration,
     UserDataCollection,
 )
@@ -235,6 +236,7 @@ def test_dump_configuration(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -606,6 +608,7 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -853,6 +856,7 @@ def test_dump_configuration_with_quota_limiters_different_values(
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -1075,6 +1079,7 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -1282,4 +1287,84 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
+        }
+
+
+def test_dump_configuration_with_skills(tmp_path: Path) -> None:
+    """
+    Test that Configuration with skills paths can be serialized to JSON.
+
+    Verifies that skills paths are properly dumped and serialized as strings.
+    """
+    cfg = Configuration(
+        name="test_name",
+        service=ServiceConfiguration(
+            tls_config=TLSConfiguration(
+                tls_certificate_path=Path("tests/configuration/server.crt"),
+                tls_key_path=Path("tests/configuration/server.key"),
+                tls_key_password=Path("tests/configuration/password"),
+            ),
+            cors=CORSConfiguration(
+                allow_origins=["foo_origin", "bar_origin", "baz_origin"],
+                allow_credentials=False,
+                allow_methods=["foo_method", "bar_method", "baz_method"],
+                allow_headers=["foo_header", "bar_header", "baz_header"],
+            ),
+        ),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=True,
+            library_client_config_path="tests/configuration/run.yaml",
+            api_key=SecretStr("whatever"),
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False, feedback_storage=None
+        ),
+        database=DatabaseConfiguration(
+            sqlite=None,
+            postgres=PostgreSQLDatabaseConfiguration(
+                db="lightspeed_stack",
+                user="ls_user",
+                password=SecretStr("ls_password"),
+                port=5432,
+                ca_cert_path=None,
+                ssl_mode="require",
+                gss_encmode="disable",
+            ),
+        ),
+        mcp_servers=[],
+        customization=None,
+        inference=InferenceConfiguration(
+            default_provider="default_provider",
+            default_model="default_model",
+        ),
+        skills=SkillsConfiguration(
+            paths=[
+                "/var/skills/openshift-troubleshooting",
+                "/var/skills/code-review",
+                "/opt/custom-skills",
+            ]
+        ),
+    )
+    assert cfg is not None
+    dump_file = tmp_path / "test.json"
+    cfg.dump(dump_file)
+
+    with open(dump_file, "r", encoding="utf-8") as fin:
+        content = json.load(fin)
+        # content should be loaded
+        assert content is not None
+
+        # skills section must exist
+        assert "skills" in content
+        assert content["skills"] is not None
+        assert "paths" in content["skills"]
+
+        # verify skills paths are properly serialized
+        assert content["skills"] == {
+            "paths": [
+                "/var/skills/openshift-troubleshooting",
+                "/var/skills/code-review",
+                "/opt/custom-skills",
+            ]
         }
