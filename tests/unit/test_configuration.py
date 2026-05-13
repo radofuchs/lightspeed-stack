@@ -2301,6 +2301,270 @@ wrong_configurations = [
             "chunk_filter_query": "And drug brother tell specific realize hit.",
         },
     },
+    {
+        "name": "Sarah Austin",
+        "service": {
+            "host": "Our marriage even information note allow.",
+            "port": 57,
+            "base_url": "Must ok worker plan.",
+            "auth_enabled": True,
+            "workers": 310,
+            "color_log": True,
+            "access_log": False,
+            "tls_config": {
+                "tls_certificate_path": "xyzzy",
+                "tls_key_path": None,
+                "tls_key_password": None,
+            },
+            "root_path": "Decade send whether trial various.",
+            "cors": {
+                "allow_origins": [
+                    "Service effort water small individual.",
+                    "Level call family yeah.",
+                ],
+                "allow_credentials": True,
+                "allow_methods": [
+                    "Read here only.",
+                    "Effect work professor. Guess about expect consumer",
+                ],
+                "allow_headers": [
+                    "Wish follow administration manage structure democr",
+                    "Sit imagine agree spend.",
+                ],
+            },
+        },
+        "llama_stack": {
+            "url": None,
+            "api_key": "xyzzy",
+            "use_as_library_client": None,
+            "library_client_config_path": None,
+            "timeout": 182,
+        },
+        "user_data_collection": {
+            "feedback_enabled": True,
+            "feedback_storage": "Media director fight with. Lay shake unit news.",
+            "transcripts_enabled": True,
+            "transcripts_storage": "Speech catch doctor organization.",
+        },
+        "database": {
+            "sqlite": None,
+            "postgres": {
+                "host": "Beat move hospital same.",
+                "port": 669,
+                "db": "Could focus find reduce.",
+                "user": "Interest while take. Doctor high example.",
+                "password": "DEBi6$q4Q#!q",
+                "namespace": "Speak family difference alone them ball.",
+                "ssl_mode": "Group decision about.",
+                "gss_encmode": "Her choice all.",
+                "ca_cert_path": None,
+            },
+        },
+        "mcp_servers": [
+            {
+                "name": "Anthony Brown",
+                "provider_id": "Over main son rich drive wife couple.",
+                "url": "http://newman.net/",
+                "authorization_headers": {
+                    "movie": "Future by season.",
+                    "food": "Important tax compare parent top. Many point someb",
+                },
+                "headers": ["Center arrive grow day because customer."],
+                "timeout": "xyzzy",
+            },
+            {
+                "name": "Mike Orozco",
+                "provider_id": "Song game interesting animal.",
+                "url": "https://www.mason.info/",
+                "authorization_headers": {
+                    "adult": "Character account popular defense require.",
+                    "medical": "Last federal buy word significant.",
+                    "education": "Away try various long.",
+                },
+                "headers": [
+                    "Mean several sell eye.",
+                    "Catch similar exist. More mother dream involve beg",
+                    "Top with provide movie rule two and draw.",
+                ],
+                "timeout": "xyzzy",
+            },
+        ],
+        "authentication": {
+            "module": "Chair difficult record safe find establish.",
+            "skip_tls_verification": True,
+            "skip_for_health_probes": True,
+            "skip_for_metrics": False,
+            "k8s_cluster_api": None,
+            "k8s_ca_cert_path": "xyzzy",
+            "jwk_config": {
+                "url": "http://peterson.com/",
+                "jwt_configuration": {
+                    "user_id_claim": "That approach.",
+                    "username_claim": "Too agent put truth then.",
+                    "role_rules": [
+                        {
+                            "jsonpath": "Seven north system market.",
+                            "operator": "xyzzy",
+                            "negate": False,
+                            "value": "any_value_placeholder",
+                            "roles": ["Also try live serve create buy believe."],
+                        },
+                        {
+                            "jsonpath": "Care audience our hear your media.",
+                            "operator": "xyzzy",
+                            "negate": False,
+                            "value": "any_value_placeholder",
+                            "roles": [
+                                "Talk strategy interest instead them anyone wrong."
+                            ],
+                        },
+                        {
+                            "jsonpath": "Early art bank about senior leg possible.",
+                            "operator": "xyzzy",
+                            "negate": True,
+                            "value": "any_value_placeholder",
+                            "roles": [
+                                "Water car guy even cultural threat.",
+                                "State page adult spring. Over Mrs firm magazine.",
+                                "Answer exist group cover measure various actually ",
+                            ],
+                        },
+                    ],
+                },
+            },
+            "api_key_config": None,
+            "rh_identity_config": {
+                "required_entitlements": None,
+                "max_header_size": 729,
+            },
+        },
+        "authorization": {
+            "access_rules": [
+                {
+                    "role": "Owner bit mother federal something. Its memory sit",
+                    "actions": ["xyzzy"],
+                },
+                {
+                    "role": "Small pretty ok figure prepare describe see.",
+                    "actions": ["xyzzy", "xyzzy"],
+                },
+            ]
+        },
+        "customization": {
+            "profile_path": None,
+            "disable_query_system_prompt": True,
+            "disable_shield_ids_override": True,
+            "system_prompt_path": None,
+            "system_prompt": "Wonder wind often doctor.",
+            "agent_card_path": "xyzzy",
+            "agent_card_config": None,
+            "custom_profile": None,
+        },
+        "inference": {
+            "default_model": "Which stop task language.",
+            "default_provider": None,
+        },
+        "conversation_cache": {
+            "type": "xyzzy",
+            "memory": {"max_entries": 332},
+            "sqlite": None,
+            "postgres": None,
+        },
+        "byok_rag": [
+            {
+                "rag_id": "Nor reduce physical section serious. She still rep",
+                "rag_type": "Hospital political recognize operation tree.",
+                "embedding_model": "Drug concern old job discover firm imagine.",
+                "embedding_dimension": 192,
+                "vector_db_id": "Relationship training argue body market old per.",
+                "db_path": "Consumer while positive. Why because quite respons",
+                "score_multiplier": 283.58,
+            },
+            {
+                "rag_id": "Past detail as star. Teacher spend sit push maybe ",
+                "rag_type": "After good nature. War option science approach.",
+                "embedding_model": "Air serve court measure most play item.",
+                "embedding_dimension": 491,
+                "vector_db_id": "Other open wonder.",
+                "db_path": "Car everybody during. Nor believe audience tax soo",
+                "score_multiplier": 159.31,
+            },
+            {
+                "rag_id": "Fire feeling person real party game method.",
+                "rag_type": "Middle together second money need fly.",
+                "embedding_model": "Do item when politics.",
+                "embedding_dimension": 896,
+                "vector_db_id": "Reason decision region past research.",
+                "db_path": "Every any nice vote civil.",
+                "score_multiplier": 776.23,
+            },
+        ],
+        "a2a_state": {
+            "sqlite": None,
+            "postgres": {
+                "host": "Occur meet pay dog decade sense. Rule discover top",
+                "port": 191,
+                "db": "Whatever democratic unit class recent affect.",
+                "user": "Worker feeling vote happen.",
+                "password": "zu7HYMtol+#F",
+                "namespace": None,
+                "ssl_mode": "Just leader family.",
+                "gss_encmode": "Billion suffer need parent her class.",
+                "ca_cert_path": None,
+            },
+        },
+        "quota_handlers": {
+            "sqlite": {"db_path": "Subject culture laugh sea finish moment."},
+            "postgres": None,
+            "limiters": [
+                {
+                    "type": "xyzzy",
+                    "name": "David Richardson",
+                    "initial_quota": 470,
+                    "quota_increase": 353,
+                    "period": "Here onto which president today.",
+                },
+                {
+                    "type": "xyzzy",
+                    "name": "Daniel Young",
+                    "initial_quota": 963,
+                    "quota_increase": 566,
+                    "period": "Nation nearly hold skin culture she.",
+                },
+            ],
+            "scheduler": {
+                "period": 817,
+                "database_reconnection_count": 153,
+                "database_reconnection_delay": 932,
+            },
+            "enable_token_history": True,
+        },
+        "azure_entra_id": {
+            "tenant_id": "xyzzy",
+            "client_id": "xyzzy",
+            "client_secret": "xyzzy",
+            "scope": "Make seven condition keep bag change ask.",
+        },
+        "rlsapi_v1": {"allow_verbose_infer": True, "quota_subject": None},
+        "splunk": {
+            "enabled": False,
+            "url": "https://www.taylor-bartlett.com/",
+            "token_path": "xyzzy",
+            "index": None,
+            "source": "Sure floor level.",
+            "timeout": 393,
+            "verify_ssl": True,
+        },
+        "deployment_environment": "Successful cut arrive ever against maybe.",
+        "rag": {
+            "inline": [
+                "Themselves scene just.",
+                "Sport develop particular when. Task agreement walk",
+            ],
+            "tool": ["Anything visit late."],
+        },
+        "okp": {"rhokp_url": "xyzzy", "offline": True, "chunk_filter_query": None},
+    },
 ]
 
 
