@@ -59,7 +59,17 @@ def test_tls_configuration_wrong_key_path() -> None:
     """Test the TLS configuration loading when some path is broken."""
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
+            tls_key_path=Path("this-is-wrong"),
+            tls_key_password=Path("tests/configuration/password"),
+        )
+
+
+def test_tls_configuration_wrong_certificate_and_key_paths() -> None:
+    """Test the TLS configuration loading when some paths are broken."""
+    with pytest.raises(ValueError, match="Path does not point to a file"):
+        TLSConfiguration(
+            tls_certificate_path=Path("this-is-wrong"),
             tls_key_path=Path("this-is-wrong"),
             tls_key_password=Path("tests/configuration/password"),
         )
@@ -77,8 +87,38 @@ def test_tls_configuration_wrong_password_path() -> None:
     """
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
             tls_key_path=Path("tests/configuration/server.key"),
+            tls_key_password=Path("this-is-wrong"),
+        )
+
+
+def test_tls_configuration_wrong_password_and_certificate_paths() -> None:
+    """Test the TLS configuration loading when some path are broken."""
+    with pytest.raises(ValueError, match="Path does not point to a file"):
+        TLSConfiguration(
+            tls_certificate_path=Path("this-is-wrong"),
+            tls_key_path=Path("tests/configuration/server.key"),
+            tls_key_password=Path("this-is-wrong"),
+        )
+
+
+def test_tls_configuration_wrong_password_and_key_paths() -> None:
+    """Test the TLS configuration loading when some path are broken."""
+    with pytest.raises(ValueError, match="Path does not point to a file"):
+        TLSConfiguration(
+            tls_certificate_path=Path("tests/configuration/server.crt"),
+            tls_key_path=Path("this-is-wrong"),
+            tls_key_password=Path("this-is-wrong"),
+        )
+
+
+def test_tls_configuration_wrong_all_paths() -> None:
+    """Test the TLS configuration loading when some paths are broken."""
+    with pytest.raises(ValueError, match="Path does not point to a file"):
+        TLSConfiguration(
+            tls_certificate_path=Path("this-is-wrong"),
+            tls_key_path=Path("this-is-wrong"),
             tls_key_password=Path("this-is-wrong"),
         )
 
@@ -104,7 +144,7 @@ def test_tls_configuration_key_path_to_directory() -> None:
     """Test the TLS configuration loading when some path points to a directory."""
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
             tls_key_path=Path("tests/"),
             tls_key_password=Path("tests/configuration/password"),
         )
@@ -114,7 +154,76 @@ def test_tls_configuration_password_path_to_directory() -> None:
     """Test the TLS configuration loading when some path points to a directory."""
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
             tls_key_path=Path("tests/configuration/server.key"),
             tls_key_password=Path("tests/"),
         )
+
+
+def test_tls_configuration_certificate_path_is_empty() -> None:
+    """Test the TLS configuration loading when some path is empty."""
+    with pytest.raises(ValueError, match="Path does not point to a file"):
+        TLSConfiguration(
+            tls_certificate_path=Path(""),
+            tls_key_path=Path("tests/configuration/server.key"),
+            tls_key_password=Path("tests/configuration/password"),
+        )
+
+
+def test_tls_configuration_key_path_is_empty() -> None:
+    """Test the TLS configuration loading when some path is empty."""
+    with pytest.raises(ValueError, match="Path does not point to a file"):
+        TLSConfiguration(
+            tls_certificate_path=Path("tests/configuration/server.crt"),
+            tls_key_path=Path(""),
+            tls_key_password=Path("tests/configuration/password"),
+        )
+
+
+def test_tls_configuration_password_path_is_empty() -> None:
+    """Test the TLS configuration loading when some path is empty."""
+    with pytest.raises(ValueError, match="Path does not point to a file"):
+        TLSConfiguration(
+            tls_certificate_path=Path("tests/configuration/server.crt"),
+            tls_key_path=Path("tests/configuration/server.key"),
+            tls_key_password=Path(""),
+        )
+
+
+def test_tls_configuration_certificate_path_is_none() -> None:
+    """Test the TLS configuration loading when some path is None."""
+    cfg = TLSConfiguration(
+        tls_certificate_path=None,
+        tls_key_path=Path("tests/configuration/server.key"),
+        tls_key_password=Path("tests/configuration/password"),
+    )
+    assert cfg is not None
+    assert cfg.tls_certificate_path is None
+    assert cfg.tls_key_path == Path("tests/configuration/server.key")
+    assert cfg.tls_key_password == Path("tests/configuration/password")
+
+
+def test_tls_configuration_key_path_is_none() -> None:
+    """Test the TLS configuration loading when some path is None."""
+    cfg = TLSConfiguration(
+        tls_certificate_path=Path("tests/configuration/server.crt"),
+        tls_key_path=None,
+        tls_key_password=Path("tests/configuration/password"),
+    )
+    assert cfg is not None
+    assert cfg.tls_key_path is None
+    assert cfg.tls_certificate_path == Path("tests/configuration/server.crt")
+    assert cfg.tls_key_password == Path("tests/configuration/password")
+
+
+def test_tls_configuration_password_path_is_none() -> None:
+    """Test the TLS configuration loading when some path is None."""
+    cfg = TLSConfiguration(
+        tls_certificate_path=Path("tests/configuration/server.crt"),
+        tls_key_path=Path("tests/configuration/server.key"),
+        tls_key_password=None,
+    )
+    assert cfg is not None
+    assert cfg.tls_key_password is None
+    assert cfg.tls_certificate_path == Path("tests/configuration/server.crt")
+    assert cfg.tls_key_path == Path("tests/configuration/server.key")
