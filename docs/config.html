@@ -498,6 +498,69 @@ always allowed for simple CORS requests.</td>
         </tr>
       </tbody>
     </table>
+    <h2 id="compactionconfiguration">CompactionConfiguration</h2>
+    <p>Configuration for conversation history compaction.</p>
+    <p>Compaction summarizes older conversation turns when their estimated
+token count approaches the context window limit, keeping the
+conversation usable instead of failing with HTTP 413. The configuration
+here controls when compaction triggers and how much recent context is
+preserved verbatim.</p>
+    <p>Attributes: enabled: Master switch. When False, compaction never
+triggers and other fields are inert. threshold_ratio: Trigger compaction
+when estimated input tokens exceed this fraction of the model&#x2019;s context
+window (clamped to 0.0..1.0). token_floor: Minimum estimated token count
+before compaction can trigger, regardless of threshold_ratio. Prevents
+triggering on very small context windows. buffer_turns: Initial number
+of recent turns to keep verbatim. The runtime applies a degrading guard
+&#x2014; if these turns exceed the available budget, it reduces buffer_turns by
+one repeatedly until the budget fits, down to zero. buffer_max_ratio:
+Hard cap on the fraction of the context window the buffer zone may
+occupy, regardless of buffer_turns.</p>
+    <table>
+      <colgroup>
+        <col style="width: 26%"/>
+        <col style="width: 23%"/>
+        <col style="width: 50%"/>
+      </colgroup>
+      <thead>
+        <tr class="header">
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="odd">
+          <td>enabled</td>
+          <td>boolean</td>
+          <td>When true, older conversation turns are summarized when estimated
+tokens approach the context window limit.</td>
+        </tr>
+        <tr class="even">
+          <td>threshold_ratio</td>
+          <td>number</td>
+          <td>Trigger compaction when estimated tokens exceed this fraction of the
+model&#x2019;s context window (0.0-1.0).</td>
+        </tr>
+        <tr class="odd">
+          <td>token_floor</td>
+          <td>integer</td>
+          <td>Minimum token count before compaction can trigger. Prevents
+triggering on very small context windows.</td>
+        </tr>
+        <tr class="even">
+          <td>buffer_turns</td>
+          <td>integer</td>
+          <td>Number of recent turns to keep verbatim.</td>
+        </tr>
+        <tr class="odd">
+          <td>buffer_max_ratio</td>
+          <td>number</td>
+          <td>Maximum fraction of context window the buffer zone can occupy,
+regardless of buffer_turns.</td>
+        </tr>
+      </tbody>
+    </table>
     <h2 id="configuration">Configuration</h2>
     <p>Global service configuration.</p>
     <table>
@@ -588,49 +651,57 @@ endpoints), the default provider and model are used.</td>
           <td/>
         </tr>
         <tr class="even">
+          <td>compaction</td>
+          <td/>
+          <td>Controls when conversation history is summarized to keep the model&#x2019;s
+input below the context window limit. Disabled by default &#x2014; when
+disabled, requests that exceed the window continue to surface as HTTP
+413.</td>
+        </tr>
+        <tr class="odd">
           <td>byok_rag</td>
           <td>array</td>
           <td>BYOK RAG configuration. This configuration can be used to
 reconfigure Llama Stack through its run.yaml configuration file</td>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>a2a_state</td>
           <td/>
           <td>Configuration for A2A protocol persistent state storage.</td>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>quota_handlers</td>
           <td/>
           <td>Quota handlers configuration</td>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>azure_entra_id</td>
           <td/>
           <td/>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>rlsapi_v1</td>
           <td/>
           <td>Configuration for the rlsapi v1 /infer endpoint used by the RHEL
 Lightspeed Command Line Assistant (CLA).</td>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>splunk</td>
           <td/>
           <td>Splunk HEC configuration for sending telemetry events.</td>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>deployment_environment</td>
           <td>string</td>
           <td>Deployment environment name (e.g., &#x2018;development&#x2019;, &#x2018;staging&#x2019;,
 &#x2018;production&#x2019;). Used in telemetry events.</td>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>rag</td>
           <td/>
           <td>Configuration for all RAG strategies (inline and tool-based).</td>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>okp</td>
           <td/>
           <td>OKP provider settings. Only used when &#x2018;okp&#x2019; is listed in rag.inline
@@ -826,6 +897,16 @@ specified.</td>
           <td>string</td>
           <td>Identification of default provider used when no other model is
 specified.</td>
+        </tr>
+        <tr class="odd">
+          <td>context_windows</td>
+          <td>object</td>
+          <td>Map of fully-qualified model identifier (e.g., &#x201C;openai/gpt-4o-mini&#x201D;)
+to context window size in tokens. Used by the conversation compaction
+trigger to decide when older turns must be summarized before the input
+exceeds the window. Models absent from this map have no registered
+window &#x2014; callers fall back to their own default or skip the token-based
+trigger.</td>
         </tr>
       </tbody>
     </table>

@@ -147,6 +147,44 @@ Useful resources:
 | allow_headers | array | A list of HTTP request headers that should be supported for cross-origin requests. You can use ['*'] to allow all headers. The Accept, Accept-Language, Content-Language and Content-Type headers are always allowed for simple CORS requests. |
 
 
+## CompactionConfiguration
+
+
+Configuration for conversation history compaction.
+
+Compaction summarizes older conversation turns when their estimated
+token count approaches the context window limit, keeping the
+conversation usable instead of failing with HTTP 413. The
+configuration here controls when compaction triggers and how much
+recent context is preserved verbatim.
+
+Attributes:
+    enabled: Master switch. When False, compaction never triggers
+        and other fields are inert.
+    threshold_ratio: Trigger compaction when estimated input tokens
+        exceed this fraction of the model's context window
+        (clamped to 0.0..1.0).
+    token_floor: Minimum estimated token count before compaction
+        can trigger, regardless of threshold_ratio. Prevents
+        triggering on very small context windows.
+    buffer_turns: Initial number of recent turns to keep verbatim.
+        The runtime applies a degrading guard — if these turns
+        exceed the available budget, it reduces buffer_turns by
+        one repeatedly until the budget fits, down to zero.
+    buffer_max_ratio: Hard cap on the fraction of the context
+        window the buffer zone may occupy, regardless of
+        buffer_turns.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| enabled | boolean | When true, older conversation turns are summarized when estimated tokens approach the context window limit. |
+| threshold_ratio | number | Trigger compaction when estimated tokens exceed this fraction of the model's context window (0.0-1.0). |
+| token_floor | integer | Minimum token count before compaction can trigger. Prevents triggering on very small context windows. |
+| buffer_turns | integer | Number of recent turns to keep verbatim. |
+| buffer_max_ratio | number | Maximum fraction of context window the buffer zone can occupy, regardless of buffer_turns. |
+
+
 ## Configuration
 
 
@@ -166,6 +204,7 @@ Global service configuration.
 | customization |  | It is possible to customize Lightspeed Core Stack via this section. System prompt can be customized and also different parts of the service can be replaced by custom Python modules. |
 | inference |  | One LLM provider and one its model might be selected as default ones. When no provider+model pair is specified in REST API calls (query endpoints), the default provider and model are used. |
 | conversation_cache |  |  |
+| compaction |  | Controls when conversation history is summarized to keep the model's input below the context window limit. Disabled by default — when disabled, requests that exceed the window continue to surface as HTTP 413. |
 | byok_rag | array | BYOK RAG configuration. This configuration can be used to reconfigure Llama Stack through its run.yaml configuration file |
 | a2a_state |  | Configuration for A2A protocol persistent state storage. |
 | quota_handlers |  | Quota handlers configuration |
@@ -254,6 +293,7 @@ Inference configuration.
 |-------|------|-------------|
 | default_model | string | Identification of default model used when no other model is specified. |
 | default_provider | string | Identification of default provider used when no other model is specified. |
+| context_windows | object | Map of fully-qualified model identifier (e.g., "openai/gpt-4o-mini") to context window size in tokens. Used by the conversation compaction trigger to decide when older turns must be summarized before the input exceeds the window. Models absent from this map have no registered window — callers fall back to their own default or skip the token-based trigger. |
 
 
 ## JsonPathOperator

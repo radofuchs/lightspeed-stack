@@ -363,6 +363,46 @@
         "title": "CORSConfiguration",
         "type": "object"
       },
+      "CompactionConfiguration": {
+        "additionalProperties": false,
+        "description": "Configuration for conversation history compaction.\n\nCompaction summarizes older conversation turns when their estimated\ntoken count approaches the context window limit, keeping the\nconversation usable instead of failing with HTTP 413. The\nconfiguration here controls when compaction triggers and how much\nrecent context is preserved verbatim.\n\nAttributes:\n    enabled: Master switch. When False, compaction never triggers\n        and other fields are inert.\n    threshold_ratio: Trigger compaction when estimated input tokens\n        exceed this fraction of the model's context window\n        (clamped to 0.0..1.0).\n    token_floor: Minimum estimated token count before compaction\n        can trigger, regardless of threshold_ratio. Prevents\n        triggering on very small context windows.\n    buffer_turns: Initial number of recent turns to keep verbatim.\n        The runtime applies a degrading guard — if these turns\n        exceed the available budget, it reduces buffer_turns by\n        one repeatedly until the budget fits, down to zero.\n    buffer_max_ratio: Hard cap on the fraction of the context\n        window the buffer zone may occupy, regardless of\n        buffer_turns.",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "description": "When true, older conversation turns are summarized when estimated tokens approach the context window limit.",
+            "title": "Enable compaction",
+            "type": "boolean"
+          },
+          "threshold_ratio": {
+            "default": 0.7,
+            "description": "Trigger compaction when estimated tokens exceed this fraction of the model's context window (0.0-1.0).",
+            "title": "Threshold ratio",
+            "type": "number"
+          },
+          "token_floor": {
+            "default": 4096,
+            "description": "Minimum token count before compaction can trigger. Prevents triggering on very small context windows.",
+            "minimum": 0,
+            "title": "Token floor",
+            "type": "integer"
+          },
+          "buffer_turns": {
+            "default": 4,
+            "description": "Number of recent turns to keep verbatim.",
+            "minimum": 0,
+            "title": "Buffer turns",
+            "type": "integer"
+          },
+          "buffer_max_ratio": {
+            "default": 0.3,
+            "description": "Maximum fraction of context window the buffer zone can occupy, regardless of buffer_turns.",
+            "title": "Buffer max ratio",
+            "type": "number"
+          }
+        },
+        "title": "CompactionConfiguration",
+        "type": "object"
+      },
       "Configuration": {
         "additionalProperties": false,
         "description": "Global service configuration.",
@@ -439,6 +479,11 @@
           "conversation_cache": {
             "$ref": "#/components/schemas/ConversationHistoryConfiguration",
             "title": "Conversation history configuration"
+          },
+          "compaction": {
+            "$ref": "#/components/schemas/CompactionConfiguration",
+            "description": "Controls when conversation history is summarized to keep the model's input below the context window limit. Disabled by default — when disabled, requests that exceed the window continue to surface as HTTP 413.",
+            "title": "Conversation compaction configuration"
           },
           "byok_rag": {
             "description": "BYOK RAG configuration. This configuration can be used to reconfigure Llama Stack through its run.yaml configuration file",
@@ -718,6 +763,15 @@
             "default": null,
             "description": "Identification of default provider used when no other model is specified.",
             "title": "Default provider"
+          },
+          "context_windows": {
+            "additionalProperties": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "Map of fully-qualified model identifier (e.g., \"openai/gpt-4o-mini\") to context window size in tokens. Used by the conversation compaction trigger to decide when older turns must be summarized before the input exceeds the window. Models absent from this map have no registered window — callers fall back to their own default or skip the token-based trigger.",
+            "title": "Per-model context window sizes (tokens)",
+            "type": "object"
           }
         },
         "title": "InferenceConfiguration",
