@@ -59,7 +59,7 @@ def test_tls_configuration_wrong_key_path() -> None:
     """Test the TLS configuration loading when some path is broken."""
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
             tls_key_path=Path("this-is-wrong"),
             tls_key_password=Path("tests/configuration/password"),
         )
@@ -77,7 +77,7 @@ def test_tls_configuration_wrong_password_path() -> None:
     """
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
             tls_key_path=Path("tests/configuration/server.key"),
             tls_key_password=Path("this-is-wrong"),
         )
@@ -104,7 +104,7 @@ def test_tls_configuration_key_path_to_directory() -> None:
     """Test the TLS configuration loading when some path points to a directory."""
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
             tls_key_path=Path("tests/"),
             tls_key_password=Path("tests/configuration/password"),
         )
@@ -114,7 +114,7 @@ def test_tls_configuration_password_path_to_directory() -> None:
     """Test the TLS configuration loading when some path points to a directory."""
     with pytest.raises(ValueError, match="Path does not point to a file"):
         TLSConfiguration(
-            tls_certificate_path=Path("tests/configurationserver.crt"),
+            tls_certificate_path=Path("tests/configuration/server.crt"),
             tls_key_path=Path("tests/configuration/server.key"),
             tls_key_password=Path("tests/"),
         )
