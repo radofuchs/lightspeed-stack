@@ -15424,7 +15424,7 @@
                 "title": "OpenAIResponseMCPApprovalResponse",
                 "description": "A response to an MCP approval request."
             },
-            "OpenAIResponseMessage-Input": {
+            "OpenAIResponseMessage": {
                 "properties": {
                     "content": {
                         "anyOf": [
@@ -15459,7 +15459,7 @@
                                 "items": {
                                     "oneOf": [
                                         {
-                                            "$ref": "#/components/schemas/OpenAIResponseOutputMessageContentOutputText-Input"
+                                            "$ref": "#/components/schemas/OpenAIResponseOutputMessageContentOutputText"
                                         },
                                         {
                                             "$ref": "#/components/schemas/OpenAIResponseContentPartRefusal"
@@ -15468,7 +15468,7 @@
                                     "discriminator": {
                                         "propertyName": "type",
                                         "mapping": {
-                                            "output_text": "#/components/schemas/OpenAIResponseOutputMessageContentOutputText-Input",
+                                            "output_text": "#/components/schemas/OpenAIResponseOutputMessageContentOutputText",
                                             "refusal": "#/components/schemas/OpenAIResponseContentPartRefusal"
                                         }
                                     }
@@ -15536,181 +15536,7 @@
                 "title": "OpenAIResponseMessage",
                 "description": "Corresponds to the various Message types in the Responses API.\nThey are all under one type because the Responses API gives them all\nthe same \"type\" value, and there is no way to tell them apart in certain\nscenarios."
             },
-            "OpenAIResponseMessage-Output": {
-                "properties": {
-                    "content": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "items": {
-                                    "oneOf": [
-                                        {
-                                            "$ref": "#/components/schemas/OpenAIResponseInputMessageContentText"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/OpenAIResponseInputMessageContentImage"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/OpenAIResponseInputMessageContentFile"
-                                        }
-                                    ],
-                                    "discriminator": {
-                                        "propertyName": "type",
-                                        "mapping": {
-                                            "input_file": "#/components/schemas/OpenAIResponseInputMessageContentFile",
-                                            "input_image": "#/components/schemas/OpenAIResponseInputMessageContentImage",
-                                            "input_text": "#/components/schemas/OpenAIResponseInputMessageContentText"
-                                        }
-                                    }
-                                },
-                                "type": "array"
-                            },
-                            {
-                                "items": {
-                                    "oneOf": [
-                                        {
-                                            "$ref": "#/components/schemas/OpenAIResponseOutputMessageContentOutputText-Output"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/OpenAIResponseContentPartRefusal"
-                                        }
-                                    ],
-                                    "discriminator": {
-                                        "propertyName": "type",
-                                        "mapping": {
-                                            "output_text": "#/components/schemas/OpenAIResponseOutputMessageContentOutputText-Output",
-                                            "refusal": "#/components/schemas/OpenAIResponseContentPartRefusal"
-                                        }
-                                    }
-                                },
-                                "type": "array"
-                            }
-                        ],
-                        "title": "Content"
-                    },
-                    "role": {
-                        "anyOf": [
-                            {
-                                "type": "string",
-                                "const": "system"
-                            },
-                            {
-                                "type": "string",
-                                "const": "developer"
-                            },
-                            {
-                                "type": "string",
-                                "const": "user"
-                            },
-                            {
-                                "type": "string",
-                                "const": "assistant"
-                            }
-                        ],
-                        "title": "Role"
-                    },
-                    "type": {
-                        "type": "string",
-                        "const": "message",
-                        "title": "Type",
-                        "default": "message"
-                    },
-                    "id": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Id"
-                    },
-                    "status": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Status"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "content",
-                    "role"
-                ],
-                "title": "OpenAIResponseMessage",
-                "description": "Corresponds to the various Message types in the Responses API.\nThey are all under one type because the Responses API gives them all\nthe same \"type\" value, and there is no way to tell them apart in certain\nscenarios."
-            },
-            "OpenAIResponseOutputMessageContentOutputText-Input": {
-                "properties": {
-                    "text": {
-                        "type": "string",
-                        "title": "Text"
-                    },
-                    "type": {
-                        "type": "string",
-                        "const": "output_text",
-                        "title": "Type",
-                        "default": "output_text"
-                    },
-                    "annotations": {
-                        "items": {
-                            "oneOf": [
-                                {
-                                    "$ref": "#/components/schemas/OpenAIResponseAnnotationFileCitation"
-                                },
-                                {
-                                    "$ref": "#/components/schemas/OpenAIResponseAnnotationCitation"
-                                },
-                                {
-                                    "$ref": "#/components/schemas/OpenAIResponseAnnotationContainerFileCitation"
-                                },
-                                {
-                                    "$ref": "#/components/schemas/OpenAIResponseAnnotationFilePath"
-                                }
-                            ],
-                            "discriminator": {
-                                "propertyName": "type",
-                                "mapping": {
-                                    "container_file_citation": "#/components/schemas/OpenAIResponseAnnotationContainerFileCitation",
-                                    "file_citation": "#/components/schemas/OpenAIResponseAnnotationFileCitation",
-                                    "file_path": "#/components/schemas/OpenAIResponseAnnotationFilePath",
-                                    "url_citation": "#/components/schemas/OpenAIResponseAnnotationCitation"
-                                }
-                            }
-                        },
-                        "type": "array",
-                        "title": "Annotations"
-                    },
-                    "logprobs": {
-                        "anyOf": [
-                            {
-                                "items": {
-                                    "$ref": "#/components/schemas/OpenAITokenLogProb"
-                                },
-                                "type": "array"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Logprobs"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "text"
-                ],
-                "title": "OpenAIResponseOutputMessageContentOutputText"
-            },
-            "OpenAIResponseOutputMessageContentOutputText-Output": {
+            "OpenAIResponseOutputMessageContentOutputText": {
                 "properties": {
                     "text": {
                         "type": "string",
@@ -17975,7 +17801,7 @@
             "ResponseItem": {
                 "anyOf": [
                     {
-                        "$ref": "#/components/schemas/OpenAIResponseMessage-Input"
+                        "$ref": "#/components/schemas/OpenAIResponseMessage"
                     },
                     {
                         "$ref": "#/components/schemas/OpenAIResponseOutputMessageWebSearchToolCall"
@@ -18372,7 +18198,7 @@
                         "items": {
                             "oneOf": [
                                 {
-                                    "$ref": "#/components/schemas/OpenAIResponseMessage-Output"
+                                    "$ref": "#/components/schemas/OpenAIResponseMessage"
                                 },
                                 {
                                     "$ref": "#/components/schemas/OpenAIResponseOutputMessageWebSearchToolCall"
@@ -18401,7 +18227,7 @@
                                     "mcp_approval_request": "#/components/schemas/OpenAIResponseMCPApprovalRequest",
                                     "mcp_call": "#/components/schemas/OpenAIResponseOutputMessageMCPCall",
                                     "mcp_list_tools": "#/components/schemas/OpenAIResponseOutputMessageMCPListTools",
-                                    "message": "#/components/schemas/OpenAIResponseMessage-Output",
+                                    "message": "#/components/schemas/OpenAIResponseMessage",
                                     "web_search_call": "#/components/schemas/OpenAIResponseOutputMessageWebSearchToolCall"
                                 }
                             }
