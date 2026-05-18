@@ -184,7 +184,7 @@ class TunnelProxy:
         self.last_connect_target = None
 
 
-class _StatsHandler:
+class _StatsHandler:  # pylint: disable=too-few-public-methods
     """Expose tunnel proxy counters over HTTP for in-cluster e2e assertions."""
 
     def __init__(self, proxy: TunnelProxy) -> None:

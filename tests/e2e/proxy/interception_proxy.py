@@ -245,7 +245,7 @@ class InterceptionProxy:
         self.intercepted_hosts.clear()
 
 
-class _InterceptionStatsHandler:
+class _InterceptionStatsHandler:  # pylint: disable=too-few-public-methods
     """Expose interception proxy counters over HTTP for in-cluster e2e assertions."""
 
     def __init__(self, proxy: InterceptionProxy) -> None:
