@@ -16311,6 +16311,14 @@
                     },
                     "ssl_mode": {
                         "type": "string",
+                        "enum": [
+                            "disable",
+                            "allow",
+                            "prefer",
+                            "require",
+                            "verify-ca",
+                            "verify-full"
+                        ],
                         "title": "SSL mode",
                         "description": "SSL mode",
                         "default": "prefer"
