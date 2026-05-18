@@ -4,23 +4,25 @@ Implements a proxy that terminates TLS from the client, inspects the traffic,
 and re-encrypts toward the destination using trustme-generated certificates.
 This simulates a corporate interception proxy (SSL inspection).
 
-The proxy generates a unique server certificate for each CONNECT target
-using the trustme CA, so the client must trust the CA certificate to
-successfully connect.
-
-Usage::
+Local Behave usage::
 
     import trustme
     ca = trustme.CA()
     proxy = InterceptionProxy(ca=ca, port=8889)
     await proxy.start()
-    # ... run tests with HTTPS_PROXY=http://localhost:8889
-    #     and ca_cert_path pointing to the trustme CA cert ...
+    # ... run tests with proxy URL and ca_cert_path pointing to the trustme CA ...
     await proxy.stop()
     assert proxy.intercepted_hosts  # verify interception happened
+
+In-cluster (Konflux/Prow) usage::
+
+    python interception_proxy.py
+    # MITM on 8889; GET http://127.0.0.1:8886/stats for counters;
+    # CA PEM at /tmp/interception-proxy-ca.pem (copy into llama-stack pod).
 """
 
 import asyncio
+import json
 import logging
 import ssl
 from pathlib import Path
@@ -29,6 +31,10 @@ from typing import Any, Optional
 import trustme
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_INTERCEPTION_PROXY_PORT = 8889
+DEFAULT_INTERCEPTION_STATS_PORT = 8886
+IN_CLUSTER_CA_CERT_PATH = Path("/tmp/interception-proxy-ca.pem")
 
 
 class InterceptionProxy:
@@ -237,3 +243,87 @@ class InterceptionProxy:
         """Reset request counters."""
         self.connect_count = 0
         self.intercepted_hosts.clear()
+
+
+class _InterceptionStatsHandler:
+    """Expose interception proxy counters over HTTP for in-cluster e2e assertions."""
+
+    def __init__(self, proxy: InterceptionProxy) -> None:
+        self._proxy = proxy
+
+    async def handle(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        """Serve ``GET /stats`` as JSON; other requests get 404."""
+        try:
+            request_line = await reader.readline()
+            if not request_line:
+                return
+            line = request_line.decode("utf-8", errors="replace").strip()
+            method_path = line.split()
+            path = method_path[1] if len(method_path) > 1 else ""
+            while True:
+                header = await reader.readline()
+                if header in (b"\r\n", b"\n", b""):
+                    break
+            if method_path and method_path[0].upper() == "GET" and path == "/stats":
+                body = json.dumps(
+                    {
+                        "connect_count": self._proxy.connect_count,
+                        "intercepted_hosts": sorted(self._proxy.intercepted_hosts),
+                    }
+                ).encode("utf-8")
+                writer.write(b"HTTP/1.1 200 OK\r\n")
+                writer.write(b"Content-Type: application/json\r\n")
+                writer.write(f"Content-Length: {len(body)}\r\n\r\n".encode())
+                writer.write(body)
+            else:
+                writer.write(b"HTTP/1.1 404 Not Found\r\n\r\n")
+            await writer.drain()
+        finally:
+            writer.close()
+
+
+async def _run_interception_stats_server(
+    proxy: InterceptionProxy, host: str, port: int
+) -> asyncio.Server:
+    """Start the stats HTTP server bound to ``host:port``."""
+    handler = _InterceptionStatsHandler(proxy)
+
+    async def _client_handler(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        await handler.handle(reader, writer)
+
+    server = await asyncio.start_server(_client_handler, host, port)
+    logger.info("Interception proxy stats listening on %s:%d", host, port)
+    return server
+
+
+async def run_in_cluster(
+    proxy_port: int = DEFAULT_INTERCEPTION_PROXY_PORT,
+    stats_port: int = DEFAULT_INTERCEPTION_STATS_PORT,
+    ca_cert_path: Path = IN_CLUSTER_CA_CERT_PATH,
+) -> None:
+    """Run MITM proxy and stats server until cancelled (in-cluster pod entrypoint)."""
+    ca = trustme.CA()
+    proxy = InterceptionProxy(ca=ca, host="0.0.0.0", port=proxy_port)
+    proxy.export_ca_cert(ca_cert_path)
+    await proxy.start()
+    stats_server = await _run_interception_stats_server(proxy, "0.0.0.0", stats_port)
+    try:
+        await asyncio.Event().wait()
+    finally:
+        stats_server.close()
+        await stats_server.wait_closed()
+        await proxy.stop()
+
+
+def main() -> None:
+    """CLI entrypoint for the ``e2e-interception-proxy`` Kubernetes pod."""
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(run_in_cluster())
+
+
+if __name__ == "__main__":
+    main()

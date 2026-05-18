@@ -13,6 +13,8 @@ feature file so readers see every restart. Cleanup restores the backup file
 """
 
 import asyncio
+import json
+import os
 import subprocess
 import tempfile
 import threading
@@ -30,6 +32,7 @@ from tests.e2e.utils.llama_config_utils import (
     restore_llama_config_if_modified,
     write_llama_config,
 )
+from tests.e2e.utils.prow_utils import get_namespace, run_e2e_ops
 from tests.e2e.utils.utils import (
     is_prow_environment,
     restart_container,
@@ -93,13 +96,111 @@ def _host_special_dns_from_container(hostname: str) -> Optional[str]:
     return ip or None
 
 
+def _cluster_tunnel_proxy_host() -> str:
+    """DNS name of the in-cluster tunnel proxy (Konflux / Prow)."""
+    explicit = os.getenv("E2E_PROXY_HOST", "").strip()
+    if explicit:
+        return explicit
+    return f"e2e-tunnel-proxy.{get_namespace()}.svc.cluster.local"
+
+
+def _fetch_cluster_tunnel_proxy_stats() -> dict[str, Any]:
+    """Read CONNECT counters from the e2e-tunnel-proxy stats HTTP server."""
+    result = run_e2e_ops("tunnel-proxy-stats", timeout=60)
+    if result.returncode != 0:
+        raise AssertionError(
+            "Failed to read e2e-tunnel-proxy stats: "
+            f"{result.stderr or result.stdout}"
+        )
+    stats = json.loads(result.stdout.strip())
+    assert isinstance(stats, dict), "tunnel-proxy-stats did not return a JSON object"
+    return stats
+
+
+def _cluster_interception_proxy_host() -> str:
+    """DNS name of the in-cluster interception proxy (Konflux / Prow)."""
+    explicit = os.getenv("E2E_INTERCEPTION_PROXY_HOST", "").strip()
+    if explicit:
+        return explicit
+    return f"e2e-interception-proxy.{get_namespace()}.svc.cluster.local"
+
+
+def _cluster_interception_proxy_port(requested_port: int) -> int:
+    """Map feature-file port to the in-cluster interception proxy listener."""
+    if requested_port in (8889, 8890):
+        return 8889
+    raise AssertionError(
+        "In-cluster e2e-interception-proxy listens on 8889 only; "
+        f"scenario requested port {requested_port}"
+    )
+
+
+def _deploy_cluster_tunnel_proxy() -> None:
+    """Deploy the in-cluster tunnel proxy pod (Konflux / Prow)."""
+    result = run_e2e_ops("deploy-e2e-tunnel-proxy", timeout=180)
+    print(result.stdout, end="")
+    if result.returncode != 0:
+        raise AssertionError(
+            "Failed to deploy e2e-tunnel-proxy: "
+            f"{result.stderr or result.stdout}"
+        )
+    os.environ.setdefault(
+        "E2E_PROXY_HOST",
+        f"e2e-tunnel-proxy.{get_namespace()}.svc.cluster.local",
+    )
+
+
+def _deploy_cluster_interception_proxy() -> None:
+    """Deploy the in-cluster interception proxy pod (Konflux / Prow)."""
+    result = run_e2e_ops("deploy-e2e-interception-proxy", timeout=200)
+    print(result.stdout, end="")
+    if result.returncode != 0:
+        raise AssertionError(
+            "Failed to deploy e2e-interception-proxy: "
+            f"{result.stderr or result.stdout}"
+        )
+    os.environ.setdefault(
+        "E2E_INTERCEPTION_PROXY_HOST",
+        f"e2e-interception-proxy.{get_namespace()}.svc.cluster.local",
+    )
+
+
+def _fetch_cluster_interception_proxy_stats() -> dict[str, Any]:
+    """Read interception counters from the e2e-interception-proxy stats HTTP server."""
+    result = run_e2e_ops("interception-proxy-stats", timeout=60)
+    if result.returncode != 0:
+        raise AssertionError(
+            "Failed to read e2e-interception-proxy stats: "
+            f"{result.stderr or result.stdout}"
+        )
+    stats = json.loads(result.stdout.strip())
+    assert isinstance(stats, dict), "interception-proxy-stats did not return JSON"
+    return stats
+
+
+_INTERCEPTION_CA_LLAMA_PATH = "/tmp/interception-proxy-ca.pem"
+
+
+def _sync_interception_proxy_ca_secret() -> None:
+    """Publish trustme CA to Secret ``e2e-interception-proxy-ca`` (mounted by llama pod)."""
+    result = run_e2e_ops("sync-interception-proxy-ca-secret", timeout=90)
+    print(result.stdout, end="")
+    if result.returncode != 0:
+        raise AssertionError(
+            "Failed to sync interception proxy CA secret: "
+            f"{result.stderr or result.stdout}"
+        )
+
+
 def _get_proxy_host(is_docker: bool) -> str:
-    """Get the host address that containers can use to reach the proxy on the host.
+    """Get the host address that Llama Stack should use to reach the tunnel proxy.
 
     Parameters:
     ----------
         is_docker: Whether services are running in Docker (local e2e).
     """
+    if is_prow_environment():
+        return _cluster_tunnel_proxy_host()
     if not is_docker:
         return "127.0.0.1"
     for hostname in ("host.docker.internal", "host.containers.internal"):
@@ -194,6 +295,9 @@ def restore_if_modified(context: Context) -> None:
     # Stop any leftover proxy servers from previous scenario
     _stop_proxy(context, "tunnel_proxy", "proxy_loop")
     _stop_proxy(context, "interception_proxy", "interception_proxy_loop")
+    os.environ.pop("E2E_COPY_INTERCEPTION_CA_TO_LLAMA", None)
+    if hasattr(context, "needs_interception_ca_on_llama"):
+        delattr(context, "needs_interception_ca_on_llama")
 
     if restore_llama_config_if_modified():
         print("Restoring original Llama Stack config from backup...")
@@ -220,7 +324,22 @@ def restart_lightspeed_stack(context: Context) -> None:
 
 @given("A tunnel proxy is running on port {port:d}")
 def start_tunnel_proxy(context: Context, port: int) -> None:
-    """Start a tunnel proxy in a background thread."""
+    """Start a tunnel proxy locally, or verify the in-cluster proxy (Konflux/Prow)."""
+    if is_prow_environment():
+        if port != 8888:
+            raise AssertionError(
+                "In-cluster e2e-tunnel-proxy is fixed on port 8888; "
+                f"scenario requested port {port}"
+            )
+        context.tunnel_proxy = None
+        context.cluster_tunnel_proxy_port = port
+        _deploy_cluster_tunnel_proxy()
+        print(
+            f"Using in-cluster tunnel proxy at "
+            f"http://{_cluster_tunnel_proxy_host()}:{port}"
+        )
+        return
+
     from tests.e2e.proxy.tunnel_proxy import TunnelProxy
 
     # Bind to 0.0.0.0 so Docker containers can reach the proxy
@@ -243,7 +362,11 @@ def start_tunnel_proxy(context: Context, port: int) -> None:
 def configure_llama_tunnel_proxy(context: Context) -> None:
     """Modify run.yaml with proxy config pointing to the tunnel proxy."""
     backup_llama_config()
-    proxy = context.tunnel_proxy
+    if is_prow_environment():
+        proxy_port = getattr(context, "cluster_tunnel_proxy_port", 8888)
+    else:
+        proxy = context.tunnel_proxy
+        proxy_port = proxy.port
     proxy_host = _get_proxy_host(context.is_docker_mode)
     config = load_llama_config()
     provider = _find_inference_provider(context, config)
@@ -252,7 +375,7 @@ def configure_llama_tunnel_proxy(context: Context) -> None:
         provider["config"] = {}
     provider["config"]["network"] = {
         "proxy": {
-            "url": f"http://{proxy_host}:{proxy.port}",
+            "url": f"http://{proxy_host}:{proxy_port}",
         }
     }
 
@@ -283,6 +406,18 @@ def configure_llama_unreachable_proxy(context: Context, proxy_url: str) -> None:
 @given("An interception proxy with trustme CA is running on port {port:d}")
 def start_interception_proxy(context: Context, port: int) -> None:
     """Start an interception proxy with trustme CA."""
+    if is_prow_environment():
+        cluster_port = _cluster_interception_proxy_port(port)
+        context.interception_proxy = None
+        context.cluster_interception_proxy_port = cluster_port
+        context.ca_cert_path_for_config = _INTERCEPTION_CA_LLAMA_PATH
+        _deploy_cluster_interception_proxy()
+        print(
+            f"Using in-cluster interception proxy at "
+            f"http://{_cluster_interception_proxy_host()}:{cluster_port}"
+        )
+        return
+
     from tests.e2e.proxy.interception_proxy import InterceptionProxy
 
     ca = trustme.CA()
@@ -325,8 +460,16 @@ def start_interception_proxy(context: Context, port: int) -> None:
 def configure_llama_interception_with_ca(context: Context) -> None:
     """Modify run.yaml with interception proxy and CA cert config."""
     backup_llama_config()
-    proxy = context.interception_proxy
-    proxy_host = _get_proxy_host(context.is_docker_mode)
+    context.needs_interception_ca_on_llama = True
+    if is_prow_environment():
+        os.environ["E2E_COPY_INTERCEPTION_CA_TO_LLAMA"] = "1"
+    if is_prow_environment():
+        proxy_port = getattr(context, "cluster_interception_proxy_port", 8889)
+        proxy_host = _cluster_interception_proxy_host()
+    else:
+        proxy = context.interception_proxy
+        proxy_port = proxy.port
+        proxy_host = _get_proxy_host(context.is_docker_mode)
     config = load_llama_config()
     provider = _find_inference_provider(context, config)
 
@@ -334,7 +477,7 @@ def configure_llama_interception_with_ca(context: Context) -> None:
         provider["config"] = {}
     provider["config"]["network"] = {
         "proxy": {
-            "url": f"http://{proxy_host}:{proxy.port}",
+            "url": f"http://{proxy_host}:{proxy_port}",
             "cacert": context.ca_cert_path_for_config,
         },
         "tls": {
@@ -343,6 +486,8 @@ def configure_llama_interception_with_ca(context: Context) -> None:
     }
 
     write_llama_config(config)
+    if is_prow_environment():
+        _sync_interception_proxy_ca_secret()
 
 
 @given(
@@ -352,8 +497,15 @@ def configure_llama_interception_with_ca(context: Context) -> None:
 def configure_llama_interception_no_ca(context: Context) -> None:
     """Modify run.yaml with interception proxy but NO CA cert."""
     backup_llama_config()
-    proxy = context.interception_proxy
-    proxy_host = _get_proxy_host(context.is_docker_mode)
+    context.needs_interception_ca_on_llama = False
+    os.environ.pop("E2E_COPY_INTERCEPTION_CA_TO_LLAMA", None)
+    if is_prow_environment():
+        proxy_port = getattr(context, "cluster_interception_proxy_port", 8889)
+        proxy_host = _cluster_interception_proxy_host()
+    else:
+        proxy = context.interception_proxy
+        proxy_port = proxy.port
+        proxy_host = _get_proxy_host(context.is_docker_mode)
     config = load_llama_config()
     provider = _find_inference_provider(context, config)
 
@@ -361,7 +513,7 @@ def configure_llama_interception_no_ca(context: Context) -> None:
         provider["config"] = {}
     provider["config"]["network"] = {
         "proxy": {
-            "url": f"http://{proxy_host}:{proxy.port}",
+            "url": f"http://{proxy_host}:{proxy_port}",
         },
     }
 
@@ -415,6 +567,16 @@ def configure_llama_ciphers(context: Context, ciphers: str) -> None:
 )
 def verify_tunnel_proxy_used(context: Context, count: int) -> None:
     """Verify the tunnel proxy received CONNECT requests."""
+    if is_prow_environment():
+        stats = _fetch_cluster_tunnel_proxy_stats()
+        connect_count = int(stats.get("connect_count", 0))
+        last_target = stats.get("last_connect_target")
+        assert (
+            connect_count >= count
+        ), f"Expected at least {count} CONNECT requests, got {connect_count}"
+        assert last_target is not None, "No CONNECT target recorded"
+        return
+
     proxy = context.tunnel_proxy
     assert proxy.connect_count >= count, (
         f"Expected at least {count} CONNECT requests, " f"got {proxy.connect_count}"
@@ -425,6 +587,16 @@ def verify_tunnel_proxy_used(context: Context, count: int) -> None:
 @then("The interception proxy intercepted at least {count:d} connection")
 def verify_interception_proxy_used(context: Context, count: int) -> None:
     """Verify the interception proxy intercepted connections."""
+    if is_prow_environment():
+        stats = _fetch_cluster_interception_proxy_stats()
+        connect_count = int(stats.get("connect_count", 0))
+        assert (
+            connect_count >= count
+        ), f"Expected at least {count} intercepted connections, got {connect_count}"
+        intercepted = stats.get("intercepted_hosts") or []
+        assert intercepted, "No intercepted hosts recorded"
+        return
+
     proxy = context.interception_proxy
     assert proxy.connect_count >= count, (
         f"Expected at least {count} intercepted connections, "

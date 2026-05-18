@@ -201,6 +201,11 @@ spec:
         - name: rag-data
           mountPath: /opt/app-root/rag-data-cm
           readOnly: true
+        # proxy.feature (interception): PEM from Secret e2e-interception-proxy-ca (optional).
+        - name: interception-proxy-ca
+          mountPath: /tmp/interception-proxy-ca.pem
+          subPath: ca.pem
+          readOnly: true
   volumes:
     - name: app-root
       emptyDir: {}
@@ -213,3 +218,7 @@ spec:
     - name: rag-data
       configMap:
         name: rag-data
+    - name: interception-proxy-ca
+      secret:
+        secretName: e2e-interception-proxy-ca
+        optional: true
