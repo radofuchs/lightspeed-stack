@@ -139,6 +139,15 @@ def test_postgresql_database_configuration_port_setting(subtests: SubTests) -> N
                 port=-1,
             )  # pyright: ignore[reportCallIssue]
 
+    with subtests.test(msg="Zero port value"):
+        with pytest.raises(ValidationError, match="Input should be greater than 0"):
+            PostgreSQLDatabaseConfiguration(
+                db="db",
+                user="user",
+                password="password",
+                port=0,
+            )  # pyright: ignore[reportCallIssue]
+
     with subtests.test(msg="Too big port value"):
         with pytest.raises(ValueError, match="Port value should be less than 65536"):
             PostgreSQLDatabaseConfiguration(
@@ -146,6 +155,24 @@ def test_postgresql_database_configuration_port_setting(subtests: SubTests) -> N
                 user="user",
                 password="password",
                 port=100000,
+            )  # pyright: ignore[reportCallIssue]
+
+    with subtests.test(msg="Non integer port value"):
+        with pytest.raises(ValueError, match="Input should be a valid integer"):
+            PostgreSQLDatabaseConfiguration(
+                db="db",
+                user="user",
+                password="password",
+                port="xyzzy",
+            )  # pyright: ignore[reportCallIssue]
+
+    with subtests.test(msg="Null port value"):
+        with pytest.raises(ValueError, match="Input should be a valid integer"):
+            PostgreSQLDatabaseConfiguration(
+                db="db",
+                user="user",
+                password="password",
+                port=None,
             )  # pyright: ignore[reportCallIssue]
 
 
@@ -181,4 +208,14 @@ def test_postgresql_database_configuration_ca_cert_path(subtests: SubTests) -> N
                 password="password",
                 port=1234,
                 ca_cert_path=Path("not a file"),
+            )  # pyright: ignore[reportCallIssue]
+
+    with subtests.test(msg="Path is empty"):
+        with pytest.raises(ValidationError, match="Path does not point to a file"):
+            PostgreSQLDatabaseConfiguration(
+                db="db",
+                user="user",
+                password="password",
+                port=1234,
+                ca_cert_path=Path(""),
             )  # pyright: ignore[reportCallIssue]
