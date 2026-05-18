@@ -141,8 +141,7 @@ def _deploy_cluster_tunnel_proxy() -> None:
     print(result.stdout, end="")
     if result.returncode != 0:
         raise AssertionError(
-            "Failed to deploy e2e-tunnel-proxy: "
-            f"{result.stderr or result.stdout}"
+            "Failed to deploy e2e-tunnel-proxy: " f"{result.stderr or result.stdout}"
         )
     os.environ.setdefault(
         "E2E_PROXY_HOST",
