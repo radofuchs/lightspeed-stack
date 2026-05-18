@@ -228,8 +228,10 @@ class PostgreSQLDatabaseConfiguration(ConfigurationBase):
         description="Database namespace",
     )
 
-    ssl_mode: str = Field(
-        constants.POSTGRES_DEFAULT_SSL_MODE,
+    ssl_mode: Literal[
+        "disable", "allow", "prefer", "require", "verify-ca", "verify-full"
+    ] = Field(
+        default=constants.POSTGRES_DEFAULT_SSL_MODE,
         title="SSL mode",
         description="SSL mode",
     )
