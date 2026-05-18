@@ -219,3 +219,48 @@ def test_postgresql_database_configuration_ca_cert_path(subtests: SubTests) -> N
                 port=1234,
                 ca_cert_path=Path(""),
             )  # pyright: ignore[reportCallIssue]
+
+
+def test_postgresql_database_configuration_ssl_mode(subtests: SubTests) -> None:
+    """Test the PostgreSQLDatabaseConfiguration model."""
+    ssl_modes = ("disable", "allow", "prefer", "require", "verify-ca", "verify-full")
+
+    for ssl_mode in ssl_modes:
+        with subtests.test(msg=f"SSL mode {ssl_mode}"):
+            # pylint: disable=no-member
+            c = PostgreSQLDatabaseConfiguration(
+                db="db",
+                user="user",
+                password="password",
+                ssl_mode=ssl_mode,
+            )  # pyright: ignore[reportCallIssue]
+
+            # most attributes are set to default values
+            assert c is not None
+            assert c.host == "localhost"
+            assert c.port == 5432
+            assert c.db == "db"
+            assert c.user == "user"
+            assert c.password.get_secret_value() == "password"
+            assert c.ssl_mode == ssl_mode
+            assert c.gss_encmode == POSTGRES_DEFAULT_GSS_ENCMODE
+            assert c.namespace == "public"
+            assert c.ca_cert_path is None
+
+
+def test_postgresql_database_configuration_improper_ssl_mode(
+    subtests: SubTests,
+) -> None:
+    """Test the PostgreSQLDatabaseConfiguration model."""
+    ssl_modes = ("foo", "bar", "baz", "")
+
+    for ssl_mode in ssl_modes:
+        with subtests.test(msg=f"SSL mode {ssl_mode}"):
+            with pytest.raises(ValueError, match="Input should be 'disable'"):
+                # pylint: disable=no-member
+                PostgreSQLDatabaseConfiguration(
+                    db="db",
+                    user="user",
+                    password="password",
+                    ssl_mode=ssl_mode,
+                )  # pyright: ignore[reportCallIssue]
