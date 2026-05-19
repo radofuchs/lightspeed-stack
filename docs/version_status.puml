@@ -18,7 +18,7 @@ printscale monthly
 [0.7rc1] starts 2026-07-01 and ends 2026-07-31 and is colored in yellow
 [0.7rc2] starts 2026-08-01 and ends 2026-08-31 and is colored in yellow
 [0.7rc2] starts after [0.7rc1]'s end
-[0.7] starts 2026-09-01 and ends 2026-12-31 and is colored in yellow
+[0.7] starts 2026-09-01 and ends 2027-01-31 and is colored in yellow
 [0.7] starts after [0.7rc2]'s end
 
 @endgantt
