@@ -236,7 +236,7 @@ class PostgreSQLDatabaseConfiguration(ConfigurationBase):
         description="SSL mode",
     )
 
-    gss_encmode: str = Field(
+    gss_encmode: Literal["disable", "prefer", "require"] = Field(
         constants.POSTGRES_DEFAULT_GSS_ENCMODE,
         title="GSS encmode",
         description="This option determines whether or with what priority a secure GSS "

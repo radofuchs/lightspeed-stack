@@ -16325,6 +16325,11 @@
                     },
                     "gss_encmode": {
                         "type": "string",
+                        "enum": [
+                            "disable",
+                            "prefer",
+                            "require"
+                        ],
                         "title": "GSS encmode",
                         "description": "This option determines whether or with what priority a secure GSS TCP/IP connection will be negotiated with the server.",
                         "default": "prefer"
