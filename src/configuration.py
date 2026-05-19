@@ -14,6 +14,7 @@ from cache.cache_factory import CacheFactory
 from log import get_logger
 from models.config import (
     A2AStateConfiguration,
+    ApprovalsConfiguration,
     AuthenticationConfiguration,
     AuthorizationConfiguration,
     AzureEntraIdConfiguration,
@@ -458,6 +459,20 @@ class AppConfig:  # pylint: disable=too-many-public-methods
         if self._configuration is None:
             raise LogicError("logic error: configuration is not loaded")
         return self._configuration.rag
+
+    @property
+    def approvals_configuration(self) -> ApprovalsConfiguration:
+        """Return human-in-the-loop approvals configuration.
+
+        Returns:
+            ApprovalsConfiguration: Settings for MCP tool approval workflow.
+
+        Raises:
+            LogicError: If the configuration has not been loaded.
+        """
+        if self._configuration is None:
+            raise LogicError("logic error: configuration is not loaded")
+        return self._configuration.approvals
 
     @property
     def okp(self) -> "OkpConfiguration":

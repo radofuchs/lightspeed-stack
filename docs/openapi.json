@@ -11400,7 +11400,7 @@
                 "title": "AllowedToolsFilter",
                 "description": "Filter configuration for restricting which MCP tools can be used.\n\n:param tool_names: (Optional) List of specific tool names that are allowed"
             },
-            "ApprovalFilter": {
+            "ApprovalFilter-Input": {
                 "properties": {
                     "always": {
                         "anyOf": [
@@ -11434,6 +11434,52 @@
                 "type": "object",
                 "title": "ApprovalFilter",
                 "description": "Filter configuration for MCP tool approval requirements.\n\n:param always: (Optional) List of tool names that always require approval\n:param never: (Optional) List of tool names that never require approval"
+            },
+            "ApprovalFilter-Output": {
+                "properties": {
+                    "always": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Always require approval",
+                        "description": "List of tool names that always require human approval"
+                    },
+                    "never": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Never require approval",
+                        "description": "List of tool names that never require approval"
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "ApprovalFilter",
+                "description": "Granular approval control for specific MCP tools.\n\nAttributes:\n    always: Tool names that always require human approval before execution.\n    never: Tool names that never require approval (pre-approved)."
+            },
+            "ApprovalsConfiguration": {
+                "properties": {
+                    "approval_timeout_seconds": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Approval timeout",
+                        "description": "Seconds before pending approval requests expire",
+                        "default": 300
+                    },
+                    "approval_retention_days": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Retention period",
+                        "description": "Days to retain decided approvals before cleanup",
+                        "default": 30
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "ApprovalsConfiguration",
+                "description": "Configuration for human-in-the-loop approvals.\n\nAttributes:\n    approval_timeout_seconds: How long approval requests remain pending\n        before expiring.\n    approval_retention_days: How long to retain decided approvals for audit\n        purposes before cleanup."
             },
             "Attachment": {
                 "properties": {
@@ -12015,6 +12061,11 @@
                         "$ref": "#/components/schemas/CompactionConfiguration",
                         "title": "Conversation compaction configuration",
                         "description": "Controls when conversation history is summarized to keep the model's input below the context window limit. Disabled by default \u2014 when disabled, requests that exceed the window continue to surface as HTTP 413."
+                    },
+                    "approvals": {
+                        "$ref": "#/components/schemas/ApprovalsConfiguration",
+                        "title": "Approvals configuration",
+                        "description": "Settings for human-in-the-loop approval of MCP tool invocations"
                     },
                     "byok_rag": {
                         "items": {
@@ -14264,6 +14315,23 @@
                         "title": "Propagated headers",
                         "description": "List of HTTP header names to automatically forward from the incoming request to this MCP server. Headers listed here are extracted from the original client request and included when calling the MCP server. This is useful when infrastructure components (e.g. API gateways) inject headers that MCP servers need, such as x-rh-identity in HCC. Header matching is case-insensitive. These headers are additive with authorization_headers and MCP-HEADERS."
                     },
+                    "require_approval": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "always",
+                                    "never"
+                                ]
+                            },
+                            {
+                                "$ref": "#/components/schemas/ApprovalFilter-Output"
+                            }
+                        ],
+                        "title": "Approval requirement",
+                        "description": "When to require human approval for tool invocations. 'always' requires approval for all tools, 'never' auto-approves, or use ApprovalFilter for granular control.",
+                        "default": "never"
+                    },
                     "timeout": {
                         "anyOf": [
                             {
@@ -15269,7 +15337,7 @@
                                 "const": "never"
                             },
                             {
-                                "$ref": "#/components/schemas/ApprovalFilter"
+                                "$ref": "#/components/schemas/ApprovalFilter-Input"
                             }
                         ],
                         "title": "Require Approval",

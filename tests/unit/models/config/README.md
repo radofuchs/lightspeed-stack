@@ -6,6 +6,9 @@ Unit tests for models defined in config.py.
 ## [test_a2a_state_configuration.py](test_a2a_state_configuration.py)
 Unit tests for A2AStateConfiguration.
 
+## [test_approvals_configuration.py](test_approvals_configuration.py)
+Unit tests for human-in-the-loop approvals configuration models.
+
 ## [test_authentication_configuration.py](test_authentication_configuration.py)
 Unit tests for AuthenticationConfiguration model.
 

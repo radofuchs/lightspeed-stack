@@ -467,6 +467,65 @@ class ServiceConfiguration(ConfigurationBase):
         return self
 
 
+class ApprovalFilter(ConfigurationBase):
+    """Granular approval control for specific MCP tools.
+
+    Attributes:
+        always: Tool names that always require human approval before execution.
+        never: Tool names that never require approval (pre-approved).
+    """
+
+    always: list[str] = Field(
+        default_factory=list,
+        title="Always require approval",
+        description="List of tool names that always require human approval",
+    )
+    never: list[str] = Field(
+        default_factory=list,
+        title="Never require approval",
+        description="List of tool names that never require approval",
+    )
+
+    @model_validator(mode="after")
+    def validate_no_overlap(self) -> Self:
+        """Ensure no tool appears in both always and never lists.
+
+        Raises:
+            ValueError: If any tool name is present in both lists.
+
+        Returns:
+            Self: The validated model instance.
+        """
+        overlap = set(self.always) & set(self.never)
+        if overlap:
+            raise ValueError(
+                f"Tools cannot be in both always and never lists: {overlap}"
+            )
+        return self
+
+
+class ApprovalsConfiguration(ConfigurationBase):
+    """Configuration for human-in-the-loop approvals.
+
+    Attributes:
+        approval_timeout_seconds: How long approval requests remain pending
+            before expiring.
+        approval_retention_days: How long to retain decided approvals for audit
+            purposes before cleanup.
+    """
+
+    approval_timeout_seconds: PositiveInt = Field(
+        default=300,
+        title="Approval timeout",
+        description="Seconds before pending approval requests expire",
+    )
+    approval_retention_days: PositiveInt = Field(
+        default=30,
+        title="Retention period",
+        description="Days to retain decided approvals before cleanup",
+    )
+
+
 class ModelContextProtocolServer(ConfigurationBase):
     """Model context protocol server configuration.
 
@@ -554,6 +613,16 @@ class ModelContextProtocolServer(ConfigurationBase):
                 raise ValueError(msg)
             seen.add(lower)
         return value
+
+    require_approval: Literal["always", "never"] | ApprovalFilter = Field(
+        default="never",
+        title="Approval requirement",
+        description=(
+            "When to require human approval for tool invocations. "
+            "'always' requires approval for all tools, 'never' auto-approves, "
+            "or use ApprovalFilter for granular control."
+        ),
+    )
 
     timeout: Optional[PositiveInt] = Field(
         default=None,
@@ -2049,6 +2118,12 @@ class Configuration(ConfigurationBase):
         "to keep the model's input below the context window limit. "
         "Disabled by default — when disabled, requests that exceed the "
         "window continue to surface as HTTP 413.",
+    )
+
+    approvals: ApprovalsConfiguration = Field(
+        default_factory=ApprovalsConfiguration,
+        title="Approvals configuration",
+        description="Settings for human-in-the-loop approval of MCP tool invocations",
     )
 
     byok_rag: list[ByokRag] = Field(
