@@ -16325,6 +16325,11 @@
                     },
                     "gss_encmode": {
                         "type": "string",
+                        "enum": [
+                            "disable",
+                            "prefer",
+                            "require"
+                        ],
                         "title": "GSS encmode",
                         "description": "This option determines whether or with what priority a secure GSS TCP/IP connection will be negotiated with the server.",
                         "default": "prefer"
@@ -19250,39 +19255,12 @@
                             }
                         ],
                         "title": "Filters",
-                        "description": "Solr provider filter payload passed through as params['solr']. Supports structured metadata filters (eq, ne, in, nin comparison operators). Legacy filter-only objects (e.g. fq) are still accepted.",
+                        "description": "Solr provider filter payload passed through as params['solr'].",
                         "examples": [
                             {
-                                "filters": {
-                                    "key": "product",
-                                    "type": "eq",
-                                    "value": "openshift_container_platform"
-                                }
-                            },
-                            {
-                                "filters": {
-                                    "filters": [
-                                        {
-                                            "key": "product",
-                                            "type": "eq",
-                                            "value": "openshift_container_platform"
-                                        },
-                                        {
-                                            "key": "version",
-                                            "type": "in",
-                                            "value": [
-                                                "4.14",
-                                                "4.15",
-                                                "4.16"
-                                            ]
-                                        }
-                                    ],
-                                    "type": "and"
-                                }
-                            },
-                            {
                                 "fq": [
-                                    "product:*openshift*"
+                                    "product:*openshift*",
+                                    "product_version:*4.16*"
                                 ]
                             }
                         ]
