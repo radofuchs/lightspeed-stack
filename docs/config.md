@@ -62,6 +62,40 @@ Note: this is not a real model, just an enumeration of all action names.
 
 
 
+## ApprovalFilter
+
+
+Granular approval control for specific MCP tools.
+
+Attributes:
+    always: Tool names that always require human approval before execution.
+    never: Tool names that never require approval (pre-approved).
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| always | array | List of tool names that always require human approval |
+| never | array | List of tool names that never require approval |
+
+
+## ApprovalsConfiguration
+
+
+Configuration for human-in-the-loop approvals.
+
+Attributes:
+    approval_timeout_seconds: How long approval requests remain pending
+        before expiring.
+    approval_retention_days: How long to retain decided approvals for audit
+        purposes before cleanup.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| approval_timeout_seconds | integer | Seconds before pending approval requests expire |
+| approval_retention_days | integer | Days to retain decided approvals before cleanup |
+
+
 ## AuthenticationConfiguration
 
 
@@ -205,6 +239,7 @@ Global service configuration.
 | inference |  | One LLM provider and one its model might be selected as default ones. When no provider+model pair is specified in REST API calls (query endpoints), the default provider and model are used. |
 | conversation_cache |  |  |
 | compaction |  | Controls when conversation history is summarized to keep the model's input below the context window limit. Disabled by default — when disabled, requests that exceed the window continue to surface as HTTP 413. |
+| approvals |  | Settings for human-in-the-loop approval of MCP tool invocations |
 | byok_rag | array | BYOK RAG configuration. This configuration can be used to reconfigure Llama Stack through its run.yaml configuration file |
 | a2a_state |  | Configuration for A2A protocol persistent state storage. |
 | quota_handlers |  | Quota handlers configuration |
@@ -419,6 +454,7 @@ Useful resources:
 | url | string | URL of the MCP server |
 | authorization_headers | object | Headers to send to the MCP server. The map contains the header name and the path to a file containing the header value (secret). There are 3 special cases: 1. Usage of the kubernetes token in the header. To specify this use a string 'kubernetes' instead of the file path. 2. Usage of the client-provided token in the header. To specify this use a string 'client' instead of the file path. 3. Usage of the oauth token in the header. To specify this use a string 'oauth' instead of the file path.  |
 | headers | array | List of HTTP header names to automatically forward from the incoming request to this MCP server. Headers listed here are extracted from the original client request and included when calling the MCP server. This is useful when infrastructure components (e.g. API gateways) inject headers that MCP servers need, such as x-rh-identity in HCC. Header matching is case-insensitive. These headers are additive with authorization_headers and MCP-HEADERS. |
+| require_approval | string or object | When to require human approval for MCP tool invocations. 'always' requires approval for all tools, 'never' auto-approves all tools (default), or use an ApprovalFilter for granular per-tool control. |
 | timeout | integer | Timeout in seconds for requests to the MCP server. If not specified, the default timeout from Llama Stack will be used. Note: This field is reserved for future use when Llama Stack adds timeout support. |
 
 

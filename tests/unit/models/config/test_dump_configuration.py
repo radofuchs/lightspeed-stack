@@ -5,6 +5,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 from pydantic import SecretStr
 
@@ -24,6 +25,18 @@ from models.config import (
     TLSConfiguration,
     UserDataCollection,
 )
+
+_DEFAULT_APPROVALS_DUMP: dict[str, int] = {
+    "approval_timeout_seconds": 300,
+    "approval_retention_days": 30,
+}
+
+_MCP_SERVER_DUMP_DEFAULTS: dict[str, Any] = {
+    "authorization_headers": {},
+    "headers": [],
+    "require_approval": "never",
+    "timeout": None,
+}
 
 
 def test_dump_configuration(tmp_path: Path) -> None:
@@ -199,6 +212,7 @@ def test_dump_configuration(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
@@ -283,9 +297,7 @@ def test_dump_configuration_with_one_mcp_server(tmp_path: Path) -> None:
                 "name": "test-server",
                 "url": "http://localhost:8080",
                 "provider_id": "model-context-protocol",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             }
         ]
 
@@ -343,25 +355,19 @@ def test_dump_configuration_with_more_mcp_servers(tmp_path: Path) -> None:
                 "name": "test-server-1",
                 "provider_id": "model-context-protocol",
                 "url": "http://localhost:8081",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             },
             {
                 "name": "test-server-2",
                 "provider_id": "model-context-protocol",
                 "url": "http://localhost:8082",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             },
             {
                 "name": "test-server-3",
                 "provider_id": "model-context-protocol",
                 "url": "http://localhost:8083",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             },
         ]
 
@@ -555,6 +561,7 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
@@ -802,6 +809,7 @@ def test_dump_configuration_with_quota_limiters_different_values(
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
@@ -1029,6 +1037,7 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [
                 {
                     "db_path": "tests/configuration/rag.txt",
@@ -1246,6 +1255,7 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
