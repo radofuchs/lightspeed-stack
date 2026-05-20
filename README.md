@@ -729,24 +729,14 @@ customization:
 
 By default, clients may specify `model` and `provider` in `/v1/query` and `/v1/streaming_query`. Override is permitted only to callers granted the `MODEL_OVERRIDE` action via the authorization rules. Requests that include `model` or `provider` without this permission are rejected with HTTP 403.
 
-## Agent Skills
-
-Agent Skills allow product teams to extend Lightspeed Core with specialized instructions and domain knowledge that the LLM can load on demand. Skills follow the [Agent Skills open standard](https://agentskills.io) and are packaged as portable directories containing a `SKILL.md` file.
-
-Skills are configured by specifying paths to skill directories in `lightspeed-stack.yaml`:
-
-```yaml
-skills:
-  paths:
-    - "/var/skills/"  # Directory containing skill subdirectories
-```
-
-Each skill directory must contain a `SKILL.md` file with YAML frontmatter (`name` and `description`) followed by Markdown instructions. The LLM discovers available skills via tool calls and loads instructions on demand.
+## Agent Skills (Upcoming)
 
 > [!NOTE]
-> Skills are configured by product teams at deployment time. End users do not have the ability to add skills.
+> Agent Skills is an upcoming feature. The documentation below describes the planned design.
 
-For the full configuration guide, skill authoring instructions, and examples, see the [Agent Skills Guide](docs/skills_guide.md).
+Agent Skills will allow product teams to extend Lightspeed Core with specialized instructions and domain knowledge that the LLM can load on demand. Skills follow the [Agent Skills open standard](https://agentskills.io) and are packaged as portable directories containing a `SKILL.md` file.
+
+For the planned configuration guide, skill authoring instructions, and examples, see the [Agent Skills Guide](docs/skills_guide.md).
 
 ## Safety Shields
 

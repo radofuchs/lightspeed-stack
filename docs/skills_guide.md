@@ -1,5 +1,8 @@
 # Agent Skills Guide
 
+> [!NOTE]
+> Agent Skills is an upcoming feature. This guide describes the planned design and will be updated when the feature is available.
+
 This guide covers how to configure Agent Skills in Lightspeed Core Stack and how to author your own skills.
 
 ---
@@ -15,7 +18,6 @@ This guide covers how to configure Agent Skills in Lightspeed Core Stack and how
 - [Creating a Skill](#creating-a-skill)
 - [How Skills Work at Runtime](#how-skills-work-at-runtime)
 - [Limitations](#limitations)
-- [Error Reference](#error-reference)
 - [References](#references)
 
 ---
