@@ -2015,6 +2015,26 @@ class AzureEntraIdConfiguration(ConfigurationBase):
     )
 
 
+class SkillsConfiguration(ConfigurationBase):
+    """Agent skills configuration.
+
+    Specifies paths to skill directories. Skill metadata (name, description)
+    is read from SKILL.md frontmatter at startup.
+
+    Each path can point to either:
+    - A directory containing a SKILL.md file (single skill)
+    - A directory containing subdirectories with SKILL.md files (multiple skills)
+
+    Paths are validated at startup to ensure they exist and contain valid SKILL.md files.
+    """
+
+    paths: list[Path] = Field(
+        default_factory=list,
+        title="Skill paths",
+        description="Paths to skill directories or directories containing skill subdirectories.",
+    )
+
+
 class Configuration(ConfigurationBase):
     """Global service configuration."""
 
@@ -2185,6 +2205,12 @@ class Configuration(ConfigurationBase):
         default_factory=RerankerConfiguration,
         title="Reranker configuration",
         description="Configuration for neural reranking of RAG chunks using cross-encoder.",
+    )
+
+    skills: Optional[SkillsConfiguration] = Field(
+        default=None,
+        title="Agent skills",
+        description="Agent skills configuration. Specifies paths to skill directories.",
     )
 
     @model_validator(mode="after")
