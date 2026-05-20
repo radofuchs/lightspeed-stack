@@ -206,6 +206,10 @@ spec:
           mountPath: /tmp/interception-proxy-ca.pem
           subPath: ca.pem
           readOnly: true
+        # tls.feature: client/CA PEMs from Secret e2e-mock-tls-certs (optional).
+        - name: mock-tls-certs
+          mountPath: /certs
+          readOnly: true
   volumes:
     - name: app-root
       emptyDir: {}
@@ -221,4 +225,8 @@ spec:
     - name: interception-proxy-ca
       secret:
         secretName: e2e-interception-proxy-ca
+        optional: true
+    - name: mock-tls-certs
+      secret:
+        secretName: e2e-mock-tls-certs
         optional: true

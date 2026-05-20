@@ -1,7 +1,9 @@
-@e2e_group_1 @skip-in-library-mode @skip-in-prow
+@e2e_group_1 @skip-in-library-mode
 Feature: TLS configuration for remote inference providers
   Validate that Llama Stack's NetworkConfig.tls settings are applied correctly
   when connecting to a remote inference provider over HTTPS.
+
+  # Only Llama run.yaml changes per scenario; LCS uses lightspeed-stack-tls.yaml throughout.
 
   Background:
     Given The service is started locally
@@ -10,6 +12,7 @@ Feature: TLS configuration for remote inference providers
       And the Lightspeed stack configuration directory is "tests/e2e/configuration"
       And The service uses the lightspeed-stack-tls.yaml configuration
       And The service is restarted
+      And The mock TLS inference server is deployed
       And The original Llama Stack config is restored if modified
 
   Scenario: Inference succeeds with TLS verification disabled
