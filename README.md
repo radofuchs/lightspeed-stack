@@ -178,20 +178,22 @@ To quickly get hands on LCS, we can run it using the default configurations prov
    ```bash
    export OPENAI_API_KEY=sk-xxxxx
    ```
-3. start Llama stack server
+3. start LCS server 
    ```bash
-   uv run llama stack run local-run.yaml
-   ```
-4. [Optional] If you're new to Llama stack, run through a quick tutorial to learn the basics of what the server is used for, by running the interactive tutorial script
-   ```bash
-   ./scripts/llama_stack_tutorial.sh
-   ```
-5. check the LCS settings in [lightspeed-stack.yaml](lightspeed-stack.yaml). `llama_stack.url` should be `url: http://localhost:8321`
-6. start LCS server
-    ```
    make run
-    ```
-7. access LCS web UI at [http://localhost:8080/](http://localhost:8080/)
+   ```
+4. access LCS web UI at [http://localhost:8080/](http://localhost:8080/)
+
+**Note**: `make run` uses containerized llama-stack (service mode). To run llama-stack manually instead, see the [Llama Stack as separate server](#llama-stack-as-separate-server) section below.
+
+## Container Runtime Requirements
+
+The Makefile requires either Podman or Docker to launch the Llama Stack container:
+
+- **Podman** (recommended for RHEL/Fedora): `sudo dnf install podman`
+- **Docker**: Install from [docker.com](https://docs.docker.com/get-docker/)
+
+The Makefile will auto-detect which runtime is available.
 
 
 # Configuration
@@ -831,7 +833,6 @@ Usage: make <OPTIONS> ... <TARGETS>
 Available targets are:
 
 run                               Run the service locally
-run-llama-stack                   Start Llama Stack with enriched config (for local service mode)
 test-unit                         Run the unit tests
 test-integration                  Run integration tests tests
 test-e2e                          Run end to end tests for the service
