@@ -108,3 +108,29 @@ class TurnSummary(BaseModel):
     rag_chunks: list[RAGChunk] = Field(default_factory=list)
     referenced_documents: list[ReferencedDocument] = Field(default_factory=list)
     token_usage: TokenCounter = Field(default_factory=TokenCounter)
+
+
+class ToolInfoSummary(BaseModel):
+    """Model representing metadata for a single tool exposed by MCP list tools."""
+
+    name: str = Field(description="Tool name")
+    description: Optional[str] = Field(
+        default=None,
+        description="Human-readable tool description",
+    )
+    input_schema: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="JSON schema for the tool input",
+    )
+
+
+class MCPListToolsSummary(BaseModel):
+    """Model representing MCP list tools payload serialized into tool results."""
+
+    server_label: str = Field(
+        description="MCP server label associated with the tool list",
+    )
+    tools: list[ToolInfoSummary] = Field(
+        default_factory=list,
+        description="Tools exposed by the MCP server",
+    )
