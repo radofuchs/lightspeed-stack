@@ -26,6 +26,11 @@ import trustme
 from behave import given, then  # pyright: ignore[reportAttributeAccessIssue]
 from behave.runner import Context
 
+from tests.e2e.proxy.interception_proxy import (
+    ALTERNATE_INTERCEPTION_PROXY_PORT,
+    DEFAULT_INTERCEPTION_PROXY_PORT,
+)
+from tests.e2e.proxy.tunnel_proxy import DEFAULT_PROXY_PORT
 from tests.e2e.utils.llama_config_utils import (
     backup_llama_config,
     load_llama_config,
@@ -33,11 +38,6 @@ from tests.e2e.utils.llama_config_utils import (
     write_llama_config,
 )
 from tests.e2e.utils.prow_utils import get_namespace, run_e2e_ops
-from tests.e2e.proxy.interception_proxy import (
-    ALTERNATE_INTERCEPTION_PROXY_PORT,
-    DEFAULT_INTERCEPTION_PROXY_PORT,
-)
-from tests.e2e.proxy.tunnel_proxy import DEFAULT_PROXY_PORT
 from tests.e2e.utils.utils import (
     is_prow_environment,
     restart_container,
@@ -372,9 +372,7 @@ def configure_llama_tunnel_proxy(context: Context) -> None:
     """Modify run.yaml with proxy config pointing to the tunnel proxy."""
     backup_llama_config()
     if is_prow_environment():
-        proxy_port = getattr(
-            context, "cluster_tunnel_proxy_port", DEFAULT_PROXY_PORT
-        )
+        proxy_port = getattr(context, "cluster_tunnel_proxy_port", DEFAULT_PROXY_PORT)
     else:
         proxy = context.tunnel_proxy
         proxy_port = proxy.port
