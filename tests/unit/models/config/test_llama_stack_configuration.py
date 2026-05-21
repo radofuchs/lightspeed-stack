@@ -2,44 +2,61 @@
 
 import pytest
 from pydantic import AnyHttpUrl, ValidationError
+from pytest_subtests import SubTests
 
 from models.config import LlamaStackConfiguration
 from utils.checks import InvalidConfigurationError
 
 
-def test_llama_stack_configuration_constructor() -> None:
+def test_llama_stack_configuration_constructor(subtests: SubTests) -> None:
     """
     Verify that the LlamaStackConfiguration constructor accepts
     valid combinations of parameters and creates instances
     successfully.
     """
-    llama_stack_configuration = LlamaStackConfiguration(
-        use_as_library_client=True,
-        library_client_config_path="tests/configuration/run.yaml",
-        url=None,
-        api_key=None,
-        timeout=60,
-    )
-    assert llama_stack_configuration is not None
+    with subtests.test(msg="Configuration for library mode"):
+        llama_stack_configuration = LlamaStackConfiguration(
+            use_as_library_client=True,
+            library_client_config_path="tests/configuration/run.yaml",
+            url=None,
+            api_key=None,
+            timeout=60,
+        )
+        assert llama_stack_configuration is not None
+        assert llama_stack_configuration.allow_degraded_mode is False
 
-    llama_stack_configuration = LlamaStackConfiguration(
-        use_as_library_client=False,
-        url=AnyHttpUrl("http://localhost"),
-        library_client_config_path=None,
-        api_key=None,
-        timeout=60,
-    )
-    assert llama_stack_configuration is not None
+    with subtests.test(msg="Configuration for server mode"):
+        llama_stack_configuration = LlamaStackConfiguration(
+            use_as_library_client=False,
+            url=AnyHttpUrl("http://localhost"),
+            library_client_config_path=None,
+            api_key=None,
+            timeout=60,
+        )
+        assert llama_stack_configuration is not None
+        assert llama_stack_configuration.allow_degraded_mode is False
 
-    llama_stack_configuration = LlamaStackConfiguration(
-        url="http://localhost"
-    )  # pyright: ignore[reportCallIssue]
-    assert llama_stack_configuration is not None
+    with subtests.test(msg="Minimal configuration for server mode"):
+        llama_stack_configuration = LlamaStackConfiguration(
+            url="http://localhost"
+        )  # pyright: ignore[reportCallIssue]
+        assert llama_stack_configuration is not None
+        assert llama_stack_configuration.allow_degraded_mode is False
 
-    llama_stack_configuration = LlamaStackConfiguration(
-        use_as_library_client=False, url="http://localhost", api_key="foo"
-    )  # pyright: ignore[reportCallIssue]
-    assert llama_stack_configuration is not None
+    with subtests.test(msg="Full configuration for server mode"):
+        llama_stack_configuration = LlamaStackConfiguration(
+            use_as_library_client=False, url="http://localhost", api_key="foo"
+        )  # pyright: ignore[reportCallIssue]
+        assert llama_stack_configuration is not None
+        assert llama_stack_configuration.allow_degraded_mode is False
+
+    with subtests.test(msg="Degraded mode enabled"):
+        llama_stack_configuration = LlamaStackConfiguration(
+            url="http://localhost",
+            allow_degraded_mode=True,
+        )  # pyright: ignore[reportCallIssue]
+        assert llama_stack_configuration is not None
+        assert llama_stack_configuration.allow_degraded_mode is True
 
 
 def test_llama_stack_configuration_no_run_yaml() -> None:

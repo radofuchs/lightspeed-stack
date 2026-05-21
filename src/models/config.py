@@ -701,6 +701,13 @@ class LlamaStackConfiguration(ConfigurationBase):
         "Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
     )
 
+    allow_degraded_mode: Optional[bool] = Field(
+        False,
+        title="Allow degraded mode",
+        description="If enabled, Lightspeed Core can be started even when Llama Stack "
+        "is not accessible (valid for server mode only)",
+    )
+
     @model_validator(mode="after")
     def check_llama_stack_model(self) -> Self:
         """
