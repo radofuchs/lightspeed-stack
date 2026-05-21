@@ -135,6 +135,9 @@ oc wait pod/mock-jwks pod/mock-mcp \
 }
 log "✅ Mock servers deployed"
 
+# e2e-tunnel-proxy and e2e-interception-proxy are deployed from proxy.feature steps
+# (see tests/e2e/features/steps/proxy.py + e2e-ops deploy-e2e-*-proxy).
+
 #========================================
 # 5. DEPLOY LIGHTSPEED STACK AND LLAMA STACK
 #========================================

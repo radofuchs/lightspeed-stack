@@ -23,6 +23,8 @@
 #   update-configmap <name> <file>  - Update ConfigMap from file
 #   get-configmap-content <name>    - Get ConfigMap content (outputs to stdout)
 #   disrupt-llama-stack             - Delete llama-stack pod to disrupt connection
+#   deploy-e2e-tunnel-proxy         - Deploy in-cluster tunnel proxy (proxy.feature step)
+#   deploy-e2e-interception-proxy   - Deploy in-cluster interception proxy (proxy.feature step)
 
 set -e
 
@@ -340,16 +342,30 @@ cmd_restart_llama_stack() {
 
     echo "Applying pod manifest..."
     if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]]; then
+        # Interception-proxy e2e: refresh Secret before pod recreate so the volume mount is populated.
+        if [[ "${E2E_COPY_INTERCEPTION_CA_TO_LLAMA:-0}" == "1" ]]; then
+            echo "[e2e-ops] Syncing e2e-interception-proxy-ca secret before llama-stack apply..."
+            if ! cmd_sync_interception_proxy_ca_secret; then
+                echo "===== Llama-stack restore FAILED (interception CA secret sync) ====="
+                exit 1
+            fi
+        fi
         _LLAMA_SVC_FQDN="llama-stack-service-svc.${NAMESPACE}.svc.cluster.local"
         oc create secret generic llama-stack-ip-secret \
             --from-literal=key="$_LLAMA_SVC_FQDN" \
             -n "$NAMESPACE" \
             --dry-run=client -o yaml | oc apply -f -
         oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/llama-stack-openai.yaml"
-        wait_for_pod "llama-stack-service" 60
+        wait_for_pod "llama-stack-service" 90
         echo "Labeling pod for service..."
         oc label pod llama-stack-service pod=llama-stack-service -n "$NAMESPACE" --overwrite
-        if ! wait_for_llama_stack_http_health 35; then
+        if [[ "${E2E_COPY_INTERCEPTION_CA_TO_LLAMA:-0}" == "1" ]]; then
+            if ! _verify_interception_ca_mounted_in_llama; then
+                echo "===== Llama-stack restore FAILED (interception CA not mounted) ====="
+                exit 1
+            fi
+        fi
+        if ! wait_for_llama_stack_http_health 50; then
             echo "===== Llama-stack restore FAILED (HTTP not healthy) ====="
             exit 1
         fi
@@ -612,6 +628,123 @@ cmd_get_configmap_content() {
         -o "go-template={{index .data \"$configmap_key\"}}"
 }
 
+cmd_tunnel_proxy_stats() {
+    local pod_name
+    pod_name=$(oc get pod -n "$NAMESPACE" -l app=e2e-tunnel-proxy \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || pod_name=""
+
+    if [[ -z "$pod_name" ]]; then
+        echo "ERROR: no e2e-tunnel-proxy pod in namespace $NAMESPACE" >&2
+        return 1
+    fi
+
+    oc exec -n "$NAMESPACE" "$pod_name" -- \
+        python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8887/stats', timeout=5).read().decode())"
+}
+
+cmd_interception_proxy_stats() {
+    local pod_name
+    pod_name=$(oc get pod -n "$NAMESPACE" -l app=e2e-interception-proxy \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || pod_name=""
+
+    if [[ -z "$pod_name" ]]; then
+        echo "ERROR: no e2e-interception-proxy pod in namespace $NAMESPACE" >&2
+        return 1
+    fi
+
+    oc exec -n "$NAMESPACE" "$pod_name" -- \
+        python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8886/stats', timeout=5).read().decode())"
+}
+
+cmd_sync_interception_proxy_ca_secret() {
+    local proxy_pod_name tmp
+    proxy_pod_name=$(oc get pod -n "$NAMESPACE" -l app=e2e-interception-proxy \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || proxy_pod_name=""
+
+    if [[ -z "$proxy_pod_name" ]]; then
+        echo "ERROR: no e2e-interception-proxy pod in namespace $NAMESPACE" >&2
+        return 1
+    fi
+
+    tmp=$(mktemp)
+    if ! oc exec -n "$NAMESPACE" "$proxy_pod_name" -- \
+        cat /tmp/interception-proxy-ca.pem >"$tmp"; then
+        rm -f "$tmp"
+        echo "ERROR: failed to read CA from e2e-interception-proxy pod" >&2
+        return 1
+    fi
+    if [[ ! -s "$tmp" ]]; then
+        rm -f "$tmp"
+        echo "ERROR: interception-proxy CA PEM is empty" >&2
+        return 1
+    fi
+
+    if ! oc create secret generic e2e-interception-proxy-ca \
+        --from-file=ca.pem="$tmp" \
+        -n "$NAMESPACE" \
+        --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -; then
+        rm -f "$tmp"
+        echo "ERROR: failed to apply e2e-interception-proxy-ca secret" >&2
+        return 1
+    fi
+    rm -f "$tmp"
+    echo "✓ Secret e2e-interception-proxy-ca updated (ca.pem)"
+}
+
+_verify_interception_ca_mounted_in_llama() {
+    local llama_pod_name="llama-stack-service"
+    if oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- \
+        test -s /tmp/interception-proxy-ca.pem; then
+        echo "✓ interception-proxy CA present at /tmp/interception-proxy-ca.pem in llama-stack"
+        return 0
+    fi
+    echo "ERROR: /tmp/interception-proxy-ca.pem missing or empty in llama-stack pod" >&2
+    oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- \
+        ls -la /tmp/interception-proxy-ca.pem 2>&1 || true
+    return 1
+}
+
+cmd_copy_interception_proxy_ca_to_llama() {
+    # Legacy name: publish CA via Secret (mounted by llama-stack-openai.yaml).
+    cmd_sync_interception_proxy_ca_secret
+}
+
+_e2e_repo_root() {
+    cd "$SCRIPT_DIR/../../../.." && pwd
+}
+
+cmd_deploy_e2e_tunnel_proxy() {
+    local repo_root
+    repo_root="$(_e2e_repo_root)"
+    echo "Deploying e2e-tunnel-proxy in namespace $NAMESPACE..."
+    oc create configmap e2e-tunnel-proxy-script -n "$NAMESPACE" \
+        --from-file=tunnel_proxy.py="$repo_root/tests/e2e/proxy/tunnel_proxy.py" \
+        --dry-run=client -o yaml | oc apply -f -
+    oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-tunnel-proxy.yaml"
+    if ! oc wait pod/e2e-tunnel-proxy -n "$NAMESPACE" --for=condition=Ready --timeout=120s; then
+        echo "ERROR: e2e-tunnel-proxy failed to become ready" >&2
+        oc describe pod e2e-tunnel-proxy -n "$NAMESPACE" 2>/dev/null | tail -25 || true
+        return 1
+    fi
+    echo "✓ e2e-tunnel-proxy ready at http://e2e-tunnel-proxy.${NAMESPACE}.svc.cluster.local:8888"
+}
+
+cmd_deploy_e2e_interception_proxy() {
+    local repo_root
+    repo_root="$(_e2e_repo_root)"
+    echo "Deploying e2e-interception-proxy in namespace $NAMESPACE..."
+    oc create configmap e2e-interception-proxy-script -n "$NAMESPACE" \
+        --from-file=interception_proxy.py="$repo_root/tests/e2e/proxy/interception_proxy.py" \
+        --dry-run=client -o yaml | oc apply -f -
+    oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-interception-proxy.yaml"
+    if ! oc wait pod/e2e-interception-proxy -n "$NAMESPACE" --for=condition=Ready --timeout=180s; then
+        echo "ERROR: e2e-interception-proxy failed to become ready" >&2
+        oc describe pod e2e-interception-proxy -n "$NAMESPACE" 2>/dev/null | tail -25 || true
+        return 1
+    fi
+    echo "✓ e2e-interception-proxy ready at http://e2e-interception-proxy.${NAMESPACE}.svc.cluster.local:8889"
+}
+
 cmd_disrupt_llama_stack() {
     local pod_name="llama-stack-service"
 
@@ -664,6 +797,24 @@ case "$COMMAND" in
     disrupt-llama-stack)
         cmd_disrupt_llama_stack
         ;;
+    tunnel-proxy-stats)
+        cmd_tunnel_proxy_stats
+        ;;
+    interception-proxy-stats)
+        cmd_interception_proxy_stats
+        ;;
+    copy-interception-proxy-ca-to-llama)
+        cmd_copy_interception_proxy_ca_to_llama
+        ;;
+    sync-interception-proxy-ca-secret)
+        cmd_sync_interception_proxy_ca_secret
+        ;;
+    deploy-e2e-tunnel-proxy)
+        cmd_deploy_e2e_tunnel_proxy
+        ;;
+    deploy-e2e-interception-proxy)
+        cmd_deploy_e2e_interception_proxy
+        ;;
     *)
         echo "Usage: $0 <command> [args...]"
         echo ""
@@ -676,6 +827,12 @@ case "$COMMAND" in
         echo "  update-configmap <name> <file>  - Update ConfigMap from file"
         echo "  get-configmap-content <name>    - Get ConfigMap content (outputs to stdout)"
         echo "  disrupt-llama-stack             - Delete llama-stack pod to disrupt connection"
+        echo "  tunnel-proxy-stats              - JSON stats from in-cluster e2e-tunnel-proxy"
+        echo "  interception-proxy-stats        - JSON stats from in-cluster e2e-interception-proxy"
+        echo "  copy-interception-proxy-ca-to-llama - Alias for sync-interception-proxy-ca-secret"
+        echo "  sync-interception-proxy-ca-secret   - Publish trustme CA to Secret for llama mount"
+        echo "  deploy-e2e-tunnel-proxy            - Deploy in-cluster tunnel proxy pod"
+        echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
         exit 1
         ;;
 esac

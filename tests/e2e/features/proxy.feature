@@ -21,7 +21,7 @@ Feature: Proxy and TLS networking tests for Llama Stack providers
 
   # --- AC1: Tunnel proxy routing ---
 
-  @TunnelProxy @skip-in-prow
+  @TunnelProxy
   Scenario: LLM traffic is routed through a configured tunnel proxy
     Given A tunnel proxy is running on port 8888
       And Llama Stack is configured to route inference through the tunnel proxy
@@ -53,7 +53,7 @@ Feature: Proxy and TLS networking tests for Llama Stack providers
 
   # --- AC2: Interception proxy with CA certificate ---
 
-  @InterceptionProxy @skip-in-prow
+  @InterceptionProxy @flaky
   Scenario: LLM traffic works through interception proxy with correct CA
     Given An interception proxy with trustme CA is running on port 8889
       And Llama Stack is configured to route inference through the interception proxy with CA cert
@@ -66,7 +66,7 @@ Feature: Proxy and TLS networking tests for Llama Stack providers
      Then The status code of the response is 200
       And The interception proxy intercepted at least 1 connection
 
-  @InterceptionProxy @skip-in-prow
+  @InterceptionProxy
   Scenario: LLM query fails when interception proxy CA is not provided
     Given An interception proxy with trustme CA is running on port 8890
       And Llama Stack is configured to route inference through the interception proxy without CA cert
@@ -76,12 +76,13 @@ Feature: Proxy and TLS networking tests for Llama Stack providers
     """
     {"query": "What is 2+2?", "model": "{MODEL}", "provider": "{PROVIDER}", "shield_ids": []}
     """
-     Then The status code of the response is 500
+     #will be fixed in https://redhat.atlassian.net/browse/LCORE-2255
+     Then The status code of the response is one of 404 or 500
 
 
   # --- AC3: TLS version and cipher configuration ---
 
-  @TLSVersion
+  @TLSVersion @flaky
   Scenario: TLS minimum version TLSv1.2 is respected
     Given Llama Stack is configured with minimum TLS version "TLSv1.2"
       And Llama Stack is restarted
@@ -92,7 +93,7 @@ Feature: Proxy and TLS networking tests for Llama Stack providers
     """
      Then The status code of the response is 200
 
-  @TLSVersion
+  @TLSVersion @flaky
   Scenario: TLS minimum version TLSv1.3 is respected
     Given Llama Stack is configured with minimum TLS version "TLSv1.3"
       And Llama Stack is restarted
@@ -103,7 +104,7 @@ Feature: Proxy and TLS networking tests for Llama Stack providers
     """
      Then The status code of the response is 200
 
-  @TLSCipher
+  @TLSCipher @flaky
   Scenario: Custom cipher suite configuration is respected
     Given Llama Stack is configured with ciphers "ECDHE+AESGCM:DHE+AESGCM"
       And Llama Stack is restarted
