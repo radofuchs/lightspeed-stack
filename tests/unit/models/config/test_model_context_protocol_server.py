@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from models.config import (  # type: ignore[import-not-found]
+    ApprovalFilter,
     AuthenticationConfiguration,
     Configuration,
     LlamaStackConfiguration,
@@ -25,6 +26,44 @@ def test_model_context_protocol_server_constructor() -> None:
     assert mcp.provider_id == "model-context-protocol"
     assert mcp.url == "http://localhost:8080"
     assert mcp.authorization_headers == {}  # Default should be empty dict
+    assert mcp.require_approval == "never"
+
+
+def test_model_context_protocol_server_require_approval_always() -> None:
+    """require_approval accepts the literal value 'always'."""
+    mcp = ModelContextProtocolServer(
+        name="strict-server",
+        url="http://localhost:8080",
+        require_approval="always",
+    )
+    assert mcp.require_approval == "always"
+
+
+def test_model_context_protocol_server_require_approval_filter() -> None:
+    """require_approval accepts an ApprovalFilter for granular control."""
+    filt = ApprovalFilter(
+        always=["create_issue"],
+        never=["list_repos"],
+    )
+    mcp = ModelContextProtocolServer(
+        name="filtered-server",
+        url="http://localhost:8080",
+        require_approval=filt,
+    )
+    require_approval = mcp.require_approval
+    assert isinstance(require_approval, ApprovalFilter)
+    assert require_approval.always == ["create_issue"]  # pylint: disable=no-member
+    assert require_approval.never == ["list_repos"]  # pylint: disable=no-member
+
+
+def test_model_context_protocol_server_require_approval_invalid_literal() -> None:
+    """require_approval rejects values other than 'always' or 'never'."""
+    with pytest.raises(ValidationError):
+        ModelContextProtocolServer(
+            name="bad-server",
+            url="http://localhost:8080",
+            require_approval="sometimes",  # type: ignore[arg-type]
+        )
 
 
 def test_model_context_protocol_server_custom_provider() -> None:

@@ -228,13 +228,15 @@ class PostgreSQLDatabaseConfiguration(ConfigurationBase):
         description="Database namespace",
     )
 
-    ssl_mode: str = Field(
-        constants.POSTGRES_DEFAULT_SSL_MODE,
+    ssl_mode: Literal[
+        "disable", "allow", "prefer", "require", "verify-ca", "verify-full"
+    ] = Field(
+        default=constants.POSTGRES_DEFAULT_SSL_MODE,
         title="SSL mode",
         description="SSL mode",
     )
 
-    gss_encmode: str = Field(
+    gss_encmode: Literal["disable", "prefer", "require"] = Field(
         constants.POSTGRES_DEFAULT_GSS_ENCMODE,
         title="GSS encmode",
         description="This option determines whether or with what priority a secure GSS "
@@ -465,6 +467,65 @@ class ServiceConfiguration(ConfigurationBase):
         return self
 
 
+class ApprovalFilter(ConfigurationBase):
+    """Granular approval control for specific MCP tools.
+
+    Attributes:
+        always: Tool names that always require human approval before execution.
+        never: Tool names that never require approval (pre-approved).
+    """
+
+    always: list[str] = Field(
+        default_factory=list,
+        title="Always require approval",
+        description="List of tool names that always require human approval",
+    )
+    never: list[str] = Field(
+        default_factory=list,
+        title="Never require approval",
+        description="List of tool names that never require approval",
+    )
+
+    @model_validator(mode="after")
+    def validate_no_overlap(self) -> Self:
+        """Ensure no tool appears in both always and never lists.
+
+        Raises:
+            ValueError: If any tool name is present in both lists.
+
+        Returns:
+            Self: The validated model instance.
+        """
+        overlap = set(self.always) & set(self.never)
+        if overlap:
+            raise ValueError(
+                f"Tools cannot be in both always and never lists: {overlap}"
+            )
+        return self
+
+
+class ApprovalsConfiguration(ConfigurationBase):
+    """Configuration for human-in-the-loop approvals.
+
+    Attributes:
+        approval_timeout_seconds: How long approval requests remain pending
+            before expiring.
+        approval_retention_days: How long to retain decided approvals for audit
+            purposes before cleanup.
+    """
+
+    approval_timeout_seconds: PositiveInt = Field(
+        default=300,
+        title="Approval timeout",
+        description="Seconds before pending approval requests expire",
+    )
+    approval_retention_days: PositiveInt = Field(
+        default=30,
+        title="Retention period",
+        description="Days to retain decided approvals before cleanup",
+    )
+
+
 class ModelContextProtocolServer(ConfigurationBase):
     """Model context protocol server configuration.
 
@@ -553,6 +614,16 @@ class ModelContextProtocolServer(ConfigurationBase):
             seen.add(lower)
         return value
 
+    require_approval: Literal["always", "never"] | ApprovalFilter = Field(
+        default="never",
+        title="Approval requirement",
+        description=(
+            "When to require human approval for tool invocations. "
+            "'always' requires approval for all tools, 'never' auto-approves, "
+            "or use ApprovalFilter for granular control."
+        ),
+    )
+
     timeout: Optional[PositiveInt] = Field(
         default=None,
         title="Request timeout",
@@ -628,6 +699,13 @@ class LlamaStackConfiguration(ConfigurationBase):
         title="Request timeout",
         description="Timeout in seconds for requests to Llama Stack service. "
         "Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
+    )
+
+    allow_degraded_mode: Optional[bool] = Field(
+        False,
+        title="Allow degraded mode",
+        description="If enabled, Lightspeed Core can be started even when Llama Stack "
+        "is not accessible (valid for server mode only)",
     )
 
     @model_validator(mode="after")
@@ -1944,6 +2022,26 @@ class AzureEntraIdConfiguration(ConfigurationBase):
     )
 
 
+class SkillsConfiguration(ConfigurationBase):
+    """Agent skills configuration.
+
+    Specifies paths to skill directories. Skill metadata (name, description)
+    is read from SKILL.md frontmatter at startup.
+
+    Each path can point to either:
+    - A directory containing a SKILL.md file (single skill)
+    - A directory containing subdirectories with SKILL.md files (multiple skills)
+
+    Paths are validated at startup to ensure they exist and contain valid SKILL.md files.
+    """
+
+    paths: list[Path] = Field(
+        default_factory=list,
+        title="Skill paths",
+        description="Paths to skill directories or directories containing skill subdirectories.",
+    )
+
+
 class Configuration(ConfigurationBase):
     """Global service configuration."""
 
@@ -2049,6 +2147,12 @@ class Configuration(ConfigurationBase):
         "window continue to surface as HTTP 413.",
     )
 
+    approvals: ApprovalsConfiguration = Field(
+        default_factory=ApprovalsConfiguration,
+        title="Approvals configuration",
+        description="Settings for human-in-the-loop approval of MCP tool invocations",
+    )
+
     byok_rag: list[ByokRag] = Field(
         default_factory=list,
         title="BYOK RAG configuration",
@@ -2108,6 +2212,12 @@ class Configuration(ConfigurationBase):
         default_factory=RerankerConfiguration,
         title="Reranker configuration",
         description="Configuration for neural reranking of RAG chunks using cross-encoder.",
+    )
+
+    skills: Optional[SkillsConfiguration] = Field(
+        default=None,
+        title="Agent skills",
+        description="Agent skills configuration. Specifies paths to skill directories.",
     )
 
     @model_validator(mode="after")

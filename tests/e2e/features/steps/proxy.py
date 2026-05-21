@@ -26,6 +26,11 @@ import trustme
 from behave import given, then  # pyright: ignore[reportAttributeAccessIssue]
 from behave.runner import Context
 
+from tests.e2e.proxy.interception_proxy import (
+    ALTERNATE_INTERCEPTION_PROXY_PORT,
+    DEFAULT_INTERCEPTION_PROXY_PORT,
+)
+from tests.e2e.proxy.tunnel_proxy import DEFAULT_PROXY_PORT
 from tests.e2e.utils.llama_config_utils import (
     backup_llama_config,
     load_llama_config,
@@ -37,6 +42,10 @@ from tests.e2e.utils.utils import (
     is_prow_environment,
     restart_container,
     wait_for_lightspeed_stack_http_ready,
+)
+
+_CLUSTER_INTERCEPTION_PROXY_PORTS = frozenset(
+    {DEFAULT_INTERCEPTION_PROXY_PORT, ALTERNATE_INTERCEPTION_PROXY_PORT}
 )
 
 
@@ -127,10 +136,11 @@ def _cluster_interception_proxy_host() -> str:
 
 def _cluster_interception_proxy_port(requested_port: int) -> int:
     """Map feature-file port to the in-cluster interception proxy listener."""
-    if requested_port in (8889, 8890):
-        return 8889
+    if requested_port in _CLUSTER_INTERCEPTION_PROXY_PORTS:
+        return DEFAULT_INTERCEPTION_PROXY_PORT
     raise AssertionError(
-        "In-cluster e2e-interception-proxy listens on 8889 only; "
+        "In-cluster e2e-interception-proxy listens on "
+        f"{DEFAULT_INTERCEPTION_PROXY_PORT} only; "
         f"scenario requested port {requested_port}"
     )
 
@@ -327,10 +337,10 @@ def restart_lightspeed_stack(context: Context) -> None:
 def start_tunnel_proxy(context: Context, port: int) -> None:
     """Start a tunnel proxy locally, or verify the in-cluster proxy (Konflux/Prow)."""
     if is_prow_environment():
-        if port != 8888:
+        if port != DEFAULT_PROXY_PORT:
             raise AssertionError(
-                "In-cluster e2e-tunnel-proxy is fixed on port 8888; "
-                f"scenario requested port {port}"
+                "In-cluster e2e-tunnel-proxy is fixed on port "
+                f"{DEFAULT_PROXY_PORT}; scenario requested port {port}"
             )
         context.tunnel_proxy = None
         context.cluster_tunnel_proxy_port = port
@@ -364,7 +374,7 @@ def configure_llama_tunnel_proxy(context: Context) -> None:
     """Modify run.yaml with proxy config pointing to the tunnel proxy."""
     backup_llama_config()
     if is_prow_environment():
-        proxy_port = getattr(context, "cluster_tunnel_proxy_port", 8888)
+        proxy_port = getattr(context, "cluster_tunnel_proxy_port", DEFAULT_PROXY_PORT)
     else:
         proxy = context.tunnel_proxy
         proxy_port = proxy.port
@@ -465,7 +475,9 @@ def configure_llama_interception_with_ca(context: Context) -> None:
     if is_prow_environment():
         os.environ["E2E_COPY_INTERCEPTION_CA_TO_LLAMA"] = "1"
     if is_prow_environment():
-        proxy_port = getattr(context, "cluster_interception_proxy_port", 8889)
+        proxy_port = getattr(
+            context, "cluster_interception_proxy_port", DEFAULT_INTERCEPTION_PROXY_PORT
+        )
         proxy_host = _cluster_interception_proxy_host()
     else:
         proxy = context.interception_proxy
@@ -501,7 +513,9 @@ def configure_llama_interception_no_ca(context: Context) -> None:
     context.needs_interception_ca_on_llama = False
     os.environ.pop("E2E_COPY_INTERCEPTION_CA_TO_LLAMA", None)
     if is_prow_environment():
-        proxy_port = getattr(context, "cluster_interception_proxy_port", 8889)
+        proxy_port = getattr(
+            context, "cluster_interception_proxy_port", DEFAULT_INTERCEPTION_PROXY_PORT
+        )
         proxy_host = _cluster_interception_proxy_host()
     else:
         proxy = context.interception_proxy

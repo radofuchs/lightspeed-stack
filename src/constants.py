@@ -1,6 +1,6 @@
 """Constants used in business logic."""
 
-from typing import Final
+from typing import Final, Literal
 
 # Use Final[type] as type hint for all constants to ensure that type checkers (Mypy etc.)
 # will be able to detect assignements to such constants.
@@ -158,9 +158,9 @@ LLM_TURN_COMPLETE_EVENT: Final[str] = "turn_complete"
 
 # PostgreSQL connection constants
 # See: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNECT-SSLMODE
-POSTGRES_DEFAULT_SSL_MODE: Final[str] = "prefer"
+POSTGRES_DEFAULT_SSL_MODE: Final[Literal["prefer"]] = "prefer"
 # See: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNECT-GSSENCMODE
-POSTGRES_DEFAULT_GSS_ENCMODE: Final[str] = "prefer"
+POSTGRES_DEFAULT_GSS_ENCMODE: Final[Literal["prefer"]] = "prefer"
 
 # cache constants
 CACHE_TYPE_MEMORY: Final[str] = "memory"

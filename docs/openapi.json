@@ -11400,7 +11400,7 @@
                 "title": "AllowedToolsFilter",
                 "description": "Filter configuration for restricting which MCP tools can be used.\n\n:param tool_names: (Optional) List of specific tool names that are allowed"
             },
-            "ApprovalFilter": {
+            "ApprovalFilter-Input": {
                 "properties": {
                     "always": {
                         "anyOf": [
@@ -11434,6 +11434,52 @@
                 "type": "object",
                 "title": "ApprovalFilter",
                 "description": "Filter configuration for MCP tool approval requirements.\n\n:param always: (Optional) List of tool names that always require approval\n:param never: (Optional) List of tool names that never require approval"
+            },
+            "ApprovalFilter-Output": {
+                "properties": {
+                    "always": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Always require approval",
+                        "description": "List of tool names that always require human approval"
+                    },
+                    "never": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Never require approval",
+                        "description": "List of tool names that never require approval"
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "ApprovalFilter",
+                "description": "Granular approval control for specific MCP tools.\n\nAttributes:\n    always: Tool names that always require human approval before execution.\n    never: Tool names that never require approval (pre-approved)."
+            },
+            "ApprovalsConfiguration": {
+                "properties": {
+                    "approval_timeout_seconds": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Approval timeout",
+                        "description": "Seconds before pending approval requests expire",
+                        "default": 300
+                    },
+                    "approval_retention_days": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Retention period",
+                        "description": "Days to retain decided approvals before cleanup",
+                        "default": 30
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "ApprovalsConfiguration",
+                "description": "Configuration for human-in-the-loop approvals.\n\nAttributes:\n    approval_timeout_seconds: How long approval requests remain pending\n        before expiring.\n    approval_retention_days: How long to retain decided approvals for audit\n        purposes before cleanup."
             },
             "Attachment": {
                 "properties": {
@@ -12016,6 +12062,11 @@
                         "title": "Conversation compaction configuration",
                         "description": "Controls when conversation history is summarized to keep the model's input below the context window limit. Disabled by default \u2014 when disabled, requests that exceed the window continue to surface as HTTP 413."
                     },
+                    "approvals": {
+                        "$ref": "#/components/schemas/ApprovalsConfiguration",
+                        "title": "Approvals configuration",
+                        "description": "Settings for human-in-the-loop approval of MCP tool invocations"
+                    },
                     "byok_rag": {
                         "items": {
                             "$ref": "#/components/schemas/ByokRag"
@@ -12081,6 +12132,18 @@
                         "$ref": "#/components/schemas/RerankerConfiguration",
                         "title": "Reranker configuration",
                         "description": "Configuration for neural reranking of RAG chunks using cross-encoder."
+                    },
+                    "skills": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/SkillsConfiguration"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Agent skills",
+                        "description": "Agent skills configuration. Specifies paths to skill directories."
                     }
                 },
                 "additionalProperties": false,
@@ -13786,6 +13849,19 @@
                         "title": "Request timeout",
                         "description": "Timeout in seconds for requests to Llama Stack service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
                         "default": 180
+                    },
+                    "allow_degraded_mode": {
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Allow degraded mode",
+                        "description": "If enabled, Lightspeed Core can be started even when Llama Stack is not accessible (valid for server mode only)",
+                        "default": false
                     }
                 },
                 "additionalProperties": false,
@@ -14263,6 +14339,23 @@
                         "type": "array",
                         "title": "Propagated headers",
                         "description": "List of HTTP header names to automatically forward from the incoming request to this MCP server. Headers listed here are extracted from the original client request and included when calling the MCP server. This is useful when infrastructure components (e.g. API gateways) inject headers that MCP servers need, such as x-rh-identity in HCC. Header matching is case-insensitive. These headers are additive with authorization_headers and MCP-HEADERS."
+                    },
+                    "require_approval": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "always",
+                                    "never"
+                                ]
+                            },
+                            {
+                                "$ref": "#/components/schemas/ApprovalFilter-Output"
+                            }
+                        ],
+                        "title": "Approval requirement",
+                        "description": "When to require human approval for tool invocations. 'always' requires approval for all tools, 'never' auto-approves, or use ApprovalFilter for granular control.",
+                        "default": "never"
                     },
                     "timeout": {
                         "anyOf": [
@@ -15269,7 +15362,7 @@
                                 "const": "never"
                             },
                             {
-                                "$ref": "#/components/schemas/ApprovalFilter"
+                                "$ref": "#/components/schemas/ApprovalFilter-Input"
                             }
                         ],
                         "title": "Require Approval",
@@ -16311,12 +16404,25 @@
                     },
                     "ssl_mode": {
                         "type": "string",
+                        "enum": [
+                            "disable",
+                            "allow",
+                            "prefer",
+                            "require",
+                            "verify-ca",
+                            "verify-full"
+                        ],
                         "title": "SSL mode",
                         "description": "SSL mode",
                         "default": "prefer"
                     },
                     "gss_encmode": {
                         "type": "string",
+                        "enum": [
+                            "disable",
+                            "prefer",
+                            "require"
+                        ],
                         "title": "GSS encmode",
                         "description": "This option determines whether or with what priority a secure GSS TCP/IP connection will be negotiated with the server.",
                         "default": "prefer"
@@ -19207,6 +19313,23 @@
                     }
                 ]
             },
+            "SkillsConfiguration": {
+                "properties": {
+                    "paths": {
+                        "items": {
+                            "type": "string",
+                            "format": "path"
+                        },
+                        "type": "array",
+                        "title": "Skill paths",
+                        "description": "Paths to skill directories or directories containing skill subdirectories."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "SkillsConfiguration",
+                "description": "Agent skills configuration.\n\nSpecifies paths to skill directories. Skill metadata (name, description)\nis read from SKILL.md frontmatter at startup.\n\nEach path can point to either:\n- A directory containing a SKILL.md file (single skill)\n- A directory containing subdirectories with SKILL.md files (multiple skills)\n\nPaths are validated at startup to ensure they exist and contain valid SKILL.md files."
+            },
             "SolrVectorSearchRequest": {
                 "properties": {
                     "mode": {
@@ -19242,12 +19365,39 @@
                             }
                         ],
                         "title": "Filters",
-                        "description": "Solr provider filter payload passed through as params['solr'].",
+                        "description": "Solr provider filter payload passed through as params['solr']. Supports structured metadata filters (eq, ne, in, nin comparison operators). Legacy filter-only objects (e.g. fq) are still accepted.",
                         "examples": [
                             {
+                                "filters": {
+                                    "key": "product",
+                                    "type": "eq",
+                                    "value": "openshift_container_platform"
+                                }
+                            },
+                            {
+                                "filters": {
+                                    "filters": [
+                                        {
+                                            "key": "product",
+                                            "type": "eq",
+                                            "value": "openshift_container_platform"
+                                        },
+                                        {
+                                            "key": "version",
+                                            "type": "in",
+                                            "value": [
+                                                "4.14",
+                                                "4.15",
+                                                "4.16"
+                                            ]
+                                        }
+                                    ],
+                                    "type": "and"
+                                }
+                            },
+                            {
                                 "fq": [
-                                    "product:*openshift*",
-                                    "product_version:*4.16*"
+                                    "product:*openshift*"
                                 ]
                             }
                         ]

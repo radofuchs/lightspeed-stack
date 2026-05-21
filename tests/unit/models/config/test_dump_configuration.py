@@ -5,6 +5,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 from pydantic import SecretStr
 
@@ -21,9 +22,22 @@ from models.config import (
     QuotaLimiterConfiguration,
     QuotaSchedulerConfiguration,
     ServiceConfiguration,
+    SkillsConfiguration,
     TLSConfiguration,
     UserDataCollection,
 )
+
+_DEFAULT_APPROVALS_DUMP: dict[str, int] = {
+    "approval_timeout_seconds": 300,
+    "approval_retention_days": 30,
+}
+
+_MCP_SERVER_DUMP_DEFAULTS: dict[str, Any] = {
+    "authorization_headers": {},
+    "headers": [],
+    "require_approval": "never",
+    "timeout": None,
+}
 
 
 def test_dump_configuration(tmp_path: Path) -> None:
@@ -146,6 +160,7 @@ def test_dump_configuration(tmp_path: Path) -> None:
                 "api_key": "**********",
                 "library_client_config_path": "tests/configuration/run.yaml",
                 "timeout": 180,
+                "allow_degraded_mode": False,
             },
             "user_data_collection": {
                 "feedback_enabled": False,
@@ -199,6 +214,7 @@ def test_dump_configuration(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
@@ -235,6 +251,7 @@ def test_dump_configuration(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -283,9 +300,7 @@ def test_dump_configuration_with_one_mcp_server(tmp_path: Path) -> None:
                 "name": "test-server",
                 "url": "http://localhost:8080",
                 "provider_id": "model-context-protocol",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             }
         ]
 
@@ -343,25 +358,19 @@ def test_dump_configuration_with_more_mcp_servers(tmp_path: Path) -> None:
                 "name": "test-server-1",
                 "provider_id": "model-context-protocol",
                 "url": "http://localhost:8081",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             },
             {
                 "name": "test-server-2",
                 "provider_id": "model-context-protocol",
                 "url": "http://localhost:8082",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             },
             {
                 "name": "test-server-3",
                 "provider_id": "model-context-protocol",
                 "url": "http://localhost:8083",
-                "authorization_headers": {},
-                "headers": [],
-                "timeout": None,
+                **_MCP_SERVER_DUMP_DEFAULTS,
             },
         ]
 
@@ -502,6 +511,7 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
                 "api_key": "**********",
                 "library_client_config_path": "tests/configuration/run.yaml",
                 "timeout": 180,
+                "allow_degraded_mode": False,
             },
             "user_data_collection": {
                 "feedback_enabled": False,
@@ -555,6 +565,7 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
@@ -606,6 +617,7 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -749,6 +761,7 @@ def test_dump_configuration_with_quota_limiters_different_values(
                 "api_key": "**********",
                 "library_client_config_path": "tests/configuration/run.yaml",
                 "timeout": 180,
+                "allow_degraded_mode": False,
             },
             "user_data_collection": {
                 "feedback_enabled": False,
@@ -802,6 +815,7 @@ def test_dump_configuration_with_quota_limiters_different_values(
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
@@ -853,6 +867,7 @@ def test_dump_configuration_with_quota_limiters_different_values(
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -976,6 +991,7 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                 "api_key": "**********",
                 "library_client_config_path": "tests/configuration/run.yaml",
                 "timeout": 180,
+                "allow_degraded_mode": False,
             },
             "user_data_collection": {
                 "feedback_enabled": False,
@@ -1029,6 +1045,7 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [
                 {
                     "db_path": "tests/configuration/rag.txt",
@@ -1075,6 +1092,7 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
         }
 
 
@@ -1193,6 +1211,7 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
                 "api_key": "**********",
                 "library_client_config_path": "tests/configuration/run.yaml",
                 "timeout": 180,
+                "allow_degraded_mode": False,
             },
             "user_data_collection": {
                 "feedback_enabled": False,
@@ -1246,6 +1265,7 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
                 "buffer_turns": 4,
                 "buffer_max_ratio": 0.3,
             },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
             "byok_rag": [],
             "quota_handlers": {
                 "sqlite": None,
@@ -1282,4 +1302,300 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
                 "enabled": False,
                 "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
             },
+            "skills": None,
+        }
+
+
+def test_dump_configuration_with_skills(tmp_path: Path) -> None:
+    """
+    Test that Configuration with skills paths can be serialized to JSON.
+
+    Verifies that skills paths are properly dumped and serialized as strings.
+    """
+    cfg = Configuration(
+        name="test_name",
+        service=ServiceConfiguration(
+            tls_config=TLSConfiguration(
+                tls_certificate_path=Path("tests/configuration/server.crt"),
+                tls_key_path=Path("tests/configuration/server.key"),
+                tls_key_password=Path("tests/configuration/password"),
+            ),
+            cors=CORSConfiguration(
+                allow_origins=["foo_origin", "bar_origin", "baz_origin"],
+                allow_credentials=False,
+                allow_methods=["foo_method", "bar_method", "baz_method"],
+                allow_headers=["foo_header", "bar_header", "baz_header"],
+            ),
+        ),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=True,
+            library_client_config_path="tests/configuration/run.yaml",
+            api_key=SecretStr("whatever"),
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False, feedback_storage=None
+        ),
+        database=DatabaseConfiguration(
+            sqlite=None,
+            postgres=PostgreSQLDatabaseConfiguration(
+                db="lightspeed_stack",
+                user="ls_user",
+                password=SecretStr("ls_password"),
+                port=5432,
+                ca_cert_path=None,
+                ssl_mode="require",
+                gss_encmode="disable",
+            ),
+        ),
+        mcp_servers=[],
+        customization=None,
+        inference=InferenceConfiguration(
+            default_provider="default_provider",
+            default_model="default_model",
+        ),
+        skills=SkillsConfiguration(
+            paths=[
+                "/var/skills/openshift-troubleshooting",
+                "/var/skills/code-review",
+                "/opt/custom-skills",
+            ]
+        ),
+    )
+    assert cfg is not None
+    dump_file = tmp_path / "test.json"
+    cfg.dump(dump_file)
+
+    with open(dump_file, "r", encoding="utf-8") as fin:
+        content = json.load(fin)
+        # content should be loaded
+        assert content is not None
+
+        # skills section must exist
+        assert "skills" in content
+        assert content["skills"] is not None
+        assert "paths" in content["skills"]
+
+        # verify skills paths are properly serialized
+        assert content["skills"] == {
+            "paths": [
+                "/var/skills/openshift-troubleshooting",
+                "/var/skills/code-review",
+                "/opt/custom-skills",
+            ]
+        }
+
+
+def test_dump_configuration_allow_degraded_mode(tmp_path: Path) -> None:
+    """
+    Test that the Configuration object can be serialized to a JSON file and
+    that the resulting file contains all expected sections and values.
+
+    Please note that redaction process is not in place.
+
+    Parameters:
+    ----------
+        tmp_path (Path): Directory where the test JSON file will be written.
+    """
+    cfg = Configuration(
+        name="test_name",
+        service=ServiceConfiguration(
+            tls_config=TLSConfiguration(
+                tls_certificate_path=Path("tests/configuration/server.crt"),
+                tls_key_path=Path("tests/configuration/server.key"),
+                tls_key_password=Path("tests/configuration/password"),
+            ),
+            cors=CORSConfiguration(
+                allow_origins=["foo_origin", "bar_origin", "baz_origin"],
+                allow_credentials=False,
+                allow_methods=["foo_method", "bar_method", "baz_method"],
+                allow_headers=["foo_header", "bar_header", "baz_header"],
+            ),
+        ),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=False,
+            url="http://localhost",
+            api_key=SecretStr("whatever"),
+            allow_degraded_mode=True,
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False, feedback_storage=None
+        ),
+        database=DatabaseConfiguration(
+            sqlite=None,
+            postgres=PostgreSQLDatabaseConfiguration(
+                db="lightspeed_stack",
+                user="ls_user",
+                password=SecretStr("ls_password"),
+                port=5432,
+                ca_cert_path=None,
+                ssl_mode="require",
+                gss_encmode="disable",
+            ),
+        ),
+        mcp_servers=[],
+        customization=None,
+        inference=InferenceConfiguration(
+            default_provider="default_provider",
+            default_model="default_model",
+        ),
+    )
+    assert cfg is not None
+    dump_file = tmp_path / "test.json"
+    cfg.dump(dump_file)
+
+    with open(dump_file, "r", encoding="utf-8") as fin:
+        content = json.load(fin)
+        # content should be loaded
+        assert content is not None
+
+        # all sections must exists
+        assert "name" in content
+        assert "service" in content
+        assert "llama_stack" in content
+        assert "user_data_collection" in content
+        assert "mcp_servers" in content
+        assert "authentication" in content
+        assert "authorization" in content
+        assert "customization" in content
+        assert "inference" in content
+        assert "database" in content
+        assert "byok_rag" in content
+        assert "quota_handlers" in content
+        assert "azure_entra_id" in content
+        assert "reranker" in content
+
+        # check the whole deserialized JSON file content
+        assert content == {
+            "name": "test_name",
+            "service": {
+                "host": "localhost",
+                "port": 8080,
+                "base_url": None,
+                "auth_enabled": False,
+                "workers": 1,
+                "color_log": True,
+                "access_log": True,
+                "tls_config": {
+                    "tls_certificate_path": "tests/configuration/server.crt",
+                    "tls_key_password": "tests/configuration/password",
+                    "tls_key_path": "tests/configuration/server.key",
+                },
+                "root_path": "",
+                "cors": {
+                    "allow_credentials": False,
+                    "allow_headers": [
+                        "foo_header",
+                        "bar_header",
+                        "baz_header",
+                    ],
+                    "allow_methods": [
+                        "foo_method",
+                        "bar_method",
+                        "baz_method",
+                    ],
+                    "allow_origins": [
+                        "foo_origin",
+                        "bar_origin",
+                        "baz_origin",
+                    ],
+                },
+            },
+            "llama_stack": {
+                "url": "http://localhost/",
+                "use_as_library_client": False,
+                "api_key": "**********",
+                "library_client_config_path": None,
+                "timeout": 180,
+                "allow_degraded_mode": True,
+            },
+            "user_data_collection": {
+                "feedback_enabled": False,
+                "feedback_storage": None,
+                "transcripts_enabled": False,
+                "transcripts_storage": None,
+            },
+            "mcp_servers": [],
+            "authentication": {
+                "module": "noop",
+                "skip_tls_verification": False,
+                "skip_for_health_probes": False,
+                "skip_for_metrics": False,
+                "k8s_ca_cert_path": None,
+                "k8s_cluster_api": None,
+                "jwk_config": None,
+                "api_key_config": None,
+                "rh_identity_config": None,
+            },
+            "customization": None,
+            "inference": {
+                "default_provider": "default_provider",
+                "default_model": "default_model",
+                "context_windows": {},
+            },
+            "database": {
+                "sqlite": None,
+                "postgres": {
+                    "host": "localhost",
+                    "port": 5432,
+                    "db": "lightspeed_stack",
+                    "user": "ls_user",
+                    "password": "**********",
+                    "ssl_mode": "require",
+                    "gss_encmode": "disable",
+                    "namespace": "public",
+                    "ca_cert_path": None,
+                },
+            },
+            "authorization": None,
+            "conversation_cache": {
+                "memory": None,
+                "postgres": None,
+                "sqlite": None,
+                "type": None,
+            },
+            "compaction": {
+                "enabled": False,
+                "threshold_ratio": 0.7,
+                "token_floor": 4096,
+                "buffer_turns": 4,
+                "buffer_max_ratio": 0.3,
+            },
+            "approvals": _DEFAULT_APPROVALS_DUMP,
+            "byok_rag": [],
+            "quota_handlers": {
+                "sqlite": None,
+                "postgres": None,
+                "limiters": [],
+                "scheduler": {
+                    "period": 1,
+                    "database_reconnection_count": 10,
+                    "database_reconnection_delay": 1,
+                },
+                "enable_token_history": False,
+            },
+            "a2a_state": {
+                "sqlite": None,
+                "postgres": None,
+            },
+            "azure_entra_id": None,
+            "rag": {
+                "inline": [],
+                "tool": [],
+            },
+            "okp": {
+                "rhokp_url": None,
+                "offline": True,
+                "chunk_filter_query": None,
+            },
+            "rlsapi_v1": {
+                "allow_verbose_infer": False,
+                "quota_subject": None,
+            },
+            "splunk": None,
+            "deployment_environment": "development",
+            "reranker": {
+                "enabled": False,
+                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+            },
+            "skills": None,
         }

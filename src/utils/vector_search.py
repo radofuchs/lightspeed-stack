@@ -112,6 +112,11 @@ def _build_query_params(
 
     Returns:
         Query parameters dict for vector_io.query.
+            - mode: Solr search mode (semantic, hybrid, lexical)
+            - filters: Solr filter payload, may contain structured metadata filters
+
+    Returns:
+        Parameter dictionary for ``vector_io.query`` with extracted filters at top level.
     """
     resolved_mode = (
         solr.mode
@@ -127,8 +132,23 @@ def _build_query_params(
     logger.debug("query_request.solr: %s", solr)
 
     if solr is not None and solr.filters is not None:
-        params["solr"] = solr.filters
-        logger.debug("Final params with solr filters: %s", params)
+        # Extract structured metadata filters if present in solr.filters dict
+        # Filters need to be at top-level params for vector_io.query
+        if isinstance(solr.filters, dict) and "filters" in solr.filters:
+            params["filters"] = solr.filters["filters"]
+            logger.debug("Extracted filters from solr.filters: %s", params["filters"])
+
+            # Pass remaining solr.filters content (legacy fq, etc.) to params["solr"]
+            remaining_filters = {
+                k: v for k, v in solr.filters.items() if k != "filters"
+            }
+            if remaining_filters:
+                params["solr"] = remaining_filters
+                logger.debug("Remaining solr.filters: %s", remaining_filters)
+        else:
+            # Legacy format: entire solr.filters dict is passed as params["solr"]
+            params["solr"] = solr.filters
+            logger.debug("Legacy solr.filters format: %s", params["solr"])
     else:
         logger.debug("No solr filters provided")
 
@@ -261,13 +281,14 @@ async def _query_store_for_byok_rag(
 
 def _extract_solr_document_metadata(
     chunk: Any,
-) -> tuple[Optional[str], Optional[str], Optional[str]]:
-    """Extract document ID, title, and reference URL from chunk metadata."""
+) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """Extract document ID, title, reference URL, and source path from chunk metadata."""
     # 1) dict metadata
     metadata = getattr(chunk, "metadata", None) or {}
     doc_id = metadata.get("doc_id") or metadata.get("document_id")
     title = metadata.get("title")
     reference_url = metadata.get("reference_url")
+    source_path = metadata.get("source_path")
 
     # 2) typed chunk_metadata
     if not doc_id:
@@ -276,15 +297,19 @@ def _extract_solr_document_metadata(
             if isinstance(chunk_meta, dict):
                 doc_id = chunk_meta.get("doc_id") or chunk_meta.get("document_id")
                 title = title or chunk_meta.get("title")
-                reference_url = chunk_meta.get("reference_url")
+                reference_url = reference_url or chunk_meta.get("reference_url")
+                source_path = source_path or chunk_meta.get("source_path")
             else:
                 doc_id = getattr(chunk_meta, "doc_id", None) or getattr(
                     chunk_meta, "document_id", None
                 )
                 title = title or getattr(chunk_meta, "title", None)
-                reference_url = getattr(chunk_meta, "reference_url", None)
+                reference_url = reference_url or getattr(
+                    chunk_meta, "reference_url", None
+                )
+                source_path = source_path or getattr(chunk_meta, "source_path", None)
 
-    return doc_id, title, reference_url
+    return doc_id, title, reference_url, source_path
 
 
 def _process_byok_rag_chunks_for_documents(
@@ -376,13 +401,17 @@ def _process_solr_chunks_for_documents(
             "Extracting doc ids from chunk id: %s", getattr(chunk, "chunk_id", None)
         )
 
-        doc_id, title, reference_url = _extract_solr_document_metadata(chunk)
+        doc_id, title, reference_url, source_path = _extract_solr_document_metadata(
+            chunk
+        )
 
-        if not doc_id and not reference_url:
+        if not doc_id and not reference_url and not source_path:
             continue
 
         # Build URL based on offline flag
-        doc_url, reference_doc = _build_document_url(offline, doc_id, reference_url)
+        doc_url, reference_doc = _build_document_url(
+            offline, doc_id, reference_url, source_path
+        )
 
         if reference_doc and reference_doc not in metadata_doc_ids:
             metadata_doc_ids.add(reference_doc)
@@ -698,16 +727,18 @@ def _join_okp_doc_url(base_url: AnyUrl, reference: Optional[str]) -> str:
 
 
 def _build_document_url(
-    offline: bool, doc_id: Optional[str], reference_url: Optional[str]
+    offline: bool,
+    doc_id: Optional[str],
+    reference_url: Optional[str],
+    source_path: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
-    """
-    Build document URL based on offline flag and available metadata.
+    """Build document URL based on offline flag and available metadata.
 
     Args:
-        offline: Whether to use offline
-        (parent_id) or online mode (reference_url)
+        offline: Whether to use offline mode (source_path) or online mode (reference_url)
         doc_id: Document ID from chunk metadata
-        reference_url: Reference URL from chunk metadata
+        reference_url: Reference URL from chunk metadata (online deep-link)
+        source_path: Relative path from chunk metadata (offline deep-link)
 
     Returns:
         Tuple of (doc_url, reference_doc) where:
@@ -715,7 +746,10 @@ def _build_document_url(
         - reference_doc: The document reference used for deduplication
     """
     base_url = _get_okp_base_url()
-    reference_doc = doc_id if offline else (reference_url or doc_id)
+    if offline:
+        reference_doc = source_path or doc_id
+    else:
+        reference_doc = reference_url or doc_id
     doc_url = _join_okp_doc_url(base_url, reference_doc)
     return doc_url, reference_doc
 
@@ -745,10 +779,10 @@ def _convert_solr_chunks_to_rag_format(
         # Legacy logic: extract doc_url from chunk metadata based on offline flag
         if chunk.metadata:
             if offline:
-                parent_id = chunk.metadata.get("parent_id")
-                if parent_id:
+                source_path = chunk.metadata.get("source_path")
+                if source_path:
                     attributes["doc_url"] = _join_okp_doc_url(
-                        _get_okp_base_url(), parent_id
+                        _get_okp_base_url(), source_path
                     )
             else:
                 reference_url = chunk.metadata.get("reference_url")

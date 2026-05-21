@@ -2,7 +2,7 @@
 
 import os
 from http import HTTPStatus
-from typing import Optional, Self, cast
+from typing import Any, Optional, Self, cast
 
 import kubernetes.client
 from fastapi import HTTPException, Request
@@ -204,7 +204,7 @@ class K8sClientSingleton:
             custom_objects_api = cls.get_custom_objects_api()
             # Kubernetes API always returns dict for custom objects
             version_data = cast(
-                dict,
+                dict[str, Any],
                 custom_objects_api.get_cluster_custom_object(
                     "config.openshift.io", "v1", "clusterversions", "version"
                 ),
