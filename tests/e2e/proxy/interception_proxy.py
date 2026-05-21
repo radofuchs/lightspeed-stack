@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INTERCEPTION_PROXY_PORT = 8889
 DEFAULT_INTERCEPTION_STATS_PORT = 8886
+# Local Behave: second listener for "without CA" scenarios; in-cluster maps to 8889.
+ALTERNATE_INTERCEPTION_PROXY_PORT = 8890
 IN_CLUSTER_CA_CERT_PATH = Path("/tmp/interception-proxy-ca.pem")
 
 
