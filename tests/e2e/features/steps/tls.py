@@ -34,22 +34,23 @@ _TLS_MODEL_RESOURCE: dict[str, str] = {
 }
 
 _mock_tls_cluster_deploy_state: dict[str, bool] = {"done": False}
-_tls_llama_warm_in_prow: dict[str, bool] = {"done": False}
 
 
 def reset_tls_prow_restart_optimization_state() -> None:
-    """Reset per-feature Prow restart optimizations (call from ``before_feature``)."""
-    _tls_llama_warm_in_prow["done"] = False
+    """Reset per-feature Prow state (call from ``before_feature``)."""
+    _mock_tls_cluster_deploy_state["done"] = False
     os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
+    os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
 
 
 def _prepare_tls_prow_llama_restart_env() -> None:
-    """Set env vars so e2e-ops can reload run.yaml instead of recreating the pod."""
+    """Set env vars so e2e-ops always recreates the llama pod (no config-only reload).
+
+    TLS scenarios change run.yaml and rely on /certs volume mounts; full pod
+    restarts are slower but more reliable than ``kill 1`` reload on Konflux.
+    """
     os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
-    if _tls_llama_warm_in_prow["done"]:
-        os.environ["E2E_LLAMA_RELOAD_CONFIG_ONLY"] = "1"
-    else:
-        os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
+    os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
 
 
 def _cluster_mock_tls_inference_host() -> str:
@@ -156,8 +157,6 @@ def _configure_tls(tls_config: dict[str, Any], base_url: Optional[str] = None) -
     write_llama_config(config)
     if is_prow_environment():
         _prepare_tls_prow_llama_restart_env()
-        if not _tls_llama_warm_in_prow["done"]:
-            _tls_llama_warm_in_prow["done"] = True
 
 
 # --- Background Steps ---
