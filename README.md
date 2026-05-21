@@ -210,7 +210,7 @@ Lightspeed Core Stack supports the following agentic features:
 | RAG | Supported | Retrieval-Augmented Generation with vector stores ([RAG Guide](docs/rag_guide.md)) |
 | A2A Protocol (Client) | Supported | Agent-to-Agent communication as client ([A2A Protocol](docs/a2a_protocol.md)) |
 | Conversation History | Supported | Persistent conversation context across requests |
-| Human-in-the-Loop | Upcoming (Q2) | Interactive approval or confirmation steps |
+| Human-in-the-Loop | Upcoming | Interactive approval or confirmation steps |
 | Agent Skills | Upcoming (Q2) | Domain-specific instructions loaded on demand ([Agent Skills Guide](docs/skills_guide.md)) |
 
 ## LLM Compatibility
