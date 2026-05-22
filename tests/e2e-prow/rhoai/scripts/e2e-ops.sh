@@ -414,7 +414,17 @@ cmd_restart_llama_stack() {
             -n "$NAMESPACE" \
             --dry-run=client -o yaml | oc apply -f -
         oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/llama-stack-openai.yaml"
-        wait_for_pod "llama-stack-service" 90
+        local llama_pod_wait=90
+        local llama_health_attempts=50
+        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+            llama_pod_wait=120
+            llama_health_attempts=100
+        fi
+        if ! wait_for_pod "llama-stack-service" "$llama_pod_wait"; then
+            echo "===== Llama-stack restore FAILED (pod not ready) ====="
+            oc describe pod llama-stack-service -n "$NAMESPACE" 2>/dev/null | tail -40 || true
+            exit 1
+        fi
         echo "Labeling pod for service..."
         oc label pod llama-stack-service pod=llama-stack-service -n "$NAMESPACE" --overwrite
         if [[ "${E2E_COPY_INTERCEPTION_CA_TO_LLAMA:-0}" == "1" ]]; then
@@ -429,12 +439,9 @@ cmd_restart_llama_stack() {
                 exit 1
             fi
         fi
-        local llama_health_attempts=50
-        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
-            llama_health_attempts=75
-        fi
         if ! wait_for_llama_stack_http_health "$llama_health_attempts"; then
             echo "===== Llama-stack restore FAILED (HTTP not healthy) ====="
+            oc logs llama-stack-service -n "$NAMESPACE" -c llama-stack-container --tail=80 2>&1 || true
             exit 1
         fi
     else
@@ -542,6 +549,9 @@ cmd_restart_llama_port_forward() {
     local local_port="${LOCAL_LLAMA_PORT:-8321}"
     local remote_port="${REMOTE_LLAMA_PORT:-8321}"
     local max_attempts=6
+    if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+        max_attempts=10
+    fi
     local pf_pid
     local pf_resource
     local llama_pf_log="/tmp/port-forward-llama.log"
@@ -788,8 +798,23 @@ _MOCK_TLS_CERT_FILES=(
     expired-client.crt
 )
 
+_mock_tls_certs_secret_is_complete() {
+    local f data
+    if ! oc get secret e2e-mock-tls-certs -n "$NAMESPACE" &>/dev/null; then
+        return 1
+    fi
+    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+        data=$(oc get secret e2e-mock-tls-certs -n "$NAMESPACE" \
+            -o "go-template={{index .data \"${f}\"}}" 2>/dev/null) || return 1
+        if [[ -z "$data" ]]; then
+            return 1
+        fi
+    done
+    return 0
+}
+
 cmd_sync_mock_tls_certs_secret() {
-    local mock_pod_name tmpdir f
+    local mock_pod_name tmpdir f attempt
     mock_pod_name=$(oc get pod -n "$NAMESPACE" -l app=e2e-mock-tls-inference \
         -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || mock_pod_name=""
 
@@ -799,19 +824,29 @@ cmd_sync_mock_tls_certs_secret() {
         return 1
     fi
 
+    if _mock_tls_certs_secret_is_complete; then
+        echo "✓ e2e-mock-tls-certs secret already complete, skipping sync"
+        return 0
+    fi
+
+    if ! oc wait pod/"$mock_pod_name" -n "$NAMESPACE" --for=condition=Ready --timeout=60s 2>/dev/null; then
+        echo "WARNING: e2e-mock-tls-inference not Ready before cert sync" >&2
+    fi
+
     tmpdir=$(mktemp -d)
     for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
-        if ! oc exec -n "$NAMESPACE" "$mock_pod_name" -c e2e-mock-tls-inference -- \
-            cat "/certs/$f" >"$tmpdir/$f"; then
-            echo "ERROR: failed to read /certs/$f from e2e-mock-tls-inference pod" >&2
-            rm -rf "$tmpdir"
-            return 1
-        fi
-        if [[ ! -s "$tmpdir/$f" ]]; then
-            echo "ERROR: /certs/$f is empty in e2e-mock-tls-inference pod" >&2
-            rm -rf "$tmpdir"
-            return 1
-        fi
+        for attempt in 1 2 3; do
+            if oc exec -n "$NAMESPACE" "$mock_pod_name" -c e2e-mock-tls-inference -- \
+                cat "/certs/$f" >"$tmpdir/$f" 2>/dev/null && [[ -s "$tmpdir/$f" ]]; then
+                break
+            fi
+            if [[ $attempt -eq 3 ]]; then
+                echo "ERROR: failed to read /certs/$f from e2e-mock-tls-inference pod" >&2
+                rm -rf "$tmpdir"
+                return 1
+            fi
+            sleep 3
+        done
     done
 
     if ! oc create secret generic e2e-mock-tls-certs \
@@ -828,11 +863,16 @@ cmd_sync_mock_tls_certs_secret() {
 
 _verify_mock_tls_certs_mounted_in_llama() {
     local llama_pod_name="llama-stack-service"
-    if oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- \
-        sh -c 'test -s /certs/ca.crt && test -s /certs/client.crt && test -s /certs/client.key'; then
-        echo "✓ mock TLS certs present under /certs in llama-stack"
-        return 0
-    fi
+    local attempt
+    for attempt in 1 2 3 4 5 6; do
+        if oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- \
+            sh -c 'test -s /certs/ca.crt && test -s /certs/client.crt && test -s /certs/client.key' \
+            2>/dev/null; then
+            echo "✓ mock TLS certs present under /certs in llama-stack"
+            return 0
+        fi
+        sleep 3
+    done
     echo "ERROR: /certs missing or incomplete in llama-stack pod" >&2
     oc get secret e2e-mock-tls-certs -n "$NAMESPACE" 2>&1 || true
     oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- \

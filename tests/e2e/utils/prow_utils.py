@@ -7,6 +7,7 @@ and are only used when running tests in the Prow CI environment.
 import os
 import subprocess
 import tempfile
+import time
 from typing import Optional
 
 
@@ -93,7 +94,12 @@ def restart_pod(container_name: str) -> None:
     """
     if container_name in _LLAMA_RESTART_NAMES:
         op = "restart-llama-stack"
-        timeout = 420
+        # TLS feature: full pod recreate + cert sync + health can exceed 7 min on Konflux.
+        timeout = (
+            900
+            if os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1"
+            else 420
+        )
     elif container_name in _LIGHTSPEED_RESTART_NAMES:
         op = "restart-lightspeed"
         # Pod wait (up to ~120s) + port-forward retries + slow Konflux/Prow clusters.
@@ -105,20 +111,35 @@ def restart_pod(container_name: str) -> None:
         )
         op = "restart-lightspeed"
         timeout = 200
-    try:
-        result = run_e2e_ops(op, timeout=timeout)
-        print(result.stdout, end="")
-        if result.returncode != 0:
-            print(result.stderr, end="")
-            detail = (result.stderr or result.stdout or "").strip()
-            raise subprocess.CalledProcessError(
-                result.returncode,
-                op,
-                detail or None,
-            )
-    except subprocess.TimeoutExpired as e:
-        print(f"Failed to restart pod {container_name}: {e}")
-        raise
+    max_attempts = 2 if op == "restart-llama-stack" else 1
+    last_error: subprocess.CalledProcessError | subprocess.TimeoutExpired | None = (
+        None
+    )
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = run_e2e_ops(op, timeout=timeout)
+            print(result.stdout, end="")
+            if result.returncode != 0:
+                print(result.stderr, end="")
+                detail = (result.stderr or result.stdout or "").strip()
+                raise subprocess.CalledProcessError(
+                    result.returncode,
+                    op,
+                    detail or None,
+                )
+            return
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
+            last_error = err
+            if attempt < max_attempts:
+                print(
+                    f"⚠️  {op} failed (attempt {attempt}/{max_attempts}), "
+                    "retrying after 20s..."
+                )
+                time.sleep(20)
+    if last_error is not None:
+        if isinstance(last_error, subprocess.TimeoutExpired):
+            print(f"Failed to restart pod {container_name}: {last_error}")
+        raise last_error
 
 
 def restore_llama_stack_pod() -> None:

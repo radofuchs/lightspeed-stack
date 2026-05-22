@@ -96,6 +96,7 @@ def _deploy_cluster_mock_tls_inference() -> None:
             "Failed to deploy e2e-mock-tls-inference: "
             f"{result.stderr or result.stdout}"
         )
+    _prepare_tls_prow_llama_restart_env()
     os.environ.setdefault(
         "E2E_MOCK_TLS_INFERENCE_HOST",
         _cluster_mock_tls_inference_host(),
