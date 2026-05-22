@@ -360,9 +360,16 @@ cmd_reload_llama_stack_config() {
     echo "Restarting llama-stack-container to pick up run.yaml..."
     oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- bash -c 'kill 1' \
         2>/dev/null || true
-    wait_for_pod "$llama_pod_name" 45
-    if ! wait_for_llama_stack_http_health 35; then
+    local reload_pod_wait=45
+    local reload_health_attempts=35
+    if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+        reload_pod_wait=60
+        reload_health_attempts=50
+    fi
+    wait_for_pod "$llama_pod_name" "$reload_pod_wait"
+    if ! wait_for_llama_stack_http_health "$reload_health_attempts"; then
         echo "===== Llama-stack reload FAILED (HTTP not healthy) ====="
+        oc logs llama-stack-service -n "$NAMESPACE" -c llama-stack-container --tail=80 2>&1 || true
         return 1
     fi
     if ! cmd_restart_llama_port_forward; then

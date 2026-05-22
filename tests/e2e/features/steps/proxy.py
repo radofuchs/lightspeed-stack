@@ -320,6 +320,14 @@ def restore_if_modified(context: Context) -> None:
 @given("Llama Stack is restarted")
 def restart_llama_stack(context: Context) -> None:
     """Restart the Llama Stack container."""
+    from tests.e2e.features.steps.tls import (
+        is_tls_configuration_feature,
+        restart_llama_for_tls_feature,
+    )
+
+    if is_tls_configuration_feature(context):
+        restart_llama_for_tls_feature(context)
+        return
     restart_container("llama-stack")
 
 

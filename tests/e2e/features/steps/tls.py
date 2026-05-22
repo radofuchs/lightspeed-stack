@@ -34,23 +34,72 @@ _TLS_MODEL_RESOURCE: dict[str, str] = {
 }
 
 _mock_tls_cluster_deploy_state: dict[str, bool] = {"done": False}
+_tls_prow_restart_state: dict[str, bool] = {"full_restart_done": False}
 
 
 def reset_tls_prow_restart_optimization_state() -> None:
     """Reset per-feature Prow state (call from ``before_feature``)."""
     _mock_tls_cluster_deploy_state["done"] = False
+    _tls_prow_restart_state["full_restart_done"] = False
     os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
     os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
 
 
-def _prepare_tls_prow_llama_restart_env() -> None:
-    """Set env vars so e2e-ops always recreates the llama pod (no config-only reload).
+def is_tls_configuration_feature(context: Context) -> bool:
+    """Return True when the active Behave feature is ``tls.feature``."""
+    feature = getattr(context, "feature", None)
+    if feature is None:
+        return False
+    name = getattr(feature, "name", "") or ""
+    return "TLS configuration" in name
 
-    TLS scenarios change run.yaml and rely on /certs volume mounts; full pod
-    restarts are slower but more reliable than ``kill 1`` reload on Konflux.
-    """
+
+def _prepare_tls_prow_llama_full_restart_env() -> None:
+    """Env for a full llama pod recreate (first TLS scenario / recovery)."""
     os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
     os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
+
+
+def _prepare_tls_prow_llama_reload_env() -> None:
+    """Env for config-only reload (run.yaml already on pod with /certs mounted)."""
+    os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
+    os.environ["E2E_LLAMA_RELOAD_CONFIG_ONLY"] = "1"
+
+
+def restart_llama_for_tls_feature(context: Context) -> None:
+    """Restart Llama for TLS tests: one full recreate per feature, then reload.
+
+    Full pod delete+apply after every scenario (~16×) is flaky on Konflux
+    (cert sync, mount races, port-forward). Later scenarios only change run.yaml
+    in the ConfigMap; ``oc cp`` + container restart is enough.
+    """
+    from tests.e2e.utils.utils import restart_container
+
+    if not is_prow_environment():
+        restart_container("llama-stack")
+        return
+
+    if _tls_prow_restart_state["full_restart_done"]:
+        _prepare_tls_prow_llama_reload_env()
+    else:
+        _prepare_tls_prow_llama_full_restart_env()
+
+    try:
+        restart_container("llama-stack")
+    except Exception:
+        _tls_prow_restart_state["full_restart_done"] = False
+        raise
+
+    _tls_prow_restart_state["full_restart_done"] = True
+
+
+def _prepare_tls_prow_llama_restart_env() -> None:
+    """Set env before writing run.yaml (used by ``_configure_tls``)."""
+    os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
+    if _tls_prow_restart_state["full_restart_done"]:
+        os.environ["E2E_LLAMA_RELOAD_CONFIG_ONLY"] = "1"
+    else:
+        os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
 
 
 def _cluster_mock_tls_inference_host() -> str:

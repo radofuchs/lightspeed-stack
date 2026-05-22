@@ -111,7 +111,15 @@ def restart_pod(container_name: str) -> None:
         )
         op = "restart-lightspeed"
         timeout = 200
-    max_attempts = 2 if op == "restart-llama-stack" else 1
+    max_attempts = (
+        3
+        if op == "restart-llama-stack"
+        and os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1"
+        and os.environ.get("E2E_LLAMA_RELOAD_CONFIG_ONLY") != "1"
+        else 2
+        if op == "restart-llama-stack"
+        else 1
+    )
     last_error: subprocess.CalledProcessError | subprocess.TimeoutExpired | None = (
         None
     )
@@ -131,11 +139,18 @@ def restart_pod(container_name: str) -> None:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
             last_error = err
             if attempt < max_attempts:
+                retry_delay = 30 if os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1" else 20
                 print(
                     f"⚠️  {op} failed (attempt {attempt}/{max_attempts}), "
-                    "retrying after 20s..."
+                    f"retrying after {retry_delay}s..."
                 )
-                time.sleep(20)
+                time.sleep(retry_delay)
+                if (
+                    op == "restart-llama-stack"
+                    and os.environ.get("E2E_LLAMA_RELOAD_CONFIG_ONLY") == "1"
+                ):
+                    # Reload failed; next attempt does full pod recreate.
+                    os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
     if last_error is not None:
         if isinstance(last_error, subprocess.TimeoutExpired):
             print(f"Failed to restart pod {container_name}: {last_error}")
