@@ -1116,6 +1116,23 @@ mode</td>
 180 seconds (3 minutes) to accommodate long-running RAG queries.</td>
         </tr>
         <tr class="even">
+          <td>max_retries</td>
+          <td>integer</td>
+          <td>Maximum number of connection attempts before giving up. Used on
+startup to connect to Llama Stack and retrieve its version. Connection
+attempts are retried with a fixed delay to handle the case where Llama
+Stack is still starting up (e.g., when running as a sidecar in the same
+pod).</td>
+        </tr>
+        <tr class="odd">
+          <td>retry_delay</td>
+          <td>integer</td>
+          <td>Delay in seconds between retry attempts. Used on startup to connect
+to Llama Stack and retrieve its version. Connection attempts are retried
+with a fixed delay to handle the case where Llama Stack is still
+starting up (e.g., when running as a sidecar in the same pod).</td>
+        </tr>
+        <tr class="even">
           <td>allow_degraded_mode</td>
           <td>boolean</td>
           <td>If enabled, Lightspeed Core can be started even when Llama Stack is

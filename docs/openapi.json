@@ -13850,6 +13850,20 @@
                         "description": "Timeout in seconds for requests to Llama Stack service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
                         "default": 180
                     },
+                    "max_retries": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Maximum number of connection attempts before giving up",
+                        "description": "Maximum number of connection attempts before giving up. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod).",
+                        "default": 5
+                    },
+                    "retry_delay": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Delay in seconds between retry attempts",
+                        "description": "Delay in seconds between retry attempts. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod).",
+                        "default": 2
+                    },
                     "allow_degraded_mode": {
                         "anyOf": [
                             {
