@@ -2,24 +2,20 @@
 
 import asyncio
 import re
+from typing import Optional
 
 from llama_stack_client import APIConnectionError, AsyncLlamaStackClient
 from semver import Version
 
 from constants import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_RETRY_DELAY,
     MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION,
     MINIMAL_SUPPORTED_LLAMA_STACK_VERSION,
 )
 from log import get_logger
 
 logger = get_logger(__name__)
-
-# Retry settings for waiting on Llama Stack readiness during startup.
-# When LCS runs as a sidecar alongside Llama Stack, both containers start
-# concurrently and Llama Stack may not be ready when LCS attempts its
-# first version check.
-_DEFAULT_MAX_RETRIES = 5
-_DEFAULT_RETRY_DELAY = 2
 
 
 class InvalidLlamaStackVersionException(Exception):
@@ -28,9 +24,9 @@ class InvalidLlamaStackVersionException(Exception):
 
 async def check_llama_stack_version(
     client: AsyncLlamaStackClient,
-    max_retries: int = _DEFAULT_MAX_RETRIES,
-    retry_delay: int = _DEFAULT_RETRY_DELAY,
-) -> None:
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    retry_delay: int = DEFAULT_RETRY_DELAY,
+) -> Optional[str]:
     """
     Verify the connected Llama Stack's version is within the supported range.
 
@@ -61,7 +57,7 @@ async def check_llama_stack_version(
                 MINIMAL_SUPPORTED_LLAMA_STACK_VERSION,
                 MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION,
             )
-            return
+            return version_info.version
         except APIConnectionError:
             if attempt == max_retries - 1:
                 raise
@@ -72,6 +68,8 @@ async def check_llama_stack_version(
                 retry_delay,
             )
             await asyncio.sleep(retry_delay)
+    # version can not be retrieved
+    return None
 
 
 def compare_versions(version_info: str, minimal: str, maximal: str) -> None:
@@ -129,4 +127,4 @@ def compare_versions(version_info: str, minimal: str, maximal: str) -> None:
         raise InvalidLlamaStackVersionException(
             f"Llama Stack version <= {maximal_version} is required, but {current_version} is used"
         )
-    logger.info("Correct Llama Stack version : %s", current_version)
+    logger.info("Correct Llama Stack version: %s", current_version)

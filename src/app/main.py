@@ -9,7 +9,7 @@ import sentry_sdk  # pyright: ignore[reportMissingImports]
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from llama_stack_client import APIConnectionError
+from llama_stack_client import APIConnectionError, AsyncLlamaStackClient
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -88,11 +88,19 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     llama_stack_config = configuration.configuration.llama_stack
     await AsyncLlamaStackClientHolder().load(llama_stack_config)
-    client = AsyncLlamaStackClientHolder().get_client()
+    client: AsyncLlamaStackClient = AsyncLlamaStackClientHolder().get_client()
+    logger.debug("Llama Stack client initialized, trying to connect to Llama Stack")
     # check if the Llama Stack version is supported by the service
     try:
-        await check_llama_stack_version(client)
+        llama_stack_version = await check_llama_stack_version(
+            client, llama_stack_config.max_retries, llama_stack_config.retry_delay
+        )
+        if llama_stack_version is None:
+            logger.error("Cannot retrieve Llama Stack version, check connection")
+        else:
+            logger.debug("Llama Stack version: %s", llama_stack_version)
     except APIConnectionError as e:
+        # if degraded mode is allowed, simply ignore the exception
         llama_stack_url = llama_stack_config.url
         logger.error(
             "Failed to connect to Llama Stack at '%s'. "
@@ -102,7 +110,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             llama_stack_url,
             e,
         )
-        raise
+        if llama_stack_config.allow_degraded_mode:
+            logger.info("Entering degraded mode: LCORE running w/o Llama Stack")
+        else:
+            raise
 
     logger.info("Registering MCP servers")
     await register_mcp_servers_async(logger, configuration.configuration)
