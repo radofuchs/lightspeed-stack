@@ -701,6 +701,24 @@ class LlamaStackConfiguration(ConfigurationBase):
         "Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
     )
 
+    max_retries: PositiveInt = Field(
+        constants.DEFAULT_MAX_RETRIES,
+        title="Maximum number of connection attempts before giving up",
+        description="Maximum number of connection attempts before giving up. "
+        "Used on startup to connect to Llama Stack and retrieve its version. Connection attempts "
+        "are retried with a fixed delay to handle the case where Llama Stack is still starting "
+        "up (e.g., when running as a sidecar in the same pod).",
+    )
+
+    retry_delay: PositiveInt = Field(
+        constants.DEFAULT_RETRY_DELAY,
+        title="Delay in seconds between retry attempts",
+        description="Delay in seconds between retry attempts. Used on startup to connect to Llama "
+        "Stack and retrieve its version. Connection attempts are retried with a fixed delay to "
+        "handle the case where Llama Stack is still starting up (e.g., when running as a sidecar "
+        "in the same pod).",
+    )
+
     allow_degraded_mode: Optional[bool] = Field(
         False,
         title="Allow degraded mode",

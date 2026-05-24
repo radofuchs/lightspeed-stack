@@ -285,3 +285,10 @@ SENTRY_EXCLUDED_ROUTES: Final[tuple[str, ...]] = (
 # Set this to a file path (e.g. /etc/pki/tls/certs/ca-bundle.crt) when
 # connecting to a Sentry instance that uses a private or internal CA.
 SENTRY_CA_CERTS_ENV_VAR: Final[str] = "SENTRY_CA_CERTS"
+
+# Retry settings for waiting on Llama Stack readiness during startup.
+# When LCS runs as a sidecar alongside Llama Stack, both containers start
+# concurrently and Llama Stack may not be ready when LCS attempts its
+# first version check.
+DEFAULT_MAX_RETRIES: Final[int] = 5
+DEFAULT_RETRY_DELAY: Final[int] = 2
