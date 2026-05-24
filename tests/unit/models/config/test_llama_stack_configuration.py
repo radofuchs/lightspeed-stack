@@ -4,6 +4,7 @@ import pytest
 from pydantic import AnyHttpUrl, ValidationError
 from pytest_subtests import SubTests
 
+import constants
 from models.config import LlamaStackConfiguration
 from utils.checks import InvalidConfigurationError
 
@@ -24,6 +25,8 @@ def test_llama_stack_configuration_constructor(subtests: SubTests) -> None:
         )
         assert llama_stack_configuration is not None
         assert llama_stack_configuration.allow_degraded_mode is False
+        assert llama_stack_configuration.max_retries == constants.DEFAULT_MAX_RETRIES
+        assert llama_stack_configuration.retry_delay == constants.DEFAULT_RETRY_DELAY
 
     with subtests.test(msg="Configuration for server mode"):
         llama_stack_configuration = LlamaStackConfiguration(
@@ -35,6 +38,8 @@ def test_llama_stack_configuration_constructor(subtests: SubTests) -> None:
         )
         assert llama_stack_configuration is not None
         assert llama_stack_configuration.allow_degraded_mode is False
+        assert llama_stack_configuration.max_retries == constants.DEFAULT_MAX_RETRIES
+        assert llama_stack_configuration.retry_delay == constants.DEFAULT_RETRY_DELAY
 
     with subtests.test(msg="Minimal configuration for server mode"):
         llama_stack_configuration = LlamaStackConfiguration(
@@ -42,6 +47,8 @@ def test_llama_stack_configuration_constructor(subtests: SubTests) -> None:
         )  # pyright: ignore[reportCallIssue]
         assert llama_stack_configuration is not None
         assert llama_stack_configuration.allow_degraded_mode is False
+        assert llama_stack_configuration.max_retries == constants.DEFAULT_MAX_RETRIES
+        assert llama_stack_configuration.retry_delay == constants.DEFAULT_RETRY_DELAY
 
     with subtests.test(msg="Full configuration for server mode"):
         llama_stack_configuration = LlamaStackConfiguration(
@@ -49,6 +56,8 @@ def test_llama_stack_configuration_constructor(subtests: SubTests) -> None:
         )  # pyright: ignore[reportCallIssue]
         assert llama_stack_configuration is not None
         assert llama_stack_configuration.allow_degraded_mode is False
+        assert llama_stack_configuration.max_retries == constants.DEFAULT_MAX_RETRIES
+        assert llama_stack_configuration.retry_delay == constants.DEFAULT_RETRY_DELAY
 
     with subtests.test(msg="Degraded mode enabled"):
         llama_stack_configuration = LlamaStackConfiguration(
@@ -57,6 +66,8 @@ def test_llama_stack_configuration_constructor(subtests: SubTests) -> None:
         )  # pyright: ignore[reportCallIssue]
         assert llama_stack_configuration is not None
         assert llama_stack_configuration.allow_degraded_mode is True
+        assert llama_stack_configuration.max_retries == constants.DEFAULT_MAX_RETRIES
+        assert llama_stack_configuration.retry_delay == constants.DEFAULT_RETRY_DELAY
 
 
 def test_llama_stack_configuration_no_run_yaml() -> None:
@@ -149,3 +160,35 @@ def test_llama_stack_configuration_invalid_scheme_rejected() -> None:
         LlamaStackConfiguration(
             url="ftp://localhost:8321"
         )  # pyright: ignore[reportCallIssue]
+
+
+def test_llama_stack_configuration_wrong_max_retries_count(subtests: SubTests) -> None:
+    """Test that malformed URLs are rejected with a ValidationError."""
+    with subtests.test(msg="Configuration with zero max_retries count"):
+        with pytest.raises(ValidationError, match="Input should be greater than 0"):
+            LlamaStackConfiguration(
+                url="https://llama-stack.example.com:8321",
+                max_retries=0,
+            )  # pyright: ignore[reportCallIssue]
+    with subtests.test(msg="Configuration with negative max_retries count"):
+        with pytest.raises(ValidationError, match="Input should be greater than 0"):
+            LlamaStackConfiguration(
+                url="https://llama-stack.example.com:8321",
+                max_retries=-1,
+            )  # pyright: ignore[reportCallIssue]
+
+
+def test_llama_stack_configuration_wrong_retry_delay_value(subtests: SubTests) -> None:
+    """Test that malformed URLs are rejected with a ValidationError."""
+    with subtests.test(msg="Configuration with zero retry_delay value"):
+        with pytest.raises(ValidationError, match="Input should be greater than 0"):
+            LlamaStackConfiguration(
+                url="https://llama-stack.example.com:8321",
+                retry_delay=0,
+            )  # pyright: ignore[reportCallIssue]
+    with subtests.test(msg="Configuration with negative retry_delay value"):
+        with pytest.raises(ValidationError, match="Input should be greater than 0"):
+            LlamaStackConfiguration(
+                url="https://llama-stack.example.com:8321",
+                retry_delay=-1,
+            )  # pyright: ignore[reportCallIssue]

@@ -920,6 +920,20 @@
             "title": "Request timeout",
             "type": "integer"
           },
+          "max_retries": {
+            "default": 5,
+            "description": "Maximum number of connection attempts before giving up. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod).",
+            "minimum": 0,
+            "title": "Maximum number of connection attempts before giving up",
+            "type": "integer"
+          },
+          "retry_delay": {
+            "default": 2,
+            "description": "Delay in seconds between retry attempts. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod).",
+            "minimum": 0,
+            "title": "Delay in seconds between retry attempts",
+            "type": "integer"
+          },
           "allow_degraded_mode": {
             "type": "boolean",
             "nullable": true,
