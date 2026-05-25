@@ -80,7 +80,8 @@ uv pip compile "$SOURCE_FILE" --refresh --generate-hashes --python-version 3.12 
 uv run pybuild-deps compile --output-file="$BUILD_FILE" "$SOURCE_FILE"
 
 # pin maturin to the version available in the Red Hat registry
-sed -i 's/maturin==[0-9.]*/maturin==1.10.2/' "$BUILD_FILE"
+# LCORE-2324: commented out (temporarily?)
+# sed -i 's/maturin==[0-9.]*/maturin==1.10.2/' "$BUILD_FILE"
 
 # remove intermediate files
 rm "$RAW_REQ_FILE" "$WHEEL_FILE" "$SOURCE_FILE"
