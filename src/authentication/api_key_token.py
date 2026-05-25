@@ -10,8 +10,9 @@ import secrets
 
 from fastapi import HTTPException, Request, status
 
-from authentication.interface import AuthInterface, AuthTuple
+from authentication.interface import NO_AUTH_TUPLE, AuthInterface, AuthTuple
 from authentication.utils import extract_user_token
+from configuration import configuration
 from constants import (
     DEFAULT_USER_NAME,
     DEFAULT_USER_UID,
@@ -21,6 +22,19 @@ from log import get_logger
 from models.config import APIKeyTokenConfiguration
 
 logger = get_logger(__name__)
+
+
+def _should_skip_auth(request: Request) -> bool:
+    """Check if auth should be skipped for health probe or metrics endpoints."""
+    auth_config = configuration.authentication_configuration
+    if auth_config.skip_for_health_probes and request.url.path in (
+        "/readiness",
+        "/liveness",
+    ):
+        return True
+    if auth_config.skip_for_metrics and request.url.path in ("/metrics",):
+        return True
+    return False
 
 
 class APIKeyTokenAuthDependency(
@@ -59,6 +73,10 @@ class APIKeyTokenAuthDependency(
             HTTPException: If the bearer token is missing or
             doesn't match the configured API key (HTTP 401).
         """
+        if not request.headers.get("Authorization"):
+            if _should_skip_auth(request):
+                return NO_AUTH_TUPLE
+
         # try to extract user token from request
         user_token = extract_user_token(request.headers)
 
