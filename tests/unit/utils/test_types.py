@@ -2,15 +2,10 @@
 
 import pytest
 from llama_stack_api import URL, ImageContentItem, TextContentItem, _URLOrData
-from llama_stack_api.openai_responses import (
-    OpenAIResponseInputToolFileSearch as InputToolFileSearch,
-)
-from llama_stack_api.openai_responses import (
-    OpenAIResponseInputToolMCP as InputToolMCP,
-)
 from pydantic import AnyUrl, ValidationError
 
 from models.common.responses.responses_api_params import ResponsesApiParams
+from models.common.responses.types import InputToolFileSearch, InputToolMCP
 from models.common.turn_summary import (
     ReferencedDocument,
     ToolCallSummary,
@@ -148,11 +143,10 @@ class TestReferencedDocument:
 
 
 class TestResponsesApiParamsModelDump:
-    """Tests for ResponsesApiParams.model_dump() MCP authorization fix.
+    """Tests for ResponsesApiParams.model_dump() MCP authorization serialization.
 
-    Regression tests for LCORE-1414 / GitHub issue #1269: llama-stack-api's
-    InputToolMCP.authorization has Field(exclude=True), causing the base
-    model_dump() to silently strip authorization tokens.
+    Regression tests for LCORE-1414 / GitHub issue #1269: MCP authorization must
+    survive model_dump() when forwarding tools to Llama Stack.
     """
 
     def _make_params(self, tools: list) -> ResponsesApiParams:
@@ -175,7 +169,7 @@ class TestResponsesApiParamsModelDump:
             authorization="my-secret-token",
         )
         assert tool.authorization == "my-secret-token"
-        assert "authorization" not in tool.model_dump()
+        assert tool.model_dump()["authorization"] == "my-secret-token"
 
         params = self._make_params([tool])
         dumped = params.model_dump(exclude_none=True)
@@ -240,8 +234,8 @@ class TestResponsesApiParamsModelDump:
         assert dumped["tools"][0]["authorization"] == "token-a"
         assert dumped["tools"][1]["authorization"] == "token-b"
 
-    def test_exclude_changing_tool_list_shape_skips_reinjection(self) -> None:
-        """Test that exclude removing tool indices does not mis-assign authorization."""
+    def test_partial_tool_dump_reinjects_auth_by_server_label(self) -> None:
+        """When exclude drops some tools, remaining MCP rows still get auth by label."""
         tool_a = InputToolMCP(
             server_label="server-a",
             server_url="http://a:3000",
@@ -258,7 +252,7 @@ class TestResponsesApiParamsModelDump:
         dumped = params.model_dump(exclude={"tools": {0}})
         assert len(dumped["tools"]) == 1
         assert dumped["tools"][0]["server_label"] == "server-b"
-        assert "authorization" not in dumped["tools"][0]
+        assert dumped["tools"][0]["authorization"] == "token-b"
 
     def test_no_tools_does_not_error(self) -> None:
         """Test that model_dump() works when tools is None."""

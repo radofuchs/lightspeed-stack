@@ -4,9 +4,6 @@ import json
 from typing import Any, Optional, Self
 
 from llama_stack_api.openai_responses import (
-    OpenAIResponseInputTool as InputTool,
-)
-from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoice as ToolChoice,
 )
 from llama_stack_api.openai_responses import (
@@ -22,7 +19,7 @@ from pydantic import BaseModel, field_validator, model_validator
 
 from constants import RESPONSES_REQUEST_MAX_SIZE
 from models.common.query import SolrVectorSearchRequest
-from models.common.responses.types import IncludeParameter, ResponseInput
+from models.common.responses.types import IncludeParameter, InputTool, ResponseInput
 from utils import suid
 
 

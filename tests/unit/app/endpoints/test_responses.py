@@ -13,7 +13,9 @@ from llama_stack_api import OpenAIResponseObject
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoiceMode as ToolChoiceMode,
 )
-from llama_stack_api.openai_responses import OpenAIResponseMessage
+from llama_stack_api.openai_responses import (
+    OpenAIResponseMessage,
+)
 from llama_stack_client import APIConnectionError, APIStatusError, AsyncLlamaStackClient
 from pytest_mock import MockerFixture
 
@@ -32,11 +34,12 @@ from constants import DEFAULT_SYSTEM_PROMPT, SUBSTITUTED_INSTRUCTIONS_PLACEHOLDE
 from models.api.requests import ResponsesRequest
 from models.api.responses.successful import ResponsesResponse
 from models.common.moderation import ShieldModerationBlocked, ShieldModerationPassed
+from models.common.responses.contexts import ResponsesContext
 from models.common.responses.responses_api_params import ResponsesApiParams
-from models.common.responses.responses_context import ResponsesContext
 from models.common.responses.responses_conversation_context import (
     ResponsesConversationContext,
 )
+from models.common.responses.types import InputToolMCP
 from models.common.turn_summary import RAGContext, TurnSummary
 from models.config import Action, ModelContextProtocolServer
 from models.database.conversations import UserConversation
@@ -73,12 +76,7 @@ def build_api_params_and_context(  # pylint: disable=too-many-arguments
     user_agent: Optional[str] = None,
 ) -> tuple[ResponsesApiParams, ResponsesContext]:
     """Build api_params/context for direct helper invocation tests."""
-    api_params = ResponsesApiParams.model_validate(
-        {
-            **updated_request.model_dump(exclude={"tools"}),
-            "tools": updated_request.tools,
-        }
-    )
+    api_params = ResponsesApiParams.model_validate(updated_request.model_dump())
     context = ResponsesContext.model_construct(
         client=client,
         auth=auth,
@@ -94,6 +92,26 @@ def build_api_params_and_context(  # pylint: disable=too-many-arguments
         user_agent=user_agent,
     )
     return api_params, context
+
+
+def test_responses_api_params_preserves_mcp_authorization() -> None:
+    """After model_validate, MCP tool authorization from model_dump is kept on api_params.tools."""
+    token = "secret-token"
+    req = ResponsesRequest(
+        input="x",
+        model=MODEL,
+        conversation=VALID_CONV_ID,
+        tools=[
+            InputToolMCP(
+                server_label="alpha",
+                server_url="http://alpha",
+                require_approval="never",
+                authorization=token,
+            )
+        ],
+    )
+    api = ResponsesApiParams.model_validate(req.model_dump())
+    assert api.tools is not None and api.tools[0].authorization == token
 
 
 def _patch_base(mocker: MockerFixture, config: AppConfig) -> None:
@@ -466,7 +484,7 @@ class TestResponsesEndpointHandler:
         """Test that Azure token refresh is called when model starts with azure."""
         responses_request = ResponsesRequest(input="Hi", model="azure/some-model")
         _patch_base(mocker, minimal_config)
-        _patch_client(mocker)
+        _mock_client, mock_holder = _patch_client(mocker)
         _patch_resolve_response_context(mocker)
         mocker.patch(
             f"{MODULE}.select_model_for_responses",
@@ -482,10 +500,7 @@ class TestResponsesEndpointHandler:
         mock_azure.refresh_token.return_value = True
         mocker.patch(f"{MODULE}.AzureEntraIDManager", return_value=mock_azure)
         updated_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
-        mock_update_token = mocker.patch(
-            f"{MODULE}.update_azure_token",
-            new=mocker.AsyncMock(return_value=updated_client),
-        )
+        mock_holder.update_azure_token = mocker.AsyncMock(return_value=updated_client)
         _patch_rag(mocker)
         _patch_moderation(mocker, decision="passed")
         mocker.patch(
@@ -505,7 +520,7 @@ class TestResponsesEndpointHandler:
             auth=MOCK_AUTH,
             mcp_headers={},
         )
-        mock_update_token.assert_called_once()
+        mock_holder.update_azure_token.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_responses_structured_input_appends_rag_message(

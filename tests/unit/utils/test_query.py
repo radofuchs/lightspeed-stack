@@ -8,11 +8,11 @@ from typing import Any
 import psycopg2
 import pytest
 from fastapi import HTTPException
-from llama_stack_client import APIConnectionError, APIStatusError
 from llama_stack_client.types import ModelListResponse
 from pytest_mock import MockerFixture
 from sqlalchemy.exc import SQLAlchemyError
 
+from cache.cache_entry import CacheEntry
 from cache.cache_error import CacheError
 from configuration import AppConfig
 from models.api.requests import QueryRequest
@@ -21,7 +21,6 @@ from models.api.responses.error import (
     PromptTooLongResponse,
     QuotaExceededResponse,
 )
-from models.cache_entry import CacheEntry
 from models.common.query import Attachment
 from models.common.turn_summary import TurnSummary
 from models.config import Action
@@ -38,7 +37,6 @@ from utils.query import (
     prepare_input,
     store_conversation_into_cache,
     store_query_results,
-    update_azure_token,
     validate_attachments_metadata,
     validate_model_provider_override,
 )
@@ -551,102 +549,6 @@ class TestConsumeQueryTokens:
                 model_id="provider1/model1",
                 token_usage=token_usage,
             )
-        assert exc_info.value.status_code == 500
-
-
-class TestUpdateAzureToken:
-    """Tests for update_azure_token function."""
-
-    @pytest.mark.asyncio
-    async def test_update_with_library_client(self, mocker: MockerFixture) -> None:
-        """Test updating token with library client."""
-        mock_client_holder = mocker.Mock()
-        mock_client_holder.is_library_client = True
-        mock_client_holder.reload_library_client = mocker.AsyncMock(
-            return_value="client"
-        )
-        mocker.patch(
-            "utils.query.AsyncLlamaStackClientHolder", return_value=mock_client_holder
-        )
-
-        mock_client = mocker.Mock()
-        result = await update_azure_token(mock_client)
-        assert result == "client"
-        mock_client_holder.reload_library_client.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_update_with_remote_client(self, mocker: MockerFixture) -> None:
-        """Test updating token with remote client."""
-        mock_client_holder = mocker.Mock()
-        mock_client_holder.is_library_client = False
-        mock_client_holder.update_provider_data = mocker.Mock(
-            return_value="updated_client"
-        )
-        mocker.patch(
-            "utils.query.AsyncLlamaStackClientHolder", return_value=mock_client_holder
-        )
-
-        mock_provider = type(
-            "Provider",
-            (),
-            {
-                "provider_type": "remote::azure",
-                "config": {"api_base": "https://api.example.com"},
-            },
-        )()
-        mock_client = mocker.AsyncMock()
-        mock_client.providers.list = mocker.AsyncMock(return_value=[mock_provider])
-
-        mocker.patch(
-            "utils.query.AzureEntraIDManager",
-            return_value=mocker.Mock(
-                access_token=mocker.Mock(
-                    get_secret_value=mocker.Mock(return_value="token")
-                )
-            ),
-        )
-
-        result = await update_azure_token(mock_client)
-        assert result == "updated_client"
-
-    @pytest.mark.asyncio
-    async def test_update_with_connection_error(self, mocker: MockerFixture) -> None:
-        """Test updating token raises HTTPException on connection error."""
-        mock_client_holder = mocker.Mock()
-        mock_client_holder.is_library_client = False
-        mocker.patch(
-            "utils.query.AsyncLlamaStackClientHolder", return_value=mock_client_holder
-        )
-
-        mock_client = mocker.AsyncMock()
-        mock_client.providers.list = mocker.AsyncMock(
-            side_effect=APIConnectionError(
-                message="Connection failed", request=mocker.Mock()
-            )
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await update_azure_token(mock_client)
-        assert exc_info.value.status_code == 503
-
-    @pytest.mark.asyncio
-    async def test_update_with_api_status_error(self, mocker: MockerFixture) -> None:
-        """Test updating token raises HTTPException on API status error."""
-        mock_client_holder = mocker.Mock()
-        mock_client_holder.is_library_client = False
-        mocker.patch(
-            "utils.query.AsyncLlamaStackClientHolder", return_value=mock_client_holder
-        )
-
-        mock_client = mocker.AsyncMock()
-        # Create a mock exception that will be caught by except APIStatusError
-        mock_error = APIStatusError(
-            message="API error", response=mocker.Mock(request=None), body=None
-        )
-        mock_client.providers.list = mocker.AsyncMock(side_effect=mock_error)
-
-        with pytest.raises(HTTPException) as exc_info:
-            await update_azure_token(mock_client)
         assert exc_info.value.status_code == 500
 
 

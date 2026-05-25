@@ -8,6 +8,7 @@ from typing import Any, Optional, cast
 
 from fastapi import HTTPException
 from llama_stack_api import OpenAIResponseObject
+from llama_stack_api.openai_responses import ApprovalFilter
 from llama_stack_api.openai_responses import (
     OpenAIResponseContentPartRefusal as ContentPartRefusal,
 )
@@ -21,9 +22,6 @@ from llama_stack_api.openai_responses import (
     OpenAIResponseInputMessageContentText as InputTextPart,
 )
 from llama_stack_api.openai_responses import (
-    OpenAIResponseInputTool as InputTool,
-)
-from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoice as ToolChoice,
 )
 from llama_stack_api.openai_responses import (
@@ -34,9 +32,6 @@ from llama_stack_api.openai_responses import (
 )
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolFileSearch as InputToolFileSearch,
-)
-from llama_stack_api.openai_responses import (
-    OpenAIResponseInputToolMCP as InputToolMCP,
 )
 from llama_stack_api.openai_responses import (
     OpenAIResponseMCPApprovalRequest as MCPApprovalRequest,
@@ -99,7 +94,12 @@ from models.api.responses.error import (
     ServiceUnavailableResponse,
 )
 from models.common.responses.responses_api_params import ResponsesApiParams
-from models.common.responses.types import ResponseInput, ResponseItem
+from models.common.responses.types import (
+    InputTool,
+    InputToolMCP,
+    ResponseInput,
+    ResponseItem,
+)
 from models.common.turn_summary import (
     RAGChunk,
     ReferencedDocument,
@@ -732,12 +732,20 @@ async def get_mcp_tools(
             continue
 
         authorization = headers.pop("Authorization", None)
+
+        require_approval = (
+            mcp_server.require_approval
+            if isinstance(mcp_server.require_approval, str)
+            else ApprovalFilter(
+                always=mcp_server.require_approval.always or None,
+                never=mcp_server.require_approval.never or None,
+            )
+        )
         tools.append(
             InputToolMCP(
-                type="mcp",
                 server_label=mcp_server.name,
                 server_url=mcp_server.url,
-                require_approval="never",
+                require_approval=require_approval,
                 headers=headers or None,
                 authorization=authorization,
             )

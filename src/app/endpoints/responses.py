@@ -60,8 +60,8 @@ from models.api.responses.error import (
 )
 from models.api.responses.successful import ResponsesResponse
 from models.common.moderation import ShieldModerationBlocked
+from models.common.responses.contexts import ResponsesContext
 from models.common.responses.responses_api_params import ResponsesApiParams
-from models.common.responses.responses_context import ResponsesContext
 from models.common.turn_summary import TurnSummary
 from models.config import Action
 from utils.conversations import append_turn_items_to_conversation
@@ -78,7 +78,6 @@ from utils.query import (
     handle_known_apistatus_errors,
     is_context_length_error,
     store_query_results,
-    update_azure_token,
     validate_model_provider_override,
 )
 from utils.quota import check_tokens_available, get_available_quotas
@@ -405,7 +404,7 @@ async def responses_endpoint_handler(
         and AzureEntraIDManager().is_token_expired
         and AzureEntraIDManager().refresh_token()
     ):
-        client = await update_azure_token(client)
+        client = await AsyncLlamaStackClientHolder().update_azure_token()
 
     input_text = (
         original_request.input
@@ -455,12 +454,7 @@ async def responses_endpoint_handler(
             original_request.input, inline_rag_context.context_text
         )
 
-    api_params = ResponsesApiParams.model_validate(
-        {
-            **updated_request.model_dump(exclude={"tools"}),
-            "tools": updated_request.tools,
-        }
-    )
+    api_params = ResponsesApiParams.model_validate(updated_request.model_dump())
     context = ResponsesContext(
         client=client,
         auth=auth,

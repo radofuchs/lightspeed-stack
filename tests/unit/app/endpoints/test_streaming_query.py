@@ -68,6 +68,7 @@ from models.api.requests import QueryRequest
 from models.api.responses.error import InternalServerErrorResponse
 from models.common.moderation import ShieldModerationPassed
 from models.common.query import Attachment
+from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.turn_summary import (
     RAGChunk,
@@ -76,7 +77,6 @@ from models.common.turn_summary import (
     TurnSummary,
 )
 from models.config import Action
-from models.context import ResponseGeneratorContext
 from utils.stream_interrupts import StreamInterruptRegistry
 from utils.token_counter import TokenCounter
 
@@ -728,8 +728,12 @@ class TestStreamingQueryEndpointHandler:
         )
 
         mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_updated_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
         mock_client_holder = mocker.Mock()
         mock_client_holder.get_client.return_value = mock_client
+        mock_client_holder.update_azure_token = mocker.AsyncMock(
+            return_value=mock_updated_client
+        )
         mocker.patch(
             "app.endpoints.streaming_query.AsyncLlamaStackClientHolder",
             return_value=mock_client_holder,
@@ -755,12 +759,6 @@ class TestStreamingQueryEndpointHandler:
         mocker.patch(
             "app.endpoints.streaming_query.AzureEntraIDManager",
             return_value=mock_azure_manager,
-        )
-
-        mock_updated_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
-        mock_update_token = mocker.patch(
-            "app.endpoints.streaming_query.update_azure_token",
-            new=mocker.AsyncMock(return_value=mock_updated_client),
         )
 
         mocker.patch(
@@ -804,7 +802,7 @@ class TestStreamingQueryEndpointHandler:
             mcp_headers={},
         )
 
-        mock_update_token.assert_called_once()
+        mock_client_holder.update_azure_token.assert_called_once()
 
 
 class TestCreateResponseGenerator:

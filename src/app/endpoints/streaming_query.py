@@ -74,10 +74,10 @@ from models.api.responses.error import (
     UnprocessableEntityResponse,
 )
 from models.api.responses.successful import StreamingQueryResponse
+from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.turn_summary import ReferencedDocument, TurnSummary
 from models.config import Action
-from models.context import ResponseGeneratorContext
 from utils.conversations import append_turn_items_to_conversation
 from utils.endpoints import (
     check_configuration_loaded,
@@ -92,7 +92,6 @@ from utils.query import (
     is_context_length_error,
     prepare_input,
     store_query_results,
-    update_azure_token,
     update_conversation_topic_summary,
     validate_attachments_metadata,
     validate_model_provider_override,
@@ -262,7 +261,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         and AzureEntraIDManager().is_token_expired
         and AzureEntraIDManager().refresh_token()
     ):
-        client = await update_azure_token(client)
+        client = await AsyncLlamaStackClientHolder().update_azure_token()
 
     request_id = get_suid()
 

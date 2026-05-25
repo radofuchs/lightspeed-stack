@@ -20,12 +20,14 @@ from openai._exceptions import APIStatusError as OpenAIAPIStatusError
 import constants
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
+from authorization.azure_token_manager import AzureEntraIDManager
 from authorization.middleware import authorize
 from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from constants import ENDPOINT_PATH_INFER
 from log import get_logger
 from metrics import recording
+from models.api.requests.rlsapi import RlsapiV1InferRequest, RlsapiV1SystemInfo
 from models.api.responses.constants import UNAUTHORIZED_OPENAPI_EXAMPLES
 from models.api.responses.error import (
     ForbiddenResponse,
@@ -37,9 +39,11 @@ from models.api.responses.error import (
     UnauthorizedResponse,
     UnprocessableEntityResponse,
 )
+from models.api.responses.successful.rlsapi import (
+    RlsapiV1InferData,
+    RlsapiV1InferResponse,
+)
 from models.config import Action
-from models.rlsapi.requests import RlsapiV1InferRequest, RlsapiV1SystemInfo
-from models.rlsapi.responses import RlsapiV1InferData, RlsapiV1InferResponse
 from observability import InferenceEventData, build_inference_event, send_splunk_event
 from utils.endpoints import check_configuration_loaded
 from utils.query import (
@@ -327,6 +331,16 @@ async def _call_llm(
     """
     client = AsyncLlamaStackClientHolder().get_client()
     resolved_model_id = model_id or await _get_default_model_id()
+
+    # Handle Azure token refresh if needed
+    if (
+        resolved_model_id.startswith("azure")
+        and AzureEntraIDManager().is_entra_id_configured
+        and AzureEntraIDManager().is_token_expired
+        and AzureEntraIDManager().refresh_token()
+    ):
+        client = await AsyncLlamaStackClientHolder().update_azure_token()
+
     logger.debug("Using model %s for rlsapi v1 inference", resolved_model_id)
 
     response = await client.responses.create(
