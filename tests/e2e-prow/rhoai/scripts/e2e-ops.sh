@@ -289,6 +289,30 @@ _llama_stack_http_health_once() {
     return 1
 }
 
+# Before recreating lightspeed-stack, Llama must answer /v1/health (reload can be Ready but not listening yet).
+_wait_for_llama_before_lightspeed_restart() {
+    local max_attempts="${1:-25}"
+    local attempt
+
+    echo "Waiting for Llama Stack before lightspeed-stack restart..."
+    for ((attempt=1; attempt<=max_attempts; attempt++)); do
+        if _llama_stack_http_health_once; then
+            echo "✓ Llama Stack healthy before LCS restart (attempt $attempt/$max_attempts)"
+            return 0
+        fi
+        if [[ $attempt -lt $max_attempts ]]; then
+            sleep 2
+        fi
+    done
+    echo "⚠️  Llama Stack not healthy after $((max_attempts * 2))s — restoring before LCS restart..."
+    # Use full recreate (reload may have left the process still starting or wedged).
+    if ! E2E_LLAMA_RELOAD_CONFIG_ONLY=0 cmd_restart_llama_stack; then
+        echo "⚠️  Llama Stack restore failed; LCS may be slow to start"
+        return 1
+    fi
+    return 0
+}
+
 # After the pod is Ready, confirm the process is actually serving HTTP (not only kubelet probes).
 wait_for_llama_stack_http_health() {
     local max_attempts="${1:-35}"
@@ -319,12 +343,9 @@ cmd_restart_lightspeed() {
     echo "Restarting lightspeed-stack service..."
 
     # LCS hangs at startup if Llama Stack is unreachable (blocks Llama handshake,
-    # never opens port 8080, readiness probe never passes).  Ensure Llama Stack
-    # is healthy before recreating the LCS pod.
-    if ! _llama_stack_http_health_once 2>/dev/null; then
-        echo "⚠️  Llama Stack not healthy — restoring before LCS restart..."
-        cmd_restart_llama_stack || echo "⚠️  Llama Stack restore failed; LCS may be slow to start"
-    fi
+    # never opens port 8080, readiness probe never passes).  After a Konflux
+    # config reload, the pod can be Ready before /v1/health responds — poll first.
+    _wait_for_llama_before_lightspeed_restart 25
 
     # Delete existing pod (short wait so hook stays within timeout; force if needed)
     timeout 20 oc delete pod lightspeed-stack-service -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || {
@@ -354,11 +375,21 @@ cmd_restart_lightspeed() {
     oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n "$NAMESPACE" --overwrite
 
     # Re-establish port-forwards (may succeed even if readiness was slow)
-    cmd_restart_port_forward
+    local forward_ok=true
+    if ! cmd_restart_port_forward; then
+        forward_ok=false
+        echo "⚠️  Lightspeed port-forward on :${LOCAL_PORT:-8080} failed"
+        e2e_ops_diagnose_forward_failure
+    fi
     cmd_restart_jwks_port_forward || echo "⚠️  Mock JWKS port-forward failed (RBAC tests may fail)"
 
     if [[ "$pod_ready" == "false" ]]; then
+        echo "E2E_LIGHTSPEED_RESTART_FAILED_PHASE=pod_not_ready"
         echo "⚠️  Lightspeed restart completed but pod was slow to become ready"
+        return 1
+    fi
+    if [[ "$forward_ok" == "false" ]]; then
+        echo "E2E_LIGHTSPEED_RESTART_FAILED_PHASE=port_forward"
         return 1
     fi
     echo "✓ Lightspeed restart complete"
