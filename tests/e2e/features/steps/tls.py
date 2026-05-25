@@ -34,13 +34,17 @@ _TLS_MODEL_RESOURCE: dict[str, str] = {
 }
 
 _mock_tls_cluster_deploy_state: dict[str, bool] = {"done": False}
-_tls_prow_restart_state: dict[str, bool] = {"full_restart_done": False}
+_tls_prow_restart_state: dict[str, bool] = {
+    "full_restart_done": False,
+    "force_full_restart": False,
+}
 
 
 def reset_tls_prow_restart_optimization_state() -> None:
     """Reset per-feature Prow state (call from ``before_feature``)."""
     _mock_tls_cluster_deploy_state["done"] = False
     _tls_prow_restart_state["full_restart_done"] = False
+    _tls_prow_restart_state["force_full_restart"] = False
     os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
     os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
 
@@ -79,7 +83,10 @@ def restart_llama_for_tls_feature(context: Context) -> None:
         restart_container("llama-stack")
         return
 
-    if _tls_prow_restart_state["full_restart_done"]:
+    if _tls_prow_restart_state.pop("force_full_restart", False):
+        _prepare_tls_prow_llama_full_restart_env()
+        mode = "full_forced"
+    elif _tls_prow_restart_state["full_restart_done"]:
         _prepare_tls_prow_llama_reload_env()
         mode = "reload"
     else:
@@ -136,6 +143,8 @@ def _tls_provider_base() -> dict[str, Any]:
             "api_key": "test-key",
             "base_url": _mock_tls_base_url(_MOCK_TLS_PORT_TLS),
             "allowed_models": ["mock-tls-model"],
+            # Avoid hitting the mock on every container restart (Konflux reload path).
+            "refresh_models": False,
         },
     }
 
@@ -211,6 +220,7 @@ def _configure_tls(tls_config: dict[str, Any], base_url: Optional[str] = None) -
         provider["config"]["base_url"] = base_url
     else:
         provider["config"]["base_url"] = _mock_tls_base_url(_MOCK_TLS_PORT_TLS)
+    provider.setdefault("config", {})["refresh_models"] = False
     provider["config"]["network"]["tls"] = tls_config
     write_llama_config(config)
     if is_prow_environment():
@@ -291,6 +301,10 @@ def configure_mtls_wrong_client_cert(context: Context) -> None:
         },
         base_url=_mock_tls_base_url(_MOCK_TLS_PORT_MTLS),
     )
+    # Konflux: reload after this config often never becomes healthy until timeout,
+    # then falls back to full recreate (~7 min). Skip reload for this scenario.
+    if is_prow_environment():
+        _tls_prow_restart_state["force_full_restart"] = True
 
 
 @given("Llama Stack is configured for mTLS with untrusted client certificate")

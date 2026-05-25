@@ -399,7 +399,8 @@ cmd_reload_llama_stack_config() {
     local reload_health_attempts=35
     if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
         reload_pod_wait=60
-        reload_health_attempts=50
+        # Fail reload faster when stack stays unhealthy (then full recreate runs once).
+        reload_health_attempts=24
     fi
     _e2e_ops_phase "reload_wait_pod_ready"
     if ! wait_for_pod "$llama_pod_name" "$reload_pod_wait"; then
