@@ -13569,6 +13569,105 @@
                     }
                 ]
             },
+            "InputToolMCP": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "const": "mcp",
+                        "title": "Type",
+                        "default": "mcp"
+                    },
+                    "server_label": {
+                        "type": "string",
+                        "title": "Server Label"
+                    },
+                    "connector_id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Connector Id"
+                    },
+                    "server_url": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Server Url"
+                    },
+                    "headers": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Headers"
+                    },
+                    "authorization": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Authorization"
+                    },
+                    "require_approval": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "const": "always"
+                            },
+                            {
+                                "type": "string",
+                                "const": "never"
+                            },
+                            {
+                                "$ref": "#/components/schemas/ApprovalFilter-Input"
+                            }
+                        ],
+                        "title": "Require Approval",
+                        "default": "never"
+                    },
+                    "allowed_tools": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "$ref": "#/components/schemas/AllowedToolsFilter"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Allowed Tools"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "server_label"
+                ],
+                "title": "InputToolMCP",
+                "description": "MCP input tool with authorization included when serializing request bodies."
+            },
             "InternalServerErrorResponse": {
                 "properties": {
                     "status_code": {
@@ -15307,105 +15406,6 @@
                 ],
                 "title": "OpenAIResponseInputToolFunction",
                 "description": "Function tool configuration for OpenAI response inputs.\n\n:param type: Tool type identifier, always \"function\"\n:param name: Name of the function that can be called\n:param description: (Optional) Description of what the function does\n:param parameters: (Optional) JSON schema defining the function's parameters\n:param strict: (Optional) Whether to enforce strict parameter validation"
-            },
-            "OpenAIResponseInputToolMCP": {
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "const": "mcp",
-                        "title": "Type",
-                        "default": "mcp"
-                    },
-                    "server_label": {
-                        "type": "string",
-                        "title": "Server Label"
-                    },
-                    "connector_id": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Connector Id"
-                    },
-                    "server_url": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Server Url"
-                    },
-                    "headers": {
-                        "anyOf": [
-                            {
-                                "additionalProperties": true,
-                                "type": "object"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Headers"
-                    },
-                    "authorization": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Authorization"
-                    },
-                    "require_approval": {
-                        "anyOf": [
-                            {
-                                "type": "string",
-                                "const": "always"
-                            },
-                            {
-                                "type": "string",
-                                "const": "never"
-                            },
-                            {
-                                "$ref": "#/components/schemas/ApprovalFilter-Input"
-                            }
-                        ],
-                        "title": "Require Approval",
-                        "default": "never"
-                    },
-                    "allowed_tools": {
-                        "anyOf": [
-                            {
-                                "items": {
-                                    "type": "string"
-                                },
-                                "type": "array"
-                            },
-                            {
-                                "$ref": "#/components/schemas/AllowedToolsFilter"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Allowed Tools"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "server_label"
-                ],
-                "title": "OpenAIResponseInputToolMCP",
-                "description": "Model Context Protocol (MCP) tool configuration for OpenAI response inputs.\n\n:param type: Tool type identifier, always \"mcp\"\n:param server_label: Label to identify this MCP server\n:param connector_id: (Optional) ID of the connector to use for this MCP server\n:param server_url: (Optional) URL endpoint of the MCP server\n:param headers: (Optional) HTTP headers to include when connecting to the server\n:param authorization: (Optional) OAuth access token for authenticating with the MCP server\n:param require_approval: Approval requirement for tool calls (\"always\", \"never\", or filter)\n:param allowed_tools: (Optional) Restriction on which tools can be used from this server"
             },
             "OpenAIResponseInputToolWebSearch": {
                 "properties": {
@@ -18194,7 +18194,7 @@
                                             "$ref": "#/components/schemas/OpenAIResponseInputToolFunction"
                                         },
                                         {
-                                            "$ref": "#/components/schemas/OpenAIResponseInputToolMCP"
+                                            "$ref": "#/components/schemas/InputToolMCP"
                                         }
                                     ],
                                     "discriminator": {
@@ -18202,7 +18202,7 @@
                                         "mapping": {
                                             "file_search": "#/components/schemas/OpenAIResponseInputToolFileSearch",
                                             "function": "#/components/schemas/OpenAIResponseInputToolFunction",
-                                            "mcp": "#/components/schemas/OpenAIResponseInputToolMCP",
+                                            "mcp": "#/components/schemas/InputToolMCP",
                                             "web_search": "#/components/schemas/OpenAIResponseInputToolWebSearch",
                                             "web_search_2025_08_26": "#/components/schemas/OpenAIResponseInputToolWebSearch",
                                             "web_search_preview": "#/components/schemas/OpenAIResponseInputToolWebSearch",

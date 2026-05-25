@@ -4,9 +4,6 @@ from collections.abc import Mapping
 from typing import Any, Final, Optional
 
 from llama_stack_api.openai_responses import (
-    OpenAIResponseInputTool as InputTool,
-)
-from llama_stack_api.openai_responses import (
     OpenAIResponseInputToolChoice as ToolChoice,
 )
 from llama_stack_api.openai_responses import (
@@ -23,7 +20,7 @@ from llama_stack_api.openai_responses import (
 )
 from pydantic import BaseModel, Field
 
-from models.common.responses.types import IncludeParameter, ResponseInput
+from models.common.responses.types import IncludeParameter, InputTool, ResponseInput
 from utils.tool_formatter import translate_vector_store_ids_to_user_facing
 
 # Attribute names that are echoed back in the response.
@@ -126,28 +123,16 @@ class ResponsesApiParams(BaseModel):
     )
 
     def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        """Serialize params, re-injecting MCP authorization stripped by exclude=True.
+        """Serialize to a request body dict.
 
-        llama-stack-api marks ``InputToolMCP.authorization`` with
-        ``Field(exclude=True)`` to prevent token leakage in API responses.
-        The base ``model_dump()`` therefore strips the field, but we need it
-        in the request payload so llama-stack server can authenticate with
-        MCP servers.  See LCORE-1414 / GitHub issue #1269.
+        Omits conversation when previous_response_id is set.
+
+        Returns:
+            Serializable dict for the Responses API request body.
         """
         result = super().model_dump(*args, **kwargs)
-        # Only one context option is allowed, previous_response_id has priority
-        # Turn is added to conversation manually if previous_response_id is used
         if self.previous_response_id:
             result.pop("conversation", None)
-        dumped_tools = result.get("tools")
-        if not self.tools or not isinstance(dumped_tools, list):
-            return result
-        if len(dumped_tools) != len(self.tools):
-            return result
-        for tool, dumped_tool in zip(self.tools, dumped_tools):
-            authorization = getattr(tool, "authorization", None)
-            if authorization is not None and isinstance(dumped_tool, dict):
-                dumped_tool["authorization"] = authorization
         return result
 
     def echoed_params(self, rag_id_mapping: Mapping[str, str]) -> dict[str, Any]:

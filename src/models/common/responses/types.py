@@ -1,9 +1,19 @@
 """Type aliases for OpenAI-compatible Responses API input shapes."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputFunctionToolCallOutput as FunctionToolCallOutput,
+)
+from llama_stack_api.openai_responses import (
+    OpenAIResponseInputToolFileSearch as InputToolFileSearch,
+)
+from llama_stack_api.openai_responses import (
+    OpenAIResponseInputToolFunction as InputToolFunction,
+)
+from llama_stack_api.openai_responses import OpenAIResponseInputToolMCP
+from llama_stack_api.openai_responses import (
+    OpenAIResponseInputToolWebSearch as InputToolWebSearch,
 )
 from llama_stack_api.openai_responses import (
     OpenAIResponseMCPApprovalRequest as McpApprovalRequest,
@@ -29,6 +39,19 @@ from llama_stack_api.openai_responses import (
 from llama_stack_api.openai_responses import (
     OpenAIResponseOutputMessageWebSearchToolCall as WebSearchToolCall,
 )
+from pydantic import Field
+
+
+class InputToolMCP(OpenAIResponseInputToolMCP):
+    """MCP input tool with authorization included when serializing request bodies."""
+
+    authorization: str | None = None
+
+
+InputTool = Annotated[
+    InputToolWebSearch | InputToolFileSearch | InputToolFunction | InputToolMCP,
+    Field(discriminator="type"),
+]
 
 type IncludeParameter = Literal[
     "web_search_call.action.sources",

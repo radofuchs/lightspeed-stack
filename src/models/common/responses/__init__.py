@@ -7,6 +7,8 @@ from models.common.responses.responses_conversation_context import (
 )
 from models.common.responses.types import (
     IncludeParameter,
+    InputTool,
+    InputToolMCP,
     ResponseInput,
     ResponseItem,
 )
@@ -15,6 +17,8 @@ __all__ = [
     "ResponseInput",
     "ResponseItem",
     "IncludeParameter",
+    "InputTool",
+    "InputToolMCP",
     "ResponsesApiParams",
     "ResponsesContext",
     "ResponsesConversationContext",
