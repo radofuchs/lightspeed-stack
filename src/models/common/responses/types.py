@@ -1,6 +1,6 @@
 """Type aliases for OpenAI-compatible Responses API input shapes."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 from llama_stack_api.openai_responses import (
     OpenAIResponseInputFunctionToolCallOutput as FunctionToolCallOutput,
@@ -45,7 +45,7 @@ from pydantic import Field
 class InputToolMCP(OpenAIResponseInputToolMCP):
     """MCP input tool with authorization included when serializing request bodies."""
 
-    authorization: str | None = None
+    authorization: Optional[str] = None
 
 
 InputTool = Annotated[
