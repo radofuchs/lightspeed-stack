@@ -67,10 +67,10 @@ async def test_authorized_dependency_unauthorized() -> None:
     with pytest.raises(HTTPException) as exc_info:
         extract_user_token(headers_no_auth)
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail["response"] == (  # type: ignore
+    assert exc_info.value.detail["response"] == (  # type: ignore[index]
         "Missing or invalid credentials provided by client"
     )
-    assert exc_info.value.detail["cause"] == (  # type: ignore
+    assert exc_info.value.detail["cause"] == (  # type: ignore[index]
         "No Authorization header found"
     )
 
@@ -78,9 +78,9 @@ async def test_authorized_dependency_unauthorized() -> None:
     with pytest.raises(HTTPException) as exc_info:
         extract_user_token(headers_invalid_auth)
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail["response"] == (  # type: ignore
+    assert exc_info.value.detail["response"] == (  # type: ignore[index]
         "Missing or invalid credentials provided by client"
     )
-    assert exc_info.value.detail["cause"] == (  # type: ignore
+    assert exc_info.value.detail["cause"] == (  # type: ignore[index]
         "No token found in Authorization header"
     )

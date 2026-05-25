@@ -296,7 +296,7 @@ class TestRunShieldModeration:
             await run_shield_moderation(mock_client, "test input", "/test-endpoint")
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert "missing-model" in exc_info.value.detail["cause"]  # type: ignore
+        assert "missing-model" in exc_info.value.detail["cause"]  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_raises_http_exception_when_shield_has_no_provider_resource_id(
@@ -352,8 +352,8 @@ class TestRunShieldModeration:
             )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert "Shield" in exc_info.value.detail["response"]  # type: ignore
-        assert "typo-shield" in exc_info.value.detail["cause"]  # type: ignore
+        assert "Shield" in exc_info.value.detail["response"]  # type: ignore[index]
+        assert "typo-shield" in exc_info.value.detail["cause"]  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_shield_ids_filters_to_specific_shield(
@@ -577,8 +577,8 @@ class TestGetShieldsForRequest:
             )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert "Shield" in exc_info.value.detail["response"]  # type: ignore
-        assert "missing-shield" in exc_info.value.detail["cause"]  # type: ignore
+        assert "Shield" in exc_info.value.detail["response"]  # type: ignore[index]
+        assert "missing-shield" in exc_info.value.detail["cause"]  # type: ignore[index]
 
     @pytest.mark.asyncio
     async def test_raises_404_when_multiple_requested_shields_not_configured(
@@ -594,8 +594,8 @@ class TestGetShieldsForRequest:
             )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert "Shields" in exc_info.value.detail["response"]  # type: ignore
-        cause = exc_info.value.detail["cause"]  # type: ignore
+        assert "Shields" in exc_info.value.detail["response"]  # type: ignore[index]
+        cause = exc_info.value.detail["cause"]  # type: ignore[index]
         assert "missing-1" in cause
         assert "missing-2" in cause
 
