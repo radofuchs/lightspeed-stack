@@ -38,6 +38,37 @@ E2E_LSC_PORT_FORWARD_PID_FILE="${E2E_LSC_PORT_FORWARD_PID_FILE:-/tmp/e2e-lightsp
 E2E_LLAMA_PORT_FORWARD_PID_FILE="${E2E_LLAMA_PORT_FORWARD_PID_FILE:-/tmp/e2e-llama-port-forward.pid}"
 E2E_JWKS_PORT_FORWARD_PID_FILE="${E2E_JWKS_PORT_FORWARD_PID_FILE:-/tmp/e2e-jwks-port-forward.pid}"
 
+# Llama restart exit codes (grep Konflux logs for E2E_LLAMA_RESTART_FAILED_PHASE=):
+#   10 reload: run.yaml copy failed
+#   11 reload: pod not Ready within wait
+#   12 reload: in-pod /v1/health failed
+#   13 reload: localhost:8321 port-forward failed
+#   20 full restart: pod not Ready
+#   21 full restart: in-pod /v1/health failed
+#   22 full restart: localhost:8321 port-forward failed
+
+E2E_OPS_CURRENT_PHASE=""
+E2E_OPS_PHASE_START=0
+
+_e2e_ops_phase() {
+    if [[ -n "${E2E_OPS_CURRENT_PHASE:-}" && "${E2E_OPS_PHASE_START:-0}" -gt 0 ]]; then
+        local elapsed=$(( $(date +%s) - E2E_OPS_PHASE_START ))
+        echo "[e2e-ops] <<< ${E2E_OPS_CURRENT_PHASE} (${elapsed}s)"
+    fi
+    E2E_OPS_CURRENT_PHASE="$1"
+    E2E_OPS_PHASE_START=$(date +%s)
+    echo "E2E_OPS_PHASE=$1"
+    echo "[e2e-ops] >>> $1"
+}
+
+_e2e_ops_llama_restart_fail() {
+    local phase="$1"
+    local code="$2"
+    echo "E2E_LLAMA_RESTART_FAILED_PHASE=$phase"
+    echo "E2E_LLAMA_RESTART_EXIT_CODE=$code"
+    exit "$code"
+}
+
 # ============================================================================
 # Helper functions
 # ============================================================================
@@ -337,26 +368,30 @@ cmd_reload_llama_stack_config() {
     local llama_pod_name="llama-stack-service"
     local tmp
 
+    echo "E2E_LLAMA_RESTART_MODE=reload"
     echo "===== Reloading llama-stack run.yaml (container restart, no pod recreate) ====="
+    _e2e_ops_phase "reload_read_configmap"
     tmp=$(mktemp)
     if ! oc get configmap llama-stack-config -n "$NAMESPACE" \
         -o jsonpath='{.data.run\.yaml}' >"$tmp"; then
         rm -f "$tmp"
         echo "ERROR: failed to read llama-stack-config run.yaml" >&2
-        return 1
+        _e2e_ops_llama_restart_fail "reload_configmap_read" 10
     fi
     if [[ ! -s "$tmp" ]]; then
         rm -f "$tmp"
         echo "ERROR: llama-stack-config run.yaml is empty" >&2
-        return 1
+        _e2e_ops_llama_restart_fail "reload_configmap_empty" 10
     fi
+    _e2e_ops_phase "reload_oc_cp_run_yaml"
     if ! oc cp "$tmp" "$NAMESPACE/$llama_pod_name:/opt/app-root/run.yaml" \
         -c llama-stack-container; then
         rm -f "$tmp"
         echo "ERROR: failed to copy run.yaml into llama-stack pod" >&2
-        return 1
+        _e2e_ops_llama_restart_fail "reload_oc_cp" 10
     fi
     rm -f "$tmp"
+    _e2e_ops_phase "reload_kill_container"
     echo "Restarting llama-stack-container to pick up run.yaml..."
     oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- bash -c 'kill 1' \
         2>/dev/null || true
@@ -366,16 +401,24 @@ cmd_reload_llama_stack_config() {
         reload_pod_wait=60
         reload_health_attempts=50
     fi
-    wait_for_pod "$llama_pod_name" "$reload_pod_wait"
+    _e2e_ops_phase "reload_wait_pod_ready"
+    if ! wait_for_pod "$llama_pod_name" "$reload_pod_wait"; then
+        echo "===== Llama-stack reload FAILED (pod not ready) ====="
+        oc describe pod llama-stack-service -n "$NAMESPACE" 2>/dev/null | tail -40 || true
+        _e2e_ops_llama_restart_fail "reload_pod_not_ready" 11
+    fi
+    _e2e_ops_phase "reload_wait_in_pod_health"
     if ! wait_for_llama_stack_http_health "$reload_health_attempts"; then
         echo "===== Llama-stack reload FAILED (HTTP not healthy) ====="
         oc logs llama-stack-service -n "$NAMESPACE" -c llama-stack-container --tail=80 2>&1 || true
-        return 1
+        _e2e_ops_llama_restart_fail "reload_in_pod_health" 12
     fi
+    _e2e_ops_phase "reload_port_forward"
     if ! cmd_restart_llama_port_forward; then
         echo "ERROR: Llama pod is up but localhost:${LOCAL_LLAMA_PORT:-8321} port-forward failed"
-        return 1
+        _e2e_ops_llama_restart_fail "reload_port_forward" 13
     fi
+    _e2e_ops_phase "reload_done"
     echo "===== Llama-stack config reload complete ====="
 }
 
@@ -386,10 +429,13 @@ cmd_restart_llama_stack() {
                 return 0
             fi
             echo "WARN: llama config reload failed; falling back to full pod restart" >&2
+            echo "E2E_LLAMA_RESTART_FALLBACK=reload_to_full"
         fi
     fi
 
+    echo "E2E_LLAMA_RESTART_MODE=full"
     echo "===== Restoring llama-stack service ====="
+    _e2e_ops_phase "full_delete_pod"
     # Pod.spec is largely immutable; delete so apply creates a pod with current volumes/env.
     echo "Deleting llama-stack pod (if any) before apply..."
     timeout 45 oc delete pod llama-stack-service -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || {
@@ -399,6 +445,7 @@ cmd_restart_llama_stack() {
 
     echo "Applying pod manifest..."
     if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]]; then
+        _e2e_ops_phase "full_apply_manifest"
         # Interception-proxy e2e: refresh Secret before pod recreate so the volume mount is populated.
         if [[ "${E2E_COPY_INTERCEPTION_CA_TO_LLAMA:-0}" == "1" ]]; then
             echo "[e2e-ops] Syncing e2e-interception-proxy-ca secret before llama-stack apply..."
@@ -427,10 +474,11 @@ cmd_restart_llama_stack() {
             llama_pod_wait=120
             llama_health_attempts=100
         fi
+        _e2e_ops_phase "full_wait_pod_ready"
         if ! wait_for_pod "llama-stack-service" "$llama_pod_wait"; then
             echo "===== Llama-stack restore FAILED (pod not ready) ====="
             oc describe pod llama-stack-service -n "$NAMESPACE" 2>/dev/null | tail -40 || true
-            exit 1
+            _e2e_ops_llama_restart_fail "full_pod_not_ready" 20
         fi
         echo "Labeling pod for service..."
         oc label pod llama-stack-service pod=llama-stack-service -n "$NAMESPACE" --overwrite
@@ -446,12 +494,14 @@ cmd_restart_llama_stack() {
                 exit 1
             fi
         fi
+        _e2e_ops_phase "full_wait_in_pod_health"
         if ! wait_for_llama_stack_http_health "$llama_health_attempts"; then
             echo "===== Llama-stack restore FAILED (HTTP not healthy) ====="
             oc logs llama-stack-service -n "$NAMESPACE" -c llama-stack-container --tail=80 2>&1 || true
-            exit 1
+            _e2e_ops_llama_restart_fail "full_in_pod_health" 21
         fi
     else
+        _e2e_ops_phase "full_apply_prow_manifest"
         # Prow: vLLM Llama Stack image (matches pipeline.sh / pipeline-services.sh)
         # Use sed instead of envsubst to avoid blanking $VAR references in embedded bash scripts
         sed "s|\${LLAMA_STACK_IMAGE}|${LLAMA_STACK_IMAGE:-}|g" "$MANIFEST_DIR/llama-stack-prow.yaml" |
@@ -461,12 +511,44 @@ cmd_restart_llama_stack() {
         oc label pod llama-stack-service pod=llama-stack-service -n "$NAMESPACE" --overwrite
     fi
 
+    _e2e_ops_phase "full_port_forward"
     if ! cmd_restart_llama_port_forward; then
         echo "ERROR: Llama pod is up but localhost:${LOCAL_LLAMA_PORT:-8321} port-forward failed"
-        exit 1
+        _e2e_ops_llama_restart_fail "full_port_forward" 22
     fi
 
+    _e2e_ops_phase "full_done"
     echo "===== Llama-stack restore complete ====="
+}
+
+cmd_diagnose_llama_restart() {
+    echo "===== Llama-stack restart diagnostics (namespace=$NAMESPACE) ====="
+    echo "E2E_KONFLUX_E2E=${E2E_KONFLUX_E2E:-0} E2E_LLAMA_RELOAD_CONFIG_ONLY=${E2E_LLAMA_RELOAD_CONFIG_ONLY:-0}"
+    oc get pod llama-stack-service -n "$NAMESPACE" -o wide 2>&1 || true
+    echo "--- container restarts / state ---"
+    oc get pod llama-stack-service -n "$NAMESPACE" \
+        -o jsonpath='{.status.containerStatuses[0].restartCount} restarts ready={.status.containerStatuses[0].ready}{"\n"}' 2>&1 || true
+    echo "--- in-pod GET /v1/health ---"
+    if _llama_stack_http_health_once; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    echo "--- localhost:${LOCAL_LLAMA_PORT:-8321}/v1/health via port-forward ---"
+    if verify_llama_local_forward 5; then
+        echo "OK"
+    else
+        echo "FAIL (pipeline PID file: ${E2E_LLAMA_PORT_FORWARD_PID_FILE:-unset})"
+        if [[ -f "${E2E_LLAMA_PORT_FORWARD_PID_FILE:-}" ]]; then
+            read -r pf_pid <"${E2E_LLAMA_PORT_FORWARD_PID_FILE}" 2>/dev/null || true
+            echo "saved_pf_pid=${pf_pid:-} alive=$(kill -0 "$pf_pid" 2>/dev/null && echo yes || echo no)"
+        fi
+    fi
+    echo "--- tls-openai in llama-stack-config (grep) ---"
+    oc get configmap llama-stack-config -n "$NAMESPACE" -o jsonpath='{.data.run\.yaml}' 2>/dev/null \
+        | grep -E 'tls-openai|network:|client_cert|verify:' | head -20 || true
+    echo "--- llama container log tail ---"
+    oc logs llama-stack-service -n "$NAMESPACE" -c llama-stack-container --tail=40 2>&1 || true
 }
 
 cmd_restart_port_forward() {
@@ -1021,6 +1103,9 @@ case "$COMMAND" in
     sync-mock-tls-certs-secret)
         cmd_sync_mock_tls_certs_secret
         ;;
+    diagnose-llama-restart)
+        cmd_diagnose_llama_restart
+        ;;
     *)
         echo "Usage: $0 <command> [args...]"
         echo ""
@@ -1041,6 +1126,7 @@ case "$COMMAND" in
         echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
         echo "  deploy-e2e-mock-tls-inference      - Deploy mock HTTPS inference server (tls.feature)"
         echo "  sync-mock-tls-certs-secret         - Publish mock TLS /certs PEMs to Secret for llama"
+        echo "  diagnose-llama-restart             - Snapshot pod/health/forward/config for debugging"
         exit 1
         ;;
 esac

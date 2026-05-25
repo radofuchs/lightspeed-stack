@@ -81,8 +81,16 @@ def restart_llama_for_tls_feature(context: Context) -> None:
 
     if _tls_prow_restart_state["full_restart_done"]:
         _prepare_tls_prow_llama_reload_env()
+        mode = "reload"
     else:
         _prepare_tls_prow_llama_full_restart_env()
+        mode = "full"
+
+    scenario = getattr(getattr(context, "scenario", None), "name", "") or "?"
+    print(
+        f"[tls.feature] Llama Stack restart: mode={mode} scenario={scenario!r}",
+        flush=True,
+    )
 
     try:
         restart_container("llama-stack")
