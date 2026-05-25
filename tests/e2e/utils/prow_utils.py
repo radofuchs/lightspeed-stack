@@ -122,8 +122,8 @@ def restart_pod(container_name: str) -> None:
         )
     elif container_name in _LIGHTSPEED_RESTART_NAMES:
         op = "restart-lightspeed"
-        # Pod wait (up to ~120s) + port-forward retries + slow Konflux/Prow clusters.
-        timeout = 320
+        # Konflux LCS: up to ~195s pod wait + extended wait + port-forward retries.
+        timeout = 420 if os.environ.get("E2E_KONFLUX_E2E") == "1" else 320
     else:
         print(
             f"Warning: restart_pod({container_name!r}) unknown; "

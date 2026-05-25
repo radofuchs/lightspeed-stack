@@ -361,14 +361,23 @@ cmd_restart_lightspeed() {
         oc apply -n "$NAMESPACE" -f -
     
     # Wait for pod to be ready (TCP probe passes when app listens on 8080).
-    # Don't let a timeout here abort the function — still attempt port-forward
-    # and diagnostics so later scenarios have a chance to recover.
+    # Manifest readiness: initialDelay 20 + failureThreshold 30 * period 5 = up to ~170s.
+    local lcs_pod_wait=40
+    if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]]; then
+        lcs_pod_wait=65
+    fi
     local pod_ready=true
-    if ! wait_for_pod "lightspeed-stack-service" 40; then
-        pod_ready=false
-        echo "⚠️  Pod not ready within 120s — dumping diagnostics:"
-        oc describe pod lightspeed-stack-service -n "$NAMESPACE" 2>&1 | tail -30 || true
-        oc logs lightspeed-stack-service -n "$NAMESPACE" --tail=40 2>&1 || true
+    if ! wait_for_pod "lightspeed-stack-service" "$lcs_pod_wait"; then
+        echo "⚠️  Pod not ready within $((lcs_pod_wait * 3))s — extended wait (Konflux LCS startup)..."
+        if ! wait_for_pod "lightspeed-stack-service" 25; then
+            pod_ready=false
+            echo "⚠️  Pod still not ready — dumping diagnostics:"
+            oc describe pod lightspeed-stack-service -n "$NAMESPACE" 2>&1 | tail -40 || true
+            oc logs lightspeed-stack-service -n "$NAMESPACE" \
+                -c lightspeed-stack-container --tail=80 2>&1 || true
+        else
+            echo "✓ Pod became ready during extended wait"
+        fi
     fi
 
     # Re-label pod for service discovery
@@ -597,8 +606,10 @@ cmd_restart_port_forward() {
         # Let the kernel release LISTEN sockets after pkill (avoids immediate "address already in use")
         sleep 3
 
-        # Service can lag endpoints after pod recreate; pod-direct forward is more reliable.
-        if [[ $attempt -le 2 ]]; then
+        # Service forward waits for endpoints; after LCS recreate use pod-direct sooner on Konflux.
+        if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]]; then
+            pf_resource="pod/lightspeed-stack-service"
+        elif [[ $attempt -le 2 ]]; then
             pf_resource="svc/lightspeed-stack-service-svc"
         else
             pf_resource="pod/lightspeed-stack-service"
