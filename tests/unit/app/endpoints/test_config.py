@@ -40,8 +40,8 @@ async def test_config_endpoint_handler_configuration_not_loaded(
 
     detail = exc_info.value.detail
     assert isinstance(detail, dict)
-    assert detail["response"] == "Configuration is not loaded"  # type: ignore
-    assert detail["cause"] == (  # type: ignore
+    assert detail["response"] == "Configuration is not loaded"  # type: ignore[index]
+    assert detail["cause"] == (  # type: ignore[index]
         "Lightspeed Stack configuration has not been initialized."
     )
 
