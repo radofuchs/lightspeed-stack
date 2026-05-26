@@ -100,8 +100,11 @@ dynamic-reconfig fit for the broader feature roadmap (LCORE-777/781).
 ### Decision S2: Deprecation timeline for the legacy path
 
 **Recommendation**: deprecate the legacy two-file path fully by end of Q4;
-emit startup deprecation warnings during Q3 and Q4. @sbunciak to confirm
-or override the calendar.
+emit startup deprecation warnings during Q3 and Q4.
+
+**Decided** (@sbunciak, 2026-05-20): warnings in 0.6 (no breaking
+change), legacy path removed in 0.7. Tentative releases — 0.6 end of
+June 2026, 0.7 end of September 2026.
 
 ### Decision S3: Downstream implications we may not have seen
 
@@ -109,6 +112,13 @@ or override the calendar.
 Reviewers from downstream teams should flag any deployment surface that
 treats `run.yaml` as a separate artifact (ConfigMap, templated file,
 build-time asset) that the unified design would need to accommodate.
+
+**Answered** (@sbunciak + @major, 2026-05-20): the downstream consumers
+to account for are **RHEL LS** (@major) and **RHDH** (@elsony), both
+running LCORE in library mode. RHEL LS is flexible on switching to
+server mode or reorganizing its `run.yaml` handling if needed; RHDH
+pending confirmation from @elsony. No design change required — library
+mode is already the primary path.
 
 ### Decision S4: Scope of this spike — what is deliberately left out
 

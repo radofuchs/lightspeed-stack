@@ -59,8 +59,9 @@ detail that LCORE owns, not an operator-facing artifact.
   and no external `run.yaml` boots LCORE in both library and server modes
   and serves `/v1/query` successfully.
 - **R2:** Legacy mode (`llama_stack.library_client_config_path` +
-  external `run.yaml`) works unchanged until the deprecation window
-  closes. A startup WARN is emitted one release after unified mode lands.
+  external `run.yaml`) works unchanged through the deprecation window:
+  fully functional with a startup deprecation WARN in 0.6, removed in
+  0.7 (Decision S2, confirmed 2026-05-20).
 - **R3:** Setting both `llama_stack.config` and
   `llama_stack.library_client_config_path` in the same file fails at
   configuration load time with a clear error message pointing to the
@@ -327,9 +328,11 @@ Three operator-facing migration paths (choose per deployment):
 | Lift-and-shift | seconds — `lightspeed-stack --migrate-config ...` | Single-file, byte-equivalent LS behavior |
 | Re-express | hours+ | Single-file; high-level sections replace `native_override` |
 
-Deprecation schedule (per Decision S2 in the spike): emit startup
-deprecation warnings during Q3 and Q4; remove the legacy path fully by
-the end of Q4. Subject to PM (@sbunciak) confirmation.
+Deprecation schedule (Decision S2, confirmed by @sbunciak 2026-05-20):
+unified mode ships in 0.6 with legacy mode fully functional plus a
+startup deprecation WARN (no breaking change); the legacy two-file path
+is removed in 0.7. Tentative releases: 0.6 end of June 2026, 0.7 end of
+September 2026.
 
 ## Implementation Suggestions
 
