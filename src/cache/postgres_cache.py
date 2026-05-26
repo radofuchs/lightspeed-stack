@@ -1,5 +1,6 @@
 """PostgreSQL cache implementation."""
 
+import builtins
 import json
 
 import psycopg2
@@ -15,6 +16,7 @@ from models.common.turn_summary import (
     ToolCallSummary,
     ToolResultSummary,
 )
+from models.compaction import ConversationSummary
 from models.config import PostgreSQLDatabaseConfiguration
 from utils.connection_decorator import connection
 
@@ -79,6 +81,19 @@ class PostgresCache(Cache):
         );
         """
 
+    CREATE_CONVERSATION_SUMMARIES_TABLE = """
+        CREATE TABLE IF NOT EXISTS conversation_summaries (
+            user_id                 text NOT NULL,
+            conversation_id         text NOT NULL,
+            created_at              text NOT NULL,
+            summarized_through_turn integer NOT NULL,
+            token_count             integer NOT NULL,
+            model_used              text NOT NULL,
+            summary_text            text NOT NULL,
+            PRIMARY KEY(user_id, conversation_id, created_at)
+        );
+        """
+
     CREATE_INDEX = """
         CREATE INDEX IF NOT EXISTS timestamps
             ON cache (created_at)
@@ -132,6 +147,24 @@ class PostgresCache(Cache):
         VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id, conversation_id)
         DO UPDATE SET last_message_timestamp = EXCLUDED.last_message_timestamp
+        """
+
+    INSERT_SUMMARY_STATEMENT = """
+        INSERT INTO conversation_summaries(user_id, conversation_id, created_at,
+                          summarized_through_turn, token_count, model_used, summary_text)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+
+    SELECT_SUMMARIES_STATEMENT = """
+        SELECT summary_text, summarized_through_turn, token_count, created_at, model_used
+          FROM conversation_summaries
+         WHERE user_id=%s AND conversation_id=%s
+         ORDER BY created_at
+        """
+
+    DELETE_SUMMARIES_STATEMENT = """
+        DELETE FROM conversation_summaries
+         WHERE user_id=%s AND conversation_id=%s
         """
 
     def __init__(self, config: PostgreSQLDatabaseConfiguration) -> None:
@@ -243,6 +276,9 @@ class PostgresCache(Cache):
 
         logger.info("Initializing table for conversations")
         cursor.execute(PostgresCache.CREATE_CONVERSATIONS_TABLE)
+
+        logger.info("Initializing table for conversation summaries")
+        cursor.execute(PostgresCache.CREATE_CONVERSATION_SUMMARIES_TABLE)
 
         logger.info("Initializing index for cache")
         cursor.execute(PostgresCache.CREATE_INDEX)
@@ -483,6 +519,12 @@ class PostgresCache(Cache):
                     (user_id, conversation_id),
                 )
 
+                # Also delete any compaction summaries for this conversation
+                cursor.execute(
+                    PostgresCache.DELETE_SUMMARIES_STATEMENT,
+                    (user_id, conversation_id),
+                )
+
                 return deleted > 0
         except psycopg2.DatabaseError as e:
             logger.error("PostgresCache.delete: %s", e)
@@ -554,6 +596,95 @@ class PostgresCache(Cache):
         except psycopg2.DatabaseError as e:
             logger.error("PostgresCache.set_topic_summary: %s", e)
             raise CacheError("PostgresCache.set_topic_summary", e) from e
+
+    @connection
+    def store_summary(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: ConversationSummary,
+        skip_user_id_check: bool = False,
+    ) -> None:
+        """Append a compaction summary chunk for the given conversation.
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            summary: The ConversationSummary chunk to persist.
+            skip_user_id_check: Skip user_id suid check.
+
+        Raises:
+        ------
+            CacheError: If the cache is disconnected or a database error occurs.
+        """
+        if self.connection is None:
+            logger.error("Cache is disconnected")
+            raise CacheError("store_summary: cache is disconnected")
+
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    self.INSERT_SUMMARY_STATEMENT,
+                    (
+                        user_id,
+                        conversation_id,
+                        summary.created_at,
+                        summary.summarized_through_turn,
+                        summary.token_count,
+                        summary.model_used,
+                        summary.summary_text,
+                    ),
+                )
+        except psycopg2.DatabaseError as e:
+            logger.error("PostgresCache.store_summary: %s", e)
+            raise CacheError("PostgresCache.store_summary", e) from e
+
+    @connection
+    def get_summaries(
+        self, user_id: str, conversation_id: str, skip_user_id_check: bool = False
+    ) -> builtins.list[ConversationSummary]:  # this class shadows the list builtin
+        """Retrieve all compaction summary chunks for a conversation.
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            skip_user_id_check: Skip user_id suid check.
+
+        Returns:
+        -------
+            Summary chunks for the conversation, oldest first (ordered by
+            ``created_at``); empty list if none exist.
+
+        Raises:
+        ------
+            CacheError: If the cache is disconnected or a database error occurs.
+        """
+        if self.connection is None:
+            logger.error("Cache is disconnected")
+            raise CacheError("get_summaries: cache is disconnected")
+
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    self.SELECT_SUMMARIES_STATEMENT, (user_id, conversation_id)
+                )
+                rows = cursor.fetchall()
+        except psycopg2.DatabaseError as e:
+            logger.error("PostgresCache.get_summaries: %s", e)
+            raise CacheError("PostgresCache.get_summaries", e) from e
+
+        return [
+            ConversationSummary(
+                summary_text=row[0],
+                summarized_through_turn=row[1],
+                token_count=row[2],
+                created_at=row[3],
+                model_used=row[4],
+            )
+            for row in rows
+        ]
 
     def ready(self) -> bool:
         """Check if the cache is ready.
