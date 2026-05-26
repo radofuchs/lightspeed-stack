@@ -103,8 +103,8 @@ def restart_pod(container_name: str) -> None:
             timeout = 420
     elif container_name in _LIGHTSPEED_RESTART_NAMES:
         op = "restart-lightspeed"
-        # Konflux LCS readiness can take ~195s (probe budget in lightspeed-stack.yaml).
-        timeout = 420 if os.environ.get("E2E_KONFLUX_E2E") == "1" else 320
+        # Konflux LCS: TCP readiness + Llama handshake; TLS suite often needs 200–300s.
+        timeout = 480 if os.environ.get("E2E_KONFLUX_E2E") == "1" else 320
     else:
         print(
             f"Warning: restart_pod({container_name!r}) unknown; "

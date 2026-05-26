@@ -45,18 +45,30 @@ E2E_JWKS_PORT_FORWARD_PID_FILE="${E2E_JWKS_PORT_FORWARD_PID_FILE:-/tmp/e2e-jwks-
 wait_for_pod() {
     local pod_name="$1"
     local max_attempts="${2:-24}"
-    
+    local attempt
+    local ready
+    local phase
+
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
-        local ready
-        ready=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
-        if [[ "$ready" == "true" ]]; then
-            echo "✓ Pod $pod_name ready"
-            return 0
+        if ! oc get pod "$pod_name" -n "$NAMESPACE" &>/dev/null; then
+            phase="Missing"
+        else
+            phase=$(oc get pod "$pod_name" -n "$NAMESPACE" \
+                -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            ready=$(oc get pod "$pod_name" -n "$NAMESPACE" \
+                -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
+            if [[ "$ready" == "true" ]]; then
+                echo "✓ Pod $pod_name ready (attempt $attempt/$max_attempts)"
+                return 0
+            fi
+        fi
+        if [[ $((attempt % 10)) -eq 0 ]]; then
+            echo "[e2e-ops] $pod_name not ready yet (attempt $attempt/$max_attempts, phase=${phase:-?})..."
         fi
         sleep 3
     done
-    
-    echo "Pod $pod_name not ready after $((max_attempts * 3))s"
+
+    echo "Pod $pod_name not ready after $((max_attempts * 3))s (last phase: ${phase:-unknown})"
     return 1
 }
 
@@ -314,17 +326,30 @@ cmd_restart_lightspeed() {
     local pod_ready=true
     local lcs_pod_wait=40
     if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]]; then
-        lcs_pod_wait=65
+        # readinessProbe: 20s + 30*5s; LCS + Llama handshake can exceed 195s on Konflux (TLS suite).
+        lcs_pod_wait=100
     fi
+    echo "[e2e-ops] Waiting for lightspeed-stack-service Ready (max ${lcs_pod_wait} attempts, $((lcs_pod_wait * 3))s)..."
     if ! wait_for_pod "lightspeed-stack-service" "$lcs_pod_wait"; then
         pod_ready=false
-        echo "⚠️  Pod not ready within 120s — dumping diagnostics:"
-        oc describe pod lightspeed-stack-service -n "$NAMESPACE" 2>&1 | tail -30 || true
-        oc logs lightspeed-stack-service -n "$NAMESPACE" --tail=40 2>&1 || true
+        echo "⚠️  Pod not ready within $((lcs_pod_wait * 3))s — dumping diagnostics:"
+        if oc get pod lightspeed-stack-service -n "$NAMESPACE" &>/dev/null; then
+            oc describe pod lightspeed-stack-service -n "$NAMESPACE" 2>&1 | tail -40 || true
+            oc logs lightspeed-stack-service -n "$NAMESPACE" -c lightspeed-stack-container --tail=60 2>&1 || true
+        else
+            echo "[e2e-ops] lightspeed-stack-service pod not found in namespace $NAMESPACE"
+            oc get pods -n "$NAMESPACE" 2>&1 | grep -E 'lightspeed|NAME' || true
+            oc get events -n "$NAMESPACE" --field-selector involvedObject.name=lightspeed-stack-service \
+                --sort-by='.lastTimestamp' 2>&1 | tail -15 || true
+        fi
     fi
 
-    # Re-label pod for service discovery
-    oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n "$NAMESPACE" --overwrite
+    # Re-label pod for service discovery (ignore if pod was deleted / not created yet)
+    if oc get pod lightspeed-stack-service -n "$NAMESPACE" &>/dev/null; then
+        oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n "$NAMESPACE" --overwrite
+    else
+        echo "⚠️  Cannot label lightspeed-stack-service — pod missing"
+    fi
 
     # Re-establish port-forwards (may succeed even if readiness was slow)
     cmd_restart_port_forward
