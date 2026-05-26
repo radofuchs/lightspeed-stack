@@ -166,6 +166,23 @@ same top-level `inference.providers` block and emits Pydantic AI's
 per-Agent `Provider(...)` + `<vendor>:<model>` shape; downstream operators
 see no change to the `inference` surface.
 
+**Lands in the existing top-level `inference:` section.** The root
+`lightspeed-stack.yaml` already has an `inference:` block
+(`InferenceConfiguration` — `default_model` / `default_provider`, used
+for query-time routing). Rather than add a competing top-level key, S5
+**extends that existing section** with a `providers:` list. So
+`inference.providers` is the high-level synthesis input, while
+`inference.default_model` / `default_provider` keep their current
+meaning. (The PoC had this list under `llama_stack.config.inference`;
+this decision is what moves it.)
+
+**Mode-detection knock-on.** Because the `inference:` section always
+exists (it carries defaults), unified mode is signalled by
+`inference.providers` being **non-empty** — or by the presence of
+`llama_stack.config` — not by the section merely existing. This expands
+Decision T1's shape rule from "`llama_stack.config` present" to "any
+*synthesis input* present"; see the spec doc's "Mode detection" table.
+
 **Scope discipline — what stays under `llama_stack.config`**: anything
 whose vocabulary is genuinely LS-specific and unlikely to translate across
 backends. Today that's `native_override`, `profile`, `baseline`. The
@@ -245,6 +262,13 @@ How does LCORE tell unified-mode configs from legacy-mode configs?
 **Recommendation**: **both, soft-coupled**. Gives a cheap upgrade path for
 future real schema bumps without forcing every existing user to add a
 version field today. Confidence: 75%.
+
+**S5 knock-on**: since Decision S5 lifts the high-level `inference`
+section to the top level, the detected "shape" is the presence of any
+*synthesis input* — top-level `inference.providers` (non-empty) **or**
+`llama_stack.config` — not just `llama_stack.config`. The soft-coupled
+version-field stance is unchanged. See the spec doc's "Mode detection"
+table for the full combination matrix.
 
 ### Decision T2: Override precedence (inside Option C)
 
@@ -440,23 +464,37 @@ scenarios reported as undefined.
 <!-- key: LCORE-???? -->
 ### LCORE-???? Unified `llama_stack.config` schema + synthesizer
 
-**Description**: Implement the unified-mode config schema
-(`UnifiedLlamaStackConfig`, `UnifiedInferenceSection`,
-`UnifiedInferenceProvider`) and the synthesizer that produces a full Llama
-Stack `run.yaml` from it. Wire library mode to the synthesizer. Preserve
-legacy mode through mutual-exclusion validation.
+**Description**: Implement the unified-mode config schema and the
+synthesizer that produces a full Llama Stack `run.yaml` from it. Per
+Decision S5, the high-level `providers` list lives on the existing
+top-level `InferenceConfiguration` (`inference.providers`), and
+`UnifiedLlamaStackConfig` holds only the backend-specific knobs
+(`baseline` / `profile` / `native_override`). Wire library mode to the
+synthesizer. Preserve legacy mode through mutual-exclusion validation on
+the root configuration model.
 
 **Scope**:
 
-- New Pydantic classes in `src/models/config.py`.
+- Pydantic changes in `src/models/config.py`:
+  - Add `UnifiedInferenceProvider`.
+  - Extend the existing `InferenceConfiguration` with
+    `providers: list[UnifiedInferenceProvider]` (default empty) — this is
+    the high-level synthesis input; `default_model` / `default_provider`
+    keep their current query-routing meaning.
+  - Add `UnifiedLlamaStackConfig` (`baseline` / `profile` /
+    `native_override`) and a `config` field on `LlamaStackConfiguration`.
+  - Add the unified-vs-legacy `@model_validator` to the **root**
+    `Configuration` model (it spans top-level `inference.providers` and
+    `llama_stack.*`).
 - New functions in `src/llama_stack_configuration.py`:
   `synthesize_configuration`, `deep_merge_list_replace`,
   `apply_high_level_inference`, `load_default_baseline`, `synthesize_to_file`.
 - A shipped default baseline at `src/data/default_run.yaml`.
-- Library-mode wiring in `src/client.py`: detect unified vs legacy, write
+- Library-mode wiring in `src/client.py`: detect unified vs legacy
+  (synthesis input present vs `library_client_config_path`), write
   synthesized file, pass path to library client.
-- Cross-field validation: reject both `config` and
-  `library_client_config_path` set simultaneously.
+- Cross-field validation: reject a synthesis input (`inference.providers`
+  non-empty, or `config`) set together with `library_client_config_path`.
 - Legacy behavior (`llama_stack.library_client_config_path` path) unchanged.
 
 **Acceptance criteria**:
@@ -1040,7 +1078,7 @@ Relative to `upstream/main`:
 
 | File | Purpose |
 |---|---|
-| `src/models/config.py` | New classes: `UnifiedInferenceProvider`, `UnifiedInferenceSection`, `UnifiedLlamaStackConfig`; modified `LlamaStackConfiguration` (adds `config` field + mutual-exclusion validator) |
+| `src/models/config.py` | New classes: `UnifiedInferenceProvider`, `UnifiedInferenceSection`, `UnifiedLlamaStackConfig`; modified `LlamaStackConfiguration` (adds `config` field + mutual-exclusion validator). _PoC layout; the implementation follows Decision S5 — `inference.providers` on the top-level `InferenceConfiguration`, validator on the root `Configuration` model, no `UnifiedInferenceSection` (see the schema JIRA)._ |
 | `src/llama_stack_configuration.py` | New: `synthesize_configuration`, `deep_merge_list_replace`, `apply_high_level_inference`, `load_default_baseline`, `synthesize_to_file`, `migrate_config_dumb`. CLI `main()` auto-detects unified vs legacy. |
 | `src/data/default_run.yaml` | Built-in default baseline (copied from repo root `run.yaml` for the PoC — implementation JIRA should slim it down; see PoC surprise about `EXTERNAL_PROVIDERS_DIR`) |
 | `src/client.py` | Library-mode path picks synthesis for unified configs, enrichment for legacy |

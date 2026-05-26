@@ -14,17 +14,23 @@
 This feature collapses the two Lightspeed Core configuration files —
 `lightspeed-stack.yaml` (LCORE settings) and `run.yaml` (Llama Stack
 operational config) — into a single `lightspeed-stack.yaml`. At runtime,
-LCORE synthesizes a full Llama Stack `run.yaml` from a new
-`llama_stack.config` sub-section and hands it to Llama Stack (library
+LCORE synthesizes a full Llama Stack `run.yaml` from high-level
+operator-facing inputs (a top-level `inference.providers` list, plus a
+`llama_stack.config` sub-section) and hands it to Llama Stack (library
 client or subprocess, mode-dependent).
 
 Key shape:
 
-- High-level keys under `llama_stack.config` for the common path
-  (v1: `inference`; future: `storage`, `safety`, `tools`).
+- **Top-level high-level sections** for the common path. v1 ships
+  `inference.providers` — added to the *existing* top-level `inference:`
+  section (alongside its `default_model` / `default_provider`). These
+  sit at the root of `lightspeed-stack.yaml`, not under `llama_stack`,
+  so they survive a future backend change (Decision S5 in the spike).
+  Future high-level sections (`rag`, `safety`, …) stay under
+  `llama_stack.config` until proven backend-agnostic.
 - `llama_stack.config.native_override` escape hatch — raw Llama Stack
   schema, deep-merged with list replacement. Covers anything the
-  high-level schema doesn't express.
+  high-level sections don't express.
 - `llama_stack.config.profile` — path to a user-authored YAML that serves
   as the synthesis baseline.
 - `llama_stack.config.baseline: default | empty` — pick between LCORE's
@@ -32,7 +38,8 @@ Key shape:
   exact round-trip).
 - Legacy two-file mode (`llama_stack.library_client_config_path` +
   external `run.yaml`) is preserved during a deprecation window;
-  mutually exclusive with `llama_stack.config`.
+  mutually exclusive with the unified *synthesis inputs* (a non-empty
+  `inference.providers` or a `llama_stack.config` block).
 
 ## Why
 
@@ -55,9 +62,10 @@ detail that LCORE owns, not an operator-facing artifact.
 
 ## Requirements
 
-- **R1:** `lightspeed-stack.yaml` with a `llama_stack.config` sub-section
-  and no external `run.yaml` boots LCORE in both library and server modes
-  and serves `/v1/query` successfully.
+- **R1:** `lightspeed-stack.yaml` using the unified schema (a non-empty
+  top-level `inference.providers`, and/or a `llama_stack.config`
+  sub-section) and no external `run.yaml` boots LCORE in both library and
+  server modes and serves `/v1/query` successfully.
 - **R2:** Legacy mode (`llama_stack.library_client_config_path` +
   external `run.yaml`) works unchanged through the deprecation window:
   fully functional with a startup deprecation WARN in 0.6, removed in
@@ -87,10 +95,15 @@ detail that LCORE owns, not an operator-facing artifact.
   for equivalent inputs.
 - **R8:** A profile referenced by a relative `profile:` path resolves
   against the directory of the loaded `lightspeed-stack.yaml`.
-- **R9:** The unified schema extends current `LlamaStackConfiguration`
-  pydantic model with a new `config: Optional[UnifiedLlamaStackConfig]`
-  field; validation enforces mutual exclusion with legacy mode and
-  rejects unknown fields (`extra="forbid"`).
+- **R9:** The unified schema (a) extends the existing top-level
+  `InferenceConfiguration` with a `providers:
+  list[UnifiedInferenceProvider]` field and (b) adds a
+  `config: Optional[UnifiedLlamaStackConfig]` field to
+  `LlamaStackConfiguration` (holding `baseline` / `profile` /
+  `native_override`). Cross-field validation on the **root**
+  `Configuration` model enforces mutual exclusion between the unified
+  synthesis inputs and legacy mode, and all unified-mode models reject
+  unknown fields (`extra="forbid"`).
 - **R10:** The synthesized `run.yaml` is written to a persistent known
   path (overwritten each boot) with file mode `0600` (owner read/write
   only — the file may contain literal secrets when `native_override` or
@@ -98,9 +111,12 @@ detail that LCORE owns, not an operator-facing artifact.
   be set on create, not left to umask). Path is logged at startup, and
   a CLI flag `--synthesized-config-output` lets operators override the
   location for debugging.
-- **R11:** Shape detection determines mode (unified vs legacy); an
-  optional `config_format_version` field is accepted but must agree with
-  the shape when present.
+- **R11:** Shape detection determines mode. Unified mode is signalled by
+  the presence of any *synthesis input* — a non-empty top-level
+  `inference.providers` or a `llama_stack.config` block; legacy mode by
+  `library_client_config_path`. An optional `config_format_version` field
+  is accepted but must agree with the detected shape when present. See the
+  "Mode detection" table under Architecture for the full matrix.
 
 ## Use Cases
 
@@ -130,10 +146,10 @@ lightspeed-stack.yaml (unified mode)
        │
        ▼
  ┌────────────────────────────┐
- │ Configuration load         │    Pydantic validation, mutual-exclusion
- │  src/configuration.py      │    check between `config` and
- │  src/models/config.py      │    `library_client_config_path`.
- └────────────┬───────────────┘
+ │ Configuration load         │    Pydantic validation; mutual-exclusion
+ │  src/configuration.py      │    check between the synthesis inputs
+ │  src/models/config.py      │    (`inference.providers`, `config`)
+ └────────────┬───────────────┘    and `library_client_config_path`.
               │ Configuration (typed)
               ▼
  ┌────────────────────────────┐   Baseline selection (profile /
@@ -154,17 +170,41 @@ lightspeed-stack.yaml (unified mode)
 
 ### Trigger mechanism
 
-At LCORE startup (library mode): if `llama_stack.config` is set in the
-loaded `lightspeed-stack.yaml`, the synthesizer produces a `run.yaml`
-dict, writes it to disk, and passes the path to the library client.
+At LCORE startup (library mode): if any synthesis input is present (a
+non-empty top-level `inference.providers`, or a `llama_stack.config`
+block), the synthesizer produces a `run.yaml` dict, writes it to disk,
+and passes the path to the library client.
 
 At Llama Stack container startup (server mode): the container's
 entrypoint script invokes
 `python3 /opt/app-root/llama_stack_configuration.py -c <lightspeed-stack.yaml>
 -o /opt/app-root/run.yaml`. The Python CLI auto-detects unified vs legacy
-by `llama_stack.config` presence; in unified mode it synthesizes and
+by the same synthesis-input check; in unified mode it synthesizes and
 writes the output; in legacy mode it performs in-place enrichment as
 before.
+
+### Mode detection
+
+*Synthesis inputs* are the top-level high-level sections (v1: a non-empty
+`inference.providers`; future `rag`, …) and the `llama_stack.config`
+block. The loaded `lightspeed-stack.yaml` maps to a mode as follows:
+
+| Shape | Mode |
+|---|---|
+| Any synthesis input, no `library_client_config_path` | **Unified** — LCORE synthesizes `run.yaml` |
+| `library_client_config_path`, no synthesis input | **Legacy** — external `run.yaml` used as-is |
+| A synthesis input **and** `library_client_config_path` | **Error** at load — points to `--migrate-config` |
+| Neither, remote `url` only | **Remote** — externally-managed LS, no synthesis (existing behavior) |
+| Neither, library-client mode, no `url` | **Error** — nothing to run |
+
+`url` is orthogonal to the synthesis/legacy split: it composes with
+unified mode (server mode — the LS container synthesizes from the same
+`lightspeed-stack.yaml`) and with the remote row above. The `inference:`
+section always exists (it carries `default_model` / `default_provider`
+defaults), so the unified signal is `inference.providers` being
+**non-empty**, not the section merely being present. An optional
+`config_format_version`, when set, must agree with the detected shape
+(the lever for a future hard schema bump).
 
 ### Storage / data model changes
 
@@ -175,25 +215,31 @@ Llama Stack configuration.
 
 ### Configuration
 
-New sub-section under the existing `llama_stack` block:
+Top-level high-level sections plus a sub-section under the existing
+`llama_stack` block:
 
 ```yaml
+# Top-level inference config — the existing `inference:` section, extended
+# with a `providers:` list (Decision S5). Backend-agnostic: it stays at the
+# root, not under `llama_stack`, so it survives a future backend change.
+inference:
+  default_model: gpt-4o-mini       # existing — query-time default routing
+  default_provider: openai         # existing — query-time default routing
+  providers:                       # NEW — high-level provider setup (synthesis input)
+    - type: openai                 # mapped to remote::openai
+      api_key_env: OPENAI_API_KEY
+      allowed_models: [gpt-4o-mini]
+    - type: sentence_transformers
+
 llama_stack:
   use_as_library_client: true
   # NOTE: library_client_config_path intentionally OMITTED in unified mode.
-  # Setting both `config` and `library_client_config_path` is a validation error.
+  # Setting a synthesis input (`inference.providers` or `config`) together
+  # with `library_client_config_path` is a validation error.
   config:
-    # Baseline selection
+    # Baseline selection (backend-specific knobs stay here)
     baseline: default              # default | empty; ignored if `profile` is set
     profile: ./my-profile.yaml     # optional; resolves relative to lightspeed-stack.yaml
-
-    # High-level sections (v1: inference; future: storage, safety, tools, ...)
-    inference:
-      providers:
-        - type: openai             # mapped to remote::openai
-          api_key_env: OPENAI_API_KEY
-          allowed_models: [gpt-4o-mini]
-        - type: sentence_transformers
 
     # Escape hatch — raw Llama Stack schema, deep-merged with list replacement
     native_override:
@@ -214,14 +260,20 @@ class UnifiedInferenceProvider(ConfigurationBase):
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
-class UnifiedInferenceSection(ConfigurationBase):
+class InferenceConfiguration(ConfigurationBase):
+    # Existing top-level section (query-time routing) — UNCHANGED fields:
+    default_model: Optional[str] = None
+    default_provider: Optional[str] = None
+    # NEW (Decision S5): high-level provider setup, the synthesis input.
+    # Empty list = not a synthesis input (legacy/remote still possible).
     providers: list[UnifiedInferenceProvider] = Field(default_factory=list)
 
 
 class UnifiedLlamaStackConfig(ConfigurationBase):
+    # Backend-specific knobs only. Per Decision S5, the backend-agnostic
+    # high-level sections (inference, ...) live at the root, NOT here.
     baseline: Literal["default", "empty"] = "default"
     profile: Optional[str] = None
-    inference: Optional[UnifiedInferenceSection] = None
     native_override: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -230,11 +282,26 @@ class LlamaStackConfiguration(ConfigurationBase):
     # library_client_config_path, timeout)
     config: Optional[UnifiedLlamaStackConfig] = None
 
+
+class Configuration(ConfigurationBase):
+    # The root lightspeed-stack.yaml model (existing). Relevant fields:
+    inference: InferenceConfiguration = Field(default_factory=InferenceConfiguration)
+    llama_stack: LlamaStackConfiguration
+    # ... other existing fields (name, service, ...) ...
+
     @model_validator(mode="after")
-    def check_llama_stack_model(self) -> Self:
-        if self.config is not None and self.library_client_config_path is not None:
+    def check_unified_vs_legacy(self) -> Self:
+        # Synthesis inputs span the root (inference.providers) and the
+        # nested llama_stack.config, so the check lives here, not on
+        # LlamaStackConfiguration.
+        synthesis_input = (
+            bool(self.inference.providers)
+            or self.llama_stack.config is not None
+        )
+        legacy_input = self.llama_stack.library_client_config_path is not None
+        if synthesis_input and legacy_input:
             raise ValueError("... mutually exclusive ... use --migrate-config")
-        # ...legacy checks preserved...
+        # ...legacy / remote checks preserved...
         return self
 ```
 
@@ -266,11 +333,13 @@ removed `-g/-i/-o` flags is cleaned up as part of the docs JIRA.
 
 ### Error handling
 
-- **Unified + legacy set simultaneously**: raised during
-  `LlamaStackConfiguration.check_llama_stack_model`. Error message
+- **Synthesis input + legacy set simultaneously**: raised during the
+  root `Configuration.check_unified_vs_legacy` validator. Error message
   directs to `--migrate-config`.
-- **Library mode with neither `config` nor `library_client_config_path`**:
-  raised during the same validator. Error identifies the two valid paths.
+- **Library mode with no synthesis input and no
+  `library_client_config_path`**: raised during the same root validator.
+  Error identifies the valid paths (populate `inference.providers` or a
+  `llama_stack.config` block, or set `library_client_config_path`).
 - **`profile:` path does not exist**: surfaced as `FileNotFoundError`
   from `open(profile_path)` during synthesis. The implementation JIRA
   should wrap this with context about where the path was resolved.
@@ -340,7 +409,7 @@ September 2026.
 
 | File | What to do |
 |---|---|
-| `src/models/config.py` | Add `UnifiedInferenceProvider`, `UnifiedInferenceSection`, `UnifiedLlamaStackConfig`. Modify `LlamaStackConfiguration` — add `config` field, extend the `model_validator` for mutual-exclusion check. |
+| `src/models/config.py` | Add `UnifiedInferenceProvider`. Extend the existing `InferenceConfiguration` with `providers: list[UnifiedInferenceProvider]`. Add `UnifiedLlamaStackConfig` (`baseline`/`profile`/`native_override`) and a `config` field on `LlamaStackConfiguration`. Put the unified-vs-legacy `model_validator` on the **root** `Configuration` model (spans `inference.providers` + `llama_stack.*`). |
 | `src/llama_stack_configuration.py` | Add `synthesize_configuration`, `deep_merge_list_replace`, `apply_high_level_inference`, `load_default_baseline`, `synthesize_to_file`, `migrate_config_dumb`, `PROVIDER_TYPE_MAP`, `DEFAULT_BASELINE_RESOURCE`. Update `main()` to auto-detect unified vs legacy. |
 | `src/data/default_run.yaml` | New file — a thinner baseline than today's repo-root `run.yaml`. Notably do **not** reference `${env.EXTERNAL_PROVIDERS_DIR}` without a default (see "Findings discovered during PoC" in the spike doc). |
 | `src/client.py` | In `_load_library_client`: branch on `config.config` presence. Add `_synthesize_library_config()` that calls the synthesizer and writes to the deterministic path (R10). Keep `_enrich_library_config` for legacy. |
@@ -353,38 +422,51 @@ September 2026.
 
 **`synthesize_configuration` pipeline** (the core new function):
 
-1. Retrieve `unified = lcs_config["llama_stack"]["config"]` — raise if absent.
-2. Baseline: if `unified.profile` set → load that file. Else if
-   `unified.baseline == "empty"` → `{}`. Else → `default_baseline` arg or
-   `load_default_baseline()`.
+1. Resolve the backend-specific block `unified =
+   lcs_config["llama_stack"].get("config")` — may be `None` when the
+   operator set only top-level `inference.providers` (then baseline
+   defaults to `default`, no profile, no `native_override`).
+2. Baseline: if `unified` and `unified.profile` set → load that file.
+   Else if `unified` and `unified.baseline == "empty"` → `{}`. Else →
+   `default_baseline` arg or `load_default_baseline()`.
 3. Run `dedupe_providers_vector_io` on the baseline.
 4. Apply existing enrichment: `enrich_byok_rag`, `enrich_solr` (Azure
    Entra ID intentionally stays separate because it's a `.env`
    side-effect, not an `ls_config` mutation).
-5. If `unified.inference` present → `apply_high_level_inference`.
-6. If `unified.native_override` non-empty →
+5. If top-level `inference.providers` is non-empty →
+   `apply_high_level_inference(ls_config, lcs_config["inference"])`.
+6. If `unified` and `unified.native_override` non-empty →
    `deep_merge_list_replace(ls_config, native_override)`.
 7. `dedupe_providers_vector_io` again for good measure.
 8. Return the final dict.
 
-**`_load_library_client` fork point** (in `src/client.py`):
+**`_load_library_client` fork point** (in `src/client.py`). The check is
+"is there a synthesis input?", which spans the root `inference.providers`
+and `llama_stack.config`, so the client needs the root config (or a
+precomputed flag) rather than only the `llama_stack` block:
 
 ```python
-if config.config is not None:
+# app_config is the root Configuration; ls = app_config.llama_stack
+synthesis_input = bool(app_config.inference.providers) or ls.config is not None
+if synthesis_input:
     self._config_path = self._synthesize_library_config()
-elif config.library_client_config_path is not None:
-    self._config_path = self._enrich_library_config(config.library_client_config_path)
+elif ls.library_client_config_path is not None:
+    self._config_path = self._enrich_library_config(ls.library_client_config_path)
 else:
-    raise ValueError(...)  # caught by the validator at load time; belt-and-suspenders here
+    raise ValueError(...)  # caught by the root validator at load time; belt-and-suspenders here
 ```
 
 ### Config pattern
 
 All new config classes extend `ConfigurationBase` (`extra="forbid"`).
 Use `Field()` with defaults, title, and description for every attribute.
-Cross-field validation in `UnifiedLlamaStackConfig` is not currently
-needed — the precedence is strictly ordered and handled by the
-synthesizer, not by the model.
+The unified-vs-legacy mutual-exclusion check is cross-field and spans the
+root model's top-level `inference.providers` and the nested
+`llama_stack.config` / `library_client_config_path`, so it lives as a
+`@model_validator` on the **root** `Configuration` model (not on
+`UnifiedLlamaStackConfig` or `LlamaStackConfiguration`). Within
+`UnifiedLlamaStackConfig` no cross-field validation is needed —
+synthesis precedence is ordered and handled by the synthesizer.
 
 Example config files live in `examples/profiles/` (two reference
 profiles — one remote-provider, one inline-provider) and in
@@ -416,9 +498,11 @@ reference.
   existing `run.yaml` into high-level sections rather than dumping to
   `native_override`. Valuable ergonomic win; deferred because the
   factoring rules require careful design per provider type.
-- **Additional high-level sections** beyond `inference` — `storage`,
-  `safety`, `tools`, `vector_stores`, etc. Add as real demand appears,
-  not speculatively.
+- **Additional high-level sections** beyond `inference` — `rag`,
+  `safety`, `storage`, `tools`, `vector_stores`, etc. Add as real demand
+  appears, not speculatively. Per Decision S5 and the Pydantic AI
+  research, these stay under `llama_stack.config` (not lifted to the top
+  level like `inference`) until proven backend-agnostic.
 - **User-supplied profile directory**: `profile_dir: /etc/lcore/profiles/`
   with name-based lookup. Deferred to v2.
 - **LS process supervision** (restart on crash, signal propagation,
