@@ -396,33 +396,36 @@ server-mode wiring, and the legacy deprecation warning.
 
 **Goals**:
 
-- A unified `lightspeed-stack.yaml` (top-level `inference.providers`
-  and/or `llama_stack.config`) drives LCORE in both modes (Decision S5).
+- A unified `lightspeed-stack.yaml` (a top-level `inference.providers`
+  section and/or a `llama_stack.config` block) drives LCORE in both
+  library and server modes.
 - A lossless dumb-mode migration tool converts the legacy two-file pair.
-- Legacy mode keeps working with a startup WARN through the 0.6 → 0.7
-  window (Decision S2).
+- Legacy mode keeps working with a startup deprecation WARN through the
+  deprecation window (WARN in 0.6, removed in 0.7).
 
 **Scope**:
 
 - In: `UnifiedInferenceProvider` + `InferenceConfiguration.providers`,
   `UnifiedLlamaStackConfig`, the synthesizer, `--migrate-config`, the LS
   container entrypoint + deployment artifacts, the deprecation WARN.
-- Out: smart migration factoring, high-level sections beyond `inference`
-  (`rag` / `safety` stay backend-specific per Decision S5), LS process
-  supervision, hot-reload (Decision S4).
+- Out: smart migration factoring; high-level sections beyond `inference`
+  (`rag` / `safety` stay backend-specific for now); LS process
+  supervision and hot-reload (tracked separately under
+  LCORE-777 / 778 / 781).
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
 #### LCORE-???? Unified `llama_stack.config` schema + synthesizer
 
 **Description**: Implement the unified-mode config schema and the
-synthesizer that produces a full Llama Stack `run.yaml` from it. Per
-Decision S5, the high-level `providers` list lives on the existing
-top-level `InferenceConfiguration` (`inference.providers`), and
-`UnifiedLlamaStackConfig` holds only the backend-specific knobs
-(`baseline` / `profile` / `native_override`). Wire library mode to the
-synthesizer. Preserve legacy mode through mutual-exclusion validation on
-the root configuration model.
+synthesizer that produces a full Llama Stack `run.yaml` from it. The
+high-level `providers` list lives on the existing top-level
+`InferenceConfiguration` (`inference.providers`) — backend-agnostic, so
+it survives a future backend change — and `UnifiedLlamaStackConfig`
+holds only the backend-specific knobs (`baseline` / `profile` /
+`native_override`). Wire library mode to the synthesizer. Preserve
+legacy mode through mutual-exclusion validation on the root
+configuration model. (Full design: the spec doc.)
 
 **Scope**:
 
@@ -522,8 +525,8 @@ the synthesizer script and default baseline.
   `load_default_baseline()` resolves.
 - Provide a unified-mode `docker-compose.yaml` (or update the existing one)
   that mounts only `lightspeed-stack.yaml` into the LS container.
-- Update `.tekton/` pipelines as needed (coordinate with pipeline owner,
-  see Decision T8).
+- Update `.tekton/` pipelines as needed (coordinate with the Konflux
+  pipeline owner, @radofuchs).
 
 **Acceptance criteria**:
 
