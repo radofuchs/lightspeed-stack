@@ -264,7 +264,8 @@ class TestCheckValidConversationId:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Invalid conversation ID format" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Invalid conversation ID format" in response
 
 
 class TestCheckConversationExistence:
@@ -295,7 +296,8 @@ class TestCheckConversationExistence:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Conversation not found" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Conversation not found" in response
 
     def test_conversation_cache_type_none(
         self, mocker: MockerFixture, mock_configuration: MockType
@@ -840,7 +842,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Configuration is not loaded" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Configuration is not loaded" in response
 
     @pytest.mark.asyncio
     async def test_invalid_conversation_id_format(
@@ -863,7 +866,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Invalid conversation ID format" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Invalid conversation ID format" in response
 
     @pytest.mark.asyncio
     async def test_conversation_cache_not_configured(
@@ -891,7 +895,7 @@ class TestUpdateConversationEndpoint:
         assert isinstance(detail, dict)
         detail_dict = cast(dict[str, Any], detail)
         response_text = detail_dict.get("response", "")
-        assert "Conversation cache not configured" in response_text  # type: ignore
+        assert "Conversation cache not configured" in response_text  # pyright: ignore
 
     @pytest.mark.asyncio
     async def test_conversation_not_found(
@@ -915,7 +919,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Conversation not found" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Conversation not found" in response
 
     @pytest.mark.asyncio
     async def test_successful_update(

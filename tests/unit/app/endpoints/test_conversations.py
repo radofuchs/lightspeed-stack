@@ -479,7 +479,8 @@ class TestGetConversationEndpoint:
 
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Configuration is not loaded" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Configuration is not loaded" in response
 
     @pytest.mark.asyncio
     async def test_invalid_conversation_id_format(
@@ -505,8 +506,10 @@ class TestGetConversationEndpoint:
 
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Invalid conversation ID format" in detail["response"]  # type: ignore
-        assert INVALID_CONVERSATION_ID in detail["cause"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Invalid conversation ID format" in response
+        cause = detail["cause"]  # pyright: ignore[reportArgumentType]
+        assert INVALID_CONVERSATION_ID in cause
 
     @pytest.mark.asyncio
     async def test_llama_stack_connection_error(
@@ -527,7 +530,7 @@ class TestGetConversationEndpoint:
 
         mock_client = mocker.AsyncMock()
         mock_client.conversations.items.list.side_effect = APIConnectionError(
-            request=None  # type: ignore
+            request=None  # type: ignore[arg-type]
         )
         mock_client_holder = mocker.patch(
             "app.endpoints.conversations_v1.AsyncLlamaStackClientHolder"
@@ -546,7 +549,8 @@ class TestGetConversationEndpoint:
 
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert detail["response"] == "Unable to connect to Llama Stack"  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert response == "Unable to connect to Llama Stack"
 
     @pytest.mark.asyncio
     async def test_llama_stack_not_found_error(
@@ -594,10 +598,10 @@ class TestGetConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert detail["response"] == "Internal server error"
-        assert detail["cause"] == (
-            "An unexpected error occurred while processing the request."
-        )
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert response == "Internal server error"
+        cause = detail["cause"]  # pyright: ignore[reportArgumentType]
+        assert cause == ("An unexpected error occurred while processing the request.")
 
     @pytest.mark.asyncio
     async def test_get_conversation_forbidden(
@@ -641,7 +645,7 @@ class TestGetConversationEndpoint:
         )
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert expected in detail["cause"]  # type: ignore
+        assert expected in detail["cause"]  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.asyncio
     async def test_get_others_conversations_allowed_for_authorized_user(
@@ -786,7 +790,8 @@ class TestGetConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Conversation not found" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Conversation not found" in response
 
     @pytest.mark.asyncio
     async def test_no_items_found_in_get_conversation(
@@ -831,7 +836,8 @@ class TestGetConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Conversation not found" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Conversation not found" in response
 
     @pytest.mark.asyncio
     async def test_api_status_error_in_get_conversation(
@@ -911,7 +917,7 @@ class TestGetConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Database" in detail["response"]  # type: ignore
+        assert "Database" in detail["response"]  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.asyncio
     async def test_sqlalchemy_error_retrieving_turns_in_get_conversation(
@@ -978,7 +984,7 @@ class TestGetConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Database" in detail["response"]  # type: ignore
+        assert "Database" in detail["response"]  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.asyncio
     async def test_sqlalchemy_error_in_retrieve_conversation(
@@ -1022,7 +1028,7 @@ class TestGetConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Database" in detail["response"]  # type: ignore
+        assert "Database" in detail["response"]  # pyright: ignore[reportArgumentType]
 
 
 class TestDeleteConversationEndpoint:
@@ -1048,7 +1054,8 @@ class TestDeleteConversationEndpoint:
 
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Configuration is not loaded" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Configuration is not loaded" in response
 
     @pytest.mark.asyncio
     async def test_invalid_conversation_id_format(
@@ -1075,8 +1082,10 @@ class TestDeleteConversationEndpoint:
 
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Invalid conversation ID format" in detail["response"]  # type: ignore
-        assert INVALID_CONVERSATION_ID in detail["cause"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Invalid conversation ID format" in response
+        cause = detail["cause"]  # pyright: ignore[reportArgumentType]
+        assert INVALID_CONVERSATION_ID in cause
 
     @pytest.mark.asyncio
     async def test_llama_stack_connection_error(
@@ -1117,7 +1126,8 @@ class TestDeleteConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert detail["response"] == "Unable to connect to Llama Stack"  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert response == "Unable to connect to Llama Stack"
 
     @pytest.mark.asyncio
     async def test_llama_stack_not_found_error(
@@ -1159,7 +1169,9 @@ class TestDeleteConversationEndpoint:
         assert isinstance(response, ConversationDeleteResponse)
         assert response.conversation_id == VALID_CONVERSATION_ID
         assert response.deleted is True
-        assert "deleted successfully" in response.response
+        assert (
+            "deleted successfully" in response.response
+        )  # pyright: ignore[reportOperatorIssue]
 
     @pytest.mark.asyncio
     async def test_delete_conversation_forbidden(
@@ -1210,7 +1222,7 @@ class TestDeleteConversationEndpoint:
         )
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert expected in detail["cause"]  # type: ignore
+        assert expected in detail["cause"]  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.asyncio
     async def test_delete_others_conversations_allowed_for_authorized_user(
@@ -1259,7 +1271,9 @@ class TestDeleteConversationEndpoint:
         assert isinstance(response, ConversationDeleteResponse)
         assert response.conversation_id == VALID_CONVERSATION_ID
         assert response.deleted is True
-        assert "deleted successfully" in response.response
+        assert (
+            "deleted successfully" in response.response
+        )  # pyright: ignore[reportOperatorIssue]
 
     @pytest.mark.asyncio
     async def test_successful_conversation_deletion(
@@ -1297,7 +1311,9 @@ class TestDeleteConversationEndpoint:
         assert isinstance(response, ConversationDeleteResponse)
         assert response.conversation_id == VALID_CONVERSATION_ID
         assert response.deleted is True
-        assert "deleted successfully" in response.response
+        assert (
+            "deleted successfully" in response.response
+        )  # pyright: ignore[reportOperatorIssue]
         mock_delete.assert_called_once()
         mock_client.conversations.delete.assert_called_once()
 
@@ -1339,7 +1355,8 @@ class TestDeleteConversationEndpoint:
         assert isinstance(response, ConversationDeleteResponse)
         assert response.conversation_id == VALID_CONVERSATION_ID
         assert response.deleted is False
-        assert "not found" in response.response  # Not found locally
+        # Not found locally
+        assert "not found" in response.response  # pyright: ignore[reportOperatorIssue]
 
     @pytest.mark.asyncio
     async def test_sqlalchemy_error_in_delete(
@@ -1386,7 +1403,8 @@ class TestDeleteConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Database" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Database" in response
 
 
 # Generated entirely by AI, no human review, so read with that in mind.
@@ -1410,7 +1428,8 @@ class TestGetConversationsListEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Configuration is not loaded" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Configuration is not loaded" in response
 
     @pytest.mark.asyncio
     async def test_successful_conversations_list_retrieval(
@@ -1563,7 +1582,8 @@ class TestGetConversationsListEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Database" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Database" in response
 
     @pytest.mark.asyncio
     async def test_conversations_list_with_none_topic_summary(
@@ -1785,7 +1805,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Configuration is not loaded" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Configuration is not loaded" in response
 
     @pytest.mark.asyncio
     async def test_invalid_conversation_id_format(
@@ -1814,7 +1835,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Invalid conversation ID format" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Invalid conversation ID format" in response
 
     @pytest.mark.asyncio
     async def test_update_conversation_forbidden(
@@ -1857,7 +1879,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "does not have permission" in detail["cause"]  # type: ignore
+        cause = detail["cause"]  # pyright: ignore[reportArgumentType]
+        assert "does not have permission" in cause
 
     @pytest.mark.asyncio
     async def test_conversation_not_found_in_update(
@@ -1890,7 +1913,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Conversation not found" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Conversation not found" in response
 
     @pytest.mark.asyncio
     async def test_sqlalchemy_error_in_retrieve_conversation_update(
@@ -1924,7 +1948,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Database" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Database" in response
 
     @pytest.mark.asyncio
     async def test_successful_conversation_update(
@@ -2028,7 +2053,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert detail["response"] == "Unable to connect to Llama Stack"  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert response == "Unable to connect to Llama Stack"
 
     @pytest.mark.asyncio
     async def test_llama_stack_not_found_error_in_update(
@@ -2075,7 +2101,8 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Conversation not found" in detail["response"]  # type: ignore
+        response = detail["response"]  # pyright: ignore[reportArgumentType]
+        assert "Conversation not found" in response
 
     @pytest.mark.asyncio
     async def test_sqlalchemy_error_in_database_update(
@@ -2134,4 +2161,4 @@ class TestUpdateConversationEndpoint:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert "Database" in detail["response"]  # type: ignore
+        assert "Database" in detail["response"]  # pyright: ignore[reportArgumentType]
