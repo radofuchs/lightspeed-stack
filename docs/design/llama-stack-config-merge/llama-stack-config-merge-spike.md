@@ -200,7 +200,7 @@ backend-specific synthesizer translates the canonical LCORE vocabulary to
 its target shape; we do not adopt either backend's surface verbatim.
 
 **Pydantic AI research findings** (full report:
-[`compass_artifact_…_text_markdown.md`](https://github.com/max-svistunov/lightspeed-stack/blob/lcore-836-spike-llama-stack-config-merge/docs/design/llama-stack-config-merge/poc-results/pydantic-ai-research.md),
+[`poc-results/pydantic-ai-research.md`](poc-results/pydantic-ai-research.md),
 pass dated 2026-05-20 against `pydantic-ai 1.98.0`):
 
 - Pydantic AI's per-Agent `<provider>:<model>` string + `Provider(...)`
@@ -408,13 +408,16 @@ before implementation of the feature itself begins.
 
 - `.feature` files covering, at minimum, these R1–R11 surfaces from the
   spec doc:
-  - Boot LCORE with unified `lightspeed-stack.yaml` (no external
-    `run.yaml`); `/liveness`, `/readiness`, and `/v1/query` succeed.
+  - Boot LCORE with a unified `lightspeed-stack.yaml` (top-level
+    `inference.providers`, no external `run.yaml`); `/liveness`,
+    `/readiness`, and `/v1/query` succeed.
   - Boot LCORE with legacy config
     (`library_client_config_path` + external `run.yaml`); same result.
-  - Setting both `llama_stack.config` and
+  - Setting a synthesis input (a non-empty `inference.providers` or a
+    `llama_stack.config` block) together with
     `llama_stack.library_client_config_path` fails at config-load time
-    with a clear error that mentions `--migrate-config`.
+    with a clear error that mentions `--migrate-config` — cover both the
+    `inference.providers` and the `llama_stack.config` cases.
   - Migration tool: `lightspeed-stack --migrate-config ...` produces a
     unified file that drives equivalent Llama Stack behavior.
   - `native_override` deep-merges onto the baseline with list
