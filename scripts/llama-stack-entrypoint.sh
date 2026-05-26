@@ -5,7 +5,7 @@
 set -e
 
 INPUT_CONFIG="${LLAMA_STACK_CONFIG:-/opt/app-root/run.yaml}"
-ENRICHED_CONFIG="/opt/app-root/run.yaml"
+ENRICHED_CONFIG="/tmp/enriched-run.yaml"
 LIGHTSPEED_CONFIG="${LIGHTSPEED_CONFIG:-/opt/app-root/lightspeed-stack.yaml}"
 
 # Enrich config if lightspeed config exists
