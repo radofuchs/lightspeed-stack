@@ -54,3 +54,17 @@ def test_get_summaries_validates_conversation_id(cache_fixture: InMemoryCache) -
     """get_summaries validates the conversation ID like the other operations."""
     with pytest.raises(ValueError, match="Invalid conversation ID"):
         cache_fixture.get_summaries(USER_ID, "not-a-valid-uuid")
+
+
+def test_replace_summaries_is_noop(cache_fixture: InMemoryCache) -> None:
+    """replace_summaries accepts a fold without persisting (in-memory cache)."""
+    cache_fixture.replace_summaries(USER_ID, CONVERSATION_ID, summary_1)
+    assert cache_fixture.get_summaries(USER_ID, CONVERSATION_ID) == []
+
+
+def test_replace_summaries_validates_conversation_id(
+    cache_fixture: InMemoryCache,
+) -> None:
+    """replace_summaries validates the conversation ID like the other operations."""
+    with pytest.raises(ValueError, match="Invalid conversation ID"):
+        cache_fixture.replace_summaries(USER_ID, "not-a-valid-uuid", summary_1)

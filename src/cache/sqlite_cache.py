@@ -656,6 +656,53 @@ class SQLiteCache(Cache):
             for row in rows
         ]
 
+    @connection
+    def replace_summaries(
+        self,
+        user_id: str,
+        conversation_id: str,
+        folded_summary: ConversationSummary,
+        skip_user_id_check: bool = False,
+    ) -> None:
+        """Replace all stored summary chunks for a conversation with one fold.
+
+        Deletes the conversation's existing chunks and inserts ``folded_summary``
+        in a single transaction, so a subsequent :meth:`get_summaries` returns the
+        fold first, followed by any chunks appended afterwards. Used by recursive
+        re-summarization (R3, LCORE-1572).
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            folded_summary: The folded summary that supersedes existing chunks.
+            skip_user_id_check: Skip user_id suid check.
+
+        Raises:
+        ------
+            CacheError: If the cache connection is not available.
+        """
+        if self.connection is None:
+            logger.error("Cache is disconnected")
+            raise CacheError("replace_summaries: cache is disconnected")
+
+        cursor = self.connection.cursor()
+        cursor.execute(self.DELETE_SUMMARIES_STATEMENT, (user_id, conversation_id))
+        cursor.execute(
+            self.INSERT_SUMMARY_STATEMENT,
+            (
+                user_id,
+                conversation_id,
+                folded_summary.created_at,
+                folded_summary.summarized_through_turn,
+                folded_summary.token_count,
+                folded_summary.model_used,
+                folded_summary.summary_text,
+            ),
+        )
+        cursor.close()
+        self.connection.commit()
+
     def ready(self) -> bool:
         """Check if the cache is ready.
 

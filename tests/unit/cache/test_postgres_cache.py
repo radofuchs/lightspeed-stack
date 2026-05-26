@@ -935,6 +935,14 @@ summary_2 = ConversationSummary(
     created_at="2025-10-03T10:05:01Z",
     model_used="openai/gpt-4o-mini",
 )
+# A fold collapsing the accumulated chunks (R3, LCORE-1572).
+folded_summary = ConversationSummary(
+    summary_text="Folded: pods/kubectl, then Helm charts and Istio routing.",
+    summarized_through_turn=18,
+    token_count=11,
+    created_at="2025-10-03T11:00:00Z",
+    model_used="openai/gpt-4o-mini",
+)
 
 
 def test_store_summary_when_disconnected(
@@ -1061,3 +1069,61 @@ def test_get_summaries_database_error(
 
     with pytest.raises(CacheError, match="get_summaries"):
         cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+
+
+def test_replace_summaries_when_disconnected(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """replace_summaries raises CacheError when the cache is disconnected."""
+    mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    cache.connection = None
+    cache.connect = lambda: None
+
+    with pytest.raises(CacheError, match="cache is disconnected"):
+        cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)
+
+
+def test_replace_summaries_when_connected(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """replace_summaries deletes existing chunks then inserts the fold."""
+    mock_connect = mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+
+    cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)
+
+    mock_cursor = mock_connect.return_value.cursor.return_value.__enter__.return_value
+    statements = [call.args[0] for call in mock_cursor.execute.call_args_list]
+    assert any("DELETE FROM conversation_summaries" in s for s in statements)
+    insert_calls = [
+        call
+        for call in mock_cursor.execute.call_args_list
+        if "INSERT INTO conversation_summaries" in call.args[0]
+    ]
+    assert len(insert_calls) == 1
+    assert insert_calls[0].args[1] == (
+        USER_ID_1,
+        CONVERSATION_ID_1,
+        folded_summary.created_at,
+        folded_summary.summarized_through_turn,
+        folded_summary.token_count,
+        folded_summary.model_used,
+        folded_summary.summary_text,
+    )
+
+
+def test_replace_summaries_database_error(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """replace_summaries wraps a psycopg2 DatabaseError in CacheError."""
+    mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    cache.connect = lambda: None
+    cache.connection = ConnectionMock()  # pyright: ignore
+
+    with pytest.raises(CacheError, match="replace_summaries"):
+        cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)

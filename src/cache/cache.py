@@ -215,6 +215,32 @@ class Cache(ABC):
         """
 
     @abstractmethod
+    def replace_summaries(
+        self,
+        user_id: str,
+        conversation_id: str,
+        folded_summary: ConversationSummary,
+        skip_user_id_check: bool,
+    ) -> None:
+        """Replace all stored summary chunks for a conversation with one fold.
+
+        Recursive re-summarization (R3, LCORE-1572) collapses the accumulated
+        summary chunks into a single folded summary when the chunks themselves
+        grow large. This atomically removes the conversation's existing chunks
+        and stores ``folded_summary`` in their place, so a subsequent
+        :meth:`get_summaries` returns the fold first (oldest), followed by any
+        chunks appended afterwards.
+
+        Parameters:
+        ----------
+            user_id (str): User identifier, part of the compound cache key.
+            conversation_id (str): Conversation identifier, part of the compound key.
+            folded_summary (ConversationSummary): The folded summary that
+                supersedes the conversation's existing chunks.
+            skip_user_id_check (bool): If True, skip validation of `user_id`.
+        """
+
+    @abstractmethod
     def ready(self) -> bool:
         """Check if the cache is ready.
 

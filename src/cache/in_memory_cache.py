@@ -209,6 +209,29 @@ class InMemoryCache(Cache):
         super().construct_key(user_id, conversation_id, skip_user_id_check)
         return []
 
+    @connection
+    def replace_summaries(
+        self,
+        user_id: str,
+        conversation_id: str,
+        folded_summary: ConversationSummary,
+        skip_user_id_check: bool = False,
+    ) -> None:
+        """Replace stored summary chunks with a fold (no-op for the in-memory cache).
+
+        This implementation does not persist data; it only validates the
+        compound key, mirroring the other in-memory summary operations.
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            folded_summary: The folded summary (not persisted).
+            skip_user_id_check: Skip user_id suid check.
+        """
+        # just check if user_id and conversation_id are UUIDs
+        super().construct_key(user_id, conversation_id, skip_user_id_check)
+
     def ready(self) -> bool:
         """Check if the cache is ready.
 

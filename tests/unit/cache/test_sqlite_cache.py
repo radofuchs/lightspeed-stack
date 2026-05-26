@@ -635,6 +635,22 @@ summary_2 = ConversationSummary(
     created_at="2025-10-03T10:05:01Z",
     model_used="openai/gpt-4o-mini",
 )
+# A fold collapsing summary_1 + summary_2; created after both (R3, LCORE-1572).
+folded_summary = ConversationSummary(
+    summary_text="Folded: pods/kubectl, then Helm charts and Istio routing.",
+    summarized_through_turn=18,
+    token_count=11,
+    created_at="2025-10-03T11:00:00Z",
+    model_used="openai/gpt-4o-mini",
+)
+# A chunk produced after a fold; created later still, so it sorts after the fold.
+summary_after_fold = ConversationSummary(
+    summary_text="Later: user asked about ArgoCD sync waves.",
+    summarized_through_turn=26,
+    token_count=10,
+    created_at="2025-10-03T11:42:00Z",
+    model_used="openai/gpt-4o-mini",
+)
 
 
 def test_get_summaries_empty(tmpdir: Path) -> None:
@@ -725,6 +741,61 @@ def test_get_summaries_when_disconnected(tmpdir: Path) -> None:
 
     with pytest.raises(CacheError, match="cache is disconnected"):
         cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+
+
+def test_replace_summaries_collapses_chunks(tmpdir: Path) -> None:
+    """replace_summaries removes all existing chunks and stores the fold (R3)."""
+    cache = create_cache(tmpdir)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_2, False)
+
+    cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)
+
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == [folded_summary]
+
+
+def test_replace_summaries_on_empty_conversation(tmpdir: Path) -> None:
+    """replace_summaries with no existing chunks simply stores the fold."""
+    cache = create_cache(tmpdir)
+
+    cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)
+
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == [folded_summary]
+
+
+def test_replace_summaries_then_append_keeps_fold_first(tmpdir: Path) -> None:
+    """After a fold, a later chunk appends after it (ordered by created_at)."""
+    cache = create_cache(tmpdir)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+    cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_after_fold, False)
+
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == [
+        folded_summary,
+        summary_after_fold,
+    ]
+
+
+def test_replace_summaries_isolated_per_conversation(tmpdir: Path) -> None:
+    """replace_summaries only affects its own (user_id, conversation_id)."""
+    cache = create_cache(tmpdir)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_2, summary_2, False)
+
+    cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)
+
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == [folded_summary]
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_2, False) == [summary_2]
+
+
+def test_replace_summaries_when_disconnected(tmpdir: Path) -> None:
+    """replace_summaries raises CacheError when the cache is disconnected."""
+    cache = create_cache(tmpdir)
+    cache.connection = None
+    cache.connect = lambda: None
+
+    with pytest.raises(CacheError, match="cache is disconnected"):
+        cache.replace_summaries(USER_ID_1, CONVERSATION_ID_1, folded_summary, False)
 
 
 def test_migration_adds_summaries_table_to_existing_db(tmpdir: Path) -> None:
