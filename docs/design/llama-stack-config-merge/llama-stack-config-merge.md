@@ -510,7 +510,8 @@ reference.
   `Literal` value on `UnifiedInferenceProvider.type` has a
   `PROVIDER_TYPE_MAP` entry.
 - e2e behave tests: migrate `tests/e2e/configuration/**` configs to
-  unified form as part of LCORE-???? (test migration JIRA).
+  unified form as part of LCORE-2342 (Migrate in-repo e2e / integration
+  test configurations).
 
 ## Open Questions for Future Work
 

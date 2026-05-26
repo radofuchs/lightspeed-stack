@@ -200,7 +200,7 @@ backend-specific synthesizer translates the canonical LCORE vocabulary to
 its target shape; we do not adopt either backend's surface verbatim.
 
 **Pydantic AI research findings** (full report:
-[`poc-results/pydantic-ai-research.md`](poc-results/pydantic-ai-research.md),
+[`pydantic-ai-research.md`](https://github.com/lightspeed-core/lightspeed-stack/blob/42844d068b488cc7d72928068b5606a7941f8c15/docs/design/llama-stack-config-merge/poc-results/pydantic-ai-research.md),
 pass dated 2026-05-20 against `pydantic-ai 1.98.0`):
 
 - Pydantic AI's per-Agent `<provider>:<model>` string + `Provider(...)`
@@ -863,15 +863,18 @@ rebuild time was impractical.
 
 ### Results
 
-Full evidence bundle for the library-mode PoC (paths relative to this doc):
+Full evidence bundle for the library-mode PoC. The `poc-results/` dir was
+removed from the tree after merge (PoC validation results aren't kept on
+`main`); the links below are permalinks to the files at the merge commit,
+where they remain in history:
 
-- [`poc-results/lightspeed-stack-unified-library.yaml`](poc-results/lightspeed-stack-unified-library.yaml)
+- [`lightspeed-stack-unified-library.yaml`](https://github.com/lightspeed-core/lightspeed-stack/blob/42844d068b488cc7d72928068b5606a7941f8c15/docs/design/llama-stack-config-merge/poc-results/lightspeed-stack-unified-library.yaml)
   — the unified-mode config used.
-- [`poc-results/library-mode/synthesized-run.yaml`](poc-results/library-mode/synthesized-run.yaml)
+- [`library-mode/synthesized-run.yaml`](https://github.com/lightspeed-core/lightspeed-stack/blob/42844d068b488cc7d72928068b5606a7941f8c15/docs/design/llama-stack-config-merge/poc-results/library-mode/synthesized-run.yaml)
   — what LCORE produced (3.7 KB).
-- [`poc-results/library-mode/query-response.json`](poc-results/library-mode/query-response.json)
+- [`library-mode/query-response.json`](https://github.com/lightspeed-core/lightspeed-stack/blob/42844d068b488cc7d72928068b5606a7941f8c15/docs/design/llama-stack-config-merge/poc-results/library-mode/query-response.json)
   — a real `/v1/query` round-trip.
-- [`poc-results/library-mode/README.md`](poc-results/library-mode/README.md)
+- [`library-mode/README.md`](https://github.com/lightspeed-core/lightspeed-stack/blob/42844d068b488cc7d72928068b5606a7941f8c15/docs/design/llama-stack-config-merge/poc-results/library-mode/README.md)
   — walkthrough.
 
 Summary of validation:
@@ -924,7 +927,7 @@ Summary of validation:
   query. The implementation JIRAs' e2e coverage must exercise a real
   Llama Guard model (e.g. `meta-llama/Llama-Guard-3-8B`) end-to-end.
   Caught by CodeRabbit on the PoC artifact at
-  `poc-results/library-mode/synthesized-run.yaml:110`.
+  [`synthesized-run.yaml` L110](https://github.com/lightspeed-core/lightspeed-stack/blob/42844d068b488cc7d72928068b5606a7941f8c15/docs/design/llama-stack-config-merge/poc-results/library-mode/synthesized-run.yaml#L110).
 
 ---
 
@@ -1147,13 +1150,22 @@ Relative to `upstream/main`:
 
 ## Appendix B — Commands to reproduce the library-mode PoC
 
+The PoC config was removed from the tree after merge but is preserved at
+the PR-1580 merge commit; step 0 fetches it from there so the commands
+stay runnable. (That config also carried a machine-local `profile:` path —
+adjust it for your environment before running.)
+
 ```bash
-# 1. Start LCORE in library mode with a unified config
+# 0. Fetch the PoC config from the merge commit (removed from the tree post-merge)
+mkdir -p /tmp/lcore-836-poc
+curl -sSL -o /tmp/lcore-836-poc/lightspeed-stack-unified-library.yaml \
+  https://raw.githubusercontent.com/lightspeed-core/lightspeed-stack/42844d068b488cc7d72928068b5606a7941f8c15/docs/design/llama-stack-config-merge/poc-results/lightspeed-stack-unified-library.yaml
+
+# 1. Start LCORE in library mode with the unified config
 export OPENAI_API_KEY=<your-key>
 export E2E_OPENAI_MODEL=gpt-4o-mini
-mkdir -p /tmp/lcore-836-poc
 uv run lightspeed-stack \
-  -c docs/design/llama-stack-config-merge/poc-results/lightspeed-stack-unified-library.yaml
+  -c /tmp/lcore-836-poc/lightspeed-stack-unified-library.yaml
 
 # 2. In another shell — query
 curl -s http://localhost:8080/liveness
