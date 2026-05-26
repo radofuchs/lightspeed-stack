@@ -16,8 +16,9 @@ from authlib.jose.errors import (
 from cachetools import TTLCache
 from fastapi import HTTPException, Request
 
-from authentication.interface import AuthInterface, AuthTuple
+from authentication.interface import NO_AUTH_TUPLE, AuthInterface, AuthTuple
 from authentication.utils import extract_user_token
+from configuration import configuration
 from constants import (
     DEFAULT_VIRTUAL_PATH,
 )
@@ -141,6 +142,19 @@ def key_resolver_func(
     return _internal
 
 
+def _should_skip_auth(request: Request) -> bool:
+    """Check if auth should be skipped for health probe or metrics endpoints."""
+    auth_config = configuration.authentication_configuration
+    if auth_config.skip_for_health_probes and request.url.path in (
+        "/readiness",
+        "/liveness",
+    ):
+        return True
+    if auth_config.skip_for_metrics and request.url.path in ("/metrics",):
+        return True
+    return False
+
+
 class JwkTokenAuthDependency(AuthInterface):  # pylint: disable=too-few-public-methods
     """JWK AuthDependency class for JWK-based JWT authentication."""
 
@@ -166,7 +180,9 @@ class JwkTokenAuthDependency(AuthInterface):  # pylint: disable=too-few-public-m
         self.config: JwkConfiguration = config
         self.skip_userid_check = False
 
-    async def __call__(self, request: Request) -> AuthTuple:
+    async def __call__(  # pylint: disable=too-many-statements
+        self, request: Request
+    ) -> AuthTuple:
         """Authenticate the JWT in the headers against the keys from the JWK url.
 
         When the Authorization header is missing, this method raises
@@ -190,6 +206,8 @@ class JwkTokenAuthDependency(AuthInterface):  # pylint: disable=too-few-public-m
             authentication; all error paths raise HTTPException.
         """
         if not request.headers.get("Authorization"):
+            if _should_skip_auth(request):
+                return NO_AUTH_TUPLE
             response = UnauthorizedResponse(cause="No Authorization header found")
             raise HTTPException(**response.model_dump())
 
