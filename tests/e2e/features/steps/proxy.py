@@ -306,7 +306,6 @@ def restore_if_modified(context: Context) -> None:
     _stop_proxy(context, "interception_proxy", "interception_proxy_loop")
     os.environ.pop("E2E_COPY_INTERCEPTION_CA_TO_LLAMA", None)
     os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
-    os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
     if hasattr(context, "needs_interception_ca_on_llama"):
         delattr(context, "needs_interception_ca_on_llama")
 

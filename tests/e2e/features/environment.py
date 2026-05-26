@@ -26,7 +26,7 @@ from tests.e2e.features.steps.health import (
     reset_llama_stack_disrupt_once_tracking,
     reset_llama_stack_was_running,
 )
-from tests.e2e.features.steps.tls import reset_tls_prow_restart_optimization_state
+from tests.e2e.features.steps.tls import reset_tls_prow_state
 from tests.e2e.utils.llama_stack_utils import register_shield
 from tests.e2e.utils.prow_utils import (
     restart_pod,
@@ -453,7 +453,7 @@ def before_feature(context: Context, feature: Feature) -> None:
     # One real Llama disruption per feature (module-level flag; survives context resets)
     reset_llama_stack_disrupt_once_tracking()
     if feature.filename and "tls.feature" in feature.filename:
-        reset_tls_prow_restart_optimization_state()
+        reset_tls_prow_state()
 
     try:
         max_flaky = int(os.getenv("E2E_FLAKY_MAX_ATTEMPTS", _E2E_FLAKY_MAX_ATTEMPTS))

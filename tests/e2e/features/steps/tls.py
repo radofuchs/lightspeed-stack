@@ -34,18 +34,11 @@ _TLS_MODEL_RESOURCE: dict[str, str] = {
 }
 
 _mock_tls_cluster_deploy_state: dict[str, bool] = {"done": False}
-_tls_prow_restart_state: dict[str, bool] = {
-    "full_restart_done": False,
-    "force_full_restart": False,
-}
 
 
-def reset_tls_prow_restart_optimization_state() -> None:
+def reset_tls_prow_state() -> None:
     """Reset per-feature Prow state (call from ``before_feature``)."""
     _mock_tls_cluster_deploy_state["done"] = False
-    _tls_prow_restart_state["full_restart_done"] = False
-    _tls_prow_restart_state["force_full_restart"] = False
-    os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
     os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
 
 
@@ -58,63 +51,26 @@ def is_tls_configuration_feature(context: Context) -> bool:
     return "TLS configuration" in name
 
 
-def _prepare_tls_prow_llama_full_restart_env() -> None:
-    """Env for a full llama pod recreate (first TLS scenario / recovery)."""
+def _prepare_tls_prow_llama_restart_env() -> None:
+    """Set env for full llama pod recreate with mock TLS certs mounted."""
     os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
-    os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
-
-
-def _prepare_tls_prow_llama_reload_env() -> None:
-    """Env for config-only reload (run.yaml already on pod with /certs mounted)."""
-    os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
-    os.environ["E2E_LLAMA_RELOAD_CONFIG_ONLY"] = "1"
 
 
 def restart_llama_for_tls_feature(context: Context) -> None:
-    """Restart Llama for TLS tests: one full recreate per feature, then reload.
-
-    Full pod delete+apply after every scenario (~16×) is flaky on Konflux
-    (cert sync, mount races, port-forward). Later scenarios only change run.yaml
-    in the ConfigMap; ``oc cp`` + container restart is enough.
-    """
+    """Restart Llama for TLS tests (full pod recreate on Prow/Konflux)."""
     from tests.e2e.utils.utils import restart_container
 
     if not is_prow_environment():
         restart_container("llama-stack")
         return
 
-    if _tls_prow_restart_state.pop("force_full_restart", False):
-        _prepare_tls_prow_llama_full_restart_env()
-        mode = "full_forced"
-    elif _tls_prow_restart_state["full_restart_done"]:
-        _prepare_tls_prow_llama_reload_env()
-        mode = "reload"
-    else:
-        _prepare_tls_prow_llama_full_restart_env()
-        mode = "full"
-
+    _prepare_tls_prow_llama_restart_env()
     scenario = getattr(getattr(context, "scenario", None), "name", "") or "?"
     print(
-        f"[tls.feature] Llama Stack restart: mode={mode} scenario={scenario!r}",
+        f"[tls.feature] Llama Stack restart: full recreate scenario={scenario!r}",
         flush=True,
     )
-
-    try:
-        restart_container("llama-stack")
-    except Exception:
-        _tls_prow_restart_state["full_restart_done"] = False
-        raise
-
-    _tls_prow_restart_state["full_restart_done"] = True
-
-
-def _prepare_tls_prow_llama_restart_env() -> None:
-    """Set env before writing run.yaml (used by ``_configure_tls``)."""
-    os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
-    if _tls_prow_restart_state["full_restart_done"]:
-        os.environ["E2E_LLAMA_RELOAD_CONFIG_ONLY"] = "1"
-    else:
-        os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
+    restart_container("llama-stack")
 
 
 def _cluster_mock_tls_inference_host() -> str:
@@ -143,7 +99,6 @@ def _tls_provider_base() -> dict[str, Any]:
             "api_key": "test-key",
             "base_url": _mock_tls_base_url(_MOCK_TLS_PORT_TLS),
             "allowed_models": ["mock-tls-model"],
-            # Avoid hitting the mock on every container restart (Konflux reload path).
             "refresh_models": False,
         },
     }
@@ -301,10 +256,6 @@ def configure_mtls_wrong_client_cert(context: Context) -> None:
         },
         base_url=_mock_tls_base_url(_MOCK_TLS_PORT_MTLS),
     )
-    # Konflux: reload after this config often never becomes healthy until timeout,
-    # then falls back to full recreate (~7 min). Skip reload for this scenario.
-    if is_prow_environment():
-        _tls_prow_restart_state["force_full_restart"] = True
 
 
 @given("Llama Stack is configured for mTLS with untrusted client certificate")

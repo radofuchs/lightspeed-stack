@@ -7,7 +7,6 @@ and are only used when running tests in the Prow CI environment.
 import os
 import subprocess
 import tempfile
-import time
 from typing import Optional
 
 
@@ -80,28 +79,6 @@ _LLAMA_RESTART_NAMES = frozenset({"llama-stack", "llama-stack-service"})
 _LIGHTSPEED_RESTART_NAMES = frozenset({"lightspeed-stack", "lightspeed-stack-service"})
 
 
-def _print_llama_restart_diagnostics_from_output(output: str) -> None:
-    """Extract e2e-ops phase markers from restart-llama-stack stdout."""
-    markers = (
-        "E2E_LLAMA_RESTART_MODE=",
-        "E2E_LLAMA_RESTART_FAILED_PHASE=",
-        "E2E_LLAMA_RESTART_FALLBACK=",
-        "E2E_LLAMA_RESTART_EXIT_CODE=",
-        "E2E_OPS_PHASE=",
-    )
-    printed = False
-    for line in output.splitlines():
-        if any(line.startswith(m) for m in markers) or "[e2e-ops] <<<" in line:
-            print(line, flush=True)
-            printed = True
-    if printed:
-        print(
-            "See docs/e2e_testing.md § Konflux Llama restart diagnostics "
-            "for phase meanings and fixes.",
-            flush=True,
-        )
-
-
 def restart_pod(container_name: str) -> None:
     """Restart Llama Stack or Lightspeed pod in OpenShift/Prow (not Docker).
 
@@ -116,13 +93,13 @@ def restart_pod(container_name: str) -> None:
     """
     if container_name in _LLAMA_RESTART_NAMES:
         op = "restart-llama-stack"
-        # TLS feature: full pod recreate + cert sync + health can exceed 7 min on Konflux.
+        # TLS: full pod recreate + cert sync + health on Konflux can exceed 7 min.
         timeout = (
             900 if os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1" else 420
         )
     elif container_name in _LIGHTSPEED_RESTART_NAMES:
         op = "restart-lightspeed"
-        # Konflux LCS: up to ~195s pod wait + extended wait + port-forward retries.
+        # Konflux LCS readiness can take ~195s (probe budget in lightspeed-stack.yaml).
         timeout = 420 if os.environ.get("E2E_KONFLUX_E2E") == "1" else 320
     else:
         print(
@@ -131,61 +108,15 @@ def restart_pod(container_name: str) -> None:
         )
         op = "restart-lightspeed"
         timeout = 200
-    max_attempts = (
-        3
-        if op == "restart-llama-stack"
-        and os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1"
-        and os.environ.get("E2E_LLAMA_RELOAD_CONFIG_ONLY") != "1"
-        else 2 if op == "restart-llama-stack" else 1
-    )
-    last_error: subprocess.CalledProcessError | subprocess.TimeoutExpired | None = None
-    for attempt in range(1, max_attempts + 1):
-        try:
-            result = run_e2e_ops(op, timeout=timeout)
-            print(result.stdout, end="")
-            if result.returncode != 0:
-                print(result.stderr, end="")
-                detail = (result.stderr or result.stdout or "").strip()
-                raise subprocess.CalledProcessError(
-                    result.returncode,
-                    op,
-                    detail or None,
-                )
-            return
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
-            last_error = err
-            if op == "restart-llama-stack" and isinstance(
-                err, subprocess.CalledProcessError
-            ):
-                _print_llama_restart_diagnostics_from_output(
-                    (err.stdout or "") + (err.stderr or "")
-                )
-                try:
-                    diag = run_e2e_ops("diagnose-llama-restart", timeout=90)
-                    print(diag.stdout, end="")
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-                    pass
-            if attempt < max_attempts:
-                retry_delay = (
-                    30
-                    if os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1"
-                    else 20
-                )
-                print(
-                    f"⚠️  {op} failed (attempt {attempt}/{max_attempts}), "
-                    f"retrying after {retry_delay}s..."
-                )
-                time.sleep(retry_delay)
-                if (
-                    op == "restart-llama-stack"
-                    and os.environ.get("E2E_LLAMA_RELOAD_CONFIG_ONLY") == "1"
-                ):
-                    # Reload failed; next attempt does full pod recreate.
-                    os.environ.pop("E2E_LLAMA_RELOAD_CONFIG_ONLY", None)
-    if last_error is not None:
-        if isinstance(last_error, subprocess.TimeoutExpired):
-            print(f"Failed to restart pod {container_name}: {last_error}")
-        raise last_error
+    try:
+        result = run_e2e_ops(op, timeout=timeout)
+        print(result.stdout, end="")
+        if result.returncode != 0:
+            print(result.stderr, end="")
+            raise subprocess.CalledProcessError(result.returncode, op)
+    except subprocess.TimeoutExpired as e:
+        print(f"Failed to restart pod {container_name}: {e}")
+        raise
 
 
 def restore_llama_stack_pod() -> None:
