@@ -394,6 +394,8 @@ The runtime that turns a unified `lightspeed-stack.yaml` into a Llama
 Stack `run.yaml`: schema + synthesizer, migration tool, library and
 server-mode wiring, and the legacy deprecation warning.
 
+**Spec doc**: https://github.com/lightspeed-core/lightspeed-stack/blob/main/docs/design/llama-stack-config-merge/llama-stack-config-merge.md
+
 **Goals**:
 
 - A unified `lightspeed-stack.yaml` (a top-level `inference.providers`
@@ -577,6 +579,8 @@ End-to-end behavior coverage for unified mode — authored before
 implementation so the test shape isn't biased by it — plus migration of
 the in-repo e2e/integration test configs to the unified format.
 
+**Spec doc**: https://github.com/lightspeed-core/lightspeed-stack/blob/main/docs/design/llama-stack-config-merge/llama-stack-config-merge.md
+
 **Goals**:
 
 - Behave `.feature` files capture unified-mode behavior up front (kickoff);
@@ -740,6 +744,8 @@ behave reports zero undefined steps.
 
 Make the single-file unified configuration the primary documented path,
 with legacy clearly marked as deprecated, plus reference profile examples.
+
+**Spec doc**: https://github.com/lightspeed-core/lightspeed-stack/blob/main/docs/design/llama-stack-config-merge/llama-stack-config-merge.md
 
 **Goals**:
 
