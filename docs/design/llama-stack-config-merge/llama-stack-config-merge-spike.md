@@ -503,7 +503,7 @@ that produces a unified single-file config from an existing
 **Agentic tool instruction**:
 
 ```text
-Read "Migration tool" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Read "Migration / backwards compatibility" and "Appendix A — Worked example: legacy → unified migration" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
 Key files: src/lightspeed_stack.py, src/llama_stack_configuration.py,
 tests/unit/test_llama_stack_synthesize.py.
 To verify: migrate the repo's root run.yaml + lightspeed-stack.yaml, then
@@ -539,7 +539,7 @@ the synthesizer script and default baseline.
 **Agentic tool instruction**:
 
 ```text
-Read "Architecture → Server mode" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Read "Architecture" (the Overview diagram and "Trigger mechanism" cover server mode) in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
 Key files: scripts/llama-stack-entrypoint.sh, test.containerfile,
 docker-compose.yaml, .tekton/*.yaml.
 To verify: docker compose up with the unified config; curl LCORE /v1/query.
@@ -568,7 +568,7 @@ to the migration doc. Legacy mode continues to fully function.
 **Agentic tool instruction**:
 
 ```text
-Read "Deprecation timeline" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Read "Migration / backwards compatibility" (the Deprecation schedule) in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
 Key files: src/models/config.py (or src/lightspeed_stack.py startup).
 To verify: run LCORE with a legacy config; confirm WARN line; run with unified config; confirm no WARN.
 ```
@@ -681,7 +681,7 @@ configs similarly.
 **Agentic tool instruction**:
 
 ```text
-Read "Migration paths" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Read "Migration / backwards compatibility" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
 Key files: tests/e2e/configs/, tests/e2e/configuration/, tests/e2e-prow/rhoai/.
 To verify: `uv run make test-e2e` green.
 ```
@@ -793,7 +793,7 @@ mentions the removed `-g/-i/-o` flags.
 **Agentic tool instruction**:
 
 ```text
-Read "Deprecation timeline" and "Migration paths" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Read "Migration / backwards compatibility" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
 Key files: docs/*.md, docs/*.html, docs/*.json, README.md, src/lightspeed_stack.py docstring.
 To verify: rendered docs present the unified mode first; legacy mode is visibly deprecated.
 ```
@@ -823,7 +823,7 @@ write and reference their own profiles via
 **Agentic tool instruction**:
 
 ```text
-Read "Profiles" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Read "Appendix B — Reference profile example" and the "Configuration" sub-section in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
 Key files to create: examples/profiles/*.yaml, a "Profiles" section in docs/config.md or docs/deployment_guide.md.
 To verify: load the example via `uv run lightspeed-stack -c <wrapper.yaml>` referencing the profile; confirm LS boots.
 ```
