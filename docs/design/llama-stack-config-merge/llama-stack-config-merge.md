@@ -137,6 +137,26 @@ detail that LCORE owns, not an operator-facing artifact.
   working throughout a deprecation window so that downstream products
   can migrate on their own cadence.
 
+## Acceptance test surface
+
+Maps each requirement to one or more observable behaviors. This section
+is the source-of-truth that drives the e2e-kickoff JIRA's `.feature`
+files — authors read it to write Gherkin scenarios.
+
+| Req | Observable behavior | Verified by |
+|---|---|---|
+| R1 | Unified config (top-level `inference.providers` and/or `llama_stack.config`, no external `run.yaml`) boots LCORE in library and server mode; `/liveness`, `/readiness`, `/v1/query` succeed | e2e |
+| R2 | Legacy two-file config still boots and serves; one startup deprecation WARN in 0.6; no WARN in unified mode | e2e |
+| R3 | A config with a synthesis input *and* `library_client_config_path` fails at load with an error naming `--migrate-config` (cover both the `inference.providers` and the `config` case) | e2e + unit |
+| R4 | `--migrate-config` on a legacy pair yields a unified file driving byte-identical LS behavior; migrate→synthesize round-trips to the original `run.yaml` | e2e + unit (round-trip) |
+| R5 | `native_override` overlapping a baseline/high-level key deep-merges: maps merge, lists replace wholesale, scalars replace | unit (parametric) + e2e (one scalar + one list key) |
+| R6 | Synthesized `run.yaml` on disk carries `${env.FOO}` refs for LCORE-emitted secrets, never resolved values | e2e (inspect file) + unit |
+| R7 | Enrichment (Azure Entra ID, BYOK RAG, Solr/OKP) yields the same synthesized result in unified mode as legacy for equivalent inputs | unit + integration |
+| R8 | A relative `profile:` path resolves against the loaded `lightspeed-stack.yaml` directory; absolute paths always resolve | e2e + unit |
+| R9 | Unknown fields rejected (`extra="forbid"`); root validator enforces synthesis-input ⊕ legacy mutual exclusion | unit |
+| R10 | Synthesized file written to the persistent known path with mode `0600`, path logged at startup; `--synthesized-config-output` overrides the location | e2e (perms + path) + unit |
+| R11 | Shape detection resolves unified vs legacy per the Mode-detection table; `config_format_version`, when set, must agree or load fails | unit + e2e |
+
 ## Architecture
 
 ### Overview

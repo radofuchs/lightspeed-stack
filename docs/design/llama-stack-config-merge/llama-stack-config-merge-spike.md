@@ -381,91 +381,39 @@ migration.
 
 ## Proposed JIRAs
 
+
 Each JIRA's agentic-tool instruction points to the spec doc
 (`llama-stack-config-merge.md`), the permanent reference. The first JIRA
 (authoring e2e feature files) is the intentional kickoff — it happens
 before feature implementation so the test shape is not influenced by
 implementation choices.
 
-<!-- type: Story -->
-<!-- key: LCORE-???? -->
-### LCORE-???? E2E feature files for unified mode (no step implementation)
+### Epic: Unified-config implementation
 
-**User story**: As a Lightspeed Core e2e engineer, I want the behave
-feature files for unified-mode scenarios written before the feature
-implementation lands, so that the test shape reflects the feature's
-intended behavior rather than the chosen implementation, and any
-architectural gaps surface early.
+The runtime that turns a unified `lightspeed-stack.yaml` into a Llama
+Stack `run.yaml`: schema + synthesizer, migration tool, library and
+server-mode wiring, and the legacy deprecation warning.
 
-**Description**: Author behave `.feature` files under `tests/e2e/features/`
-that describe the behaviors required of unified mode. Step definitions
-(Python glue) are explicitly **not** part of this ticket — they are
-covered by a later sibling ticket (LCORE-???? — Implement step
-definitions). The feature files can be submitted for review and land
-before implementation of the feature itself begins.
+**Goals**:
+
+- A unified `lightspeed-stack.yaml` (top-level `inference.providers`
+  and/or `llama_stack.config`) drives LCORE in both modes (Decision S5).
+- A lossless dumb-mode migration tool converts the legacy two-file pair.
+- Legacy mode keeps working with a startup WARN through the 0.6 → 0.7
+  window (Decision S2).
 
 **Scope**:
 
-- `.feature` files covering, at minimum, these R1–R11 surfaces from the
-  spec doc:
-  - Boot LCORE with a unified `lightspeed-stack.yaml` (top-level
-    `inference.providers`, no external `run.yaml`); `/liveness`,
-    `/readiness`, and `/v1/query` succeed.
-  - Boot LCORE with legacy config
-    (`library_client_config_path` + external `run.yaml`); same result.
-  - Setting a synthesis input (a non-empty `inference.providers` or a
-    `llama_stack.config` block) together with
-    `llama_stack.library_client_config_path` fails at config-load time
-    with a clear error that mentions `--migrate-config` — cover both the
-    `inference.providers` and the `llama_stack.config` cases.
-  - Migration tool: `lightspeed-stack --migrate-config ...` produces a
-    unified file that drives equivalent Llama Stack behavior.
-  - `native_override` deep-merges onto the baseline with list
-    replacement (tested on a scalar key and a list key).
-  - `profile:` path (absolute and relative-to-config-dir) loads the
-    referenced baseline.
-  - Secrets appear as `${env.FOO}` references in the synthesized
-    `run.yaml` on disk; never resolved to raw values.
-  - Legacy mode emits a one-line deprecation WARN at startup; unified
-    mode does not.
-- Additions to `tests/e2e/test_list.txt` so behave discovers the new
-  files.
-- Gherkin scenarios authored from the spec doc (`R1..R11`) only; author
-  must avoid reading the implementation JIRAs' scope sections while
-  drafting scenarios.
-
-**Acceptance criteria**:
-
-- behave parses every new `.feature` file without syntax errors.
-- behave marks all new scenario steps as `undefined` (step definitions
-  land in LCORE-????).
-- `uv run make test-e2e` remains green (new scenarios are skipped or
-  reported undefined, not failing).
-- Any ambiguity or architectural tension uncovered while authoring is
-  captured either as a comment in the spec doc or as a new sub-JIRA.
-
-**Blocks**: LCORE-???? (Implement behave step definitions for unified
-mode).
-
-**Agentic tool instruction**:
-
-```text
-Read "Requirements" (R1..R11) and "Use Cases" in
-docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
-Do NOT read the other JIRAs' scope sections or the synthesizer/schema
-implementation code while authoring; the point of this ticket is to
-produce feature files uncontaminated by implementation detail.
-Key files to create: tests/e2e/features/unified-mode-*.feature plus
-additions to tests/e2e/test_list.txt. Do NOT create step definitions in
-tests/e2e/features/steps/.
-To verify: `uv run behave --dry-run tests/e2e/features/unified-mode-*.feature`
-parses successfully; `uv run make test-e2e` still green with the new
-scenarios reported as undefined.
-```
+- In: `UnifiedInferenceProvider` + `InferenceConfiguration.providers`,
+  `UnifiedLlamaStackConfig`, the synthesizer, `--migrate-config`, the LS
+  container entrypoint + deployment artifacts, the deprecation WARN.
+- Out: smart migration factoring, high-level sections beyond `inference`
+  (`rag` / `safety` stay backend-specific per Decision S5), LS process
+  supervision, hot-reload (Decision S4).
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
-### LCORE-???? Unified `llama_stack.config` schema + synthesizer
+#### LCORE-???? Unified `llama_stack.config` schema + synthesizer
 
 **Description**: Implement the unified-mode config schema and the
 synthesizer that produces a full Llama Stack `run.yaml` from it. Per
@@ -523,7 +471,7 @@ To verify: run a unified-mode config end-to-end via `uv run lightspeed-stack -c 
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
-### LCORE-???? Migration tool — dumb-mode lift-and-shift
+#### LCORE-???? Migration tool — dumb-mode lift-and-shift
 
 **Description**: Implement `--migrate-config` on the `lightspeed-stack` CLI
 that produces a unified single-file config from an existing
@@ -559,7 +507,7 @@ start LCORE with the output; confirm /v1/query works.
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
-### LCORE-???? LS container entrypoint + deployment artifacts for unified mode
+#### LCORE-???? LS container entrypoint + deployment artifacts for unified mode
 
 **Description**: Update the Llama Stack container entrypoint and deployment
 manifests so server mode works end-to-end from a unified
@@ -592,9 +540,113 @@ docker-compose.yaml, .tekton/*.yaml.
 To verify: docker compose up with the unified config; curl LCORE /v1/query.
 ```
 
+<!-- type: Task -->
+<!-- key: LCORE-???? -->
+#### LCORE-???? Deprecation warning for legacy mode
+
+**Description**: After the unified-mode feature lands (one release later),
+emit a one-line startup WARN when `library_client_config_path` is set. Link
+to the migration doc. Legacy mode continues to fully function.
+
+**Scope**:
+
+- Warning emission point: on load in `LlamaStackConfiguration`
+  `check_llama_stack_model` validator, or at LCORE startup.
+- Log line format includes a stable URL fragment to the migration doc.
+
+**Acceptance criteria**:
+
+- Legacy configs still load and run.
+- A single WARN line appears at startup when legacy fields are used.
+- The warning is not emitted in unified mode.
+
+**Agentic tool instruction**:
+
+```text
+Read "Deprecation timeline" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Key files: src/models/config.py (or src/lightspeed_stack.py startup).
+To verify: run LCORE with a legacy config; confirm WARN line; run with unified config; confirm no WARN.
+```
+
+### Epic: E2E and test-config coverage for unified mode
+
+End-to-end behavior coverage for unified mode — authored before
+implementation so the test shape isn't biased by it — plus migration of
+the in-repo e2e/integration test configs to the unified format.
+
+**Goals**:
+
+- Behave `.feature` files capture unified-mode behavior up front (kickoff);
+  step definitions make them executable once the feature lands.
+- In-repo e2e/integration configs use the unified format, so the reference
+  shapes downstream teams see are the new ones.
+
+**Scope**:
+
+- In: e2e feature files (kickoff), their step definitions, migration of
+  `tests/e2e/**` and `tests/e2e-prow/rhoai/` configs.
+- Out: non-e2e test-infrastructure changes.
+
 <!-- type: Story -->
 <!-- key: LCORE-???? -->
-### LCORE-???? Migrate in-repo e2e / integration test configurations
+#### LCORE-???? E2E feature files for unified mode (no step implementation)
+
+**User story**: As a Lightspeed Core e2e engineer, I want the behave
+feature files for unified-mode scenarios written before the feature
+implementation lands, so that the test shape reflects the feature's
+intended behavior rather than the chosen implementation, and any
+architectural gaps surface early.
+
+**Description**: Author behave `.feature` files under `tests/e2e/features/`
+that describe the behaviors required of unified mode. Step definitions
+(Python glue) are explicitly **not** part of this ticket — they are
+covered by a later sibling ticket (LCORE-???? — Implement step
+definitions). The feature files can be submitted for review and land
+before implementation of the feature itself begins.
+
+**Scope**:
+
+- `.feature` files covering the spec doc's **Acceptance test surface**
+  (the R1–R11 → observable-behavior mapping) — at minimum every row whose
+  "Verified by" includes e2e.
+- Additions to `tests/e2e/test_list.txt` so behave discovers the new
+  files.
+- Gherkin scenarios authored from the spec doc's Requirements and
+  Acceptance test surface only; author must avoid reading the
+  implementation JIRAs' scope sections while drafting scenarios.
+
+**Acceptance criteria**:
+
+- behave parses every new `.feature` file without syntax errors.
+- behave marks all new scenario steps as `undefined` (step definitions
+  land in LCORE-????).
+- `uv run make test-e2e` remains green (new scenarios are skipped or
+  reported undefined, not failing).
+- Any ambiguity or architectural tension uncovered while authoring is
+  captured either as a comment in the spec doc or as a new sub-JIRA.
+
+**Blocks**: LCORE-???? (Implement behave step definitions for unified
+mode).
+
+**Agentic tool instruction**:
+
+```text
+Read "Requirements" (R1..R11) and "Acceptance test surface" in
+docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
+Do NOT read the other JIRAs' scope sections or the synthesizer/schema
+implementation code while authoring; the point of this ticket is to
+produce feature files uncontaminated by implementation detail.
+Key files to create: tests/e2e/features/unified-mode-*.feature plus
+additions to tests/e2e/test_list.txt. Do NOT create step definitions in
+tests/e2e/features/steps/.
+To verify: `uv run behave --dry-run tests/e2e/features/unified-mode-*.feature`
+parses successfully; `uv run make test-e2e` still green with the new
+scenarios reported as undefined.
+```
+
+<!-- type: Story -->
+<!-- key: LCORE-???? -->
+#### LCORE-???? Migrate in-repo e2e / integration test configurations
 
 **User story**: As a Lightspeed Core maintainer, I want the in-repo e2e and
 integration tests to use the unified-mode config format, so that the
@@ -629,7 +681,7 @@ To verify: `uv run make test-e2e` green.
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
-### LCORE-???? Implement behave step definitions for unified-mode feature files
+#### LCORE-???? Implement behave step definitions for unified-mode feature files
 
 **Description**: Implement the Python step definitions
 (`@given`/`@when`/`@then` functions) under `tests/e2e/features/steps/`
@@ -681,9 +733,27 @@ To verify: `uv run make test-e2e` runs every new scenario green and
 behave reports zero undefined steps.
 ```
 
+### Epic: Documentation for unified mode
+
+Make the single-file unified configuration the primary documented path,
+with legacy clearly marked as deprecated, plus reference profile examples.
+
+**Goals**:
+
+- Every doc that showed a two-file setup also shows the unified-mode
+  equivalent; legacy is visibly deprecated.
+- Operators have reference profile examples and a documented `profile:`
+  workflow.
+
+**Scope**:
+
+- In: docs migration (deployment / byok / okp / rag / providers / config /
+  README), a migration section, `examples/profiles/` reference files.
+- Out: API-reference regeneration beyond what the config change requires.
+
 <!-- type: Story -->
 <!-- key: LCORE-???? -->
-### LCORE-???? Docs migration to unified mode as primary
+#### LCORE-???? Docs migration to unified mode as primary
 
 **User story**: As an operator reading Lightspeed Core docs, I want the
 single-file unified configuration to be the primary way documented, with
@@ -721,7 +791,7 @@ To verify: rendered docs present the unified mode first; legacy mode is visibly 
 
 <!-- type: Task -->
 <!-- key: LCORE-???? -->
-### LCORE-???? Reference profile examples and profile-path doc
+#### LCORE-???? Reference profile examples and profile-path doc
 
 **Description**: Add `examples/profiles/` with two reference profile YAML
 files — one remote-provider (OpenAI) and one inline-provider (sentence-
@@ -747,34 +817,6 @@ write and reference their own profiles via
 Read "Profiles" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
 Key files to create: examples/profiles/*.yaml, a "Profiles" section in docs/config.md or docs/deployment_guide.md.
 To verify: load the example via `uv run lightspeed-stack -c <wrapper.yaml>` referencing the profile; confirm LS boots.
-```
-
-<!-- type: Task -->
-<!-- key: LCORE-???? -->
-### LCORE-???? Deprecation warning for legacy mode
-
-**Description**: After the unified-mode feature lands (one release later),
-emit a one-line startup WARN when `library_client_config_path` is set. Link
-to the migration doc. Legacy mode continues to fully function.
-
-**Scope**:
-
-- Warning emission point: on load in `LlamaStackConfiguration`
-  `check_llama_stack_model` validator, or at LCORE startup.
-- Log line format includes a stable URL fragment to the migration doc.
-
-**Acceptance criteria**:
-
-- Legacy configs still load and run.
-- A single WARN line appears at startup when legacy fields are used.
-- The warning is not emitted in unified mode.
-
-**Agentic tool instruction**:
-
-```text
-Read "Deprecation timeline" in docs/design/llama-stack-config-merge/llama-stack-config-merge.md.
-Key files: src/models/config.py (or src/lightspeed_stack.py startup).
-To verify: run LCORE with a legacy config; confirm WARN line; run with unified config; confirm no WARN.
 ```
 
 ---
