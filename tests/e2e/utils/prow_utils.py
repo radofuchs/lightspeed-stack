@@ -113,7 +113,14 @@ def restart_pod(container_name: str) -> None:
         print(result.stdout, end="")
         if result.returncode != 0:
             print(result.stderr, end="")
-            raise subprocess.CalledProcessError(result.returncode, op)
+            combined = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
+            tail = "\n".join(combined.splitlines()[-25:]) if combined else ""
+            detail = tail or f"exit {result.returncode}"
+            raise subprocess.CalledProcessError(
+                result.returncode,
+                op,
+                detail,
+            )
     except subprocess.TimeoutExpired as e:
         print(f"Failed to restart pod {container_name}: {e}")
         raise

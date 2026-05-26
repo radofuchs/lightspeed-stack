@@ -10,10 +10,10 @@ Feature: TLS configuration for remote inference providers
       And The system is in default state
       And REST API service prefix is /v1
       And the Lightspeed stack configuration directory is "tests/e2e/configuration"
-      And The service uses the lightspeed-stack-tls.yaml configuration
-      And The service is restarted
       And The original Llama Stack config is restored if modified
       And The mock TLS inference server is deployed
+      And The service uses the lightspeed-stack-tls.yaml configuration
+      And The service is restarted
 
   Scenario: Inference succeeds with TLS verification disabled
     Given Llama Stack is configured with TLS verification disabled
