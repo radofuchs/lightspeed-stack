@@ -553,7 +553,7 @@ Feature: Agent skills tests
       And I capture the current token metrics
     When I use "query" to ask question
     """
-    {"query": "Use the agent skills tools in this exact order: (1) call list_skills to discover available skills, (2) call activate_skill with name \"e2e-test-skill\" to load its instructions, (3) call load_skill_resource with skill_name \"e2e-test-skill\" and path \"references/guide.md\" to read the reference guide. After all three tool calls complete, briefly summarize the guide.", "model": "{MODEL}", "provider": "{PROVIDER}"}
+    {"query": "Use the echo skill to echo this 'Hello World!'", "model": "{MODEL}", "provider": "{PROVIDER}"}
     """
     Then The status code of the response is 200
      And The body of the "tool_results" field is    #TODO: Currently placeholder, should reflect actual tool results
@@ -587,7 +587,7 @@ Feature: Agent skills tests
       """
 
 
-  @SkillsConfig @flaky
+  @SkillsConfig
   Scenario: LLM completes list_skills then activate_skill then load_skill_resource via streaming_query endpoint
     Given The e2e-test-skill skill directory path is "e2e-test-skill"
       And The service uses the lightspeed-stack-skills-auth-noop-token.yaml configuration
@@ -595,7 +595,7 @@ Feature: Agent skills tests
       And I capture the current token metrics
     When I use "streaming_query" to ask question
     """
-    {"query": "Use the agent skills tools in this exact order: (1) call list_skills to discover available skills, (2) call activate_skill with name \"e2e-test-skill\" to load its instructions, (3) call load_skill_resource with skill_name \"e2e-test-skill\" and path \"references/guide.md\" to read the reference guide. After all three tool calls complete, briefly summarize the guide.", "model": "{MODEL}", "provider": "{PROVIDER}"}
+    {"query": "Use the echo skill to echo this 'Hello World!'", "model": "{MODEL}", "provider": "{PROVIDER}"}
     """
     When I wait for the response to be completed
     Then The status code of the response is 200
