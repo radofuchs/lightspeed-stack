@@ -416,8 +416,8 @@ server-mode wiring, and the legacy deprecation warning.
   LCORE-777 / 778 / 781).
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Unified `llama_stack.config` schema + synthesizer
+<!-- key: LCORE-2336 -->
+#### LCORE-2336: Unified `llama_stack.config` schema + synthesizer
 
 **Description**: Implement the unified-mode config schema and the
 synthesizer that produces a full Llama Stack `run.yaml` from it. The
@@ -475,8 +475,8 @@ To verify: run a unified-mode config end-to-end via `uv run lightspeed-stack -c 
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Migration tool — dumb-mode lift-and-shift
+<!-- key: LCORE-2337 -->
+#### LCORE-2337: Migration tool — dumb-mode lift-and-shift
 
 **Description**: Implement `--migrate-config` on the `lightspeed-stack` CLI
 that produces a unified single-file config from an existing
@@ -511,8 +511,8 @@ start LCORE with the output; confirm /v1/query works.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? LS container entrypoint + deployment artifacts for unified mode
+<!-- key: LCORE-2338 -->
+#### LCORE-2338: LS container entrypoint + deployment artifacts for unified mode
 
 **Description**: Update the Llama Stack container entrypoint and deployment
 manifests so server mode works end-to-end from a unified
@@ -546,8 +546,8 @@ To verify: docker compose up with the unified config; curl LCORE /v1/query.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Deprecation warning for legacy mode
+<!-- key: LCORE-2339 -->
+#### LCORE-2339: Deprecation warning for legacy mode
 
 **Description**: After the unified-mode feature lands (one release later),
 emit a one-line startup WARN when `library_client_config_path` is set. Link
@@ -595,8 +595,8 @@ the in-repo e2e/integration test configs to the unified format.
 - Out: non-e2e test-infrastructure changes.
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? E2E feature files for unified mode (no step implementation)
+<!-- key: LCORE-2341 -->
+#### LCORE-2341: E2E feature files for unified mode (no step implementation)
 
 **User story**: As a Lightspeed Core e2e engineer, I want the behave
 feature files for unified-mode scenarios written before the feature
@@ -607,7 +607,7 @@ architectural gaps surface early.
 **Description**: Author behave `.feature` files under `tests/e2e/features/`
 that describe the behaviors required of unified mode. Step definitions
 (Python glue) are explicitly **not** part of this ticket — they are
-covered by a later sibling ticket (LCORE-???? — Implement step
+covered by a later sibling ticket (LCORE-2343 — Implement step
 definitions). The feature files can be submitted for review and land
 before implementation of the feature itself begins.
 
@@ -626,13 +626,13 @@ before implementation of the feature itself begins.
 
 - behave parses every new `.feature` file without syntax errors.
 - behave marks all new scenario steps as `undefined` (step definitions
-  land in LCORE-????).
+  land in LCORE-2343).
 - `uv run make test-e2e` remains green (new scenarios are skipped or
   reported undefined, not failing).
 - Any ambiguity or architectural tension uncovered while authoring is
   captured either as a comment in the spec doc or as a new sub-JIRA.
 
-**Blocks**: LCORE-???? (Implement behave step definitions for unified
+**Blocks**: LCORE-2343 (Implement behave step definitions for unified
 mode).
 
 **Agentic tool instruction**:
@@ -652,8 +652,8 @@ scenarios reported as undefined.
 ```
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Migrate in-repo e2e / integration test configurations
+<!-- key: LCORE-2342 -->
+#### LCORE-2342: Migrate in-repo e2e / integration test configurations
 
 **User story**: As a Lightspeed Core maintainer, I want the in-repo e2e and
 integration tests to use the unified-mode config format, so that the
@@ -687,18 +687,18 @@ To verify: `uv run make test-e2e` green.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Implement behave step definitions for unified-mode feature files
+<!-- key: LCORE-2343 -->
+#### LCORE-2343: Implement behave step definitions for unified-mode feature files
 
 **Description**: Implement the Python step definitions
 (`@given`/`@when`/`@then` functions) under `tests/e2e/features/steps/`
-for the `.feature` files authored in LCORE-???? (E2E feature files
+for the `.feature` files authored in LCORE-2341 (E2E feature files
 kickoff). After this ticket lands, the scenarios transition from
 `undefined` to fully executing.
 
 The feature files are taken as-is — do not modify the Gherkin to make
 implementation easier. If a scenario cannot be implemented faithfully,
-raise it against the spec doc (and possibly back to LCORE-???? kickoff)
+raise it against the spec doc (and possibly back to LCORE-2341 kickoff)
 rather than quietly weakening the test.
 
 **Scope**:
@@ -720,10 +720,10 @@ rather than quietly weakening the test.
 
 **Blocked by**:
 
-- LCORE-???? (E2E feature files for unified mode — the `.feature`
+- LCORE-2341 (E2E feature files for unified mode — the `.feature`
   files being implemented against).
-- LCORE-???? (Unified schema + synthesizer), LCORE-????
-  (Migration tool), LCORE-???? (LS container entrypoint + deployment)
+- LCORE-2336 (Unified schema + synthesizer), LCORE-2337
+  (Migration tool), LCORE-2338 (LS container entrypoint + deployment)
   — the feature under test must exist.
 
 **Agentic tool instruction**:
@@ -761,8 +761,8 @@ with legacy clearly marked as deprecated, plus reference profile examples.
 - Out: API-reference regeneration beyond what the config change requires.
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Docs migration to unified mode as primary
+<!-- key: LCORE-2345 -->
+#### LCORE-2345: Docs migration to unified mode as primary
 
 **User story**: As an operator reading Lightspeed Core docs, I want the
 single-file unified configuration to be the primary way documented, with
@@ -799,8 +799,8 @@ To verify: rendered docs present the unified mode first; legacy mode is visibly 
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Reference profile examples and profile-path doc
+<!-- key: LCORE-2346 -->
+#### LCORE-2346: Reference profile examples and profile-path doc
 
 **Description**: Add `examples/profiles/` with two reference profile YAML
 files — one remote-provider (OpenAI) and one inline-provider (sentence-
