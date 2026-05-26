@@ -12,7 +12,7 @@ LIGHTSPEED_CONFIG="${LIGHTSPEED_CONFIG:-/opt/app-root/lightspeed-stack.yaml}"
 if [ -f "$LIGHTSPEED_CONFIG" ]; then
     echo "Enriching llama-stack config..."
     ENRICHMENT_FAILED=0
-    python3 /opt/app-root/llama_stack_configuration.py \
+    /opt/app-root/.venv/bin/python3 /opt/app-root/llama_stack_configuration.py \
         -c "$LIGHTSPEED_CONFIG" \
         -i "$INPUT_CONFIG" \
         -o "$ENRICHED_CONFIG" 2>&1 || ENRICHMENT_FAILED=1
