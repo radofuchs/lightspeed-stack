@@ -16,6 +16,7 @@ from models.common.turn_summary import (
     ToolCallSummary,
     ToolResultSummary,
 )
+from models.compaction import ConversationSummary
 from models.config import SQLiteDatabaseConfiguration
 from utils import suid
 
@@ -616,3 +617,134 @@ def test_insert_and_get_with_all_fields(tmpdir: Path) -> None:
     assert retrieved_entries[0].tool_calls[0].name == "test_tool"
     assert retrieved_entries[0].tool_results is not None
     assert retrieved_entries[0].tool_results[0].status == "success"
+
+
+# --- conversation compaction summaries (LCORE-1571) ---
+
+summary_1 = ConversationSummary(
+    summary_text="User asked about Kubernetes pods; assistant explained kubectl.",
+    summarized_through_turn=8,
+    token_count=14,
+    created_at="2025-10-03T09:31:29Z",
+    model_used="openai/gpt-4o-mini",
+)
+summary_2 = ConversationSummary(
+    summary_text="User then moved on to Helm charts and Istio routing.",
+    summarized_through_turn=18,
+    token_count=12,
+    created_at="2025-10-03T10:05:01Z",
+    model_used="openai/gpt-4o-mini",
+)
+
+
+def test_get_summaries_empty(tmpdir: Path) -> None:
+    """get_summaries returns an empty list for a conversation with no summaries."""
+    cache = create_cache(tmpdir)
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == []
+
+
+def test_store_and_get_single_summary(tmpdir: Path) -> None:
+    """A stored summary can be retrieved by conversation_id (AC1)."""
+    cache = create_cache(tmpdir)
+
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+
+    summaries = cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+    assert len(summaries) == 1
+    assert summaries[0] == summary_1
+
+
+def test_store_multiple_summary_chunks_additive(tmpdir: Path) -> None:
+    """Multiple chunks per conversation are supported and returned oldest-first (AC2)."""
+    cache = create_cache(tmpdir)
+
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_2, False)
+
+    summaries = cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+    assert len(summaries) == 2
+    # ordered by created_at: summary_1 (09:31) before summary_2 (10:05)
+    assert summaries[0] == summary_1
+    assert summaries[1] == summary_2
+    # the first chunk is preserved verbatim, not re-summarized
+    assert summaries[0].summarized_through_turn == 8
+
+
+def test_summaries_isolated_per_conversation_and_user(tmpdir: Path) -> None:
+    """Summaries are scoped to the (user_id, conversation_id) compound key."""
+    cache = create_cache(tmpdir)
+
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_2, summary_2, False)
+
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == [summary_1]
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_2, False) == [summary_2]
+    assert cache.get_summaries(USER_ID_2, CONVERSATION_ID_1, False) == []
+
+
+def test_summaries_persist_across_reconnect(tmpdir: Path) -> None:
+    """Summaries survive a fresh cache instance over the same db file (restart)."""
+    db_path = str(tmpdir / "test.sqlite")
+    cache = SQLiteCache(SQLiteDatabaseConfiguration(db_path=db_path))
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+
+    # New instance on the same file simulates a service restart.
+    reopened = SQLiteCache(SQLiteDatabaseConfiguration(db_path=db_path))
+    summaries = reopened.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+    assert summaries == [summary_1]
+
+
+def test_summaries_deleted_with_conversation(tmpdir: Path) -> None:
+    """Deleting a conversation cascades to its summaries."""
+    cache = create_cache(tmpdir)
+
+    cache.insert_or_append(USER_ID_1, CONVERSATION_ID_1, cache_entry_1, False)
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+    assert len(cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)) == 1
+
+    cache.delete(USER_ID_1, CONVERSATION_ID_1, False)
+
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == []
+
+
+def test_store_summary_when_disconnected(tmpdir: Path) -> None:
+    """store_summary raises CacheError when the cache is disconnected."""
+    cache = create_cache(tmpdir)
+    cache.connection = None
+    cache.connect = lambda: None
+
+    with pytest.raises(CacheError, match="cache is disconnected"):
+        cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+
+
+def test_get_summaries_when_disconnected(tmpdir: Path) -> None:
+    """get_summaries raises CacheError when the cache is disconnected."""
+    cache = create_cache(tmpdir)
+    cache.connection = None
+    cache.connect = lambda: None
+
+    with pytest.raises(CacheError, match="cache is disconnected"):
+        cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+
+
+def test_migration_adds_summaries_table_to_existing_db(tmpdir: Path) -> None:
+    """initialize_cache adds the summaries table to a pre-existing cache db (AC3).
+
+    Simulates an older database that has the cache/conversations tables but not
+    conversation_summaries, then verifies a fresh SQLiteCache initializes the
+    new table without error and can store/retrieve summaries.
+    """
+    db_path = str(tmpdir / "legacy.sqlite")
+
+    # Build a "legacy" db with only the pre-1571 tables.
+    legacy = sqlite3.connect(db_path)
+    legacy.execute(SQLiteCache.CREATE_CACHE_TABLE)
+    legacy.execute(SQLiteCache.CREATE_CONVERSATIONS_TABLE)
+    legacy.commit()
+    legacy.close()
+
+    # Opening with the current code must migrate (create the missing table)
+    # without error and be immediately usable.
+    cache = SQLiteCache(SQLiteDatabaseConfiguration(db_path=db_path))
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == [summary_1]

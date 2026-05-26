@@ -1,5 +1,7 @@
 """Unit tests for PostgreSQL cache implementation."""
 
+# pylint: disable=too-many-lines
+
 import json
 from typing import Any
 
@@ -17,6 +19,7 @@ from models.common.turn_summary import (
     ToolCallSummary,
     ToolResultSummary,
 )
+from models.compaction import ConversationSummary
 from models.config import PostgreSQLDatabaseConfiguration
 from utils import suid
 
@@ -914,3 +917,147 @@ def test_insert_and_get_with_tool_calls_and_results(
     assert retrieved_entries[0].tool_results is not None
     assert len(retrieved_entries[0].tool_results) == 1
     assert retrieved_entries[0].tool_results[0].status == "success"
+
+
+# --- conversation compaction summaries (LCORE-1571) ---
+
+summary_1 = ConversationSummary(
+    summary_text="User asked about Kubernetes pods; assistant explained kubectl.",
+    summarized_through_turn=8,
+    token_count=14,
+    created_at="2025-10-03T09:31:29Z",
+    model_used="openai/gpt-4o-mini",
+)
+summary_2 = ConversationSummary(
+    summary_text="User then moved on to Helm charts and Istio routing.",
+    summarized_through_turn=18,
+    token_count=12,
+    created_at="2025-10-03T10:05:01Z",
+    model_used="openai/gpt-4o-mini",
+)
+
+
+def test_store_summary_when_disconnected(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """store_summary raises CacheError when the cache is disconnected."""
+    mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    cache.connection = None
+    cache.connect = lambda: None
+
+    with pytest.raises(CacheError, match="cache is disconnected"):
+        cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+
+
+def test_store_summary_when_connected(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """store_summary issues the insert without failing when connected."""
+    mock_connect = mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+
+    cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+
+    mock_cursor = mock_connect.return_value.cursor.return_value.__enter__.return_value
+    # The most recent execute() is the INSERT (an earlier "SELECT 1" comes from
+    # the @connection decorator's connected() probe sharing this mock cursor).
+    statement, params = mock_cursor.execute.call_args[0]
+    assert "INSERT INTO conversation_summaries" in statement
+    # the values tuple carries the summary fields in column order
+    assert params == (
+        USER_ID_1,
+        CONVERSATION_ID_1,
+        summary_1.created_at,
+        summary_1.summarized_through_turn,
+        summary_1.token_count,
+        summary_1.model_used,
+        summary_1.summary_text,
+    )
+
+
+def test_store_summary_database_error(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """store_summary wraps a psycopg2 DatabaseError in CacheError."""
+    mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    cache.connect = lambda: None
+    cache.connection = ConnectionMock()  # pyright: ignore
+
+    with pytest.raises(CacheError, match="store_summary"):
+        cache.store_summary(USER_ID_1, CONVERSATION_ID_1, summary_1, False)
+
+
+def test_get_summaries_when_disconnected(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """get_summaries raises CacheError when the cache is disconnected."""
+    mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    cache.connection = None
+    cache.connect = lambda: None
+
+    with pytest.raises(CacheError, match="cache is disconnected"):
+        cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+
+
+def test_get_summaries_empty(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """get_summaries returns an empty list when the table has no rows."""
+    mock_connect = mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    mock_cursor = mock_connect.return_value.cursor.return_value.__enter__.return_value
+    mock_cursor.fetchall.return_value = []
+
+    assert cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False) == []
+
+
+def test_get_summaries_returns_rows(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """get_summaries reconstructs ConversationSummary objects from DB rows."""
+    mock_connect = mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    mock_cursor = mock_connect.return_value.cursor.return_value.__enter__.return_value
+    # SELECT order: summary_text, summarized_through_turn, token_count, created_at, model_used
+    mock_cursor.fetchall.return_value = [
+        (
+            summary_1.summary_text,
+            summary_1.summarized_through_turn,
+            summary_1.token_count,
+            summary_1.created_at,
+            summary_1.model_used,
+        ),
+        (
+            summary_2.summary_text,
+            summary_2.summarized_through_turn,
+            summary_2.token_count,
+            summary_2.created_at,
+            summary_2.model_used,
+        ),
+    ]
+
+    summaries = cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
+    assert summaries == [summary_1, summary_2]
+
+
+def test_get_summaries_database_error(
+    postgres_cache_config_fixture: PostgreSQLDatabaseConfiguration,
+    mocker: MockerFixture,
+) -> None:
+    """get_summaries wraps a psycopg2 DatabaseError in CacheError."""
+    mocker.patch("psycopg2.connect")
+    cache = PostgresCache(postgres_cache_config_fixture)
+    cache.connect = lambda: None
+    cache.connection = ConnectionMock()  # pyright: ignore
+
+    with pytest.raises(CacheError, match="get_summaries"):
+        cache.get_summaries(USER_ID_1, CONVERSATION_ID_1, False)
