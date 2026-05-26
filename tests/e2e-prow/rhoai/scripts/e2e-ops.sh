@@ -339,6 +339,7 @@ cmd_restart_lightspeed() {
 
 cmd_restart_llama_stack() {
     echo "===== Restoring llama-stack service ====="
+    echo "[e2e-ops] restart-llama-stack env: E2E_KONFLUX_E2E=${E2E_KONFLUX_E2E:-0} E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA=${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}"
     # Pod.spec is largely immutable; delete so apply creates a pod with current volumes/env.
     echo "Deleting llama-stack pod (if any) before apply..."
     timeout 45 oc delete pod llama-stack-service -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || {
@@ -369,7 +370,19 @@ cmd_restart_llama_stack() {
             -n "$NAMESPACE" \
             --dry-run=client -o yaml | oc apply -f -
         oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/llama-stack-openai.yaml"
-        wait_for_pod "llama-stack-service" 90
+        local llama_pod_wait=90
+        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+            # readinessProbe: 20s + 36*5s = 200s; clone/enrich/RAG on Konflux often needs 400s+ total.
+            llama_pod_wait=180
+        fi
+        echo "[e2e-ops] Waiting for llama-stack-service Ready (max ${llama_pod_wait} attempts, $((llama_pod_wait * 3))s)..."
+        if ! wait_for_pod "llama-stack-service" "$llama_pod_wait"; then
+            echo "===== Llama-stack restore FAILED (pod not Ready within $((llama_pod_wait * 3))s) ====="
+            oc get pod llama-stack-service -n "$NAMESPACE" -o wide 2>&1 || true
+            oc describe pod llama-stack-service -n "$NAMESPACE" 2>&1 | tail -50 || true
+            oc logs llama-stack-service -n "$NAMESPACE" -c llama-stack-container --tail=80 2>&1 || true
+            exit 1
+        fi
         echo "Labeling pod for service..."
         oc label pod llama-stack-service pod=llama-stack-service -n "$NAMESPACE" --overwrite
         if [[ "${E2E_COPY_INTERCEPTION_CA_TO_LLAMA:-0}" == "1" ]]; then
@@ -386,7 +399,7 @@ cmd_restart_llama_stack() {
         fi
         local llama_health_attempts=50
         if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
-            llama_health_attempts=75
+            llama_health_attempts=100
         fi
         if ! wait_for_llama_stack_http_health "$llama_health_attempts"; then
             echo "===== Llama-stack restore FAILED (HTTP not healthy) ====="
@@ -497,11 +510,14 @@ cmd_restart_llama_port_forward() {
     local local_port="${LOCAL_LLAMA_PORT:-8321}"
     local remote_port="${REMOTE_LLAMA_PORT:-8321}"
     local max_attempts=6
+    if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+        max_attempts=10
+    fi
     local pf_pid
     local pf_resource
     local llama_pf_log="/tmp/port-forward-llama.log"
 
-    echo "Re-establishing Llama Stack port-forward on $local_port:$remote_port..."
+    echo "Re-establishing Llama Stack port-forward on $local_port:$remote_port (max $max_attempts attempts)..."
 
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
         kill_stale_llama_forward "$local_port"

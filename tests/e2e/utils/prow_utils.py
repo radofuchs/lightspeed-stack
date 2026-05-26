@@ -93,10 +93,14 @@ def restart_pod(container_name: str) -> None:
     """
     if container_name in _LLAMA_RESTART_NAMES:
         op = "restart-llama-stack"
-        # TLS: full pod recreate + cert sync + health on Konflux can exceed 7 min.
-        timeout = (
-            900 if os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1" else 420
-        )
+        # Subprocess cap must exceed e2e-ops internal waits (pod + in-pod health + port-forward).
+        # Konflux TLS full recreate: ~6–12 min typical, 15+ min under load (user-reported 400s+).
+        if os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1":
+            timeout = 1200
+        elif os.environ.get("E2E_KONFLUX_E2E") == "1":
+            timeout = 720
+        else:
+            timeout = 420
     elif container_name in _LIGHTSPEED_RESTART_NAMES:
         op = "restart-lightspeed"
         # Konflux LCS readiness can take ~195s (probe budget in lightspeed-stack.yaml).
@@ -133,8 +137,11 @@ def restore_llama_stack_pod() -> None:
         subprocess.CalledProcessError: If oc/e2e-ops restore fails.
         subprocess.TimeoutExpired: If the operation times out.
     """
-    # wait_for_pod (up to ~180s) + in-pod /v1/health polling (~105s) — allow headroom.
-    result = run_e2e_ops("restart-llama-stack", timeout=420)
+    if os.environ.get("E2E_KONFLUX_E2E") == "1":
+        timeout = 720
+    else:
+        timeout = 420
+    result = run_e2e_ops("restart-llama-stack", timeout=timeout)
     print(result.stdout, end="")
     if result.returncode != 0:
         print(result.stderr, end="")
