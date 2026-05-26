@@ -759,42 +759,115 @@ _MOCK_TLS_CERT_FILES=(
     expired-client.crt
 )
 
-cmd_sync_mock_tls_certs_secret() {
-    local mock_pod_name tmpdir f
-    mock_pod_name=$(oc get pod -n "$NAMESPACE" -l app=e2e-mock-tls-inference \
-        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || mock_pod_name=""
+_mock_tls_secret_is_complete() {
+    local f b64
+    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+        b64=$(oc get secret e2e-mock-tls-certs -n "$NAMESPACE" \
+            -o "go-template={{index .data \"${f}\"}}" 2>/dev/null) || return 1
+        [[ -n "$b64" ]] || return 1
+    done
+    return 0
+}
 
-    if [[ -z "$mock_pod_name" ]]; then
-        echo "ERROR: no e2e-mock-tls-inference pod in namespace $NAMESPACE" >&2
-        echo "  Run: e2e-ops.sh deploy-e2e-mock-tls-inference" >&2
+_get_mock_tls_inference_pod_name() {
+    oc get pod -n "$NAMESPACE" -l app=e2e-mock-tls-inference \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+}
+
+_wait_for_mock_tls_inference_pod() {
+    if ! oc wait pod -l app=e2e-mock-tls-inference -n "$NAMESPACE" \
+        --for=condition=Ready --timeout=120s 2>/dev/null; then
+        echo "ERROR: e2e-mock-tls-inference pod not Ready" >&2
+        oc get pods -n "$NAMESPACE" -l app=e2e-mock-tls-inference -o wide 2>&1 || true
         return 1
     fi
+    return 0
+}
 
-    tmpdir=$(mktemp -d)
-    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
-        if ! oc exec -n "$NAMESPACE" "$mock_pod_name" -c e2e-mock-tls-inference -- \
-            cat "/certs/$f" >"$tmpdir/$f"; then
-            echo "ERROR: failed to read /certs/$f from e2e-mock-tls-inference pod" >&2
-            rm -rf "$tmpdir"
+_copy_mock_tls_cert_from_pod() {
+    local mock_pod_name="$1"
+    local cert_file="$2"
+    local dest="$3"
+    local attempt
+
+    for ((attempt=1; attempt<=4; attempt++)); do
+        if oc exec --request-timeout=90 -n "$NAMESPACE" "$mock_pod_name" \
+            -c e2e-mock-tls-inference -- cat "/certs/$cert_file" >"$dest" 2>/dev/null \
+            && [[ -s "$dest" ]]; then
+            return 0
+        fi
+        echo "[e2e-ops] WARN: read /certs/$cert_file from mock pod failed (attempt $attempt/4)"
+        sleep 5
+    done
+    return 1
+}
+
+_recycle_mock_tls_inference_pod() {
+    echo "[e2e-ops] Recycling e2e-mock-tls-inference pod (stale or unresponsive)..."
+    oc delete pod e2e-mock-tls-inference -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || true
+    sleep 3
+    if ! _wait_for_mock_tls_inference_pod; then
+        return 1
+    fi
+    # Certs are written at container start; allow trustme + pip to finish.
+    sleep 10
+    return 0
+}
+
+cmd_sync_mock_tls_certs_secret() {
+    local mock_pod_name tmpdir f recycle_attempt
+
+    if _mock_tls_secret_is_complete; then
+        echo "✓ Secret e2e-mock-tls-certs already complete (${#_MOCK_TLS_CERT_FILES[@]} keys); skipping sync"
+        return 0
+    fi
+
+    for recycle_attempt in 1 2; do
+        mock_pod_name=$(_get_mock_tls_inference_pod_name)
+        if [[ -z "$mock_pod_name" ]]; then
+            echo "ERROR: no e2e-mock-tls-inference pod in namespace $NAMESPACE" >&2
+            echo "  Run: e2e-ops.sh deploy-e2e-mock-tls-inference" >&2
             return 1
         fi
-        if [[ ! -s "$tmpdir/$f" ]]; then
-            echo "ERROR: /certs/$f is empty in e2e-mock-tls-inference pod" >&2
-            rm -rf "$tmpdir"
+
+        if ! _wait_for_mock_tls_inference_pod; then
+            [[ $recycle_attempt -lt 2 ]] && _recycle_mock_tls_inference_pod && continue
             return 1
+        fi
+
+        tmpdir=$(mktemp -d)
+        local sync_ok=true
+        for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+            if ! _copy_mock_tls_cert_from_pod "$mock_pod_name" "$f" "$tmpdir/$f"; then
+                echo "ERROR: failed to read /certs/$f from e2e-mock-tls-inference pod" >&2
+                oc logs "$mock_pod_name" -n "$NAMESPACE" -c e2e-mock-tls-inference --tail=40 2>&1 \
+                    | sed 's/^/[e2e-ops] /' || true
+                sync_ok=false
+                break
+            fi
+        done
+
+        if [[ "$sync_ok" == "true" ]]; then
+            if ! oc create secret generic e2e-mock-tls-certs \
+                --from-file="$tmpdir" \
+                -n "$NAMESPACE" \
+                --dry-run=client -o yaml | oc apply -f -; then
+                echo "ERROR: failed to apply e2e-mock-tls-certs secret" >&2
+                rm -rf "$tmpdir"
+                return 1
+            fi
+            rm -rf "$tmpdir"
+            echo "✓ Secret e2e-mock-tls-certs updated (${#_MOCK_TLS_CERT_FILES[@]} files)"
+            return 0
+        fi
+
+        rm -rf "$tmpdir"
+        if [[ $recycle_attempt -lt 2 ]]; then
+            _recycle_mock_tls_inference_pod || return 1
         fi
     done
 
-    if ! oc create secret generic e2e-mock-tls-certs \
-        --from-file="$tmpdir" \
-        -n "$NAMESPACE" \
-        --dry-run=client -o yaml | oc apply -f -; then
-        echo "ERROR: failed to apply e2e-mock-tls-certs secret" >&2
-        rm -rf "$tmpdir"
-        return 1
-    fi
-    rm -rf "$tmpdir"
-    echo "✓ Secret e2e-mock-tls-certs updated (${#_MOCK_TLS_CERT_FILES[@]} files)"
+    return 1
 }
 
 _verify_mock_tls_certs_mounted_in_llama() {
