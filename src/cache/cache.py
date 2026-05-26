@@ -1,9 +1,11 @@
 """Abstract class that is parent for all cache implementations."""
 
+import builtins
 from abc import ABC, abstractmethod
 
 from cache.cache_entry import CacheEntry
 from models.common import ConversationData
+from models.compaction import ConversationSummary
 from utils.suid import check_suid
 
 
@@ -168,6 +170,74 @@ class Cache(ABC):
             conversation_id (str): Conversation identifier used as part of the compound cache key.
             topic_summary (str): Text summary of the conversation topic to store.
             skip_user_id_check (bool): If True, skip validation of `user_id` before storing.
+        """
+
+    @abstractmethod
+    def store_summary(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: ConversationSummary,
+        skip_user_id_check: bool,
+    ) -> None:
+        """Append a conversation-compaction summary chunk to the cache.
+
+        Compaction (LCORE-1572) produces one ``ConversationSummary`` each time
+        it triggers. The additive design keeps every chunk: this method appends
+        a new chunk rather than replacing previous ones. Chunks are scoped to
+        the ``(user_id, conversation_id)`` compound key and ordered by their
+        ``created_at`` timestamp on retrieval.
+
+        Parameters:
+        ----------
+            user_id (str): User identifier, part of the compound cache key.
+            conversation_id (str): Conversation identifier, part of the compound key.
+            summary (ConversationSummary): The summary chunk to persist.
+            skip_user_id_check (bool): If True, skip validation of `user_id`.
+        """
+
+    @abstractmethod
+    def get_summaries(
+        self, user_id: str, conversation_id: str, skip_user_id_check: bool
+    ) -> builtins.list[ConversationSummary]:  # this class shadows the list builtin
+        """Retrieve all compaction summary chunks for a conversation.
+
+        Parameters:
+        ----------
+            user_id (str): User identifier, part of the compound cache key.
+            conversation_id (str): Conversation identifier, part of the compound key.
+            skip_user_id_check (bool): If True, skip validation of `user_id`.
+
+        Returns:
+        -------
+            list[ConversationSummary]: Summary chunks for the conversation,
+            oldest first (ordered by ``created_at``); empty list if none exist.
+        """
+
+    @abstractmethod
+    def replace_summaries(
+        self,
+        user_id: str,
+        conversation_id: str,
+        folded_summary: ConversationSummary,
+        skip_user_id_check: bool,
+    ) -> None:
+        """Replace all stored summary chunks for a conversation with one fold.
+
+        Recursive re-summarization (R3, LCORE-1572) collapses the accumulated
+        summary chunks into a single folded summary when the chunks themselves
+        grow large. This atomically removes the conversation's existing chunks
+        and stores ``folded_summary`` in their place, so a subsequent
+        :meth:`get_summaries` returns the fold first (oldest), followed by any
+        chunks appended afterwards.
+
+        Parameters:
+        ----------
+            user_id (str): User identifier, part of the compound cache key.
+            conversation_id (str): Conversation identifier, part of the compound key.
+            folded_summary (ConversationSummary): The folded summary that
+                supersedes the conversation's existing chunks.
+            skip_user_id_check (bool): If True, skip validation of `user_id`.
         """
 
     @abstractmethod

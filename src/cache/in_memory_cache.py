@@ -1,9 +1,12 @@
 """In-memory cache implementation."""
 
+import builtins
+
 from cache.cache import Cache
 from cache.cache_entry import CacheEntry
 from log import get_logger
 from models.common import ConversationData
+from models.compaction import ConversationSummary
 from models.config import InMemoryCacheConfig
 from utils.connection_decorator import connection
 
@@ -158,6 +161,72 @@ class InMemoryCache(Cache):
             user_id: User identification.
             conversation_id: Conversation ID unique for given user.
             topic_summary: The topic summary to store.
+            skip_user_id_check: Skip user_id suid check.
+        """
+        # just check if user_id and conversation_id are UUIDs
+        super().construct_key(user_id, conversation_id, skip_user_id_check)
+
+    @connection
+    def store_summary(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: ConversationSummary,
+        skip_user_id_check: bool = False,
+    ) -> None:
+        """Store a compaction summary chunk (no-op for the in-memory cache).
+
+        This implementation does not persist data; it only validates the
+        compound key, mirroring the other in-memory operations.
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            summary: The ConversationSummary chunk (not persisted).
+            skip_user_id_check: Skip user_id suid check.
+        """
+        # just check if user_id and conversation_id are UUIDs
+        super().construct_key(user_id, conversation_id, skip_user_id_check)
+
+    @connection
+    def get_summaries(
+        self, user_id: str, conversation_id: str, skip_user_id_check: bool = False
+    ) -> builtins.list[ConversationSummary]:  # this class shadows the list builtin
+        """Return compaction summaries (always empty for the in-memory cache).
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            skip_user_id_check: Skip user_id suid check.
+
+        Returns:
+        -------
+            An empty list.
+        """
+        # just check if user_id and conversation_id are UUIDs
+        super().construct_key(user_id, conversation_id, skip_user_id_check)
+        return []
+
+    @connection
+    def replace_summaries(
+        self,
+        user_id: str,
+        conversation_id: str,
+        folded_summary: ConversationSummary,
+        skip_user_id_check: bool = False,
+    ) -> None:
+        """Replace stored summary chunks with a fold (no-op for the in-memory cache).
+
+        This implementation does not persist data; it only validates the
+        compound key, mirroring the other in-memory summary operations.
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            folded_summary: The folded summary (not persisted).
             skip_user_id_check: Skip user_id suid check.
         """
         # just check if user_id and conversation_id are UUIDs

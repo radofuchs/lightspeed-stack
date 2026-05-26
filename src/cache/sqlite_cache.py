@@ -1,5 +1,6 @@
 """Cache that uses SQLite to store cached values."""
 
+import builtins
 import json
 import sqlite3
 from time import time
@@ -14,6 +15,7 @@ from models.common.turn_summary import (
     ToolCallSummary,
     ToolResultSummary,
 )
+from models.compaction import ConversationSummary
 from models.config import SQLiteDatabaseConfiguration
 from utils.connection_decorator import connection
 
@@ -76,6 +78,19 @@ class SQLiteCache(Cache):
         );
         """
 
+    CREATE_CONVERSATION_SUMMARIES_TABLE = """
+        CREATE TABLE IF NOT EXISTS conversation_summaries (
+            user_id                 text NOT NULL,
+            conversation_id         text NOT NULL,
+            created_at              text NOT NULL,
+            summarized_through_turn int  NOT NULL,
+            token_count             int  NOT NULL,
+            model_used              text NOT NULL,
+            summary_text            text NOT NULL,
+            PRIMARY KEY(user_id, conversation_id, created_at)
+        );
+        """
+
     CREATE_INDEX = """
         CREATE INDEX IF NOT EXISTS timestamps
             ON cache (created_at)
@@ -127,6 +142,24 @@ class SQLiteCache(Cache):
         VALUES (?, ?, ?, ?)
         ON CONFLICT (user_id, conversation_id)
         DO UPDATE SET last_message_timestamp = excluded.last_message_timestamp
+        """
+
+    INSERT_SUMMARY_STATEMENT = """
+        INSERT INTO conversation_summaries(user_id, conversation_id, created_at,
+                          summarized_through_turn, token_count, model_used, summary_text)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+
+    SELECT_SUMMARIES_STATEMENT = """
+        SELECT summary_text, summarized_through_turn, token_count, created_at, model_used
+          FROM conversation_summaries
+         WHERE user_id=? AND conversation_id=?
+         ORDER BY created_at
+        """
+
+    DELETE_SUMMARIES_STATEMENT = """
+        DELETE FROM conversation_summaries
+         WHERE user_id=? AND conversation_id=?
         """
 
     def __init__(self, config: SQLiteDatabaseConfiguration) -> None:
@@ -203,8 +236,12 @@ class SQLiteCache(Cache):
     def initialize_cache(self) -> None:
         """Initialize cache - clean it up etc.
 
-        Creates the cache table, conversations table, and index if they do not
-        already exist, and commits the changes.
+        Creates the cache table, conversations table, conversation_summaries
+        table, and index if they do not already exist, and commits the changes.
+        Because every table is created with ``CREATE TABLE IF NOT EXISTS``, this
+        doubles as the forward-only schema migration: running it against an
+        existing database adds only the missing ``conversation_summaries`` table
+        and leaves existing data untouched.
 
         Raises:
             CacheError: if the database connection is not established.
@@ -220,6 +257,9 @@ class SQLiteCache(Cache):
 
         logger.info("Initializing table for conversations")
         cursor.execute(SQLiteCache.CREATE_CONVERSATIONS_TABLE)
+
+        logger.info("Initializing table for conversation summaries")
+        cursor.execute(SQLiteCache.CREATE_CONVERSATION_SUMMARIES_TABLE)
 
         logger.info("Initializing index for cache")
         cursor.execute(SQLiteCache.CREATE_INDEX)
@@ -458,6 +498,12 @@ class SQLiteCache(Cache):
             (user_id, conversation_id),
         )
 
+        # Also delete any compaction summaries for this conversation
+        cursor.execute(
+            self.DELETE_SUMMARIES_STATEMENT,
+            (user_id, conversation_id),
+        )
+
         cursor.close()
         self.connection.commit()
         return deleted
@@ -524,6 +570,135 @@ class SQLiteCache(Cache):
         cursor.execute(
             self.INSERT_OR_UPDATE_TOPIC_SUMMARY_STATEMENT,
             (user_id, conversation_id, topic_summary, time()),
+        )
+        cursor.close()
+        self.connection.commit()
+
+    @connection
+    def store_summary(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: ConversationSummary,
+        skip_user_id_check: bool = False,
+    ) -> None:
+        """Append a compaction summary chunk for the given conversation.
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            summary: The ConversationSummary chunk to persist.
+            skip_user_id_check: Skip user_id suid check.
+
+        Raises:
+        ------
+            CacheError: If the cache connection is not available.
+        """
+        if self.connection is None:
+            logger.error("Cache is disconnected")
+            raise CacheError("store_summary: cache is disconnected")
+
+        cursor = self.connection.cursor()
+        cursor.execute(
+            self.INSERT_SUMMARY_STATEMENT,
+            (
+                user_id,
+                conversation_id,
+                summary.created_at,
+                summary.summarized_through_turn,
+                summary.token_count,
+                summary.model_used,
+                summary.summary_text,
+            ),
+        )
+        cursor.close()
+        self.connection.commit()
+
+    @connection
+    def get_summaries(
+        self, user_id: str, conversation_id: str, skip_user_id_check: bool = False
+    ) -> builtins.list[ConversationSummary]:  # this class shadows the list builtin
+        """Retrieve all compaction summary chunks for a conversation.
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            skip_user_id_check: Skip user_id suid check.
+
+        Returns:
+        -------
+            Summary chunks for the conversation, oldest first (ordered by
+            ``created_at``); empty list if none exist.
+
+        Raises:
+        ------
+            CacheError: If the cache connection is not available.
+        """
+        if self.connection is None:
+            logger.error("Cache is disconnected")
+            raise CacheError("get_summaries: cache is disconnected")
+
+        cursor = self.connection.cursor()
+        cursor.execute(self.SELECT_SUMMARIES_STATEMENT, (user_id, conversation_id))
+        rows = cursor.fetchall()
+        cursor.close()
+
+        return [
+            ConversationSummary(
+                summary_text=row[0],
+                summarized_through_turn=row[1],
+                token_count=row[2],
+                created_at=row[3],
+                model_used=row[4],
+            )
+            for row in rows
+        ]
+
+    @connection
+    def replace_summaries(
+        self,
+        user_id: str,
+        conversation_id: str,
+        folded_summary: ConversationSummary,
+        skip_user_id_check: bool = False,
+    ) -> None:
+        """Replace all stored summary chunks for a conversation with one fold.
+
+        Deletes the conversation's existing chunks and inserts ``folded_summary``
+        in a single transaction, so a subsequent :meth:`get_summaries` returns the
+        fold first, followed by any chunks appended afterwards. Used by recursive
+        re-summarization (R3, LCORE-1572).
+
+        Parameters:
+        ----------
+            user_id: User identification.
+            conversation_id: Conversation ID unique for given user.
+            folded_summary: The folded summary that supersedes existing chunks.
+            skip_user_id_check: Skip user_id suid check.
+
+        Raises:
+        ------
+            CacheError: If the cache connection is not available.
+        """
+        if self.connection is None:
+            logger.error("Cache is disconnected")
+            raise CacheError("replace_summaries: cache is disconnected")
+
+        cursor = self.connection.cursor()
+        cursor.execute(self.DELETE_SUMMARIES_STATEMENT, (user_id, conversation_id))
+        cursor.execute(
+            self.INSERT_SUMMARY_STATEMENT,
+            (
+                user_id,
+                conversation_id,
+                folded_summary.created_at,
+                folded_summary.summarized_through_turn,
+                folded_summary.token_count,
+                folded_summary.model_used,
+                folded_summary.summary_text,
+            ),
         )
         cursor.close()
         self.connection.commit()

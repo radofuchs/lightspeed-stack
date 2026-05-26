@@ -6,6 +6,7 @@ import pytest
 
 from cache.cache_entry import CacheEntry
 from cache.noop_cache import NoopCache
+from models.compaction import ConversationSummary
 from utils import suid
 
 USER_ID = suid.get_suid()
@@ -250,3 +251,42 @@ def test_get_improper_conversation_id(cache_fixture: NoopCache) -> None:
     """
     with pytest.raises(ValueError, match="Invalid conversation ID"):
         cache_fixture.get(USER_ID, "this-is-not-valid-uuid")
+
+
+# --- conversation compaction summaries (LCORE-1571) ---
+
+summary_1 = ConversationSummary(
+    summary_text="Summary chunk for the no-op cache test.",
+    summarized_through_turn=8,
+    token_count=9,
+    created_at="2025-10-03T09:31:29Z",
+    model_used="openai/gpt-4o-mini",
+)
+
+
+def test_store_summary_is_noop(cache_fixture: NoopCache) -> None:
+    """store_summary accepts a summary without persisting (no-op cache)."""
+    cache_fixture.store_summary(USER_ID, CONVERSATION_ID, summary_1)
+
+
+def test_get_summaries_returns_empty(cache_fixture: NoopCache) -> None:
+    """get_summaries always returns an empty list for the no-op cache."""
+    assert cache_fixture.get_summaries(USER_ID, CONVERSATION_ID) == []
+
+
+def test_get_summaries_validates_conversation_id(cache_fixture: NoopCache) -> None:
+    """get_summaries validates the conversation ID like the other operations."""
+    with pytest.raises(ValueError, match="Invalid conversation ID"):
+        cache_fixture.get_summaries(USER_ID, "this-is-not-valid-uuid")
+
+
+def test_replace_summaries_is_noop(cache_fixture: NoopCache) -> None:
+    """replace_summaries accepts a fold without persisting (no-op cache)."""
+    cache_fixture.replace_summaries(USER_ID, CONVERSATION_ID, summary_1)
+    assert cache_fixture.get_summaries(USER_ID, CONVERSATION_ID) == []
+
+
+def test_replace_summaries_validates_conversation_id(cache_fixture: NoopCache) -> None:
+    """replace_summaries validates the conversation ID like the other operations."""
+    with pytest.raises(ValueError, match="Invalid conversation ID"):
+        cache_fixture.replace_summaries(USER_ID, "this-is-not-valid-uuid", summary_1)
