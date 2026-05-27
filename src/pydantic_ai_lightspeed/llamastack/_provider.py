@@ -31,18 +31,22 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
 
     @property
     def name(self) -> str:
+        """The provider name."""
         return "llama-stack"
 
     @property
     def base_url(self) -> str:
+        """The base URL for the provider API."""
         return str(self._client.base_url)
 
     @property
     def client(self) -> AsyncOpenAI:
+        """The OpenAI-compatible client for the provider."""
         return self._client
 
     @staticmethod
     def model_profile(model_name: str) -> ModelProfile | None:
+        """Return the model profile for the named model, if available."""
         return openai_model_profile(model_name)
 
     def __init__(
@@ -104,6 +108,7 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
                 )
 
     def __repr__(self) -> str:
+        """Return a string representation of the provider."""
         return f"LlamaStackProvider(name={self.name!r}, base_url={self.base_url!r})"
 
     def _set_http_client(self, http_client: httpx.AsyncClient) -> None:

@@ -39,9 +39,26 @@ class LlamaStackLibraryTransport(httpx.AsyncBaseTransport):
     """
 
     def __init__(self, client: AsyncLlamaStackAsLibraryClient) -> None:
+        """Initialize the transport with a Llama Stack library client.
+
+        Args:
+            client: An initialized ``AsyncLlamaStackAsLibraryClient`` whose route
+                handlers will receive dispatched requests.
+        """
         self._client = client
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        """Dispatch an httpx request to the in-process Llama Stack route handlers.
+
+        Args:
+            request: The outgoing httpx request to route.
+
+        Returns:
+            An httpx response built from the matched route handler result.
+
+        Raises:
+            RuntimeError: If the library client has not been initialized.
+        """
         if self._client.route_impls is None:
             raise RuntimeError(
                 "Llama Stack library client not initialized. Call initialize() first."
