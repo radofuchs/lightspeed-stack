@@ -86,7 +86,7 @@ class TestVectorStoreFileCreateRequest:
         request = VectorStoreFileCreateRequest(
             file_id="file-abc123", attributes=attributes, chunking_strategy=None
         )
-        assert len(request.attributes) == 16  # type: ignore
+        assert len(request.attributes) == 16  # pyright: ignore[reportArgumentType]
 
     def test_attributes_exceeds_16_pairs(self) -> None:
         """Test that attributes with more than 16 pairs is rejected."""
@@ -107,7 +107,9 @@ class TestVectorStoreFileCreateRequest:
         request = VectorStoreFileCreateRequest(
             file_id="file-abc123", attributes=attributes, chunking_strategy=None
         )
-        assert key_64_chars in request.attributes  # type: ignore
+        assert (
+            key_64_chars in request.attributes
+        )  # pyright: ignore[reportOperatorIssue]
 
     def test_attributes_key_exceeds_64_chars(self) -> None:
         """Test that attribute keys exceeding 64 characters are rejected."""
@@ -125,7 +127,9 @@ class TestVectorStoreFileCreateRequest:
         request = VectorStoreFileCreateRequest(
             file_id="file-abc123", attributes=attributes, chunking_strategy=None
         )
-        assert request.attributes["key"] == value_512_chars  # type: ignore
+        assert isinstance(request.attributes, dict)
+        assert "key" in request.attributes
+        assert request.attributes["key"] == value_512_chars
 
     def test_attributes_string_value_exceeds_512_chars(self) -> None:
         """Test that string attribute values exceeding 512 characters are rejected."""
@@ -170,7 +174,7 @@ class TestVectorStoreFileCreateRequest:
     def test_file_id_required(self) -> None:
         """Test that file_id is required."""
         with pytest.raises(ValidationError):
-            VectorStoreFileCreateRequest()  # type: ignore
+            VectorStoreFileCreateRequest()  # pyright: ignore[reportCallIssue]
 
     def test_file_id_cannot_be_empty(self) -> None:
         """Test that file_id cannot be an empty string."""

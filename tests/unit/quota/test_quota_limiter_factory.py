@@ -40,7 +40,7 @@ def test_quota_limiters_no_limiters_pg_storage() -> None:
         gss_encmode=constants.POSTGRES_DEFAULT_GSS_ENCMODE,
         ca_cert_path=None,
     )
-    configuration.limiters = None  # pyright: ignore
+    configuration.limiters = None  # pyright: ignore[reportAttributeAccessIssue]
     limiters = QuotaLimiterFactory.quota_limiters(configuration)
     assert not limiters
 
@@ -51,7 +51,7 @@ def test_quota_limiters_no_limiters_sqlite_storage() -> None:
     configuration.sqlite = SQLiteDatabaseConfiguration(
         db_path="/foo/bar",
     )
-    configuration.limiters = None  # pyright: ignore
+    configuration.limiters = None  # pyright: ignore[reportAttributeAccessIssue]
     limiters = QuotaLimiterFactory.quota_limiters(configuration)
     assert not limiters
 
@@ -274,7 +274,9 @@ def test_quota_limiters_invalid_limiter_type(mocker: MockerFixture) -> None:
             period="5 days",
         ),
     ]
-    configuration.limiters[0].type = "foo"  # pyright: ignore
+    configuration.limiters[0].type = (
+        "foo"  # pyright: ignore[reportAttributeAccessIssue]
+    )
     # do not use connection to real PostgreSQL instance
     mocker.patch("psycopg2.connect")
     with pytest.raises(ValueError, match="Invalid limiter type: foo"):
