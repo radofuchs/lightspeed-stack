@@ -154,7 +154,7 @@ def test_connected_when_connection_error(tmpdir: Path) -> None:
     # simulate connection error
     cache = create_cache(tmpdir)
     # connection can have any type
-    cache.connection = ConnectionMock()  # pyright: ignore
+    cache.connection = ConnectionMock()  # pyright: ignore[reportAttributeAccessIssue]
     assert cache.connection is not None
     assert cache.connected() is False
 
