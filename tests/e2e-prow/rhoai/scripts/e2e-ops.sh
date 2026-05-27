@@ -25,6 +25,8 @@
 #   disrupt-llama-stack             - Delete llama-stack pod to disrupt connection
 #   deploy-e2e-tunnel-proxy         - Deploy in-cluster tunnel proxy (proxy.feature step)
 #   deploy-e2e-interception-proxy   - Deploy in-cluster interception proxy (proxy.feature step)
+#   deploy-e2e-mock-tls-inference   - Deploy in-cluster mock TLS server (tls.feature)
+#   reload-llama-stack-config       - Apply ConfigMap run.yaml in pod and restart main process
 
 set -e
 
@@ -356,6 +358,46 @@ wait_for_llama_stack_http_health() {
     return 1
 }
 
+# Copy llama-stack-config run.yaml into the running pod and restart PID 1 (no init rerun).
+cmd_reload_llama_stack_config() {
+    local pod="llama-stack-service"
+    local ctr="llama-stack-container"
+    local tmp
+
+    if ! oc get pod "$pod" -n "$NAMESPACE" &>/dev/null; then
+        echo "ERROR: $pod not found; use restart-llama-stack first" >&2
+        return 1
+    fi
+
+    tmp=$(mktemp)
+    if ! oc get configmap llama-stack-config -n "$NAMESPACE" \
+        -o "go-template={{index .data \"run.yaml\"}}" >"$tmp" 2>/dev/null \
+        || [[ ! -s "$tmp" ]]; then
+        rm -f "$tmp"
+        echo "ERROR: could not read run.yaml from llama-stack-config" >&2
+        return 1
+    fi
+
+    echo "Reloading Llama Stack run.yaml in $pod (container restart, not pod delete)..."
+    oc cp "$tmp" "$NAMESPACE/$pod:/opt/app-root/run.yaml" -c "$ctr" || {
+        rm -f "$tmp"
+        return 1
+    }
+    rm -f "$tmp"
+    oc exec -n "$NAMESPACE" "$pod" -c "$ctr" -- kill -1
+
+    if ! wait_for_pod "$pod" 40; then
+        echo "===== Llama-stack reload FAILED (pod not Ready) ====="
+        return 1
+    fi
+    if ! wait_for_llama_stack_http_health 40; then
+        echo "===== Llama-stack reload FAILED (HTTP not healthy) ====="
+        return 1
+    fi
+    cmd_restart_llama_port_forward || return 1
+    echo "===== Llama-stack reload complete ====="
+}
+
 # ============================================================================
 # Command implementations
 # ============================================================================
@@ -424,6 +466,12 @@ cmd_restart_llama_stack() {
             echo "[e2e-ops] Syncing e2e-interception-proxy-ca secret before llama-stack apply..."
             if ! cmd_sync_interception_proxy_ca_secret; then
                 echo "===== Llama-stack restore FAILED (interception CA secret sync) ====="
+                exit 1
+            fi
+        fi
+        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+            if ! cmd_sync_mock_tls_certs_secret; then
+                echo "===== Llama-stack restore FAILED (mock TLS cert secret sync) ====="
                 exit 1
             fi
         fi
@@ -827,6 +875,86 @@ cmd_deploy_e2e_interception_proxy() {
     echo "✓ e2e-interception-proxy ready at http://e2e-interception-proxy.${NAMESPACE}.svc.cluster.local:8889"
 }
 
+_MOCK_TLS_CERT_FILES=(
+    ca.crt client.crt client.key untrusted-ca.crt expired-ca.crt
+    untrusted-client.crt untrusted-client.key expired-client.crt
+)
+
+_mock_tls_certs_secret_is_complete() {
+    local f present
+    if ! oc get secret e2e-mock-tls-certs -n "$NAMESPACE" &>/dev/null; then
+        return 1
+    fi
+    present=$(oc get secret e2e-mock-tls-certs -n "$NAMESPACE" \
+        -o go-template='{{range $k, $v := .data}}{{$k}} {{end}}' 2>/dev/null) || return 1
+    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+        [[ " $present " == *" $f "* ]] || return 1
+    done
+    return 0
+}
+
+cmd_sync_mock_tls_certs_secret() {
+    local mock_pod="e2e-mock-tls-inference"
+    local mock_ctr="e2e-mock-tls-inference"
+    local f tmpdir from_args
+
+    if _mock_tls_certs_secret_is_complete; then
+        echo "✓ Secret e2e-mock-tls-certs already complete; skipping sync"
+        return 0
+    fi
+    if ! oc get pod "$mock_pod" -n "$NAMESPACE" &>/dev/null; then
+        echo "ERROR: $mock_pod not found (deploy-e2e-mock-tls-inference first)" >&2
+        return 1
+    fi
+    if ! oc exec -n "$NAMESPACE" "$mock_pod" -c "$mock_ctr" --request-timeout=30s -- \
+        test -s /certs/ca.crt 2>/dev/null; then
+        echo "ERROR: mock TLS /certs not ready yet" >&2
+        return 1
+    fi
+
+    tmpdir=$(mktemp -d)
+    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+        if ! oc exec -n "$NAMESPACE" "$mock_pod" -c "$mock_ctr" --request-timeout=30s -- \
+            cat "/certs/${f}" >"${tmpdir}/${f}" 2>/dev/null \
+            || [[ ! -s "${tmpdir}/${f}" ]]; then
+            rm -rf "$tmpdir"
+            echo "ERROR: failed to read /certs/${f} from mock pod" >&2
+            return 1
+        fi
+    done
+    from_args=()
+    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+        from_args+=(--from-file="${f}=${tmpdir}/${f}")
+    done
+    oc create secret generic e2e-mock-tls-certs \
+        "${from_args[@]}" -n "$NAMESPACE" \
+        --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
+    rm -rf "$tmpdir"
+    echo "✓ Secret e2e-mock-tls-certs updated"
+}
+
+cmd_deploy_e2e_mock_tls_inference() {
+    local repo_root server_py
+    repo_root="$(_e2e_repo_root)"
+    server_py="$repo_root/tests/e2e/mock_tls_inference_server/server.py"
+    [[ -f "$server_py" ]] || {
+        echo "ERROR: missing $server_py" >&2
+        return 1
+    }
+    echo "Deploying e2e-mock-tls-inference in namespace $NAMESPACE..."
+    oc create configmap e2e-mock-tls-inference-script -n "$NAMESPACE" \
+        --from-file=server.py="$server_py" \
+        --dry-run=client -o yaml | oc apply -f -
+    oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-mock-tls-inference.yaml"
+    if ! oc wait pod/e2e-mock-tls-inference -n "$NAMESPACE" --for=condition=Ready --timeout=240s; then
+        echo "ERROR: e2e-mock-tls-inference not ready" >&2
+        e2e_ops_dump_pod_logs "e2e-mock-tls-inference" "e2e-mock-tls-inference" 80
+        return 1
+    fi
+    cmd_sync_mock_tls_certs_secret || return 1
+    echo "✓ e2e-mock-tls-inference ready"
+}
+
 cmd_disrupt_llama_stack() {
     local pod_name="llama-stack-service"
 
@@ -897,6 +1025,12 @@ case "$COMMAND" in
     deploy-e2e-interception-proxy)
         cmd_deploy_e2e_interception_proxy
         ;;
+    deploy-e2e-mock-tls-inference)
+        cmd_deploy_e2e_mock_tls_inference
+        ;;
+    reload-llama-stack-config)
+        cmd_reload_llama_stack_config
+        ;;
     *)
         echo "Usage: $0 <command> [args...]"
         echo ""
@@ -915,6 +1049,8 @@ case "$COMMAND" in
         echo "  sync-interception-proxy-ca-secret   - Publish trustme CA to Secret for llama mount"
         echo "  deploy-e2e-tunnel-proxy            - Deploy in-cluster tunnel proxy pod"
         echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
+        echo "  deploy-e2e-mock-tls-inference        - Deploy in-cluster mock TLS inference (tls.feature)"
+        echo "  reload-llama-stack-config            - Reload run.yaml without deleting llama pod"
         exit 1
         ;;
 esac
