@@ -1,0 +1,103 @@
+from __future__ import annotations as _annotations
+
+import os
+from typing import TYPE_CHECKING
+
+import httpx
+from openai import AsyncOpenAI
+
+from pydantic_ai import ModelProfile
+from pydantic_ai.models import create_async_http_client
+from pydantic_ai.profiles.openai import openai_model_profile
+from pydantic_ai.providers import Provider
+
+if TYPE_CHECKING:
+    from llama_stack.core.library_client import AsyncLlamaStackAsLibraryClient
+
+DEFAULT_BASE_URL = 'http://localhost:8321/v1'
+
+
+class LlamaStackProvider(Provider[AsyncOpenAI]):
+    """Provider for Llama Stack — connects to a Llama Stack server's OpenAI-compatible API.
+
+    Supports two modes:
+
+    1. **Server mode** — connect to a running Llama Stack server via HTTP
+    2. **Library mode** — run Llama Stack in-process via ``AsyncLlamaStackAsLibraryClient``
+    """
+
+    @property
+    def name(self) -> str:
+        return 'llama-stack'
+
+    @property
+    def base_url(self) -> str:
+        return str(self._client.base_url)
+
+    @property
+    def client(self) -> AsyncOpenAI:
+        return self._client
+
+    @staticmethod
+    def model_profile(model_name: str) -> ModelProfile | None:
+        return openai_model_profile(model_name)
+
+    def __init__(
+        self,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        library_client: AsyncLlamaStackAsLibraryClient | None = None,
+        http_client: httpx.AsyncClient | None = None,
+    ) -> None:
+        """Create a new Llama Stack provider.
+
+        Args:
+            base_url: The base URL for the Llama Stack server (OpenAI-compatible endpoint).
+                Defaults to ``LLAMA_STACK_BASE_URL`` env var, then ``http://localhost:8321/v1``.
+                Must be ``None`` when ``library_client`` is provided.
+            api_key: The API key for authentication. Defaults to ``LLAMA_STACK_API_KEY`` env
+                var, then ``'not-needed'`` since local Llama Stack servers typically don't
+                require one. Must be ``None`` when ``library_client`` is provided.
+            library_client: An initialized ``AsyncLlamaStackAsLibraryClient`` for library mode.
+                When provided, requests are dispatched in-process (no server needed).
+                Mutually exclusive with ``base_url``, ``api_key``, and ``http_client``.
+            http_client: An existing ``httpx.AsyncClient`` to use for making HTTP requests.
+                Must be ``None`` when ``library_client`` is provided.
+        """
+        if library_client is not None:
+            assert base_url is None, 'Cannot provide both `library_client` and `base_url`'
+            assert api_key is None, 'Cannot provide both `library_client` and `api_key`'
+            assert http_client is None, 'Cannot provide both `library_client` and `http_client`'
+
+            from ._transport import LlamaStackLibraryTransport
+
+            self._library_client = library_client
+            transport = LlamaStackLibraryTransport(library_client)
+            lib_http_client = httpx.AsyncClient(
+                transport=transport, base_url='http://llama-stack-library'
+            )
+            self._client = AsyncOpenAI(
+                http_client=lib_http_client,
+                base_url='http://llama-stack-library/v1',
+                api_key='not-needed',
+            )
+        else:
+            base_url = base_url or os.environ.get('LLAMA_STACK_BASE_URL') or DEFAULT_BASE_URL
+            api_key = api_key or os.environ.get('LLAMA_STACK_API_KEY') or 'not-needed'
+
+            if http_client is not None:
+                self._client = AsyncOpenAI(
+                    base_url=base_url, api_key=api_key, http_client=http_client
+                )
+            else:
+                oai_http_client = create_async_http_client()
+                self._client = AsyncOpenAI(
+                    base_url=base_url, api_key=api_key, http_client=oai_http_client
+                )
+
+    def __repr__(self) -> str:
+        return f'LlamaStackProvider(name={self.name!r}, base_url={self.base_url!r})'
+
+    def _set_http_client(self, http_client: httpx.AsyncClient) -> None:
+        self._client._client = http_client  # pyright: ignore[reportPrivateUsage]
