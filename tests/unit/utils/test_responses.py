@@ -834,6 +834,86 @@ class TestGetMCPTools:
         assert len(tools[0].headers) == 1
 
 
+class TestInputToolMCPTypeDiscriminator:
+    """Regression tests for RSPEED-3116.
+
+    The llama-stack client SDK serializes pydantic instances with
+    ``model_dump(exclude_unset=True)`` before sending them to the server.
+    Because Pydantic v2 treats defaulted fields as "unset", the
+    ``type: Literal['mcp'] = 'mcp'`` discriminator on the parent class is
+    stripped from the wire payload unless we pass ``type='mcp'`` explicitly
+    at every construction site. In library-client mode the resulting dict
+    is revalidated against a discriminated union and raises
+    ``union_tag_not_found``.
+    """
+
+    def test_input_tool_mcp_dump_excludes_unset_includes_type(self) -> None:
+        """InputToolMCP must serialize 'type' under exclude_unset=True."""
+        tool = InputToolMCP(
+            type="mcp",
+            server_label="okp",
+            server_url="http://example.com",
+        )
+
+        dumped = tool.model_dump(exclude_unset=True)
+
+        assert dumped.get("type") == "mcp"
+
+    @pytest.mark.asyncio
+    async def test_get_mcp_tools_sets_type_explicitly(
+        self, mocker: MockerFixture
+    ) -> None:
+        """get_mcp_tools must produce instances whose dump retains 'type'."""
+        servers = [
+            ModelContextProtocolServer(
+                name="okp", url="http://okp.example.com", provider_id="mcp"
+            ),
+        ]
+        mock_config = mocker.Mock()
+        mock_config.mcp_servers = servers
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        tools = await get_mcp_tools(token=None)
+
+        assert len(tools) == 1
+        dumped = tools[0].model_dump(exclude_unset=True)
+        assert dumped.get("type") == "mcp"
+
+    @pytest.mark.asyncio
+    async def test_apply_mcp_headers_preserves_type(
+        self, mocker: MockerFixture
+    ) -> None:
+        """apply_mcp_headers_to_explicit_tools must keep 'type' explicitly set."""
+        from utils.responses import (  # pylint: disable=import-outside-toplevel
+            apply_mcp_headers_to_explicit_tools,
+        )
+
+        servers = [
+            ModelContextProtocolServer(
+                name="okp", url="http://okp.example.com", provider_id="mcp"
+            ),
+        ]
+        mock_config = mocker.Mock()
+        mock_config.mcp_servers = servers
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        # Simulate an explicit tool that came in over the wire. Construct it
+        # via the parent path (no explicit type=) so model_copy is the only
+        # place 'type' could become set.
+        explicit = InputToolMCP(
+            server_label="okp",
+            server_url="http://okp.example.com",
+        )
+
+        out = apply_mcp_headers_to_explicit_tools(
+            [explicit], token=None, mcp_headers=None, request_headers=None
+        )
+
+        assert len(out) == 1
+        dumped = out[0].model_dump(exclude_unset=True)
+        assert dumped.get("type") == "mcp"
+
+
 class TestGetTopicSummary:
     """Tests for get_topic_summary function."""
 
