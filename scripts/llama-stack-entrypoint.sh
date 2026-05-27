@@ -5,14 +5,14 @@
 set -e
 
 INPUT_CONFIG="${LLAMA_STACK_CONFIG:-/opt/app-root/run.yaml}"
-ENRICHED_CONFIG="/opt/app-root/run.yaml"
+ENRICHED_CONFIG="/tmp/enriched-run.yaml"
 LIGHTSPEED_CONFIG="${LIGHTSPEED_CONFIG:-/opt/app-root/lightspeed-stack.yaml}"
 
 # Enrich config if lightspeed config exists
 if [ -f "$LIGHTSPEED_CONFIG" ]; then
     echo "Enriching llama-stack config..."
     ENRICHMENT_FAILED=0
-    python3 /opt/app-root/llama_stack_configuration.py \
+    /opt/app-root/.venv/bin/python3 /opt/app-root/llama_stack_configuration.py \
         -c "$LIGHTSPEED_CONFIG" \
         -i "$INPUT_CONFIG" \
         -o "$ENRICHED_CONFIG" 2>&1 || ENRICHMENT_FAILED=1

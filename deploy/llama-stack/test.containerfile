@@ -1,11 +1,12 @@
-# Upstream llama-stack built from Red Hat UBI
-FROM registry.access.redhat.com/ubi9/ubi-minimal
+# Upstream llama-stack built from Red Hat UBI Python 3.12 image
+FROM registry.access.redhat.com/ubi9/python-312
 
 USER root
 
-# Install Python and build tools
-RUN microdnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs \
-    python3.12 python3.12-devel python3.12-pip git tar gcc gcc-c++ make
+# Install additional build tools
+RUN dnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs \
+    git tar gcc gcc-c++ make && \
+    dnf clean all
     
 # Install uv
 ENV PATH="/root/.local/bin:${PATH}"
