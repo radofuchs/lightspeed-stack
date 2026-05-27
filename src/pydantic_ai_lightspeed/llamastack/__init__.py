@@ -2,4 +2,4 @@
 
 from ._provider import LlamaStackProvider
 
-__all__ = ['LlamaStackProvider']
+__all__ = ["LlamaStackProvider"]

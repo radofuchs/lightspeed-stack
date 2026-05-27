@@ -1,3 +1,5 @@
+"""Llama Stack provider implementation for Pydantic AI."""
+
 from __future__ import annotations as _annotations
 
 import os
@@ -5,16 +7,17 @@ from typing import TYPE_CHECKING
 
 import httpx
 from openai import AsyncOpenAI
-
 from pydantic_ai import ModelProfile
 from pydantic_ai.models import create_async_http_client
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers import Provider
 
+from ._transport import LlamaStackLibraryTransport
+
 if TYPE_CHECKING:
     from llama_stack.core.library_client import AsyncLlamaStackAsLibraryClient
 
-DEFAULT_BASE_URL = 'http://localhost:8321/v1'
+DEFAULT_BASE_URL = "http://localhost:8321/v1"
 
 
 class LlamaStackProvider(Provider[AsyncOpenAI]):
@@ -28,7 +31,7 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
 
     @property
     def name(self) -> str:
-        return 'llama-stack'
+        return "llama-stack"
 
     @property
     def base_url(self) -> str:
@@ -66,25 +69,29 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
                 Must be ``None`` when ``library_client`` is provided.
         """
         if library_client is not None:
-            assert base_url is None, 'Cannot provide both `library_client` and `base_url`'
-            assert api_key is None, 'Cannot provide both `library_client` and `api_key`'
-            assert http_client is None, 'Cannot provide both `library_client` and `http_client`'
-
-            from ._transport import LlamaStackLibraryTransport
+            assert (
+                base_url is None
+            ), "Cannot provide both `library_client` and `base_url`"
+            assert api_key is None, "Cannot provide both `library_client` and `api_key`"
+            assert (
+                http_client is None
+            ), "Cannot provide both `library_client` and `http_client`"
 
             self._library_client = library_client
             transport = LlamaStackLibraryTransport(library_client)
             lib_http_client = httpx.AsyncClient(
-                transport=transport, base_url='http://llama-stack-library'
+                transport=transport, base_url="http://llama-stack-library"
             )
             self._client = AsyncOpenAI(
                 http_client=lib_http_client,
-                base_url='http://llama-stack-library/v1',
-                api_key='not-needed',
+                base_url="http://llama-stack-library/v1",
+                api_key="not-needed",
             )
         else:
-            base_url = base_url or os.environ.get('LLAMA_STACK_BASE_URL') or DEFAULT_BASE_URL
-            api_key = api_key or os.environ.get('LLAMA_STACK_API_KEY') or 'not-needed'
+            base_url = (
+                base_url or os.environ.get("LLAMA_STACK_BASE_URL") or DEFAULT_BASE_URL
+            )
+            api_key = api_key or os.environ.get("LLAMA_STACK_API_KEY") or "not-needed"
 
             if http_client is not None:
                 self._client = AsyncOpenAI(
@@ -97,7 +104,7 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
                 )
 
     def __repr__(self) -> str:
-        return f'LlamaStackProvider(name={self.name!r}, base_url={self.base_url!r})'
+        return f"LlamaStackProvider(name={self.name!r}, base_url={self.base_url!r})"
 
     def _set_http_client(self, http_client: httpx.AsyncClient) -> None:
-        self._client._client = http_client  # pyright: ignore[reportPrivateUsage]
+        self._client._client = http_client  # pyright: ignore[reportPrivateUsage]  # pylint: disable=protected-access
