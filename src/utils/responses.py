@@ -743,6 +743,13 @@ async def get_mcp_tools(
         )
         tools.append(
             InputToolMCP(
+                # Pass type explicitly: the llama-stack client serializes pydantic
+                # instances with model_dump(exclude_unset=True), which strips fields
+                # filled from defaults. Without an explicit value here, the 'type'
+                # discriminator is dropped before reaching CreateResponseRequest,
+                # causing a union_tag_not_found validation error in library-client
+                # mode. See RSPEED-3116.
+                type="mcp",
                 server_label=mcp_server.name,
                 server_url=mcp_server.url,
                 require_approval=require_approval,
@@ -807,6 +814,10 @@ def apply_mcp_headers_to_explicit_tools(
         out.append(
             mcp_tool.model_copy(
                 update={
+                    # Force 'type' to be explicitly set on the copy so it survives
+                    # model_dump(exclude_unset=True) in the llama-stack client.
+                    # See RSPEED-3116.
+                    "type": "mcp",
                     "headers": headers or None,
                     "authorization": authorization,
                 }
