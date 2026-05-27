@@ -92,10 +92,12 @@ def restart_llama_for_tls_feature(context: Context) -> None:
     )
     result = run_e2e_ops("reload-llama-stack-config", timeout=240)
     print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="")
     if result.returncode != 0:
+        detail = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
         raise RuntimeError(
-            "tls.feature: reload-llama-stack-config failed: "
-            f"{result.stderr or result.stdout}"
+            f"tls.feature: reload-llama-stack-config failed:\n{detail or result.returncode}"
         )
 
 

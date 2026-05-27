@@ -379,22 +379,34 @@ cmd_reload_llama_stack_config() {
     fi
 
     echo "Reloading Llama Stack run.yaml in $pod (container restart, not pod delete)..."
-    oc cp "$tmp" "$NAMESPACE/$pod:/opt/app-root/run.yaml" -c "$ctr" || {
+    if ! oc cp "$tmp" "$NAMESPACE/$pod:/opt/app-root/run.yaml" -c "$ctr"; then
         rm -f "$tmp"
+        echo "ERROR: oc cp run.yaml into $pod failed" >&2
+        e2e_ops_dump_pod_logs "$pod" "$ctr" 150
         return 1
-    }
+    fi
     rm -f "$tmp"
-    oc exec -n "$NAMESPACE" "$pod" -c "$ctr" -- kill -1
+    # kill -1 is parsed as "signal -1, no PID" — use kill -HUP 1 (PID 1 = main process).
+    if ! oc exec -n "$NAMESPACE" "$pod" -c "$ctr" -- kill -HUP 1; then
+        echo "ERROR: kill -HUP 1 failed in $pod" >&2
+        e2e_ops_dump_pod_logs "$pod" "$ctr" 150
+        return 1
+    fi
 
     if ! wait_for_pod "$pod" 40; then
         echo "===== Llama-stack reload FAILED (pod not Ready) ====="
+        e2e_ops_dump_pod_logs "$pod" "$ctr" 200
         return 1
     fi
     if ! wait_for_llama_stack_http_health 40; then
         echo "===== Llama-stack reload FAILED (HTTP not healthy) ====="
+        e2e_ops_dump_pod_logs "$pod" "$ctr" 200
         return 1
     fi
-    cmd_restart_llama_port_forward || return 1
+    if ! cmd_restart_llama_port_forward; then
+        e2e_ops_dump_pod_logs "$pod" "$ctr" 120
+        return 1
+    fi
     echo "===== Llama-stack reload complete ====="
 }
 
