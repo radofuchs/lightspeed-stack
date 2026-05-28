@@ -132,6 +132,57 @@ Feature: Llama Stack connection disrupted
     Then The status code of the response is 503
     And The body of the response contains Unable to connect to Llama Stack
 
+  Scenario: Check if prompts list endpoint fails when llama-stack is unavailable
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+      And The service is restarted
+    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+    And The llama-stack connection is disrupted
+    When I access REST API endpoint "prompts" using HTTP GET method
+    Then The status code of the response is 503
+    And The body of the response contains Unable to connect to Llama Stack
+
+  Scenario: Check if prompts create endpoint fails when llama-stack is unavailable
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+      And The service is restarted
+    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+    And The llama-stack connection is disrupted
+    When I access REST API endpoint "prompts" using HTTP POST method
+    """
+    {"prompt": "Summarize: {{text}}", "variables": ["text"]}
+    """
+    Then The status code of the response is 503
+    And The body of the response contains Unable to connect to Llama Stack
+
+  Scenario: Check if prompts get by id endpoint fails when llama-stack is unavailable
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+      And The service is restarted
+    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+    And The llama-stack connection is disrupted
+    When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP GET method
+    Then The status code of the response is 503
+    And The body of the response contains Unable to connect to Llama Stack
+
+  Scenario: Check if prompts update endpoint fails when llama-stack is unavailable
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+      And The service is restarted
+    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+    And The llama-stack connection is disrupted
+    When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP PUT method
+    """
+    {"prompt": "Summarize in bullets: {{text}}", "version": 1, "set_as_default": true, "variables": ["text"]}
+    """
+    Then The status code of the response is 503
+    And The body of the response contains Unable to connect to Llama Stack
+
+  Scenario: Check if prompts delete endpoint fails when llama-stack is unavailable
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+      And The service is restarted
+    And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
+    And The llama-stack connection is disrupted
+    When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP DELETE method
+    Then The status code of the response is 503
+    And The body of the response contains Unable to connect to Llama Stack
+
   Scenario: Check if conversations/{conversation_id} GET endpoint fails when llama-stack is unavailable
     Given Llama Stack is restarted
     And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
