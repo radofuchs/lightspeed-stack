@@ -118,8 +118,12 @@ def restart_pod(container_name: str) -> None:
         if result.returncode != 0:
             print(result.stderr, end="")
             combined = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
-            tail = "\n".join(combined.splitlines()[-25:]) if combined else ""
-            detail = tail or f"exit {result.returncode}"
+            # Prefer full e2e-ops output when diagnostics were printed (TLS/Llama failures).
+            if "========== failure logs:" in combined:
+                detail = combined
+            else:
+                detail = "\n".join(combined.splitlines()[-40:]) if combined else ""
+            detail = detail or f"exit {result.returncode}"
             raise subprocess.CalledProcessError(
                 result.returncode,
                 op,

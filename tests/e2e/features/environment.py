@@ -241,24 +241,26 @@ def before_scenario(context: Context, scenario: Scenario) -> None:
             delattr(context, _attr)
 
 
-def _dump_pod_logs_on_failure(scenario: Scenario, namespace: str) -> None:
-    """Dump llama-stack and lightspeed-stack pod logs when a scenario fails in Prow."""
+def _dump_pod_logs_on_failure(
+    context: Context, scenario: Scenario, namespace: str
+) -> None:
+    """Dump pod diagnostics when a scenario fails in Prow (init + main container logs)."""
     if scenario.status != "failed":
         return
-    for pod in ("llama-stack-service", "lightspeed-stack-service"):
-        print(f"--- {pod} logs (scenario failed: {scenario.name}) ---")
+    pods: tuple[str, ...] = ("llama-stack-service", "lightspeed-stack-service")
+    feature = getattr(context, "feature", None)
+    feat_file = getattr(feature, "filename", "") or "" if feature else ""
+    if "tls.feature" in feat_file:
+        pods = (*pods, "e2e-mock-tls-inference")
+    print(f"--- scenario failed: {scenario.name!r} — dumping pod logs ---", flush=True)
+    for pod in pods:
         try:
-            r = subprocess.run(
-                ["oc", "logs", pod, "-n", namespace, "--tail=100"],
-                capture_output=True,
-                text=True,
-                timeout=15,
-                check=False,
-            )
-            print(r.stdout or r.stderr or "(no output)")
+            result = run_e2e_ops("dump-pod-logs", [pod], timeout=90)
+            print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="")
         except subprocess.TimeoutExpired:
-            print("(timed out fetching logs)")
-        print(f"--- end {pod} logs ---")
+            print(f"(timed out dumping logs for {pod})")
 
 
 def after_scenario(context: Context, scenario: Scenario) -> None:
@@ -292,7 +294,7 @@ def after_scenario(context: Context, scenario: Scenario) -> None:
     """
     if is_prow_environment():
         _dump_pod_logs_on_failure(
-            scenario, os.environ.get("NAMESPACE", "e2e-rhoai-dsc")
+            context, scenario, os.environ.get("NAMESPACE", "e2e-rhoai-dsc")
         )
 
     if getattr(context, "scenario_lightspeed_override_active", False):
