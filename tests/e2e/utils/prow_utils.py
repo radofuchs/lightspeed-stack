@@ -96,7 +96,7 @@ def restart_pod(container_name: str) -> None:
         # Subprocess cap must exceed e2e-ops internal waits (pod + in-pod health + port-forward).
         # Konflux TLS full recreate: ~6–12 min typical, 15+ min under load (user-reported 400s+).
         if os.environ.get("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA") == "1":
-            timeout = 900
+            timeout = 1200
         elif os.environ.get("E2E_KONFLUX_E2E") == "1":
             timeout = 720
         else:

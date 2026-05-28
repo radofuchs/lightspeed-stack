@@ -19,6 +19,7 @@ from tests.e2e.utils.llama_config_utils import (
     backup_llama_config,
     clear_llama_config_backup,
     load_llama_config,
+    reset_llama_run_config_to_pipeline_default,
     write_llama_config,
 )
 from tests.e2e.utils.prow_utils import get_namespace, restart_pod, run_e2e_ops
@@ -35,15 +36,41 @@ _TLS_MODEL_RESOURCE: dict[str, str] = {
 }
 
 _mock_tls_cluster_deploy_state: dict[str, bool] = {"done": False}
-_tls_llama_pod_warmed: dict[str, bool] = {"done": False}
 
 
 def reset_tls_prow_state() -> None:
     """Reset per-feature Prow state (call from ``before_feature``)."""
     _mock_tls_cluster_deploy_state["done"] = False
-    _tls_llama_pod_warmed["done"] = False
     os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
     clear_llama_config_backup()
+
+
+def prepare_tls_feature_entry_on_prow() -> None:
+    """Baseline cluster state when tls.feature runs after other features in test_list.
+
+    Earlier features (disrupted, MCP) delete or reconfigure Llama without mock TLS
+    certs. Isolated tls.feature runs skip that churn, which is why the same Gherkin
+    passes alone but flakes mid-feature in the full suite.
+    """
+    if not is_prow_environment():
+        return
+    print("[tls.feature] Prow/Konflux entry: reset run.yaml and warm Llama + mock TLS...")
+    reset_llama_run_config_to_pipeline_default()
+    result = run_e2e_ops("deploy-e2e-mock-tls-inference", timeout=300)
+    print(result.stdout, end="")
+    if result.returncode != 0:
+        raise RuntimeError(
+            "tls.feature entry: deploy-e2e-mock-tls-inference failed: "
+            f"{result.stderr or result.stdout}"
+        )
+    _mock_tls_cluster_deploy_state["done"] = True
+    _prepare_tls_prow_llama_restart_env()
+    os.environ.setdefault(
+        "E2E_MOCK_TLS_INFERENCE_HOST",
+        _cluster_mock_tls_inference_host(),
+    )
+    restart_pod("llama-stack")
+    print("[tls.feature] Prow/Konflux entry baseline complete", flush=True)
 
 
 def is_tls_configuration_feature(context: Context) -> bool:
@@ -61,12 +88,7 @@ def _prepare_tls_prow_llama_restart_env() -> None:
 
 
 def restart_llama_for_tls_feature(context: Context) -> None:
-    """Restart Llama for TLS tests.
-
-    On Prow/Konflux the first restart per feature recreates the pod (mock TLS cert
-    Secret volume). Later restarts reload run.yaml in-place (``kill 1``) to avoid
-    re-running the heavy setup-from-source init on every scenario.
-    """
+    """Restart Llama for TLS tests (full pod recreate on Prow/Konflux)."""
     from tests.e2e.utils.utils import restart_container
 
     if not is_prow_environment():
@@ -75,30 +97,11 @@ def restart_llama_for_tls_feature(context: Context) -> None:
 
     _prepare_tls_prow_llama_restart_env()
     scenario = getattr(getattr(context, "scenario", None), "name", "") or "?"
-
-    if not _tls_llama_pod_warmed["done"]:
-        print(
-            f"[tls.feature] Llama Stack restart: pod recreate (once per feature) "
-            f"scenario={scenario!r}",
-            flush=True,
-        )
-        restart_pod("llama-stack")
-        _tls_llama_pod_warmed["done"] = True
-        return
-
     print(
-        f"[tls.feature] Llama Stack restart: reload run.yaml scenario={scenario!r}",
+        f"[tls.feature] Llama Stack restart: full recreate scenario={scenario!r}",
         flush=True,
     )
-    result = run_e2e_ops("reload-llama-stack-config", timeout=240)
-    print(result.stdout, end="")
-    if result.stderr:
-        print(result.stderr, end="")
-    if result.returncode != 0:
-        detail = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
-        raise RuntimeError(
-            f"tls.feature: reload-llama-stack-config failed:\n{detail or result.returncode}"
-        )
+    restart_container("llama-stack")
 
 
 def _cluster_mock_tls_inference_host() -> str:
