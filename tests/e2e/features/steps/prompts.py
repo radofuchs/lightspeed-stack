@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import requests
 from behave import (  # pyright: ignore[reportAttributeAccessIssue]
     step,
     then,
