@@ -104,8 +104,9 @@ def get_prompt_by_stored_id_and_version(context: Context, version: int) -> None:
         context, "stored_prompt_id"
     ), "stored_prompt_id not set; run prompt creation first"
     endpoint = normalize_endpoint(f"prompts/{context.stored_prompt_id}")
-    context.response = requests.get(
-        _prompts_url(context, endpoint),
+    context.response = request_with_transient_retry(
+        method="GET",
+        url=_prompts_url(context, endpoint),
         params={"version": version},
         headers=_auth_headers(context),
         timeout=DEFAULT_TIMEOUT,
@@ -123,10 +124,11 @@ def get_prompt_by_stored_id_and_version_query(
         context, "stored_prompt_id"
     ), "stored_prompt_id not set; run prompt creation first"
     endpoint = normalize_endpoint(f"prompts/{context.stored_prompt_id}")
-    context.response = requests.get(
-        _prompts_url(context, endpoint),
-        params={"version": version_query},
+    context.response = request_with_transient_retry(
+        method="GET",
+        url=_prompts_url(context, endpoint),
         headers=_auth_headers(context),
+        params={"version": version_query},
         timeout=DEFAULT_TIMEOUT,
     )
 
