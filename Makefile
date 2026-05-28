@@ -77,6 +77,13 @@ start-llama-stack-container: build-llama-stack-image ## Start llama-stack contai
 		-e AWS_BEARER_TOKEN_BEDROCK \
 		-e LLAMA_STACK_LOGGING=$${LLAMA_STACK_LOGGING:-} \
 		-e FAISS_VECTOR_STORE_ID=$${FAISS_VECTOR_STORE_ID:-} \
+		-e RH_SERVER_OKP \
+		-e SOLR_URL \
+		-e SOLR_COLLECTION \
+		-e SOLR_VECTOR_FIELD \
+		-e SOLR_CONTENT_FIELD \
+		-e SOLR_EMBEDDING_MODEL \
+		-e SOLR_EMBEDDING_DIM \
 		$(LLAMA_STACK_IMAGE)
 	@$(MAKE) wait-for-llama-stack-health
 
