@@ -59,6 +59,7 @@ def _request_prompts_with_stored_id(context: Context, method: str) -> None:
         timeout=DEFAULT_TIMEOUT,
     )
 
+
 @step("I store the prompt_id from the last response")  # type: ignore[reportCallIssue]
 def store_prompt_id(context: Context) -> None:
     """Store ``prompt_id`` from the latest JSON response."""
@@ -111,6 +112,25 @@ def get_prompt_by_stored_id_and_version(context: Context, version: int) -> None:
     )
 
 
+@when(  # type: ignore[reportCallIssue]
+    'I access REST API prompts endpoint with stored prompt id and version query "{version_query}" using HTTP GET method'
+)
+def get_prompt_by_stored_id_and_version_query(
+    context: Context, version_query: str
+) -> None:
+    """GET /v1/prompts/{stored_prompt_id}?version={version_query} (non-integer for 422 tests)."""
+    assert hasattr(
+        context, "stored_prompt_id"
+    ), "stored_prompt_id not set; run prompt creation first"
+    endpoint = normalize_endpoint(f"prompts/{context.stored_prompt_id}")
+    context.response = requests.get(
+        _prompts_url(context, endpoint),
+        params={"version": version_query},
+        headers=_auth_headers(context),
+        timeout=DEFAULT_TIMEOUT,
+    )
+
+
 @then("The prompt_id in the response matches the stored prompt id")  # type: ignore[reportCallIssue]
 def response_prompt_id_matches_stored(context: Context) -> None:
     """Assert response ``prompt_id`` equals the stored prompt id."""
@@ -128,9 +148,9 @@ def prompt_version_matches(context: Context, expected_version: int) -> None:
     """Assert response ``version`` equals the expected value."""
     assert context.response is not None, "Request needs to be performed first"
     body: dict[str, Any] = context.response.json()
-    assert body["version"] == expected_version, (
-        f"Expected version {expected_version}, got {body.get('version')}"
-    )
+    assert (
+        body["version"] == expected_version
+    ), f"Expected version {expected_version}, got {body.get('version')}"
 
 
 @then("The prompts list contains the stored prompt id")  # type: ignore[reportCallIssue]
@@ -141,6 +161,6 @@ def prompt_list_contains_stored_prompt(context: Context) -> None:
     body: dict[str, Any] = context.response.json()
     prompts = body.get("data", [])
     assert isinstance(prompts, list), f"Expected data list, got: {type(prompts)}"
-    assert any(p.get("prompt_id") == context.stored_prompt_id for p in prompts), (
-        f"prompt_id {context.stored_prompt_id!r} not found in prompts list: {prompts}"
-    )
+    assert any(
+        p.get("prompt_id") == context.stored_prompt_id for p in prompts
+    ), f"prompt_id {context.stored_prompt_id!r} not found in prompts list: {prompts}"
