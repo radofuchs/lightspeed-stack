@@ -130,6 +130,52 @@
         "title": "Action",
         "type": "string"
       },
+      "ApprovalFilter": {
+        "additionalProperties": false,
+        "description": "Granular approval control for specific MCP tools.\n\nAttributes:\n    always: Tool names that always require human approval before execution.\n    never: Tool names that never require approval (pre-approved).",
+        "properties": {
+          "always": {
+            "description": "List of tool names that always require human approval",
+            "items": {
+              "type": "string"
+            },
+            "title": "Always require approval",
+            "type": "array"
+          },
+          "never": {
+            "description": "List of tool names that never require approval",
+            "items": {
+              "type": "string"
+            },
+            "title": "Never require approval",
+            "type": "array"
+          }
+        },
+        "title": "ApprovalFilter",
+        "type": "object"
+      },
+      "ApprovalsConfiguration": {
+        "additionalProperties": false,
+        "description": "Configuration for human-in-the-loop approvals.\n\nAttributes:\n    approval_timeout_seconds: How long approval requests remain pending\n        before expiring.\n    approval_retention_days: How long to retain decided approvals for audit\n        purposes before cleanup.",
+        "properties": {
+          "approval_timeout_seconds": {
+            "default": 300,
+            "description": "Seconds before pending approval requests expire",
+            "minimum": 0,
+            "title": "Approval timeout",
+            "type": "integer"
+          },
+          "approval_retention_days": {
+            "default": 30,
+            "description": "Days to retain decided approvals before cleanup",
+            "minimum": 0,
+            "title": "Retention period",
+            "type": "integer"
+          }
+        },
+        "title": "ApprovalsConfiguration",
+        "type": "object"
+      },
       "AuthenticationConfiguration": {
         "additionalProperties": false,
         "description": "Authentication configuration.",
@@ -485,6 +531,11 @@
             "description": "Controls when conversation history is summarized to keep the model's input below the context window limit. Disabled by default — when disabled, requests that exceed the window continue to surface as HTTP 413.",
             "title": "Conversation compaction configuration"
           },
+          "approvals": {
+            "$ref": "#/components/schemas/ApprovalsConfiguration",
+            "description": "Settings for human-in-the-loop approval of MCP tool invocations",
+            "title": "Approvals configuration"
+          },
           "byok_rag": {
             "description": "BYOK RAG configuration. This configuration can be used to reconfigure Llama Stack through its run.yaml configuration file",
             "items": {
@@ -547,6 +598,24 @@
             "$ref": "#/components/schemas/OkpConfiguration",
             "description": "OKP provider settings. Only used when 'okp' is listed in rag.inline or rag.tool.",
             "title": "OKP configuration"
+          },
+          "reranker": {
+            "$ref": "#/components/schemas/RerankerConfiguration",
+            "description": "Configuration for neural reranking of RAG chunks using cross-encoder.",
+            "title": "Reranker configuration"
+          },
+          "skills": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillsConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Agent skills configuration. Specifies paths to skill directories.",
+            "title": "Agent skills"
           }
         },
         "required": [
@@ -981,6 +1050,23 @@
             "title": "Propagated headers",
             "type": "array"
           },
+          "require_approval": {
+            "anyOf": [
+              {
+                "enum": [
+                  "always",
+                  "never"
+                ],
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/ApprovalFilter"
+              }
+            ],
+            "default": "never",
+            "description": "When to require human approval for tool invocations. 'always' requires approval for all tools, 'never' auto-approves, or use ApprovalFilter for granular control.",
+            "title": "Approval requirement"
+          },
           "timeout": {
             "type": "integer",
             "nullable": true,
@@ -1068,12 +1154,25 @@
           "ssl_mode": {
             "default": "prefer",
             "description": "SSL mode",
+            "enum": [
+              "disable",
+              "allow",
+              "prefer",
+              "require",
+              "verify-ca",
+              "verify-full"
+            ],
             "title": "SSL mode",
             "type": "string"
           },
           "gss_encmode": {
             "default": "prefer",
             "description": "This option determines whether or with what priority a secure GSS TCP/IP connection will be negotiated with the server.",
+            "enum": [
+              "disable",
+              "prefer",
+              "require"
+            ],
             "title": "GSS encmode",
             "type": "string"
           },
@@ -1267,6 +1366,26 @@
         "title": "RagConfiguration",
         "type": "object"
       },
+      "RerankerConfiguration": {
+        "additionalProperties": false,
+        "description": "Reranker configuration for RAG chunk reranking.",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "description": "When True, reranking applied to RAG chunks. When False, reranking is disabled and original scoring used.",
+            "title": "Reranker enabled",
+            "type": "boolean"
+          },
+          "model": {
+            "default": "cross-encoder/ms-marco-MiniLM-L6-v2",
+            "description": "Cross-encoder model name for reranking RAG chunks. Defaults to 'cross-encoder/ms-marco-MiniLM-L6-v2' from sentence-transformers.",
+            "title": "Reranker model",
+            "type": "string"
+          }
+        },
+        "title": "RerankerConfiguration",
+        "type": "object"
+      },
       "RlsapiV1Configuration": {
         "additionalProperties": false,
         "description": "Configuration for the rlsapi v1 /infer endpoint.\n\nSettings specific to the RHEL Lightspeed Command Line Assistant (CLA)\nstateless inference endpoint. Kept separate from shared configuration\nsections so that CLA-specific options do not affect other endpoints.",
@@ -1371,6 +1490,23 @@
           }
         },
         "title": "ServiceConfiguration",
+        "type": "object"
+      },
+      "SkillsConfiguration": {
+        "additionalProperties": false,
+        "description": "Agent skills configuration.\n\nSpecifies paths to skill directories. Skill metadata (name, description)\nis read from SKILL.md frontmatter at startup.\n\nEach path can point to either:\n- A directory containing a SKILL.md file (single skill)\n- A directory containing subdirectories with SKILL.md files (multiple skills)\n\nPaths are validated at startup to ensure they exist and contain valid SKILL.md files.",
+        "properties": {
+          "paths": {
+            "description": "Paths to skill directories or directories containing skill subdirectories.",
+            "items": {
+              "format": "path",
+              "type": "string"
+            },
+            "title": "Skill paths",
+            "type": "array"
+          }
+        },
+        "title": "SkillsConfiguration",
         "type": "object"
       },
       "SplunkConfiguration": {

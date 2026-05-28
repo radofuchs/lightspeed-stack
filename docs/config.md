@@ -249,6 +249,8 @@ Global service configuration.
 | deployment_environment | string | Deployment environment name (e.g., 'development', 'staging', 'production'). Used in telemetry events. |
 | rag |  | Configuration for all RAG strategies (inline and tool-based). |
 | okp |  | OKP provider settings. Only used when 'okp' is listed in rag.inline or rag.tool. |
+| reranker |  | Configuration for neural reranking of RAG chunks using cross-encoder. |
+| skills |  | Agent skills configuration. Specifies paths to skill directories. |
 
 
 ## ConversationHistoryConfiguration
@@ -457,7 +459,7 @@ Useful resources:
 | url | string | URL of the MCP server |
 | authorization_headers | object | Headers to send to the MCP server. The map contains the header name and the path to a file containing the header value (secret). There are 3 special cases: 1. Usage of the kubernetes token in the header. To specify this use a string 'kubernetes' instead of the file path. 2. Usage of the client-provided token in the header. To specify this use a string 'client' instead of the file path. 3. Usage of the oauth token in the header. To specify this use a string 'oauth' instead of the file path.  |
 | headers | array | List of HTTP header names to automatically forward from the incoming request to this MCP server. Headers listed here are extracted from the original client request and included when calling the MCP server. This is useful when infrastructure components (e.g. API gateways) inject headers that MCP servers need, such as x-rh-identity in HCC. Header matching is case-insensitive. These headers are additive with authorization_headers and MCP-HEADERS. |
-| require_approval | string or object | When to require human approval for MCP tool invocations. 'always' requires approval for all tools, 'never' auto-approves all tools (default), or use an ApprovalFilter for granular per-tool control. |
+| require_approval |  | When to require human approval for tool invocations. 'always' requires approval for all tools, 'never' auto-approves, or use ApprovalFilter for granular control. |
 | timeout | integer | Timeout in seconds for requests to the MCP server. If not specified, the default timeout from Llama Stack will be used. Note: This field is reserved for future use when Llama Stack adds timeout support. |
 
 
@@ -608,6 +610,18 @@ the RAG tool will register all stores available to llama-stack.
 | tool | array | RAG IDs made available to the LLM as a file_search tool. Use 'okp' to include the OKP vector store. When omitted, all registered BYOK vector stores are used (backward compatibility). |
 
 
+## RerankerConfiguration
+
+
+Reranker configuration for RAG chunk reranking.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| enabled | boolean | When True, reranking applied to RAG chunks. When False, reranking is disabled and original scoring used. |
+| model | string | Cross-encoder model name for reranking RAG chunks. Defaults to 'cross-encoder/ms-marco-MiniLM-L6-v2' from sentence-transformers. |
+
+
 ## RlsapiV1Configuration
 
 
@@ -658,6 +672,26 @@ the service can handle requests concurrently.
 | tls_config |  | Transport Layer Security configuration for HTTPS support |
 | root_path | string | ASGI root path for serving behind a reverse proxy on a subpath |
 | cors |  | Cross-Origin Resource Sharing configuration for cross-domain requests |
+
+
+## SkillsConfiguration
+
+
+Agent skills configuration.
+
+Specifies paths to skill directories. Skill metadata (name, description)
+is read from SKILL.md frontmatter at startup.
+
+Each path can point to either:
+- A directory containing a SKILL.md file (single skill)
+- A directory containing subdirectories with SKILL.md files (multiple skills)
+
+Paths are validated at startup to ensure they exist and contain valid SKILL.md files.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| paths | array | Paths to skill directories or directories containing skill subdirectories. |
 
 
 ## SplunkConfiguration

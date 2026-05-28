@@ -258,6 +258,68 @@ storage.</p>
     <p>Available actions in the system.</p>
     <p>Note: this is not a real model, just an enumeration of all action
 names.</p>
+    <h2 id="approvalfilter">ApprovalFilter</h2>
+    <p>Granular approval control for specific MCP tools.</p>
+    <p>Attributes: always: Tool names that always require human approval
+before execution. never: Tool names that never require approval
+(pre-approved).</p>
+    <table>
+      <colgroup>
+        <col style="width: 26%"/>
+        <col style="width: 23%"/>
+        <col style="width: 50%"/>
+      </colgroup>
+      <thead>
+        <tr class="header">
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="odd">
+          <td>always</td>
+          <td>array</td>
+          <td>List of tool names that always require human approval</td>
+        </tr>
+        <tr class="even">
+          <td>never</td>
+          <td>array</td>
+          <td>List of tool names that never require approval</td>
+        </tr>
+      </tbody>
+    </table>
+    <h2 id="approvalsconfiguration">ApprovalsConfiguration</h2>
+    <p>Configuration for human-in-the-loop approvals.</p>
+    <p>Attributes: approval_timeout_seconds: How long approval requests
+remain pending before expiring. approval_retention_days: How long to
+retain decided approvals for audit purposes before cleanup.</p>
+    <table>
+      <colgroup>
+        <col style="width: 26%"/>
+        <col style="width: 23%"/>
+        <col style="width: 50%"/>
+      </colgroup>
+      <thead>
+        <tr class="header">
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="odd">
+          <td>approval_timeout_seconds</td>
+          <td>integer</td>
+          <td>Seconds before pending approval requests expire</td>
+        </tr>
+        <tr class="even">
+          <td>approval_retention_days</td>
+          <td>integer</td>
+          <td>Days to retain decided approvals before cleanup</td>
+        </tr>
+      </tbody>
+    </table>
     <h2 id="authenticationconfiguration">AuthenticationConfiguration</h2>
     <p>Authentication configuration.</p>
     <table>
@@ -659,53 +721,70 @@ disabled, requests that exceed the window continue to surface as HTTP
 413.</td>
         </tr>
         <tr class="odd">
+          <td>approvals</td>
+          <td/>
+          <td>Settings for human-in-the-loop approval of MCP tool invocations</td>
+        </tr>
+        <tr class="even">
           <td>byok_rag</td>
           <td>array</td>
           <td>BYOK RAG configuration. This configuration can be used to
 reconfigure Llama Stack through its run.yaml configuration file</td>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>a2a_state</td>
           <td/>
           <td>Configuration for A2A protocol persistent state storage.</td>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>quota_handlers</td>
           <td/>
           <td>Quota handlers configuration</td>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>azure_entra_id</td>
           <td/>
           <td/>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>rlsapi_v1</td>
           <td/>
           <td>Configuration for the rlsapi v1 /infer endpoint used by the RHEL
 Lightspeed Command Line Assistant (CLA).</td>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>splunk</td>
           <td/>
           <td>Splunk HEC configuration for sending telemetry events.</td>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>deployment_environment</td>
           <td>string</td>
           <td>Deployment environment name (e.g., &#x2018;development&#x2019;, &#x2018;staging&#x2019;,
 &#x2018;production&#x2019;). Used in telemetry events.</td>
         </tr>
-        <tr class="even">
+        <tr class="odd">
           <td>rag</td>
           <td/>
           <td>Configuration for all RAG strategies (inline and tool-based).</td>
         </tr>
-        <tr class="odd">
+        <tr class="even">
           <td>okp</td>
           <td/>
           <td>OKP provider settings. Only used when &#x2018;okp&#x2019; is listed in rag.inline
 or rag.tool.</td>
+        </tr>
+        <tr class="odd">
+          <td>reranker</td>
+          <td/>
+          <td>Configuration for neural reranking of RAG chunks using
+cross-encoder.</td>
+        </tr>
+        <tr class="even">
+          <td>skills</td>
+          <td/>
+          <td>Agent skills configuration. Specifies paths to skill
+directories.</td>
         </tr>
       </tbody>
     </table>
@@ -1214,6 +1293,13 @@ matching is case-insensitive. These headers are additive with
 authorization_headers and MCP-HEADERS.</td>
         </tr>
         <tr class="even">
+          <td>require_approval</td>
+          <td/>
+          <td>When to require human approval for tool invocations. &#x2018;always&#x2019;
+requires approval for all tools, &#x2018;never&#x2019; auto-approves, or use
+ApprovalFilter for granular control.</td>
+        </tr>
+        <tr class="odd">
           <td>timeout</td>
           <td>integer</td>
           <td>Timeout in seconds for requests to the MCP server. If not specified,
@@ -1564,6 +1650,36 @@ vector stores are used (backward compatibility).</td>
         </tr>
       </tbody>
     </table>
+    <h2 id="rerankerconfiguration">RerankerConfiguration</h2>
+    <p>Reranker configuration for RAG chunk reranking.</p>
+    <table>
+      <colgroup>
+        <col style="width: 26%"/>
+        <col style="width: 23%"/>
+        <col style="width: 50%"/>
+      </colgroup>
+      <thead>
+        <tr class="header">
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="odd">
+          <td>enabled</td>
+          <td>boolean</td>
+          <td>When True, reranking applied to RAG chunks. When False, reranking is
+disabled and original scoring used.</td>
+        </tr>
+        <tr class="even">
+          <td>model</td>
+          <td>string</td>
+          <td>Cross-encoder model name for reranking RAG chunks. Defaults to
+&#x2018;cross-encoder/ms-marco-MiniLM-L6-v2&#x2019; from sentence-transformers.</td>
+        </tr>
+      </tbody>
+    </table>
     <h2 id="rlsapiv1configuration">RlsapiV1Configuration</h2>
     <p>Configuration for the rlsapi v1 /infer endpoint.</p>
     <p>Settings specific to the RHEL Lightspeed Command Line Assistant (CLA)
@@ -1692,6 +1808,37 @@ support.</td>
           <td/>
           <td>Cross-Origin Resource Sharing configuration for cross-domain
 requests</td>
+        </tr>
+      </tbody>
+    </table>
+    <h2 id="skillsconfiguration">SkillsConfiguration</h2>
+    <p>Agent skills configuration.</p>
+    <p>Specifies paths to skill directories. Skill metadata (name,
+description) is read from SKILL.md frontmatter at startup.</p>
+    <p>Each path can point to either: - A directory containing a SKILL.md
+file (single skill) - A directory containing subdirectories with
+SKILL.md files (multiple skills)</p>
+    <p>Paths are validated at startup to ensure they exist and contain valid
+SKILL.md files.</p>
+    <table>
+      <colgroup>
+        <col style="width: 26%"/>
+        <col style="width: 23%"/>
+        <col style="width: 50%"/>
+      </colgroup>
+      <thead>
+        <tr class="header">
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="odd">
+          <td>paths</td>
+          <td>array</td>
+          <td>Paths to skill directories or directories containing skill
+subdirectories.</td>
         </tr>
       </tbody>
     </table>
@@ -1860,4 +2007,3 @@ further processing.</td>
     </table>
   </body>
 </html>
-
