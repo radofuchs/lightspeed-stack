@@ -51,6 +51,7 @@ from utils.query import (
     extract_provider_and_model_from_model_id,
     handle_known_apistatus_errors,
     is_context_length_error,
+    normalize_vertex_ai_model_id,
 )
 from utils.quota import check_tokens_available
 from utils.responses import (
@@ -343,9 +344,12 @@ async def _call_llm(
 
     logger.debug("Using model %s for rlsapi v1 inference", resolved_model_id)
 
+    # Normalize Vertex AI model IDs to work around llama-stack 0.6.x bug
+    normalized_model = normalize_vertex_ai_model_id(resolved_model_id)
+
     response = await client.responses.create(
         input=question,
-        model=resolved_model_id,
+        model=normalized_model,
         instructions=instructions,
         tools=tools or [],
         stream=False,
