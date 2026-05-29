@@ -47,7 +47,7 @@ start-llama-stack-container: build-llama-stack-image ## Start llama-stack contai
 		--health-timeout 5s \
 		--health-retries 3 \
 		--health-start-period 15s \
-		-v $(PWD)/$(LLAMA_STACK_CONFIG):/opt/app-root/run.yaml:ro,z \
+		-v $(PWD)/$(LLAMA_STACK_CONFIG):/opt/app-root/run.yaml:z \
 		-v $(PWD)/$(CONFIG):/opt/app-root/lightspeed-stack.yaml:ro,z \
 		-v $(PWD)/scripts/llama-stack-entrypoint.sh:/opt/app-root/enrich-entrypoint.sh:ro,z \
 		-v $(PWD)/src/llama_stack_configuration.py:/opt/app-root/llama_stack_configuration.py:ro,z \
