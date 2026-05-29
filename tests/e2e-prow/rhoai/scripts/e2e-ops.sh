@@ -25,6 +25,8 @@
 #   disrupt-llama-stack             - Delete llama-stack pod to disrupt connection
 #   deploy-e2e-tunnel-proxy         - Deploy in-cluster tunnel proxy (proxy.feature step)
 #   deploy-e2e-interception-proxy   - Deploy in-cluster interception proxy (proxy.feature step)
+#   deploy-e2e-mock-tls-inference   - Deploy mock HTTPS inference server (tls.feature)
+#   sync-mock-tls-certs-secret      - Copy mock /certs into Secret for llama-stack mount
 
 set -e
 
@@ -370,6 +372,13 @@ cmd_restart_llama_stack() {
             echo "[e2e-ops] Syncing e2e-interception-proxy-ca secret before llama-stack apply..."
             if ! cmd_sync_interception_proxy_ca_secret; then
                 echo "===== Llama-stack restore FAILED (interception CA secret sync) ====="
+                exit 1
+            fi
+        fi
+        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+            echo "[e2e-ops] Syncing e2e-mock-tls-certs secret before llama-stack apply..."
+            if ! cmd_sync_mock_tls_certs_secret; then
+                echo "===== Llama-stack restore FAILED (mock TLS cert secret sync) ====="
                 exit 1
             fi
         fi
@@ -762,10 +771,75 @@ cmd_deploy_e2e_interception_proxy() {
     oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-interception-proxy.yaml"
     if ! oc wait pod/e2e-interception-proxy -n "$NAMESPACE" --for=condition=Ready --timeout=180s; then
         echo "ERROR: e2e-interception-proxy failed to become ready" >&2
-        oc describe pod e2e-interception-proxy -n "$NAMESPACE" 2>/dev/null | tail -25 || true
+        e2e_ops_dump_pod_logs "e2e-interception-proxy" 80
         return 1
     fi
     echo "✓ e2e-interception-proxy ready at http://e2e-interception-proxy.${NAMESPACE}.svc.cluster.local:8889"
+}
+
+_MOCK_TLS_CERT_FILES=(
+    ca.crt client.crt client.key untrusted-ca.crt expired-ca.crt
+    untrusted-client.crt untrusted-client.key expired-client.crt
+)
+
+cmd_sync_mock_tls_certs_secret() {
+    local mock_pod="e2e-mock-tls-inference"
+    local f tmpdir from_args
+
+    if ! oc get pod "$mock_pod" -n "$NAMESPACE" &>/dev/null; then
+        echo "ERROR: $mock_pod not found — run deploy-e2e-mock-tls-inference first" >&2
+        return 1
+    fi
+    if ! oc wait pod/"$mock_pod" -n "$NAMESPACE" --for=condition=Ready --timeout=120s; then
+        echo "ERROR: $mock_pod not Ready" >&2
+        e2e_ops_dump_pod_logs "$mock_pod" 80
+        return 1
+    fi
+
+    tmpdir=$(mktemp -d)
+    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+        oc exec -n "$NAMESPACE" "$mock_pod" -c e2e-mock-tls-inference --request-timeout=60s -- \
+            cat "/certs/${f}" >"${tmpdir}/${f}" 2>/dev/null || true
+        if [[ ! -s "${tmpdir}/${f}" ]]; then
+            echo "ERROR: failed to read /certs/${f} from $mock_pod" >&2
+            rm -rf "$tmpdir"
+            e2e_ops_dump_pod_logs "$mock_pod" 80
+            return 1
+        fi
+    done
+    from_args=()
+    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
+        from_args+=(--from-file="${f}=${tmpdir}/${f}")
+    done
+    oc create secret generic e2e-mock-tls-certs \
+        "${from_args[@]}" -n "$NAMESPACE" \
+        --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
+    rm -rf "$tmpdir"
+    echo "✓ Secret e2e-mock-tls-certs updated"
+}
+
+cmd_deploy_e2e_mock_tls_inference() {
+    local repo_root server_py
+    repo_root="$(_e2e_repo_root)"
+    server_py="$repo_root/tests/e2e/mock_tls_inference_server/server.py"
+    if [[ ! -f "$server_py" ]]; then
+        echo "ERROR: missing $server_py" >&2
+        return 1
+    fi
+    echo "Deploying e2e-mock-tls-inference in namespace $NAMESPACE..."
+    oc create configmap e2e-mock-tls-inference-script -n "$NAMESPACE" \
+        --from-file=server.py="$server_py" \
+        --dry-run=client -o yaml | oc apply -f -
+    oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-mock-tls-inference.yaml"
+    if ! oc wait pod/e2e-mock-tls-inference -n "$NAMESPACE" --for=condition=Ready --timeout=240s; then
+        echo "ERROR: e2e-mock-tls-inference failed to become ready" >&2
+        e2e_ops_dump_pod_logs "e2e-mock-tls-inference" 80
+        return 1
+    fi
+    if ! cmd_sync_mock_tls_certs_secret; then
+        return 1
+    fi
+    echo "✓ e2e-mock-tls-inference ready"
 }
 
 cmd_dump_pod_logs() {
@@ -842,6 +916,12 @@ case "$COMMAND" in
     deploy-e2e-interception-proxy)
         cmd_deploy_e2e_interception_proxy
         ;;
+    deploy-e2e-mock-tls-inference)
+        cmd_deploy_e2e_mock_tls_inference
+        ;;
+    sync-mock-tls-certs-secret)
+        cmd_sync_mock_tls_certs_secret
+        ;;
     dump-pod-logs)
         cmd_dump_pod_logs "$@"
         ;;
@@ -863,6 +943,8 @@ case "$COMMAND" in
         echo "  sync-interception-proxy-ca-secret   - Publish trustme CA to Secret for llama mount"
         echo "  deploy-e2e-tunnel-proxy            - Deploy in-cluster tunnel proxy pod"
         echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
+        echo "  deploy-e2e-mock-tls-inference        - Deploy mock HTTPS inference (tls.feature)"
+        echo "  sync-mock-tls-certs-secret           - Publish mock TLS /certs to Secret"
         echo "  dump-pod-logs <pod> [tail-lines]   - Print init + container logs"
         exit 1
         ;;
