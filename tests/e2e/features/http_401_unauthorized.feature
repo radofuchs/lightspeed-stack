@@ -124,6 +124,73 @@ Feature: HTTP 401 Unauthorized
     }
     """
 
+  # --- prompts ---
+
+  Scenario: Prompts list returns 401 when not authenticated
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service is restarted
+    When I access REST API endpoint "prompts" using HTTP GET method
+    Then The status code of the response is 401
+    And The body of the response is the following
+    """
+    {
+      "detail": {
+        "response": "Missing or invalid credentials provided by client",
+        "cause": "No Authorization header found"
+      }
+    }
+    """
+
+  Scenario: Prompts create returns 401 when not authenticated
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service is restarted
+    When I access REST API endpoint "prompts" using HTTP POST method
+    """
+    {"prompt": "Summarize: {{text}}", "variables": ["text"]}
+    """
+    Then The status code of the response is 401
+    And The body of the response contains No Authorization header found
+
+  Scenario: Prompts get by id returns 401 when not authenticated
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service is restarted
+    When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP GET method
+    Then The status code of the response is 401
+    And The body of the response is the following
+    """
+    {
+      "detail": {
+        "response": "Missing or invalid credentials provided by client",
+        "cause": "No Authorization header found"
+      }
+    }
+    """
+
+  Scenario: Prompts update returns 401 when not authenticated
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service is restarted
+    When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP PUT method
+    """
+    {"prompt": "Summarize in bullets: {{text}}", "version": 1, "set_as_default": true, "variables": ["text"]}
+    """
+    Then The status code of the response is 401
+    And The body of the response contains No Authorization header found
+
+  Scenario: Prompts delete returns 401 when not authenticated
+    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service is restarted
+    When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP DELETE method
+    Then The status code of the response is 401
+    And The body of the response is the following
+    """
+    {
+      "detail": {
+        "response": "Missing or invalid credentials provided by client",
+        "cause": "No Authorization header found"
+      }
+    }
+    """
+
   # --- authorized (noop token) ---
 
   Scenario: Check if the authorized endpoint fails when user_id and auth header are not provided
