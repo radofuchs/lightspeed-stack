@@ -213,8 +213,10 @@ e2e_ops_diagnose_forward_failure() {
         echo "[e2e-ops] /tmp/port-forward.log (tail 30):"
         tail -30 /tmp/port-forward.log 2>/dev/null | sed 's/^/[e2e-ops] /' || true
     fi
-    echo "[e2e-ops] oc get pods -n $NAMESPACE:"
-    oc get pods -n "$NAMESPACE" -o wide 2>&1 | sed 's/^/[e2e-ops] /' || true
+    e2e_ops_dump_pod_logs "lightspeed-stack-service" 10000
+    if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+        e2e_ops_dump_pod_logs "llama-stack-service" 10000
+    fi
 }
 
 verify_connectivity() {
@@ -346,7 +348,10 @@ cmd_restart_lightspeed() {
     oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n "$NAMESPACE" --overwrite
 
     # Re-establish port-forwards (may succeed even if readiness was slow)
-    cmd_restart_port_forward
+    if ! cmd_restart_port_forward; then
+        echo "⚠️  Lightspeed port-forward failed"
+        return 1
+    fi
     cmd_restart_jwks_port_forward || echo "⚠️  Mock JWKS port-forward failed (RBAC tests may fail)"
 
     if [[ "$pod_ready" == "false" ]]; then
@@ -413,6 +418,7 @@ cmd_restart_llama_stack() {
 
     if ! cmd_restart_llama_port_forward; then
         echo "ERROR: Llama pod is up but localhost:${LOCAL_LLAMA_PORT:-8321} port-forward failed"
+        e2e_ops_dump_pod_logs "llama-stack-service" 10000
         exit 1
     fi
 
@@ -557,9 +563,10 @@ cmd_restart_llama_port_forward() {
 
     echo "Failed to establish Llama Stack port-forward on :$local_port"
     if [[ -s "$llama_pf_log" ]]; then
+        echo "[e2e-ops] $llama_pf_log (tail 30):"
         tail -30 "$llama_pf_log" 2>/dev/null | sed 's/^/[e2e-ops] /' || true
     fi
-    return 1
+    e2e_ops_dump_pod_logs "llama-stack-service" 100000    return 1
 }
 
 cmd_restart_jwks_port_forward() {
