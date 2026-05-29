@@ -244,7 +244,7 @@ def before_scenario(context: Context, scenario: Scenario) -> None:
 def _dump_pod_logs_on_failure(
     context: Context, scenario: Scenario, namespace: str
 ) -> None:
-    """Dump pod diagnostics when a scenario fails in Prow (init + main container logs)."""
+    """Dump container logs when a scenario fails in Prow."""
     if scenario.status != "failed":
         return
     pods: tuple[str, ...] = ("llama-stack-service", "lightspeed-stack-service")
@@ -252,15 +252,15 @@ def _dump_pod_logs_on_failure(
     feat_file = getattr(feature, "filename", "") or "" if feature else ""
     if "tls.feature" in feat_file:
         pods = (*pods, "e2e-mock-tls-inference")
-    print(f"--- scenario failed: {scenario.name!r} — dumping pod logs ---", flush=True)
+    print(f"--- scenario failed: {scenario.name!r} — pod logs ---", flush=True)
     for pod in pods:
         try:
-            result = run_e2e_ops("dump-pod-logs", [pod], timeout=90)
+            result = run_e2e_ops("dump-pod-logs", [pod, "150"], timeout=90)
             print(result.stdout, end="")
             if result.stderr:
                 print(result.stderr, end="")
         except subprocess.TimeoutExpired:
-            print(f"(timed out dumping logs for {pod})")
+            print(f"(timed out fetching logs for {pod})")
 
 
 def after_scenario(context: Context, scenario: Scenario) -> None:

@@ -25,9 +25,6 @@
 #   disrupt-llama-stack             - Delete llama-stack pod to disrupt connection
 #   deploy-e2e-tunnel-proxy         - Deploy in-cluster tunnel proxy (proxy.feature step)
 #   deploy-e2e-interception-proxy   - Deploy in-cluster interception proxy (proxy.feature step)
-#   deploy-e2e-mock-tls-inference   - Deploy mock HTTPS inference server (tls.feature step)
-#   sync-mock-tls-certs-secret      - Publish /certs PEMs to Secret for llama-stack mount
-#   dump-pod-logs <pod> [container] - Print events, describe, init + container logs (on failure)
 
 set -e
 
@@ -43,138 +40,48 @@ E2E_JWKS_PORT_FORWARD_PID_FILE="${E2E_JWKS_PORT_FORWARD_PID_FILE:-/tmp/e2e-jwks-
 # Helper functions
 # ============================================================================
 
-# Print diagnostics to stdout (captured by Behave as CAPTURED STDOUT).
+# Print container logs only (no events/describe). Used on failure paths.
 e2e_ops_dump_pod_logs() {
     local pod_name="${1:?pod name required}"
-    local preferred_container="${2:-}"
-    local log_tail="${3:-200}"
+    local log_tail="${2:-150}"
     local prefix="[e2e-ops] "
-    local init_ctr ctr restart_count phase
+    local ctr tmp
 
-    echo "${prefix}========== failure logs: pod/$pod_name (namespace $NAMESPACE) =========="
-
-    echo "${prefix}--- events for pod/$pod_name ---"
-    oc get events -n "$NAMESPACE" --field-selector "involvedObject.name=${pod_name}" \
-        --sort-by='.lastTimestamp' 2>&1 | tail -50 | sed "s/^/${prefix}/" \
-        || echo "${prefix}(could not list events)"
-
+    echo "${prefix}--- logs: pod/$pod_name ---"
     if ! oc get pod "$pod_name" -n "$NAMESPACE" &>/dev/null; then
-        echo "${prefix}pod/$pod_name not found (deleted or never created)"
-        echo "${prefix}--- recent namespace events mentioning $pod_name ---"
-        oc get events -n "$NAMESPACE" --sort-by='.lastTimestamp' 2>&1 \
-            | grep -F "$pod_name" | tail -40 | sed "s/^/${prefix}/" \
-            || echo "${prefix}(no matching events or API error)"
-        oc get pods -n "$NAMESPACE" -o wide 2>&1 | sed "s/^/${prefix}/" || true
-        echo "${prefix}========== end failure logs: pod/$pod_name =========="
+        echo "${prefix}pod not found, cannot fetch logs"
         return 0
     fi
-
-    phase=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "?")
-    echo "${prefix}pod phase=$phase"
-    oc get pod "$pod_name" -n "$NAMESPACE" -o wide 2>&1 | sed "s/^/${prefix}/" || true
-    oc describe pod "$pod_name" -n "$NAMESPACE" 2>&1 | sed "s/^/${prefix}/" || true
-
-    for init_ctr in $(oc get pod "$pod_name" -n "$NAMESPACE" \
-        -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null); do
-        [[ -n "$init_ctr" ]] || continue
-        echo "${prefix}--- logs pod/$pod_name -c $init_ctr (init, tail $log_tail) ---"
-        oc logs "$pod_name" -n "$NAMESPACE" -c "$init_ctr" --tail="$log_tail" 2>&1 \
-            | sed "s/^/${prefix}/" || echo "${prefix}(no init logs for $init_ctr)"
-    done
-
-    for ctr in $(oc get pod "$pod_name" -n "$NAMESPACE" \
-        -o jsonpath='{.spec.containers[*].name}' 2>/dev/null); do
+    while IFS= read -r ctr; do
         [[ -n "$ctr" ]] || continue
-        echo "${prefix}--- logs pod/$pod_name -c $ctr (tail $log_tail) ---"
-        oc logs "$pod_name" -n "$NAMESPACE" -c "$ctr" --tail="$log_tail" 2>&1 \
-            | sed "s/^/${prefix}/" || echo "${prefix}(no logs for $ctr)"
-        restart_count=$(oc get pod "$pod_name" -n "$NAMESPACE" \
-            -o jsonpath="{.status.containerStatuses[?(@.name==\"${ctr}\")].restartCount}" \
-            2>/dev/null) || restart_count="0"
-        if [[ "${restart_count:-0}" -gt 0 ]]; then
-            echo "${prefix}--- logs pod/$pod_name -c $ctr --previous (tail $log_tail) ---"
-            oc logs "$pod_name" -n "$NAMESPACE" -c "$ctr" --previous --tail="$log_tail" 2>&1 \
-                | sed "s/^/${prefix}/" || true
-        fi
-    done
-
-    if [[ -n "$preferred_container" ]]; then
-        echo "${prefix}--- logs pod/$pod_name -c $preferred_container (preferred, tail $log_tail) ---"
-        oc logs "$pod_name" -n "$NAMESPACE" -c "$preferred_container" --tail="$log_tail" 2>&1 \
-            | sed "s/^/${prefix}/" || true
-    fi
-
-    echo "${prefix}========== end failure logs: pod/$pod_name =========="
-}
-
-_oc_api_reachable() {
-    oc get namespace "$NAMESPACE" --request-timeout=10s &>/dev/null
+        echo "${prefix}--- oc logs -c $ctr ---"
+        tmp=$(mktemp)
+        oc logs "$pod_name" -n "$NAMESPACE" -c "$ctr" --tail="$log_tail" >"$tmp" 2>&1 \
+            || true
+        sed "s/^/${prefix}/" <"$tmp"
+        rm -f "$tmp"
+    done < <(
+        oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{range .spec.initContainers[*]}{.name}{"\n"}{end}{range .spec.containers[*]}{.name}{"\n"}{end}' 2>/dev/null \
+            || true
+    )
 }
 
 wait_for_pod() {
     local pod_name="$1"
     local max_attempts="${2:-24}"
-    local attempt
-    local ready
-    local phase
-    local pod_seen=false
-    local missing_streak=0
-    local pending_diag_done=false
-    local missing_dump_done=false
-
+    
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
-        if ! _oc_api_reachable; then
-            echo "[e2e-ops] ERROR: OpenShift API unreachable (attempt $attempt/$max_attempts)"
-            e2e_ops_dump_pod_logs "$pod_name" "" 150
-            return 1
-        fi
-
-        if ! oc get pod "$pod_name" -n "$NAMESPACE" &>/dev/null; then
-            phase="Missing"
-            if [[ "$pod_seen" == true ]]; then
-                missing_streak=$((missing_streak + 1))
-                if [[ "$missing_dump_done" == false ]]; then
-                    echo "[e2e-ops] $pod_name disappeared (attempt $attempt/$max_attempts) — dumping logs now"
-                    e2e_ops_dump_pod_logs "$pod_name" "" 250
-                    missing_dump_done=true
-                fi
-                if [[ $missing_streak -ge 3 ]]; then
-                    echo "Pod $pod_name gone after being scheduled (missing ${missing_streak} polls)"
-                    return 1
-                fi
-            fi
-        else
-            pod_seen=true
-            missing_streak=0
-            phase=$(oc get pod "$pod_name" -n "$NAMESPACE" \
-                -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            ready=$(oc get pod "$pod_name" -n "$NAMESPACE" \
-                -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
-            if [[ "$ready" == "true" ]]; then
-                echo "✓ Pod $pod_name ready (attempt $attempt/$max_attempts)"
-                return 0
-            fi
-            if [[ "$phase" == "Failed" ]]; then
-                echo "[e2e-ops] $pod_name phase=Failed (attempt $attempt/$max_attempts)"
-                e2e_ops_dump_pod_logs "$pod_name" "" 250
-                return 1
-            fi
-            if [[ "$phase" == "Pending" && "$pending_diag_done" == false && $attempt -ge 15 ]]; then
-                pending_diag_done=true
-                echo "[e2e-ops] $pod_name still Pending after $((attempt * 3))s — init/scheduling snapshot:"
-                e2e_ops_dump_pod_logs "$pod_name" "" 200
-            fi
-        fi
-        if [[ $((attempt % 10)) -eq 0 ]]; then
-            echo "[e2e-ops] $pod_name not ready yet (attempt $attempt/$max_attempts, phase=${phase:-?})..."
+        local ready
+        ready=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
+        if [[ "$ready" == "true" ]]; then
+            echo "✓ Pod $pod_name ready"
+            return 0
         fi
         sleep 3
     done
-
-    echo "Pod $pod_name not ready after $((max_attempts * 3))s (last phase: ${phase:-unknown})"
-    if [[ "$missing_dump_done" == false && "$pending_diag_done" == false ]]; then
-        e2e_ops_dump_pod_logs "$pod_name" "" 250
-    fi
+    
+    echo "Pod $pod_name not ready after $((max_attempts * 3))s"
+    e2e_ops_dump_pod_logs "$pod_name" 200
     return 1
 }
 
@@ -392,7 +299,7 @@ wait_for_llama_stack_http_health() {
         fi
     done
     echo "ERROR: Llama Stack did not respond on http://127.0.0.1:8321/v1/health inside the pod"
-    e2e_ops_dump_pod_logs "llama-stack-service" "llama-stack-container" 250
+    e2e_ops_dump_pod_logs "llama-stack-service" 200
     return 1
 }
 
@@ -428,23 +335,13 @@ cmd_restart_lightspeed() {
     # Don't let a timeout here abort the function — still attempt port-forward
     # and diagnostics so later scenarios have a chance to recover.
     local pod_ready=true
-    local lcs_pod_wait=40
-    if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]]; then
-        # readinessProbe: 20s + 30*5s; LCS + Llama handshake can exceed 195s on Konflux (TLS suite).
-        lcs_pod_wait=100
-    fi
-    echo "[e2e-ops] Waiting for lightspeed-stack-service Ready (max ${lcs_pod_wait} attempts, $((lcs_pod_wait * 3))s)..."
-    if ! wait_for_pod "lightspeed-stack-service" "$lcs_pod_wait"; then
+    if ! wait_for_pod "lightspeed-stack-service" 40; then
         pod_ready=false
-        echo "⚠️  Pod not ready within $((lcs_pod_wait * 3))s"
+        echo "⚠️  Pod not ready within 120s"
     fi
 
-    # Re-label pod for service discovery (ignore if pod was deleted / not created yet)
-    if oc get pod lightspeed-stack-service -n "$NAMESPACE" &>/dev/null; then
-        oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n "$NAMESPACE" --overwrite
-    else
-        echo "⚠️  Cannot label lightspeed-stack-service — pod missing"
-    fi
+    # Re-label pod for service discovery
+    oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n "$NAMESPACE" --overwrite
 
     # Re-establish port-forwards (may succeed even if readiness was slow)
     cmd_restart_port_forward
@@ -452,7 +349,6 @@ cmd_restart_lightspeed() {
 
     if [[ "$pod_ready" == "false" ]]; then
         echo "⚠️  Lightspeed restart completed but pod was slow to become ready"
-        e2e_ops_dump_pod_logs "lightspeed-stack-service" "lightspeed-stack-container" 150
         return 1
     fi
     echo "✓ Lightspeed restart complete"
@@ -460,7 +356,6 @@ cmd_restart_lightspeed() {
 
 cmd_restart_llama_stack() {
     echo "===== Restoring llama-stack service ====="
-    echo "[e2e-ops] restart-llama-stack env: E2E_KONFLUX_E2E=${E2E_KONFLUX_E2E:-0} E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA=${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}"
     # Pod.spec is largely immutable; delete so apply creates a pod with current volumes/env.
     echo "Deleting llama-stack pod (if any) before apply..."
     timeout 45 oc delete pod llama-stack-service -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || {
@@ -478,52 +373,22 @@ cmd_restart_llama_stack() {
                 exit 1
             fi
         fi
-        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
-            echo "[e2e-ops] Syncing e2e-mock-tls-certs secret before llama-stack apply..."
-            if ! cmd_sync_mock_tls_certs_secret; then
-                echo "===== Llama-stack restore FAILED (mock TLS certs secret sync) ====="
-                e2e_ops_dump_pod_logs "e2e-mock-tls-inference" "e2e-mock-tls-inference" 120
-                e2e_ops_dump_pod_logs "llama-stack-service" "llama-stack-container" 120
-                exit 1
-            fi
-        fi
         _LLAMA_SVC_FQDN="llama-stack-service-svc.${NAMESPACE}.svc.cluster.local"
         oc create secret generic llama-stack-ip-secret \
             --from-literal=key="$_LLAMA_SVC_FQDN" \
             -n "$NAMESPACE" \
             --dry-run=client -o yaml | oc apply -f -
         oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/llama-stack-openai.yaml"
-        local llama_pod_wait=90
-        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
-            # readinessProbe: 20s + 36*5s = 200s; clone/enrich/RAG on Konflux often needs 400s+ total.
-            llama_pod_wait=180
-        fi
-        echo "[e2e-ops] Waiting for llama-stack-service Ready (max ${llama_pod_wait} attempts, $((llama_pod_wait * 3))s)..."
-        if ! wait_for_pod "llama-stack-service" "$llama_pod_wait"; then
-            echo "===== Llama-stack restore FAILED (pod not Ready within $((llama_pod_wait * 3))s) ====="
-            exit 1
-        fi
+        wait_for_pod "llama-stack-service" 90
         echo "Labeling pod for service..."
         oc label pod llama-stack-service pod=llama-stack-service -n "$NAMESPACE" --overwrite
         if [[ "${E2E_COPY_INTERCEPTION_CA_TO_LLAMA:-0}" == "1" ]]; then
             if ! _verify_interception_ca_mounted_in_llama; then
                 echo "===== Llama-stack restore FAILED (interception CA not mounted) ====="
-                e2e_ops_dump_pod_logs "llama-stack-service" "llama-stack-container" 150
                 exit 1
             fi
         fi
-        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
-            if ! _verify_mock_tls_certs_mounted_in_llama; then
-                echo "===== Llama-stack restore FAILED (mock TLS certs not mounted) ====="
-                e2e_ops_dump_pod_logs "llama-stack-service" "llama-stack-container" 150
-                exit 1
-            fi
-        fi
-        local llama_health_attempts=50
-        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
-            llama_health_attempts=100
-        fi
-        if ! wait_for_llama_stack_http_health "$llama_health_attempts"; then
+        if ! wait_for_llama_stack_http_health 50; then
             echo "===== Llama-stack restore FAILED (HTTP not healthy) ====="
             exit 1
         fi
@@ -539,7 +404,6 @@ cmd_restart_llama_stack() {
 
     if ! cmd_restart_llama_port_forward; then
         echo "ERROR: Llama pod is up but localhost:${LOCAL_LLAMA_PORT:-8321} port-forward failed"
-        e2e_ops_dump_pod_logs "llama-stack-service" "llama-stack-container" 150
         exit 1
     fi
 
@@ -633,23 +497,20 @@ cmd_restart_llama_port_forward() {
     local local_port="${LOCAL_LLAMA_PORT:-8321}"
     local remote_port="${REMOTE_LLAMA_PORT:-8321}"
     local max_attempts=6
-    if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
-        max_attempts=10
-    fi
     local pf_pid
     local pf_resource
     local llama_pf_log="/tmp/port-forward-llama.log"
 
-    echo "Re-establishing Llama Stack port-forward on $local_port:$remote_port (max $max_attempts attempts)..."
+    echo "Re-establishing Llama Stack port-forward on $local_port:$remote_port..."
 
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
         kill_stale_llama_forward "$local_port"
         sleep 3
 
-        if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]] || [[ $attempt -ge 3 ]]; then
-            pf_resource="pod/llama-stack-service"
-        else
+        if [[ $attempt -le 2 ]]; then
             pf_resource="svc/llama-stack-service-svc"
+        else
+            pf_resource="pod/llama-stack-service"
         fi
         echo "Llama port-forward attempt $attempt/$max_attempts -> $pf_resource"
 
@@ -687,10 +548,8 @@ cmd_restart_llama_port_forward() {
 
     echo "Failed to establish Llama Stack port-forward on :$local_port"
     if [[ -s "$llama_pf_log" ]]; then
-        echo "[e2e-ops] $llama_pf_log (tail 30):"
         tail -30 "$llama_pf_log" 2>/dev/null | sed 's/^/[e2e-ops] /' || true
     fi
-    e2e_ops_dump_pod_logs "llama-stack-service" "llama-stack-container" 150
     return 1
 }
 
@@ -873,145 +732,6 @@ cmd_copy_interception_proxy_ca_to_llama() {
     cmd_sync_interception_proxy_ca_secret
 }
 
-_MOCK_TLS_CERT_FILES=(
-    ca.crt
-    client.crt
-    client.key
-    untrusted-ca.crt
-    expired-ca.crt
-    untrusted-client.crt
-    untrusted-client.key
-    expired-client.crt
-)
-
-_mock_tls_secret_is_complete() {
-    local f b64
-    for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
-        b64=$(oc get secret e2e-mock-tls-certs -n "$NAMESPACE" \
-            -o "go-template={{index .data \"${f}\"}}" 2>/dev/null) || return 1
-        [[ -n "$b64" ]] || return 1
-    done
-    return 0
-}
-
-_get_mock_tls_inference_pod_name() {
-    oc get pod -n "$NAMESPACE" -l app=e2e-mock-tls-inference \
-        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
-}
-
-_wait_for_mock_tls_inference_pod() {
-    if ! oc wait pod -l app=e2e-mock-tls-inference -n "$NAMESPACE" \
-        --for=condition=Ready --timeout=120s 2>/dev/null; then
-        echo "ERROR: e2e-mock-tls-inference pod not Ready" >&2
-        oc get pods -n "$NAMESPACE" -l app=e2e-mock-tls-inference -o wide 2>&1 || true
-        return 1
-    fi
-    return 0
-}
-
-_copy_mock_tls_cert_from_pod() {
-    local mock_pod_name="$1"
-    local cert_file="$2"
-    local dest="$3"
-    local attempt
-
-    for ((attempt=1; attempt<=4; attempt++)); do
-        if oc exec --request-timeout=90 -n "$NAMESPACE" "$mock_pod_name" \
-            -c e2e-mock-tls-inference -- cat "/certs/$cert_file" >"$dest" 2>/dev/null \
-            && [[ -s "$dest" ]]; then
-            return 0
-        fi
-        echo "[e2e-ops] WARN: read /certs/$cert_file from mock pod failed (attempt $attempt/4)"
-        sleep 5
-    done
-    return 1
-}
-
-_recycle_mock_tls_inference_pod() {
-    echo "[e2e-ops] Recycling e2e-mock-tls-inference pod (stale or unresponsive)..."
-    oc delete pod e2e-mock-tls-inference -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || true
-    sleep 3
-    if ! _wait_for_mock_tls_inference_pod; then
-        return 1
-    fi
-    # Certs are written at container start; allow trustme + pip to finish.
-    sleep 10
-    return 0
-}
-
-cmd_sync_mock_tls_certs_secret() {
-    local mock_pod_name tmpdir f recycle_attempt
-
-    if _mock_tls_secret_is_complete; then
-        echo "✓ Secret e2e-mock-tls-certs already complete (${#_MOCK_TLS_CERT_FILES[@]} keys); skipping sync"
-        return 0
-    fi
-
-    for recycle_attempt in 1 2; do
-        mock_pod_name=$(_get_mock_tls_inference_pod_name)
-        if [[ -z "$mock_pod_name" ]]; then
-            echo "ERROR: no e2e-mock-tls-inference pod in namespace $NAMESPACE" >&2
-            echo "  Run: e2e-ops.sh deploy-e2e-mock-tls-inference" >&2
-            return 1
-        fi
-
-        if ! _wait_for_mock_tls_inference_pod; then
-            if [[ $recycle_attempt -lt 2 ]] && _recycle_mock_tls_inference_pod; then
-                continue
-            fi
-            e2e_ops_dump_pod_logs "e2e-mock-tls-inference" "e2e-mock-tls-inference" 120
-            return 1
-        fi
-
-        tmpdir=$(mktemp -d)
-        local sync_ok=true
-        for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
-            if ! _copy_mock_tls_cert_from_pod "$mock_pod_name" "$f" "$tmpdir/$f"; then
-                echo "ERROR: failed to read /certs/$f from e2e-mock-tls-inference pod" >&2
-                e2e_ops_dump_pod_logs "$mock_pod_name" "e2e-mock-tls-inference" 120
-                sync_ok=false
-                break
-            fi
-        done
-
-        if [[ "$sync_ok" == "true" ]]; then
-            if ! oc create secret generic e2e-mock-tls-certs \
-                --from-file="$tmpdir" \
-                -n "$NAMESPACE" \
-                --dry-run=client -o yaml | oc apply -f -; then
-                echo "ERROR: failed to apply e2e-mock-tls-certs secret" >&2
-                rm -rf "$tmpdir"
-                return 1
-            fi
-            rm -rf "$tmpdir"
-            echo "✓ Secret e2e-mock-tls-certs updated (${#_MOCK_TLS_CERT_FILES[@]} files)"
-            return 0
-        fi
-
-        rm -rf "$tmpdir"
-        if [[ $recycle_attempt -lt 2 ]]; then
-            _recycle_mock_tls_inference_pod || return 1
-        fi
-    done
-
-    e2e_ops_dump_pod_logs "e2e-mock-tls-inference" "e2e-mock-tls-inference" 120
-    return 1
-}
-
-_verify_mock_tls_certs_mounted_in_llama() {
-    local llama_pod_name="llama-stack-service"
-    if oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- \
-        sh -c 'test -s /certs/ca.crt && test -s /certs/client.crt && test -s /certs/client.key'; then
-        echo "✓ mock TLS certs present under /certs in llama-stack"
-        return 0
-    fi
-    echo "ERROR: /certs missing or incomplete in llama-stack pod" >&2
-    oc get secret e2e-mock-tls-certs -n "$NAMESPACE" 2>&1 || true
-    oc exec -n "$NAMESPACE" "$llama_pod_name" -c llama-stack-container -- \
-        ls -la /certs 2>&1 || true
-    return 1
-}
-
 _e2e_repo_root() {
     cd "$SCRIPT_DIR/../../../.." && pwd
 }
@@ -1048,32 +768,8 @@ cmd_deploy_e2e_interception_proxy() {
     echo "✓ e2e-interception-proxy ready at http://e2e-interception-proxy.${NAMESPACE}.svc.cluster.local:8889"
 }
 
-cmd_deploy_e2e_mock_tls_inference() {
-    local repo_root
-    repo_root="$(_e2e_repo_root)"
-    echo "Deploying e2e-mock-tls-inference in namespace $NAMESPACE..."
-    oc create configmap e2e-mock-tls-inference-script -n "$NAMESPACE" \
-        --from-file=server.py="$repo_root/tests/e2e/mock_tls_inference_server/server.py" \
-        --dry-run=client -o yaml | oc apply -f -
-    oc delete pod e2e-mock-tls-inference -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || true
-    oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-mock-tls-inference.yaml"
-    if ! oc wait pod/e2e-mock-tls-inference -n "$NAMESPACE" --for=condition=Ready --timeout=240s; then
-        echo "ERROR: e2e-mock-tls-inference failed to become ready" >&2
-        e2e_ops_dump_pod_logs "e2e-mock-tls-inference" "e2e-mock-tls-inference" 150
-        return 1
-    fi
-    echo "✓ e2e-mock-tls-inference ready at https://e2e-mock-tls-inference.${NAMESPACE}.svc.cluster.local:8443"
-    if ! cmd_sync_mock_tls_certs_secret; then
-        echo "WARNING: mock TLS server is up but e2e-mock-tls-certs secret sync failed" >&2
-        e2e_ops_dump_pod_logs "e2e-mock-tls-inference" "e2e-mock-tls-inference" 150
-        return 1
-    fi
-}
-
 cmd_dump_pod_logs() {
-    local pod_name="${1:?pod name required}"
-    local container="${2:-}"
-    e2e_ops_dump_pod_logs "$pod_name" "$container" 200
+    e2e_ops_dump_pod_logs "${1:?pod name required}" "${2:-150}"
 }
 
 cmd_disrupt_llama_stack() {
@@ -1146,12 +842,6 @@ case "$COMMAND" in
     deploy-e2e-interception-proxy)
         cmd_deploy_e2e_interception_proxy
         ;;
-    deploy-e2e-mock-tls-inference)
-        cmd_deploy_e2e_mock_tls_inference
-        ;;
-    sync-mock-tls-certs-secret)
-        cmd_sync_mock_tls_certs_secret
-        ;;
     dump-pod-logs)
         cmd_dump_pod_logs "$@"
         ;;
@@ -1173,9 +863,7 @@ case "$COMMAND" in
         echo "  sync-interception-proxy-ca-secret   - Publish trustme CA to Secret for llama mount"
         echo "  deploy-e2e-tunnel-proxy            - Deploy in-cluster tunnel proxy pod"
         echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
-        echo "  deploy-e2e-mock-tls-inference        - Deploy mock HTTPS inference server (tls.feature)"
-        echo "  sync-mock-tls-certs-secret           - Publish mock TLS /certs to Secret for llama mount"
-        echo "  dump-pod-logs <pod> [container]      - Events, describe, init + container logs"
+        echo "  dump-pod-logs <pod> [tail-lines]   - Print init + container logs"
         exit 1
         ;;
 esac
