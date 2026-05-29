@@ -529,5 +529,6 @@ def after_feature(context: Context, feature: Feature) -> None:
 
 
 # Behave captures hook stdout by default; output is only shown in some failure paths.
-# Disable capture so feature timing lines always appear on the real console/CI log.
+# Disable capture so feature timing and failure diagnostics appear in the main CI log.
 after_feature.capture = False  # type: ignore[attr-defined]
+after_scenario.capture = False  # type: ignore[attr-defined]

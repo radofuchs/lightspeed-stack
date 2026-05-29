@@ -60,6 +60,10 @@ e2e_ops_dump_pod_logs() {
 
     if ! oc get pod "$pod_name" -n "$NAMESPACE" &>/dev/null; then
         echo "${prefix}pod/$pod_name not found (deleted or never created)"
+        echo "${prefix}--- recent namespace events mentioning $pod_name ---"
+        oc get events -n "$NAMESPACE" --sort-by='.lastTimestamp' 2>&1 \
+            | grep -F "$pod_name" | tail -40 | sed "s/^/${prefix}/" \
+            || echo "${prefix}(no matching events or API error)"
         oc get pods -n "$NAMESPACE" -o wide 2>&1 | sed "s/^/${prefix}/" || true
         echo "${prefix}========== end failure logs: pod/$pod_name =========="
         return 0
@@ -103,17 +107,45 @@ e2e_ops_dump_pod_logs() {
     echo "${prefix}========== end failure logs: pod/$pod_name =========="
 }
 
+_oc_api_reachable() {
+    oc get namespace "$NAMESPACE" --request-timeout=10s &>/dev/null
+}
+
 wait_for_pod() {
     local pod_name="$1"
     local max_attempts="${2:-24}"
     local attempt
     local ready
     local phase
+    local pod_seen=false
+    local missing_streak=0
+    local pending_diag_done=false
+    local missing_dump_done=false
 
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
+        if ! _oc_api_reachable; then
+            echo "[e2e-ops] ERROR: OpenShift API unreachable (attempt $attempt/$max_attempts)"
+            e2e_ops_dump_pod_logs "$pod_name" "" 150
+            return 1
+        fi
+
         if ! oc get pod "$pod_name" -n "$NAMESPACE" &>/dev/null; then
             phase="Missing"
+            if [[ "$pod_seen" == true ]]; then
+                missing_streak=$((missing_streak + 1))
+                if [[ "$missing_dump_done" == false ]]; then
+                    echo "[e2e-ops] $pod_name disappeared (attempt $attempt/$max_attempts) — dumping logs now"
+                    e2e_ops_dump_pod_logs "$pod_name" "" 250
+                    missing_dump_done=true
+                fi
+                if [[ $missing_streak -ge 3 ]]; then
+                    echo "Pod $pod_name gone after being scheduled (missing ${missing_streak} polls)"
+                    return 1
+                fi
+            fi
         else
+            pod_seen=true
+            missing_streak=0
             phase=$(oc get pod "$pod_name" -n "$NAMESPACE" \
                 -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
             ready=$(oc get pod "$pod_name" -n "$NAMESPACE" \
@@ -121,6 +153,16 @@ wait_for_pod() {
             if [[ "$ready" == "true" ]]; then
                 echo "✓ Pod $pod_name ready (attempt $attempt/$max_attempts)"
                 return 0
+            fi
+            if [[ "$phase" == "Failed" ]]; then
+                echo "[e2e-ops] $pod_name phase=Failed (attempt $attempt/$max_attempts)"
+                e2e_ops_dump_pod_logs "$pod_name" "" 250
+                return 1
+            fi
+            if [[ "$phase" == "Pending" && "$pending_diag_done" == false && $attempt -ge 15 ]]; then
+                pending_diag_done=true
+                echo "[e2e-ops] $pod_name still Pending after $((attempt * 3))s — init/scheduling snapshot:"
+                e2e_ops_dump_pod_logs "$pod_name" "" 200
             fi
         fi
         if [[ $((attempt % 10)) -eq 0 ]]; then
@@ -130,7 +172,9 @@ wait_for_pod() {
     done
 
     echo "Pod $pod_name not ready after $((max_attempts * 3))s (last phase: ${phase:-unknown})"
-    e2e_ops_dump_pod_logs "$pod_name" "" 250
+    if [[ "$missing_dump_done" == false && "$pending_diag_done" == false ]]; then
+        e2e_ops_dump_pod_logs "$pod_name" "" 250
+    fi
     return 1
 }
 
