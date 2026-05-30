@@ -27,6 +27,7 @@ from tests.e2e.features.steps.health import (
     reset_llama_stack_was_running,
 )
 from tests.e2e.features.steps.tls import (
+    is_tls_feature_file,
     prepare_tls_feature_entry_on_prow,
     reset_tls_prow_state,
 )
@@ -250,7 +251,7 @@ def _dump_pod_logs_on_failure(
     pods: tuple[str, ...] = ("llama-stack-service", "lightspeed-stack-service")
     feature = getattr(context, "feature", None)
     feat_file = getattr(feature, "filename", "") or "" if feature else ""
-    if "tls.feature" in feat_file:
+    if is_tls_feature_file(feat_file):
         pods = (*pods, "e2e-mock-tls-inference")
     print(f"--- scenario failed: {scenario.name!r} — pod logs ---", flush=True)
     for pod in pods:
@@ -457,9 +458,9 @@ def before_feature(context: Context, feature: Feature) -> None:
     context.active_lightspeed_stack_config_basename = None
     # One real Llama disruption per feature (module-level flag; survives context resets)
     reset_llama_stack_disrupt_once_tracking()
-    if feature.filename and "tls.feature" in feature.filename:
+    if feature.filename and is_tls_feature_file(feature.filename):
         reset_tls_prow_state()
-        prepare_tls_feature_entry_on_prow()
+        prepare_tls_feature_entry_on_prow(feature.filename)
 
     try:
         max_flaky = int(os.getenv("E2E_FLAKY_MAX_ATTEMPTS", _E2E_FLAKY_MAX_ATTEMPTS))

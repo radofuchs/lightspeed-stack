@@ -28,7 +28,7 @@
 #   disrupt-llama-stack             - Delete llama-stack pod to disrupt connection
 #   deploy-e2e-tunnel-proxy         - Deploy in-cluster tunnel proxy (proxy.feature step)
 #   deploy-e2e-interception-proxy   - Deploy in-cluster interception proxy (proxy.feature step)
-#   deploy-e2e-mock-tls-inference   - Deploy mock HTTPS inference server (tls.feature)
+#   deploy-e2e-mock-tls-inference   - Deploy mock HTTPS inference server (tls-*.feature)
 #   sync-mock-tls-certs-secret      - Copy mock /certs into Secret for llama-stack mount
 
 set -e
@@ -1012,7 +1012,7 @@ case "$COMMAND" in
         echo "  sync-interception-proxy-ca-secret   - Publish trustme CA to Secret for llama mount"
         echo "  deploy-e2e-tunnel-proxy            - Deploy in-cluster tunnel proxy pod"
         echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
-        echo "  deploy-e2e-mock-tls-inference        - Deploy mock HTTPS inference (tls.feature)"
+        echo "  deploy-e2e-mock-tls-inference        - Deploy mock HTTPS inference (tls-*.feature)"
         echo "  sync-mock-tls-certs-secret           - Publish mock TLS /certs to Secret"
         echo "  dump-pod-logs <pod> [tail-lines]   - Print init + container logs"
         exit 1
