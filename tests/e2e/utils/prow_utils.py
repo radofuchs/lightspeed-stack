@@ -103,8 +103,7 @@ def restart_pod(container_name: str) -> None:
             timeout = 420
     elif container_name in _LIGHTSPEED_RESTART_NAMES:
         op = "restart-lightspeed"
-        # Konflux LCS: TCP readiness + Llama handshake; on failure e2e-ops may run full
-        # both-services recovery (Llama recreate first), which can exceed 10 min under load.
+        # Konflux LCS: TCP readiness + Llama handshake; full recreate can exceed 10 min under load.
         timeout = 1200 if os.environ.get("E2E_KONFLUX_E2E") == "1" else 320
     else:
         print(

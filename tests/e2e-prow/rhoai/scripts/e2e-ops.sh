@@ -13,13 +13,14 @@
 #   pod is recreated, that forward must be restarted or you get "PodSandbox ... not found" /
 #   APIConnectionError on subsequent scenarios.
 # - E2E_LLAMA_PORT_FORWARD_PID_FILE coordinates killing/restarting the 8321 forward.
-# - restart-lightspeed / restart-llama-stack: on any restore failure, one full restart of
-#   both services (Llama first, then LCS) before giving up — avoids cascading half-dead state.
+# - restart-lightspeed ensures Llama is running before LCS recreate when needed.
+# - restart-both-services is available explicitly; restart-lightspeed / restart-llama-stack
+#   do not auto-trigger a full stack restart on failure.
 #
 # Commands:
 #   restart-lightspeed              - Restart lightspeed-stack pod and port-forward
 #   restart-llama-stack             - Restart/restore llama-stack pod and localhost:8321 forward
-#   restart-both-services           - Full llama-stack then lightspeed-stack restart (recovery)
+#   restart-both-services           - Full llama-stack then lightspeed-stack restart (explicit only)
 #   restart-port-forward            - Re-establish port-forward for lightspeed
 #   restart-llama-port-forward      - Re-establish port-forward for Llama Stack (8321)
 #   wait-for-pod <name> [attempts]  - Wait for a pod to be ready
@@ -316,10 +317,7 @@ wait_for_llama_stack_http_health() {
 # Command implementations
 # ============================================================================
 
-# Set while cmd_restart_both_services runs so nested failures do not loop forever.
-E2E_OPS_RECOVERY_IN_PROGRESS="${E2E_OPS_RECOVERY_IN_PROGRESS:-0}"
-
-# Llama pod recreate + in-pod health + :8321 port-forward (no cross-service recovery).
+# Llama pod recreate + in-pod health + :8321 port-forward.
 _restart_llama_stack_core() {
     echo "===== Restoring llama-stack service ====="
     echo "Deleting llama-stack pod (if any) before apply..."
@@ -449,39 +447,12 @@ cmd_restart_both_services() {
     return $rc
 }
 
-# On first failure, rebuild both services once (CI often leaves the pair in a bad state).
-_restart_with_both_services_recovery() {
-    local label="$1"
-    shift
-    local core_fn="$1"
-    shift
-
-    if "$core_fn" "$@"; then
-        return 0
-    fi
-
-    if [[ "${E2E_OPS_RECOVERY_IN_PROGRESS:-0}" == "1" ]]; then
-        echo "[e2e-ops] $label failed during full both-services recovery; aborting"
-        return 1
-    fi
-
-    echo "[e2e-ops] $label failed — attempting full restart of llama-stack + lightspeed-stack..."
-    E2E_OPS_RECOVERY_IN_PROGRESS=1
-    export E2E_OPS_RECOVERY_IN_PROGRESS
-    if cmd_restart_both_services; then
-        echo "[e2e-ops] ✓ Full both-services recovery succeeded after $label failure"
-        return 0
-    fi
-    echo "[e2e-ops] ✗ Full both-services recovery failed after $label failure"
-    return 1
-}
-
 cmd_restart_llama_stack() {
-    _restart_with_both_services_recovery "Llama Stack restore" _restart_llama_stack_core
+    _restart_llama_stack_core
 }
 
 cmd_restart_lightspeed() {
-    _restart_with_both_services_recovery "Lightspeed Stack restore" _restart_lightspeed_core
+    _restart_lightspeed_core
 }
 
 cmd_restart_port_forward() {
@@ -849,28 +820,38 @@ _MOCK_TLS_CERT_FILES=(
     untrusted-client.crt untrusted-client.key expired-client.crt
 )
 
-cmd_sync_mock_tls_certs_secret() {
+# Copy one PEM from the mock pod; retries oc exec when kubelet returns transient EOF.
+_mock_tls_copy_cert_from_pod() {
+    local mock_pod="$1"
+    local cert_name="$2"
+    local dest="$3"
+    local max_attempts="${4:-6}"
+    local attempt
+
+    for ((attempt=1; attempt<=max_attempts; attempt++)); do
+        if oc exec -n "$NAMESPACE" "$mock_pod" -c e2e-mock-tls-inference --request-timeout=60s -- \
+            cat "/certs/${cert_name}" >"$dest" 2>/dev/null && [[ -s "$dest" ]]; then
+            return 0
+        fi
+        rm -f "$dest"
+        if [[ $attempt -lt $max_attempts ]]; then
+            echo "[e2e-ops] WARN: oc exec /certs/${cert_name} failed (attempt $attempt/$max_attempts); retrying..."
+            sleep $((attempt * 2))
+        fi
+    done
+    return 1
+}
+
+# Read all mock /certs into a temp dir (caller removes tmpdir).
+_sync_mock_tls_certs_from_running_pod() {
     local mock_pod="e2e-mock-tls-inference"
     local f tmpdir from_args
 
-    if ! oc get pod "$mock_pod" -n "$NAMESPACE" &>/dev/null; then
-        echo "ERROR: $mock_pod not found — run deploy-e2e-mock-tls-inference first" >&2
-        return 1
-    fi
-    if ! oc wait pod/"$mock_pod" -n "$NAMESPACE" --for=condition=Ready --timeout=120s; then
-        echo "ERROR: $mock_pod not Ready" >&2
-        e2e_ops_dump_pod_logs "$mock_pod" 80
-        return 1
-    fi
-
     tmpdir=$(mktemp -d)
     for f in "${_MOCK_TLS_CERT_FILES[@]}"; do
-        oc exec -n "$NAMESPACE" "$mock_pod" -c e2e-mock-tls-inference --request-timeout=60s -- \
-            cat "/certs/${f}" >"${tmpdir}/${f}" 2>/dev/null || true
-        if [[ ! -s "${tmpdir}/${f}" ]]; then
-            echo "ERROR: failed to read /certs/${f} from $mock_pod" >&2
+        if ! _mock_tls_copy_cert_from_pod "$mock_pod" "$f" "${tmpdir}/${f}"; then
+            echo "ERROR: failed to read /certs/${f} from $mock_pod after retries" >&2
             rm -rf "$tmpdir"
-            e2e_ops_dump_pod_logs "$mock_pod" 80
             return 1
         fi
     done
@@ -882,7 +863,67 @@ cmd_sync_mock_tls_certs_secret() {
         "${from_args[@]}" -n "$NAMESPACE" \
         --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
     rm -rf "$tmpdir"
-    echo "✓ Secret e2e-mock-tls-certs updated"
+    return 0
+}
+
+# Apply mock TLS manifest and wait for Ready (no Secret sync).
+_deploy_e2e_mock_tls_inference_pod() {
+    local repo_root server_py
+    repo_root="$(_e2e_repo_root)"
+    server_py="$repo_root/tests/e2e/mock_tls_inference_server/server.py"
+    if [[ ! -f "$server_py" ]]; then
+        echo "ERROR: missing $server_py" >&2
+        return 1
+    fi
+    echo "Deploying e2e-mock-tls-inference pod in namespace $NAMESPACE..."
+    oc create configmap e2e-mock-tls-inference-script -n "$NAMESPACE" \
+        --from-file=server.py="$server_py" \
+        --dry-run=client -o yaml | oc apply -f -
+    oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-mock-tls-inference.yaml"
+    if ! oc wait pod/e2e-mock-tls-inference -n "$NAMESPACE" --for=condition=Ready --timeout=240s; then
+        echo "ERROR: e2e-mock-tls-inference failed to become ready" >&2
+        e2e_ops_dump_pod_logs "e2e-mock-tls-inference" 80
+        return 1
+    fi
+    return 0
+}
+
+cmd_sync_mock_tls_certs_secret() {
+    local mock_pod="e2e-mock-tls-inference"
+    local pass
+
+    for pass in 1 2; do
+        if ! oc get pod "$mock_pod" -n "$NAMESPACE" &>/dev/null; then
+            echo "[e2e-ops] WARN: $mock_pod not found — deploying mock TLS inference..."
+            if ! _deploy_e2e_mock_tls_inference_pod; then
+                return 1
+            fi
+        elif ! oc wait pod/"$mock_pod" -n "$NAMESPACE" --for=condition=Ready --timeout=120s; then
+            echo "[e2e-ops] WARN: $mock_pod not Ready — redeploying mock TLS inference..."
+            cmd_delete_e2e_mock_tls_inference
+            if ! _deploy_e2e_mock_tls_inference_pod; then
+                return 1
+            fi
+        fi
+
+        if _sync_mock_tls_certs_from_running_pod; then
+            echo "✓ Secret e2e-mock-tls-certs updated"
+            return 0
+        fi
+
+        if [[ $pass -eq 1 ]]; then
+            echo "[e2e-ops] WARN: mock TLS cert sync failed (oc exec/kubelet) — redeploying mock pod and retrying..."
+            cmd_delete_e2e_mock_tls_inference
+            if ! _deploy_e2e_mock_tls_inference_pod; then
+                return 1
+            fi
+            continue
+        fi
+
+        e2e_ops_dump_pod_logs "$mock_pod" 80
+        return 1
+    done
+    return 1
 }
 
 cmd_delete_e2e_mock_tls_inference() {
@@ -896,21 +937,7 @@ cmd_delete_e2e_mock_tls_inference() {
 }
 
 cmd_deploy_e2e_mock_tls_inference() {
-    local repo_root server_py
-    repo_root="$(_e2e_repo_root)"
-    server_py="$repo_root/tests/e2e/mock_tls_inference_server/server.py"
-    if [[ ! -f "$server_py" ]]; then
-        echo "ERROR: missing $server_py" >&2
-        return 1
-    fi
-    echo "Deploying e2e-mock-tls-inference in namespace $NAMESPACE..."
-    oc create configmap e2e-mock-tls-inference-script -n "$NAMESPACE" \
-        --from-file=server.py="$server_py" \
-        --dry-run=client -o yaml | oc apply -f -
-    oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/e2e-mock-tls-inference.yaml"
-    if ! oc wait pod/e2e-mock-tls-inference -n "$NAMESPACE" --for=condition=Ready --timeout=240s; then
-        echo "ERROR: e2e-mock-tls-inference failed to become ready" >&2
-        e2e_ops_dump_pod_logs "e2e-mock-tls-inference" 80
+    if ! _deploy_e2e_mock_tls_inference_pod; then
         return 1
     fi
     if ! cmd_sync_mock_tls_certs_secret; then
@@ -961,7 +988,7 @@ case "$COMMAND" in
         cmd_restart_llama_stack
         ;;
     restart-both-services)
-        E2E_OPS_RECOVERY_IN_PROGRESS=1 cmd_restart_both_services
+        cmd_restart_both_services
         ;;
     restart-llama-port-forward)
         cmd_restart_llama_port_forward
@@ -1023,7 +1050,7 @@ case "$COMMAND" in
         echo "Commands:"
         echo "  restart-lightspeed              - Restart lightspeed-stack pod and port-forward"
         echo "  restart-llama-stack             - Restart/restore llama-stack pod"
-        echo "  restart-both-services           - Full llama-stack + lightspeed-stack restart"
+        echo "  restart-both-services           - Full llama-stack + lightspeed-stack restart (explicit)"
         echo "  restart-llama-port-forward      - Re-establish port-forward for Llama (8321)"
         echo "  restart-port-forward            - Re-establish port-forward for lightspeed"
         echo "  wait-for-pod <name> [attempts]  - Wait for a pod to be ready"
