@@ -35,3 +35,4 @@ OpenAPI-aligned error response models: HTTP 401 Unauthorized.
 
 ## [unprocessable_entity.py](unprocessable_entity.py)
 OpenAPI-aligned error response models: HTTP 422 Unprocessable Entity.
+

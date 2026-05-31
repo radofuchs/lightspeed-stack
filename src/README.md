@@ -1,4 +1,4 @@
-# List of source files stored in `src/` directory
+# List of source files stored in `src` directory
 
 ## [__init__.py](__init__.py)
 Main classes for the Lightspeed Core Stack REST API service.
