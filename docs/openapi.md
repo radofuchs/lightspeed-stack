@@ -6024,6 +6024,12 @@ Example:
 
 Response for a successful MCP server registration.
 
+Attributes:
+    name: Registered MCP server name.
+    url: Registered MCP server URL.
+    provider_id: MCP provider identification.
+    message: Status message.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6076,6 +6082,7 @@ Useful resources:
 | url | string | URL of the MCP server |
 | authorization_headers | object | Headers to send to the MCP server. The map contains the header name and the path to a file containing the header value (secret). There are 3 special cases: 1. Usage of the kubernetes token in the header. To specify this use a string 'kubernetes' instead of the file path. 2. Usage of the client-provided token in the header. To specify this use a string 'client' instead of the file path. 3. Usage of the oauth token in the header. To specify this use a string 'oauth' instead of the file path.  |
 | headers | array | List of HTTP header names to automatically forward from the incoming request to this MCP server. Headers listed here are extracted from the original client request and included when calling the MCP server. This is useful when infrastructure components (e.g. API gateways) inject headers that MCP servers need, such as x-rh-identity in HCC. Header matching is case-insensitive. These headers are additive with authorization_headers and MCP-HEADERS. |
+| require_approval |  | When to require human approval for tool invocations. 'always' requires approval for all tools, 'never' auto-approves, or use ApprovalFilter for granular control. |
 | timeout |  | Timeout in seconds for requests to the MCP server. If not specified, the default timeout from Llama Stack will be used. Note: This field is reserved for future use when Llama Stack adds timeout support. |
 
 
@@ -6938,6 +6945,10 @@ Useful resources:
 
 Request body to create a stored prompt template in Llama Stack.
 
+Attributes:
+    prompt: Prompt text with variable placeholders.
+    variables: Variable names allowed in the template.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6950,18 +6961,30 @@ Request body to create a stored prompt template in Llama Stack.
 
 Result of deleting a stored prompt (always HTTP 200, like conversations v2).
 
+Attributes:
+    prompt_id: Prompt identifier that was passed to delete.
+    deleted: Whether the prompt was deleted successfully
+    response: Human readable response
+
 
 | Field | Type | Description |
 |-------|------|-------------|
+| deleted | boolean | Whether the deletion was successful. |
 | prompt_id | string | Prompt identifier that was passed to delete. |
-| success | boolean | Whether Llama Stack deleted the prompt. |
-| response | string | Human-readable outcome. |
+| response | string | Human-readable outcome of the delete operation. |
 
 
 ## PromptResourceResponse
 
 
 A stored prompt template as returned by Llama Stack.
+
+Attributes:
+    prompt_id: Prompt identifier from Llama Stack.
+    version: Version number for this prompt.
+    is_default: Whether this version is the default.
+    prompt: Prompt text with placeholders.
+    variables: Variable names used in the template.
 
 
 | Field | Type | Description |
@@ -6990,6 +7013,12 @@ A stored prompt template as returned by Llama Stack.
 
 Request body to update a stored prompt (creates a new version).
 
+Attributes:
+    prompt: Updated prompt text.
+    version: Current version being updated.
+    set_as_default: Whether the new version becomes the default.
+    variables: Updated allowed variable names.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -7003,6 +7032,9 @@ Request body to update a stored prompt (creates a new version).
 
 
 List of stored prompt templates returned by Llama Stack.
+
+Attributes:
+    data: Prompt entries as returned by the Llama Stack list API.
 
 
 | Field | Type | Description |
@@ -7091,7 +7123,7 @@ Example:
 | media_type |  | Media type for the response format |
 | vector_store_ids |  | Optional list of specific vector store IDs to query for RAG. If not provided, all available vector stores will be queried. |
 | shield_ids |  | Optional list of safety shield IDs to apply. If None, all configured shields are used.  |
-| solr |  | Solr-specific query parameters including filter queries |
+| solr |  | Solr inline RAG config: mode (semantic, hybrid, lexical) and filters; a legacy filter-only object (e.g. fq) is still accepted. |
 
 
 ## QueryResponse
@@ -7119,7 +7151,7 @@ Attributes:
 | response | string | Response from LLM |
 | rag_chunks | array | Deprecated: List of RAG chunks used to generate the response. |
 | referenced_documents | array | List of documents referenced in generating the response |
-| truncated | boolean | Deprecated:Whether conversation history was truncated |
+| truncated | boolean | Deprecated: whether conversation history was truncated |
 | input_tokens | integer | Number of tokens sent to LLM |
 | output_tokens | integer | Number of tokens received from LLM |
 | available_quotas | object | Quota available as measured by all configured quota limiters |
@@ -7325,6 +7357,7 @@ Model representing a document referenced in generating a response.
 Attributes:
     doc_url: Url to the referenced doc.
     doc_title: Title of the referenced doc.
+    document_id: Document ID for preserving identity during deduplication.
 
 
 | Field | Type | Description |
@@ -7332,6 +7365,19 @@ Attributes:
 | doc_url |  | URL of the referenced document |
 | doc_title |  | Title of the referenced document |
 | source |  | Index name identifying the knowledge source from configuration |
+| document_id |  | Document ID for preserving identity during deduplication |
+
+
+## RerankerConfiguration
+
+
+Reranker configuration for RAG chunk reranking.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| enabled | boolean | When True, reranking applied to RAG chunks. When False, reranking is disabled and original scoring used. |
+| model | string | Cross-encoder model name for reranking RAG chunks. Defaults to 'cross-encoder/ms-marco-MiniLM-L6-v2' from sentence-transformers. |
 
 
 ## ResponseInput
@@ -7384,8 +7430,7 @@ Attributes:
         topic summary for new conversations. Defaults to True.
     shield_ids: LCORE-specific list of safety shield IDs to apply. If None, all
         configured shields are used.
-    solr: LCORE-specific Solr vector_io provider query parameters (e.g. filter
-        queries). Optional.
+    solr: Optional Solr inline RAG options (mode, filters) or legacy filter-only dict.
 
 
 | Field | Type | Description |
@@ -7787,6 +7832,45 @@ Model representing a response to shields request.
 | shields | array | List of shields available |
 
 
+## SkillsConfiguration
+
+
+Agent skills configuration.
+
+Specifies paths to skill directories. Skill metadata (name, description)
+is read from SKILL.md frontmatter at startup.
+
+Each path can point to either:
+- A directory containing a SKILL.md file (single skill)
+- A directory containing subdirectories with SKILL.md files (multiple skills)
+
+Paths are validated at startup to ensure they exist and contain valid SKILL.md files.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| paths | array | Paths to skill directories or directories containing skill subdirectories. |
+
+
+## SolrVectorSearchRequest
+
+
+LCORE Solr inline RAG options for vector_io.query (mode and provider filters).
+
+Attributes:
+    mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.
+    filters: Solr provider filter payload passed through as params['solr'].
+
+Legacy clients may send a plain JSON object with filter keys only;
+that object is accepted as filters with mode unset (server default applies).
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| mode |  | Solr vector_io search mode. When omitted, the server default ('hybrid') is used. |
+| filters |  | Solr provider filter payload passed through as params['solr']. Supports structured metadata filters (eq, ne, in, nin comparison operators). Legacy filter-only objects (e.g. fq) are still accepted. |
+
+
 ## SplunkConfiguration
 
 
@@ -8018,6 +8102,19 @@ Attributes:
 | metadata |  | Metadata dictionary for storing session information |
 
 
+## VectorStoreDeleteResponse
+
+
+Result of deleting a vector store (always HTTP 200).
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| deleted | boolean | Whether the deletion was successful. |
+| vector_store_id | string | Vector store identifier that was passed to delete. |
+| response | string | Human-readable outcome of the delete operation. |
+
+
 ## VectorStoreFileCreateRequest
 
 
@@ -8034,6 +8131,19 @@ Attributes:
 | file_id | string | ID of the file to add to the vector store |
 | attributes |  | Set of up to 16 key-value pairs for storing additional information. Keys: strings (max 64 chars). Values: strings (max 512 chars), booleans, or numbers. |
 | chunking_strategy |  | Chunking strategy configuration for this file |
+
+
+## VectorStoreFileDeleteResponse
+
+
+Result of deleting a file from a vector store (always HTTP 200).
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| deleted | boolean | Whether the deletion was successful. |
+| file_id | string | File identifier that was passed to delete. |
+| response | string | Human-readable outcome of the delete operation. |
 
 
 ## VectorStoreFileResponse
