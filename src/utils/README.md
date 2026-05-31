@@ -9,6 +9,9 @@ Checks that are performed to configuration options.
 ## [common.py](common.py)
 Common utilities for the project.
 
+## [compaction.py](compaction.py)
+Conversation compaction — partitioning, summarization, additive fold-up.
+
 ## [connection_decorator.py](connection_decorator.py)
 Decorator that makes sure the object is 'connected' according to it's connected predicate.
 
@@ -39,6 +42,9 @@ Utility functions for working with queries.
 ## [quota.py](quota.py)
 Quota handling helper functions.
 
+## [reranker.py](reranker.py)
+Reranker utilities for RAG chunk reranking.
+
 ## [responses.py](responses.py)
 Utility functions for processing Responses API output.
 
@@ -59,6 +65,9 @@ Session ID utility functions.
 
 ## [token_counter.py](token_counter.py)
 Helper classes to count tokens sent and received by the LLM.
+
+## [token_estimator.py](token_estimator.py)
+Pre-LLM-call token estimation.
 
 ## [tool_formatter.py](tool_formatter.py)
 Utility functions for formatting and parsing MCP tool descriptions.

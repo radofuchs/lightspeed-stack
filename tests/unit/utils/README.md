@@ -12,6 +12,9 @@ Unit tests for functions defined in utils/checks module.
 ## [test_common.py](test_common.py)
 Test module for utils/common.py.
 
+## [test_compaction.py](test_compaction.py)
+Unit tests for utils/compaction — partitioning, prompt, summarization.
+
 ## [test_connection_decorator.py](test_connection_decorator.py)
 Unit tests for the connection decorator.
 
@@ -47,6 +50,9 @@ Unit tests for utils/shields.py functions.
 
 ## [test_suid.py](test_suid.py)
 Unit tests for functions defined in utils.suid module.
+
+## [test_token_estimator.py](test_token_estimator.py)
+Unit tests for utils/token_estimator.
 
 ## [test_tool_formatter.py](test_tool_formatter.py)
 Unit tests for tool_formatter utilities.

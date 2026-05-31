@@ -6,6 +6,9 @@ Test cases for conversation history cache implementations.
 ## [test_cache_factory.py](test_cache_factory.py)
 Unit tests for CacheFactory class.
 
+## [test_in_memory_cache.py](test_in_memory_cache.py)
+Unit tests for InMemoryCache class — conversation compaction summaries (LCORE-1571).
+
 ## [test_noop_cache.py](test_noop_cache.py)
 Unit tests for NoopCache class.
 

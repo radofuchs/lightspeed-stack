@@ -3,14 +3,9 @@
 ## [__init__.py](__init__.py)
 Pydantic models.
 
+## [compaction.py](compaction.py)
+Pydantic models for conversation compaction.
+
 ## [config.py](config.py)
 Model with service configuration.
 
-## [api/](api/)
-Models for API request and response bodies.
-
-## [common/](common/)
-Shared models and types used across endpoints.
-
-## [database/](database/)
-SQLAlchemy ORM models.

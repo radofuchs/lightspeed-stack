@@ -7,7 +7,7 @@ Concrete successful HTTP response models grouped by domain.
 Base classes for successful API response models.
 
 ## [catalog.py](catalog.py)
-Successful responses for models, tools, shields, RAG, and providers.
+Successful response bodies for catalog-style endpoints.
 
 ## [configuration.py](configuration.py)
 Successful response model for the configuration endpoint.
@@ -22,7 +22,7 @@ Successful responses for feedback and feedback status endpoints.
 Successful responses for MCP server registration and listing.
 
 ## [probes.py](probes.py)
-Successful responses for service probes and related endpoints (info, readiness, liveness, status, auth).
+Successful probe-related API responses (info, readiness, liveness, status, auth).
 
 ## [prompts.py](prompts.py)
 Successful responses for stored prompt templates.
@@ -34,7 +34,8 @@ Successful response models for synchronous query and streaming query documentati
 Successful response model for the OpenAI-compatible Responses API.
 
 ## [rlsapi.py](rlsapi.py)
-Successful response payloads for the rlsapi v1 `/infer` endpoint.
+Models for rlsapi v1 REST API responses.
 
 ## [vector_stores.py](vector_stores.py)
 Successful responses for vector stores and vector store files.
+

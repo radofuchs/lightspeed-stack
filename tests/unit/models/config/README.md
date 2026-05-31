@@ -15,6 +15,9 @@ Unit tests for AuthenticationConfiguration model.
 ## [test_byok_rag.py](test_byok_rag.py)
 Unit tests for ByokRag model.
 
+## [test_compaction_configuration.py](test_compaction_configuration.py)
+Unit tests for CompactionConfiguration and its placement on Configuration.
+
 ## [test_conversation_history.py](test_conversation_history.py)
 Unit tests for ConversationHistoryConfiguration model.
 
@@ -29,6 +32,9 @@ Unit tests for DatabaseConfiguration model.
 
 ## [test_dump_configuration.py](test_dump_configuration.py)
 Unit tests checking ability to dump configuration.
+
+## [test_in_memory_cache_configuration.py](test_in_memory_cache_configuration.py)
+Unit tests for InMemoryCache model.
 
 ## [test_inference_configuration.py](test_inference_configuration.py)
 Unit tests for InferenceConfiguration model.
@@ -57,11 +63,17 @@ Unit tests for QuotaSchedulerConfig model.
 ## [test_rag_configuration.py](test_rag_configuration.py)
 Unit tests for RAG and OKP configuration models.
 
+## [test_reranker_configuration.py](test_reranker_configuration.py)
+Unit tests for RerankerConfiguration model.
+
 ## [test_rlsapi_v1_configuration.py](test_rlsapi_v1_configuration.py)
 Unit tests for RlsapiV1Configuration and related startup validators.
 
 ## [test_service_configuration.py](test_service_configuration.py)
 Unit tests for ServiceConfiguration model.
+
+## [test_skills_configuration.py](test_skills_configuration.py)
+Unit tests for SkillsConfiguration model.
 
 ## [test_splunk_configuration.py](test_splunk_configuration.py)
 Unit tests for SplunkConfiguration model.
