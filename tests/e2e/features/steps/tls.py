@@ -35,16 +35,10 @@ _TLS_MODEL_RESOURCE: dict[str, str] = {
     "provider_model_id": "mock-tls-model",
 }
 
-_mock_tls_cluster_deploy_state: dict[str, bool] = {"done": False}
-
-
 def reset_tls_prow_state() -> None:
-    """Reset per-feature TLS test state (call from ``before_feature``).
-
-    Does not clear ``_mock_tls_cluster_deploy_state`` so split tls-*.feature files
-    after the first reuse the in-cluster mock inference deployment.
-    """
+    """Reset per-feature TLS test state (call from ``before_feature``)."""
     os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
+    os.environ.pop("E2E_MOCK_TLS_INFERENCE_HOST", None)
     clear_llama_config_backup()
 
 
@@ -60,15 +54,15 @@ def prepare_tls_feature_entry_on_prow(feature_filename: str | None = None) -> No
     """Baseline cluster state at the start of each tls-*.feature file.
 
     Earlier features (disrupted, MCP) delete or reconfigure Llama without mock TLS
-    certs. Each tls feature file gets a fresh run.yaml default and Llama warm-up;
-    mock inference is deployed once per suite run when possible.
+    certs. Each tls feature file gets a fresh mock TLS pod, run.yaml default, and
+    Llama warm-up (previous feature's ``after_feature`` removes the mock pod).
     """
     if not is_prow_environment():
         return
     label = os.path.basename(feature_filename or "tls.feature")
-    print(f"[{label}] Prow/Konflux entry: reset run.yaml and warm Llama + mock TLS...")
+    print(f"[{label}] Prow/Konflux entry: fresh mock TLS, reset run.yaml, warm Llama...")
     reset_llama_run_config_to_pipeline_default()
-    _deploy_cluster_mock_tls_inference()
+    _restart_cluster_mock_tls_inference()
     _prepare_tls_prow_llama_restart_env()
     os.environ.setdefault(
         "E2E_MOCK_TLS_INFERENCE_HOST",
@@ -76,6 +70,25 @@ def prepare_tls_feature_entry_on_prow(feature_filename: str | None = None) -> No
     )
     restart_pod("llama-stack")
     print(f"[{label}] Prow/Konflux entry baseline complete", flush=True)
+
+
+def teardown_tls_feature_on_prow(feature_filename: str | None = None) -> None:
+    """Remove in-cluster mock TLS after each tls-*.feature file (Prow/Konflux only)."""
+    if not is_prow_environment():
+        return
+    label = os.path.basename(feature_filename or "tls.feature")
+    print(f"[{label}] Prow/Konflux teardown: removing e2e-mock-tls-inference...")
+    result = run_e2e_ops("delete-e2e-mock-tls-inference", timeout=120)
+    print(result.stdout, end="")
+    if result.returncode != 0:
+        print(
+            f"Warning: delete-e2e-mock-tls-inference failed after {label}: "
+            f"{result.stderr or result.stdout}",
+            flush=True,
+        )
+    os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
+    os.environ.pop("E2E_MOCK_TLS_INFERENCE_HOST", None)
+    print(f"[{label}] Prow/Konflux teardown complete", flush=True)
 
 
 def is_tls_configuration_feature(context: Context) -> bool:
@@ -146,9 +159,30 @@ def _tls_provider_base() -> dict[str, Any]:
     }
 
 
+def _mock_tls_inference_pod_ready() -> bool:
+    """Return True when the in-cluster mock TLS pod exists and is Ready."""
+    result = run_e2e_ops("wait-for-pod", ["e2e-mock-tls-inference", "1"], timeout=45)
+    return result.returncode == 0
+
+
+def _restart_cluster_mock_tls_inference() -> None:
+    """Delete and redeploy the in-cluster mock TLS pod (Konflux / Prow)."""
+    result = run_e2e_ops("restart-e2e-mock-tls-inference", timeout=360)
+    print(result.stdout, end="")
+    if result.returncode != 0:
+        raise RuntimeError(
+            "restart-e2e-mock-tls-inference failed: "
+            f"{result.stderr or result.stdout}"
+        )
+
+
 def _deploy_cluster_mock_tls_inference() -> None:
-    """Deploy the in-cluster mock TLS inference pod (Konflux / Prow)."""
-    if _mock_tls_cluster_deploy_state["done"]:
+    """Ensure the in-cluster mock TLS inference pod is running (Konflux / Prow).
+
+    ``before_feature`` already restarts mock TLS; Background steps only verify
+    or deploy if the pod is missing mid-feature.
+    """
+    if _mock_tls_inference_pod_ready():
         print("Using existing e2e-mock-tls-inference deployment")
         return
 
@@ -164,7 +198,6 @@ def _deploy_cluster_mock_tls_inference() -> None:
         "E2E_MOCK_TLS_INFERENCE_HOST",
         _cluster_mock_tls_inference_host(),
     )
-    _mock_tls_cluster_deploy_state["done"] = True
 
 
 def _ensure_tls_provider(config: dict[str, Any]) -> dict[str, Any]:

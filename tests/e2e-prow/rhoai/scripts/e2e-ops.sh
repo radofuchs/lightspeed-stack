@@ -29,6 +29,8 @@
 #   deploy-e2e-tunnel-proxy         - Deploy in-cluster tunnel proxy (proxy.feature step)
 #   deploy-e2e-interception-proxy   - Deploy in-cluster interception proxy (proxy.feature step)
 #   deploy-e2e-mock-tls-inference   - Deploy mock HTTPS inference server (tls-*.feature)
+#   delete-e2e-mock-tls-inference   - Remove mock TLS pod + Service (tls-*.feature after_feature)
+#   restart-e2e-mock-tls-inference  - Delete then deploy mock TLS (tls-*.feature before_feature)
 #   sync-mock-tls-certs-secret      - Copy mock /certs into Secret for llama-stack mount
 
 set -e
@@ -883,6 +885,16 @@ cmd_sync_mock_tls_certs_secret() {
     echo "✓ Secret e2e-mock-tls-certs updated"
 }
 
+cmd_delete_e2e_mock_tls_inference() {
+    echo "Removing e2e-mock-tls-inference from namespace $NAMESPACE..."
+    timeout 60 oc delete pod e2e-mock-tls-inference -n "$NAMESPACE" --ignore-not-found=true --wait=true 2>/dev/null || {
+        oc delete pod e2e-mock-tls-inference -n "$NAMESPACE" --ignore-not-found=true --force --grace-period=0 2>/dev/null || true
+        sleep 2
+    }
+    oc delete svc e2e-mock-tls-inference -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+    echo "✓ e2e-mock-tls-inference removed"
+}
+
 cmd_deploy_e2e_mock_tls_inference() {
     local repo_root server_py
     repo_root="$(_e2e_repo_root)"
@@ -905,6 +917,12 @@ cmd_deploy_e2e_mock_tls_inference() {
         return 1
     fi
     echo "✓ e2e-mock-tls-inference ready"
+}
+
+cmd_restart_e2e_mock_tls_inference() {
+    echo "Restarting e2e-mock-tls-inference (delete + deploy)..."
+    cmd_delete_e2e_mock_tls_inference
+    cmd_deploy_e2e_mock_tls_inference
 }
 
 cmd_dump_pod_logs() {
@@ -987,6 +1005,12 @@ case "$COMMAND" in
     deploy-e2e-mock-tls-inference)
         cmd_deploy_e2e_mock_tls_inference
         ;;
+    delete-e2e-mock-tls-inference)
+        cmd_delete_e2e_mock_tls_inference
+        ;;
+    restart-e2e-mock-tls-inference)
+        cmd_restart_e2e_mock_tls_inference
+        ;;
     sync-mock-tls-certs-secret)
         cmd_sync_mock_tls_certs_secret
         ;;
@@ -1013,6 +1037,8 @@ case "$COMMAND" in
         echo "  deploy-e2e-tunnel-proxy            - Deploy in-cluster tunnel proxy pod"
         echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
         echo "  deploy-e2e-mock-tls-inference        - Deploy mock HTTPS inference (tls-*.feature)"
+        echo "  delete-e2e-mock-tls-inference        - Remove mock TLS pod + Service"
+        echo "  restart-e2e-mock-tls-inference       - Delete then deploy mock TLS (per feature file)"
         echo "  sync-mock-tls-certs-secret           - Publish mock TLS /certs to Secret"
         echo "  dump-pod-logs <pod> [tail-lines]   - Print init + container logs"
         exit 1

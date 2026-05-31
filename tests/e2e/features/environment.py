@@ -30,6 +30,7 @@ from tests.e2e.features.steps.tls import (
     is_tls_feature_file,
     prepare_tls_feature_entry_on_prow,
     reset_tls_prow_state,
+    teardown_tls_feature_on_prow,
 )
 from tests.e2e.utils.llama_stack_utils import register_shield
 from tests.e2e.utils.prow_utils import (
@@ -516,6 +517,9 @@ def after_feature(context: Context, feature: Feature) -> None:
 
         _stop_proxy(context, "tunnel_proxy", "proxy_loop")
         _stop_proxy(context, "interception_proxy", "interception_proxy_loop")
+
+    if feature.filename and is_tls_feature_file(feature.filename):
+        teardown_tls_feature_on_prow(feature.filename)
 
     start = getattr(feature, _E2E_FEATURE_PERF_START_ATTR, None)
     if start is not None:
