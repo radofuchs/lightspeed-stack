@@ -17,11 +17,14 @@ LLAMA_STACK_IMAGE ?= lightspeed-llama-stack:local
 LLAMA_STACK_PORT ?= 8321
 CONTAINER_RUNTIME ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
-.PHONY: run build-llama-stack-image remove-llama-stack-container start-llama-stack-container wait-for-llama-stack-health clean-llama-stack
+.PHONY: run run-stack build-llama-stack-image remove-llama-stack-container start-llama-stack-container wait-for-llama-stack-health clean-llama-stack
 
-run: start-llama-stack-container ## Run the service locally with llama-stack container
-	@echo "Starting Lightspeed Core Stack..."
+run-stack: ## Run lightspeed-stack directly, without building dependent service/s
 	uv run src/lightspeed_stack.py -c $(CONFIG)
+
+run: start-llama-stack-container ## Run the service locally with dependent services
+	@echo "Starting Lightspeed Core Stack..."
+	$(MAKE) run-stack
 
 build-llama-stack-image: remove-llama-stack-container ## Build llama-stack container image
 	@echo "Building llama-stack container image..."
@@ -47,7 +50,7 @@ start-llama-stack-container: build-llama-stack-image ## Start llama-stack contai
 		--health-timeout 5s \
 		--health-retries 3 \
 		--health-start-period 15s \
-		-v $(PWD)/$(LLAMA_STACK_CONFIG):/opt/app-root/run.yaml:ro,z \
+		-v $(PWD)/$(LLAMA_STACK_CONFIG):/opt/app-root/run.yaml:z \
 		-v $(PWD)/$(CONFIG):/opt/app-root/lightspeed-stack.yaml:ro,z \
 		-v $(PWD)/scripts/llama-stack-entrypoint.sh:/opt/app-root/enrich-entrypoint.sh:ro,z \
 		-v $(PWD)/src/llama_stack_configuration.py:/opt/app-root/llama_stack_configuration.py:ro,z \
@@ -108,6 +111,7 @@ clean-llama-stack: remove-llama-stack-container ## Remove container and image
 		echo "Removing llama-stack image..."; \
 		$(CONTAINER_RUNTIME) rmi $(LLAMA_STACK_IMAGE); \
 	fi
+
 run-llama-stack: ## Start Llama Stack with enriched config (for local service mode)
 	uv run src/llama_stack_configuration.py -c $(CONFIG) -i $(LLAMA_STACK_CONFIG) -o $(LLAMA_STACK_CONFIG) && \
 	uv run llama stack run $(LLAMA_STACK_CONFIG)
