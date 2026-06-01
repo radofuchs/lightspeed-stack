@@ -2,7 +2,6 @@
 
 from __future__ import annotations as _annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import httpx
@@ -61,11 +60,11 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
 
         Args:
             base_url: The base URL for the Llama Stack server (OpenAI-compatible endpoint).
-                Defaults to ``LLAMA_STACK_BASE_URL`` env var, then ``http://localhost:8321/v1``.
+                Defaults to ``http://localhost:8321/v1``.
                 Must be ``None`` when ``library_client`` is provided.
-            api_key: The API key for authentication. Defaults to ``LLAMA_STACK_API_KEY`` env
-                var, then ``'not-needed'`` since local Llama Stack servers typically don't
-                require one. Must be ``None`` when ``library_client`` is provided.
+            api_key: The API key for authentication. Defaults to ``'not-needed'`` since
+                local Llama Stack servers typically don't require one.
+                Must be ``None`` when ``library_client`` is provided.
             library_client: An initialized ``AsyncLlamaStackAsLibraryClient`` for library mode.
                 When provided, requests are dispatched in-process (no server needed).
                 Mutually exclusive with ``base_url``, ``api_key``, and ``http_client``.
@@ -92,10 +91,8 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
                 api_key="not-needed",
             )
         else:
-            base_url = (
-                base_url or os.environ.get("LLAMA_STACK_BASE_URL") or DEFAULT_BASE_URL
-            )
-            api_key = api_key or os.environ.get("LLAMA_STACK_API_KEY") or "not-needed"
+            base_url = base_url or DEFAULT_BASE_URL
+            api_key = api_key or "not-needed"
 
             if http_client is not None:
                 self._client = AsyncOpenAI(
