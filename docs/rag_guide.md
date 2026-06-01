@@ -382,11 +382,12 @@ OKP and BYOK scores are not directly comparable (different scoring systems), so
 `score_multiplier` (a BYOK-only concept) does not apply to OKP results. To control
 the number of retrieved chunks, set the constants in `src/constants.py`:
 
-| Constant | Default | Description |
-|----------|---------|-------------|
-| `OKP_RAG_MAX_CHUNKS` | 5 | Max chunks retrieved from OKP (Inline RAG) |
-| `BYOK_RAG_MAX_CHUNKS` | 10 | Max chunks retrieved from BYOK stores (Inline RAG) |
-| `TOOL_RAG_MAX_CHUNKS` | 10 | Max chunks retrieved via Tool RAG (`file_search`) |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `INLINE_RAG_MAX_CHUNKS` | 10 | Hard upper bound on the final merged inline RAG chunks (BYOK + OKP) delivered to the LLM |
+| `OKP_RAG_MAX_CHUNKS` | 5 | Fetch hint for OKP (Inline RAG); controls how many chunks enter the reranking pool |
+| `BYOK_RAG_MAX_CHUNKS` | 10 | Fetch hint for BYOK stores (Inline RAG); controls how many chunks enter the reranking pool |
+| `TOOL_RAG_MAX_CHUNKS` | 10 | Max chunks retrieved via Tool RAG (`file_search`); independent from `INLINE_RAG_MAX_CHUNKS` |
 
 **Limitations:**
 
