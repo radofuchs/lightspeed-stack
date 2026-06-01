@@ -30,8 +30,8 @@
 #   deploy-e2e-tunnel-proxy         - Deploy in-cluster tunnel proxy (proxy.feature step)
 #   deploy-e2e-interception-proxy   - Deploy in-cluster interception proxy (proxy.feature step)
 #   deploy-e2e-mock-tls-inference   - Deploy mock HTTPS inference server (tls-*.feature)
-#   delete-e2e-mock-tls-inference   - Remove mock TLS pod + Service (tls-*.feature after_feature)
-#   restart-e2e-mock-tls-inference  - Delete then deploy mock TLS (tls-*.feature before_feature)
+#   delete-e2e-mock-tls-inference   - Remove mock TLS pod + Service (manual cleanup)
+#   restart-e2e-mock-tls-inference  - Delete then deploy mock TLS (manual / recovery)
 #   sync-mock-tls-certs-secret      - Copy mock /certs into Secret for llama-stack mount
 
 set -e
@@ -74,28 +74,6 @@ e2e_ops_dump_pod_logs() {
     )
 }
 
-# Print pod phase / init status when readiness polling fails (Konflux init can take 10+ min).
-e2e_ops_describe_pod_state() {
-    local pod_name="${1:?pod name required}"
-    local prefix="[e2e-ops] "
-
-    if ! oc get pod "$pod_name" -n "$NAMESPACE" &>/dev/null; then
-        echo "${prefix}pod/$pod_name not found (evicted, rejected, or deleted)"
-        echo "${prefix}--- recent events (namespace) ---"
-        oc get events -n "$NAMESPACE" --field-selector "involvedObject.name=$pod_name" \
-            --sort-by='.lastTimestamp' 2>/dev/null | tail -15 | sed "s/^/${prefix}/" || true
-        return 0
-    fi
-    local phase reason
-    phase=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "?")
-    reason=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.reason}' 2>/dev/null || true)
-    echo "${prefix}pod/$pod_name phase=${phase}${reason:+ reason=$reason}"
-    oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{range .status.initContainerStatuses[*]}init={.name} ready={.ready} state={.state}{"\n"}{end}' 2>/dev/null \
-        | sed "s/^/${prefix}/" || true
-    oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{range .status.containerStatuses[*]}container={.name} ready={.ready} restarts={.restartCount}{"\n"}{end}' 2>/dev/null \
-        | sed "s/^/${prefix}/" || true
-}
-
 wait_for_pod() {
     local pod_name="$1"
     local max_attempts="${2:-24}"
@@ -116,7 +94,6 @@ wait_for_pod() {
     done
 
     echo "Pod $pod_name not ready after $((max_attempts * 3))s"
-    e2e_ops_describe_pod_state "$pod_name"
     e2e_ops_dump_pod_logs "$pod_name" 200
     return 1
 }
@@ -363,7 +340,8 @@ _restart_llama_stack_core() {
                 return 1
             fi
         fi
-        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]]; then
+        if [[ "${E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA:-0}" == "1" ]] \
+            && [[ "${E2E_SYNC_MOCK_TLS_CERTS:-0}" == "1" ]]; then
             echo "[e2e-ops] Syncing e2e-mock-tls-certs secret before llama-stack apply..."
             if ! cmd_sync_mock_tls_certs_secret; then
                 echo "===== Llama-stack restore FAILED (mock TLS cert secret sync) ====="
@@ -1098,7 +1076,7 @@ case "$COMMAND" in
         echo "  deploy-e2e-interception-proxy      - Deploy in-cluster interception proxy pod"
         echo "  deploy-e2e-mock-tls-inference        - Deploy mock HTTPS inference (tls-*.feature)"
         echo "  delete-e2e-mock-tls-inference        - Remove mock TLS pod + Service"
-        echo "  restart-e2e-mock-tls-inference       - Delete then deploy mock TLS (per feature file)"
+        echo "  restart-e2e-mock-tls-inference       - Delete then deploy mock TLS (recovery)"
         echo "  sync-mock-tls-certs-secret           - Publish mock TLS /certs to Secret"
         echo "  dump-pod-logs <pod> [tail-lines]   - Print init + container logs"
         exit 1

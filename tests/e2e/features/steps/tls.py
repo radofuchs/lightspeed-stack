@@ -35,9 +35,11 @@ _TLS_MODEL_RESOURCE: dict[str, str] = {
     "provider_model_id": "mock-tls-model",
 }
 
+
 def reset_tls_prow_state() -> None:
     """Reset per-feature TLS test state (call from ``before_feature``)."""
     os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
+    os.environ.pop("E2E_SYNC_MOCK_TLS_CERTS", None)
     os.environ.pop("E2E_MOCK_TLS_INFERENCE_HOST", None)
     clear_llama_config_backup()
 
@@ -53,42 +55,21 @@ def is_tls_feature_file(feature_filename: str | None) -> bool:
 def prepare_tls_feature_entry_on_prow(feature_filename: str | None = None) -> None:
     """Baseline cluster state at the start of each tls-*.feature file.
 
-    Earlier features (disrupted, MCP) delete or reconfigure Llama without mock TLS
-    certs. Each tls feature file gets a fresh mock TLS pod, run.yaml default, and
-    Llama warm-up (previous feature's ``after_feature`` removes the mock pod).
+    Mock TLS stays up for the whole tls suite (tls-ca → tls-mtls → tls-tlsv13).
+    Certs are synced to the Secret only when the mock pod is first deployed
+    (``deploy-e2e-mock-tls-inference``). Per-scenario TLS cases change which
+    ``/certs/*`` path Llama uses via run.yaml, not the Secret contents.
     """
     if not is_prow_environment():
         return
     label = os.path.basename(feature_filename or "tls.feature")
-    print(f"[{label}] Prow/Konflux entry: fresh mock TLS, reset run.yaml, warm Llama...")
+    print(f"[{label}] Prow/Konflux entry: ensure mock TLS, reset run.yaml, warm Llama...")
     reset_llama_run_config_to_pipeline_default()
-    _restart_cluster_mock_tls_inference()
+    _ensure_cluster_mock_tls_inference()
     _prepare_tls_prow_llama_restart_env()
-    os.environ.setdefault(
-        "E2E_MOCK_TLS_INFERENCE_HOST",
-        _cluster_mock_tls_inference_host(),
-    )
+    os.environ.pop("E2E_SYNC_MOCK_TLS_CERTS", None)
     restart_pod("llama-stack")
     print(f"[{label}] Prow/Konflux entry baseline complete", flush=True)
-
-
-def teardown_tls_feature_on_prow(feature_filename: str | None = None) -> None:
-    """Remove in-cluster mock TLS after each tls-*.feature file (Prow/Konflux only)."""
-    if not is_prow_environment():
-        return
-    label = os.path.basename(feature_filename or "tls.feature")
-    print(f"[{label}] Prow/Konflux teardown: removing e2e-mock-tls-inference...")
-    result = run_e2e_ops("delete-e2e-mock-tls-inference", timeout=120)
-    print(result.stdout, end="")
-    if result.returncode != 0:
-        print(
-            f"Warning: delete-e2e-mock-tls-inference failed after {label}: "
-            f"{result.stderr or result.stdout}",
-            flush=True,
-        )
-    os.environ.pop("E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA", None)
-    os.environ.pop("E2E_MOCK_TLS_INFERENCE_HOST", None)
-    print(f"[{label}] Prow/Konflux teardown complete", flush=True)
 
 
 def is_tls_configuration_feature(context: Context) -> bool:
@@ -113,8 +94,7 @@ def _restart_lightspeed_after_llama_tls(context: Context) -> None:
 
     TLS scenarios only change Llama run.yaml; LCS yaml is unchanged. Without this,
     queries through LCS often fail with 503/connection errors after Llama pod
-    recreate on Prow (stale HTTP connections). Replaces per-scenario Gherkin
-    ``Lightspeed Stack is restarted`` steps.
+    recreate on Prow (stale HTTP connections).
     """
     from tests.e2e.utils.utils import (
         restart_container,
@@ -140,6 +120,7 @@ def restart_llama_for_tls_feature(context: Context) -> None:
 
     if is_prow_environment():
         _prepare_tls_prow_llama_restart_env()
+        os.environ.pop("E2E_SYNC_MOCK_TLS_CERTS", None)
     scenario = getattr(getattr(context, "scenario", None), "name", "") or "?"
     feature_file = os.path.basename(
         getattr(getattr(context, "feature", None), "filename", "") or "tls.feature"
@@ -189,35 +170,27 @@ def _mock_tls_inference_pod_ready() -> bool:
     return result.returncode == 0
 
 
-def _restart_cluster_mock_tls_inference() -> None:
-    """Delete and redeploy the in-cluster mock TLS pod (Konflux / Prow)."""
-    result = run_e2e_ops("restart-e2e-mock-tls-inference", timeout=360)
-    print(result.stdout, end="")
-    if result.returncode != 0:
-        raise RuntimeError(
-            "restart-e2e-mock-tls-inference failed: "
-            f"{result.stderr or result.stdout}"
-        )
+def _ensure_cluster_mock_tls_inference() -> None:
+    """Deploy mock TLS on Prow if missing; keep one pod for the whole tls suite.
 
-
-def _deploy_cluster_mock_tls_inference() -> None:
-    """Ensure the in-cluster mock TLS inference pod is running (Konflux / Prow).
-
-    ``before_feature`` already restarts mock TLS; Background steps only verify
-    or deploy if the pod is missing mid-feature.
+    ``deploy-e2e-mock-tls-inference`` copies all PEMs into Secret ``e2e-mock-tls-certs``
+    once. Scenarios only change which cert path Llama uses in run.yaml.
     """
     if _mock_tls_inference_pod_ready():
         print("Using existing e2e-mock-tls-inference deployment")
+        os.environ.setdefault(
+            "E2E_MOCK_TLS_INFERENCE_HOST",
+            _cluster_mock_tls_inference_host(),
+        )
         return
 
     result = run_e2e_ops("deploy-e2e-mock-tls-inference", timeout=300)
     print(result.stdout, end="")
     if result.returncode != 0:
-        raise AssertionError(
+        raise RuntimeError(
             "Failed to deploy e2e-mock-tls-inference: "
             f"{result.stderr or result.stdout}"
         )
-    _prepare_tls_prow_llama_restart_env()
     os.environ.setdefault(
         "E2E_MOCK_TLS_INFERENCE_HOST",
         _cluster_mock_tls_inference_host(),
@@ -290,7 +263,7 @@ def _configure_tls(tls_config: dict[str, Any], base_url: Optional[str] = None) -
 def deploy_mock_tls_inference_server(context: Context) -> None:
     """Ensure mock TLS inference is reachable (Compose locally, pod in Prow)."""
     if is_prow_environment():
-        _deploy_cluster_mock_tls_inference()
+        _ensure_cluster_mock_tls_inference()
         return
     print("Using docker-compose mock-tls-inference service")
 
@@ -322,6 +295,7 @@ def configure_tls_mtls(context: Context) -> None:
     _configure_tls(
         {
             "verify": "/certs/ca.crt",
+            "min_version": "TLSv1.2",
             "client_cert": "/certs/client.crt",
             "client_key": "/certs/client.key",
         },
@@ -329,14 +303,8 @@ def configure_tls_mtls(context: Context) -> None:
     )
 
 
-@given('Llama Stack is configured with CA certificate path "{path}"')
-def configure_tls_verify_ca_path(context: Context, path: str) -> None:
-    """Configure run.yaml with TLS verify pointing to a specific CA cert path."""
-    _configure_tls({"verify": path})
-
-
 @given("Llama Stack is configured for mTLS without client certificate")
-def configure_mtls_no_client_cert(context: Context) -> None:
+def configure_tls_mtls_no_client_cert(context: Context) -> None:
     """Configure run.yaml for mTLS port without client cert (should fail)."""
     _configure_tls(
         {"verify": "/certs/ca.crt"},
@@ -345,7 +313,7 @@ def configure_mtls_no_client_cert(context: Context) -> None:
 
 
 @given("Llama Stack is configured for mTLS with wrong client certificate")
-def configure_mtls_wrong_client_cert(context: Context) -> None:
+def configure_tls_mtls_wrong_client_cert(context: Context) -> None:
     """Configure run.yaml for mTLS with invalid client cert (CA cert as client cert)."""
     _configure_tls(
         {
@@ -358,11 +326,12 @@ def configure_mtls_wrong_client_cert(context: Context) -> None:
 
 
 @given("Llama Stack is configured for mTLS with untrusted client certificate")
-def configure_mtls_untrusted_client_cert(context: Context) -> None:
-    """Configure run.yaml for mTLS with client cert from untrusted CA."""
+def configure_tls_mtls_untrusted_client_cert(context: Context) -> None:
+    """Configure run.yaml with untrusted client certificate."""
     _configure_tls(
         {
             "verify": "/certs/ca.crt",
+            "min_version": "TLSv1.2",
             "client_cert": "/certs/untrusted-client.crt",
             "client_key": "/certs/untrusted-client.key",
         },
@@ -371,11 +340,12 @@ def configure_mtls_untrusted_client_cert(context: Context) -> None:
 
 
 @given("Llama Stack is configured for mTLS with expired client certificate")
-def configure_mtls_expired_client_cert(context: Context) -> None:
-    """Configure run.yaml for mTLS with an expired client certificate."""
+def configure_tls_mtls_expired_client_cert(context: Context) -> None:
+    """Configure run.yaml with expired client certificate."""
     _configure_tls(
         {
             "verify": "/certs/ca.crt",
+            "min_version": "TLSv1.2",
             "client_cert": "/certs/expired-client.crt",
             "client_key": "/certs/client.key",
         },
@@ -384,7 +354,7 @@ def configure_mtls_expired_client_cert(context: Context) -> None:
 
 
 @given("Llama Stack is configured with CA certificate and hostname mismatch server")
-def configure_tls_hostname_mismatch(context: Context) -> None:
+def configure_tls_ca_hostname_mismatch(context: Context) -> None:
     """Configure run.yaml to connect to hostname-mismatch server (should fail)."""
     _configure_tls(
         {"verify": "/certs/ca.crt"},
@@ -393,16 +363,31 @@ def configure_tls_hostname_mismatch(context: Context) -> None:
 
 
 @given("Llama Stack is configured with mutual TLS and hostname mismatch server")
-def configure_mtls_hostname_mismatch(context: Context) -> None:
-    """Configure run.yaml for mTLS against hostname-mismatch server (should fail)."""
+def configure_tls_mtls_hostname_mismatch(context: Context) -> None:
+    """Configure run.yaml with mTLS against hostname-mismatch server."""
     _configure_tls(
         {
             "verify": "/certs/ca.crt",
+            "min_version": "TLSv1.2",
             "client_cert": "/certs/client.crt",
             "client_key": "/certs/client.key",
         },
         base_url=_mock_tls_base_url(_MOCK_TLS_PORT_HOSTNAME_MISMATCH),
     )
+
+
+@given('Llama Stack is configured with CA certificate path "{path}"')
+def configure_tls_ca_path(context: Context, path: str) -> None:
+    """Configure run.yaml with TLS verify pointing to a specific CA cert path."""
+    _configure_tls({"verify": path})
+
+
+@given(
+    'Llama Stack is configured with TLS minimum version "{version}" and CA certificate path "{path}"'
+)
+def configure_tls_min_version_and_ca(context: Context, version: str, path: str) -> None:
+    """Configure run.yaml with TLS minimum version and a specific CA cert path."""
+    _configure_tls({"verify": path, "min_version": version})
 
 
 @given(
@@ -414,13 +399,3 @@ def configure_tls_min_version_hostname_mismatch(context: Context, version: str) 
         {"verify": "/certs/ca.crt", "min_version": version},
         base_url=_mock_tls_base_url(_MOCK_TLS_PORT_HOSTNAME_MISMATCH),
     )
-
-
-@given(
-    'Llama Stack is configured with TLS minimum version "{version}" and CA certificate path "{path}"'
-)
-def configure_tls_min_version_with_ca_path(
-    context: Context, version: str, path: str
-) -> None:
-    """Configure run.yaml with TLS minimum version and a specific CA cert path."""
-    _configure_tls({"verify": path, "min_version": version})
