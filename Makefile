@@ -17,11 +17,14 @@ LLAMA_STACK_IMAGE ?= lightspeed-llama-stack:local
 LLAMA_STACK_PORT ?= 8321
 CONTAINER_RUNTIME ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
-.PHONY: run run-local build-llama-stack-image remove-llama-stack-container start-llama-stack-container wait-for-llama-stack-health clean-llama-stack
+.PHONY: run run-stack build-llama-stack-image remove-llama-stack-container start-llama-stack-container wait-for-llama-stack-health clean-llama-stack
 
-run: start-llama-stack-container ## Run the service locally with llama-stack container
-	@echo "Starting Lightspeed Core Stack..."
+run-stack: ## Run lightspeed-stack directly, without building dependent service/s
 	uv run src/lightspeed_stack.py -c $(CONFIG)
+
+run: start-llama-stack-container ## Run the service locally with dependent services
+	@echo "Starting Lightspeed Core Stack..."
+	$(MAKE) run-stack
 
 build-llama-stack-image: remove-llama-stack-container ## Build llama-stack container image
 	@echo "Building llama-stack container image..."
@@ -108,8 +111,6 @@ clean-llama-stack: remove-llama-stack-container ## Remove container and image
 		echo "Removing llama-stack image..."; \
 		$(CONTAINER_RUNTIME) rmi $(LLAMA_STACK_IMAGE); \
 	fi
-run-local: ## Run the service locally, assuming llama-stack is already running externally
-	uv run src/lightspeed_stack.py -c $(CONFIG)
 
 run-llama-stack: ## Start Llama Stack with enriched config (for local service mode)
 	uv run src/llama_stack_configuration.py -c $(CONFIG) -i $(LLAMA_STACK_CONFIG) -o $(LLAMA_STACK_CONFIG) && \
