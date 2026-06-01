@@ -156,7 +156,7 @@ format: ## Format the code into unified format
 	uv run black --line-length 88 src tests
 	uv run ruff check src tests --fix
 
-schema:	## Generate OpenAPI schema file
+schema:	## Generate OpenAPI schema file stored in docs subdirectory
 	uv run scripts/generate_openapi_schema.py docs/openapi.json
 
 openapi-doc:	docs/openapi.json scripts/fix_openapi_doc.py	## Generate OpenAPI documentation
