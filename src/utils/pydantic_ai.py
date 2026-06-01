@@ -29,14 +29,6 @@ _LLS_RESPONSES_EXTRA_FIELDS: Final[frozenset[str]] = frozenset(
 )
 
 
-def _openai_v1_base_url(client: AsyncLlamaStackClient) -> str:
-    """Return OpenAI-compatible ``/v1`` base URL for the given service client."""
-    base = str(client.base_url).rstrip("/")
-    if base.endswith("/v1"):
-        return base
-    return f"{base}/v1"
-
-
 def _llama_stack_provider_from_client(
     client: AsyncLlamaStackClient | AsyncLlamaStackAsLibraryClient,
 ) -> LlamaStackProvider:
@@ -44,8 +36,10 @@ def _llama_stack_provider_from_client(
     if isinstance(client, AsyncLlamaStackAsLibraryClient):
         return LlamaStackProvider(library_client=client)
     api_key = client.api_key or "not-needed"
+    base = str(client.base_url).rstrip("/")
+    base_url = base if base.endswith("/v1") else f"{base}/v1"
     return LlamaStackProvider(
-        base_url=_openai_v1_base_url(client),
+        base_url=base_url,
         api_key=api_key,
         http_client=client._client,
     )
