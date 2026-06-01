@@ -23,9 +23,19 @@ class _AsyncByteStream(httpx.AsyncByteStream):
     """Wraps an async byte generator as an httpx AsyncByteStream."""
 
     def __init__(self, gen: AsyncGenerator[bytes, None]) -> None:
+        """Store an async generator that yields raw bytes for streaming.
+
+        Args:
+            gen: An async generator producing byte chunks to stream.
+        """
         self._gen = gen
 
     async def __aiter__(self) -> AsyncIterator[bytes]:
+        """Yield bytes chunks from the wrapped generator.
+
+        Returns:
+            An async iterator of bytes fulfilling the httpx.AsyncByteStream contract.
+        """
         async for chunk in self._gen:
             yield chunk
 
@@ -97,17 +107,32 @@ class LlamaStackLibraryTransport(httpx.AsyncBaseTransport):
         path: str,
         body: dict[str, Any],
     ) -> httpx.Response:
-        assert self._client.route_impls is not None
+        """Dispatch a non-streaming request to the matched route handler.
+
+        Args:
+            request: The original httpx request (attached to the response).
+            method: The HTTP method (e.g. ``"POST"``).
+            path: The decoded URL path used for route matching.
+            body: The parsed JSON request body.
+
+        Returns:
+            An httpx.Response containing the JSON-serialized handler result.
+
+        Raises:
+            RuntimeError: If route_impls is not initialized.
+        """
+        if self._client.route_impls is None:
+            raise RuntimeError("route_impls is not initialized")
 
         matched_func, path_params, _, _ = find_matching_route(
             method, path, self._client.route_impls
         )
-        body |= path_params
-        body = self._client._convert_body(  # pylint: disable=protected-access
-            matched_func, body
+        merged_body = {**body, **path_params}
+        merged_body = self._client._convert_body(  # pylint: disable=protected-access
+            matched_func, merged_body
         )
 
-        result = await matched_func(**body)
+        result = await matched_func(**merged_body)
 
         json_content = json.dumps(convert_pydantic_to_json_value(result))
         status_code = httpx.codes.OK
@@ -130,17 +155,32 @@ class LlamaStackLibraryTransport(httpx.AsyncBaseTransport):
         path: str,
         body: dict[str, Any],
     ) -> httpx.Response:
-        assert self._client.route_impls is not None
+        """Dispatch a streaming request and return an SSE event-stream response.
+
+        Args:
+            request: The original httpx request (attached to the response).
+            method: The HTTP method (e.g. ``"POST"``).
+            path: The decoded URL path used for route matching.
+            body: The parsed JSON request body (must contain ``stream: True``).
+
+        Returns:
+            An httpx.Response with a streaming body of SSE-formatted chunks.
+
+        Raises:
+            RuntimeError: If route_impls is not initialized.
+        """
+        if self._client.route_impls is None:
+            raise RuntimeError("route_impls is not initialized")
 
         func, path_params, _, _ = find_matching_route(
             method, path, self._client.route_impls
         )
-        body |= path_params
-        body = self._client._convert_body(  # pylint: disable=protected-access
-            func, body
+        merged_body = {**body, **path_params}
+        merged_body = self._client._convert_body(  # pylint: disable=protected-access
+            func, merged_body
         )
 
-        result = await func(**body)
+        result = await func(**merged_body)
 
         async def gen() -> AsyncGenerator[bytes, None]:
             async for chunk in result:

@@ -67,11 +67,11 @@ class TestLlamaStackProviderServerMode:
         provider = LlamaStackProvider()
         assert provider.client.api_key == "not-needed"
 
-    def test_custom_http_client(self) -> None:
-        """Test that a provided http_client is used."""
-        custom_client = httpx.AsyncClient()
+    def test_custom_http_client(self, mocker: MockerFixture) -> None:
+        """Test that a provided http_client is wired into the provider."""
+        custom_client = mocker.Mock(spec=httpx.AsyncClient)
         provider = LlamaStackProvider(http_client=custom_client)
-        assert provider.client is not None
+        assert provider._client._client is custom_client
 
 
 class TestLlamaStackProviderLibraryMode:
@@ -101,12 +101,12 @@ class TestLlamaStackProviderMutualExclusion:
     """Tests for mutual exclusion between library_client and server mode options."""
 
     def test_library_client_and_base_url_raises(self, mocker: MockerFixture) -> None:
-        """Test that providing both library_client and base_url raises AssertionError."""
+        """Test that providing both library_client and base_url raises ValueError."""
         mock_lib_client = mocker.Mock()
         mock_lib_client.provider_data = None
 
         with pytest.raises(
-            AssertionError,
+            ValueError,
             match="Cannot provide both `library_client` and `base_url`",
         ):
             LlamaStackProvider(
@@ -115,12 +115,12 @@ class TestLlamaStackProviderMutualExclusion:
             )
 
     def test_library_client_and_api_key_raises(self, mocker: MockerFixture) -> None:
-        """Test that providing both library_client and api_key raises AssertionError."""
+        """Test that providing both library_client and api_key raises ValueError."""
         mock_lib_client = mocker.Mock()
         mock_lib_client.provider_data = None
 
         with pytest.raises(
-            AssertionError,
+            ValueError,
             match="Cannot provide both `library_client` and `api_key`",
         ):
             LlamaStackProvider(
@@ -129,27 +129,27 @@ class TestLlamaStackProviderMutualExclusion:
             )
 
     def test_library_client_and_http_client_raises(self, mocker: MockerFixture) -> None:
-        """Test that providing both library_client and http_client raises AssertionError."""
+        """Test that providing both library_client and http_client raises ValueError."""
         mock_lib_client = mocker.Mock()
         mock_lib_client.provider_data = None
 
         with pytest.raises(
-            AssertionError,
+            ValueError,
             match="Cannot provide both `library_client` and `http_client`",
         ):
             LlamaStackProvider(
                 library_client=mock_lib_client,
-                http_client=httpx.AsyncClient(),
+                http_client=mocker.Mock(spec=httpx.AsyncClient),
             )
 
 
 class TestSetHttpClient:  # pylint: disable=too-few-public-methods
     """Tests for LlamaStackProvider._set_http_client."""
 
-    def test_replaces_internal_http_client(self) -> None:
+    def test_replaces_internal_http_client(self, mocker: MockerFixture) -> None:
         """Test that _set_http_client replaces the underlying httpx client."""
         provider = LlamaStackProvider()
-        new_client = httpx.AsyncClient()
+        new_client = mocker.Mock(spec=httpx.AsyncClient)
 
         provider._set_http_client(new_client)
 

@@ -11,7 +11,7 @@ from pydantic_ai.models import create_async_http_client
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers import Provider
 
-from ._transport import LlamaStackLibraryTransport
+from pydantic_ai_lightspeed.llamastack._transport import LlamaStackLibraryTransport
 
 if TYPE_CHECKING:
     from llama_stack.core.library_client import AsyncLlamaStackAsLibraryClient
@@ -72,18 +72,21 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
                 Must be ``None`` when ``library_client`` is provided.
         """
         if library_client is not None:
-            assert (
-                base_url is None
-            ), "Cannot provide both `library_client` and `base_url`"
-            assert api_key is None, "Cannot provide both `library_client` and `api_key`"
-            assert (
-                http_client is None
-            ), "Cannot provide both `library_client` and `http_client`"
+            if base_url is not None:
+                raise ValueError("Cannot provide both `library_client` and `base_url`")
+            if api_key is not None:
+                raise ValueError("Cannot provide both `library_client` and `api_key`")
+            if http_client is not None:
+                raise ValueError(
+                    "Cannot provide both `library_client` and `http_client`"
+                )
 
             self._library_client = library_client
             transport = LlamaStackLibraryTransport(library_client)
             lib_http_client = httpx.AsyncClient(
-                transport=transport, base_url="http://llama-stack-library"
+                transport=transport,
+                base_url="http://llama-stack-library",
+                timeout=httpx.Timeout(None),
             )
             self._client = AsyncOpenAI(
                 http_client=lib_http_client,
@@ -109,4 +112,12 @@ class LlamaStackProvider(Provider[AsyncOpenAI]):
         return f"LlamaStackProvider(name={self.name!r}, base_url={self.base_url!r})"
 
     def _set_http_client(self, http_client: httpx.AsyncClient) -> None:
+        """Inject an httpx.AsyncClient into the underlying OpenAI client.
+
+        Replaces the internal HTTP transport by assigning directly to the
+        protected ``self._client._client`` attribute of the AsyncOpenAI instance.
+
+        Args:
+            http_client: The async HTTP client to use for subsequent requests.
+        """
         self._client._client = http_client  # pyright: ignore[reportPrivateUsage]  # pylint: disable=protected-access
