@@ -74,21 +74,49 @@ e2e_ops_dump_pod_logs() {
     )
 }
 
+# Print pod phase / init status when readiness polling fails (Konflux init can take 10+ min).
+e2e_ops_describe_pod_state() {
+    local pod_name="${1:?pod name required}"
+    local prefix="[e2e-ops] "
+
+    if ! oc get pod "$pod_name" -n "$NAMESPACE" &>/dev/null; then
+        echo "${prefix}pod/$pod_name not found (evicted, rejected, or deleted)"
+        echo "${prefix}--- recent events (namespace) ---"
+        oc get events -n "$NAMESPACE" --field-selector "involvedObject.name=$pod_name" \
+            --sort-by='.lastTimestamp' 2>/dev/null | tail -15 | sed "s/^/${prefix}/" || true
+        return 0
+    fi
+    local phase reason
+    phase=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "?")
+    reason=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.reason}' 2>/dev/null || true)
+    echo "${prefix}pod/$pod_name phase=${phase}${reason:+ reason=$reason}"
+    oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{range .status.initContainerStatuses[*]}init={.name} ready={.ready} state={.state}{"\n"}{end}' 2>/dev/null \
+        | sed "s/^/${prefix}/" || true
+    oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{range .status.containerStatuses[*]}container={.name} ready={.ready} restarts={.restartCount}{"\n"}{end}' 2>/dev/null \
+        | sed "s/^/${prefix}/" || true
+}
+
 wait_for_pod() {
     local pod_name="$1"
     local max_attempts="${2:-24}"
-    
+    local attempt phase
+
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
         local ready
         ready=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
         if [[ "$ready" == "true" ]]; then
-            echo "✓ Pod $pod_name ready"
+            echo "✓ Pod $pod_name ready (after $((attempt * 3))s)"
             return 0
+        fi
+        if (( max_attempts >= 60 && attempt % 20 == 0 )); then
+            phase=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "?")
+            echo "[e2e-ops] Still waiting for $pod_name ($attempt/${max_attempts}, phase=${phase})..."
         fi
         sleep 3
     done
-    
+
     echo "Pod $pod_name not ready after $((max_attempts * 3))s"
+    e2e_ops_describe_pod_state "$pod_name"
     e2e_ops_dump_pod_logs "$pod_name" 200
     return 1
 }
@@ -348,7 +376,12 @@ _restart_llama_stack_core() {
             -n "$NAMESPACE" \
             --dry-run=client -o yaml | oc apply -f -
         oc apply -n "$NAMESPACE" -f "$MANIFEST_DIR/llama-stack-openai.yaml"
-        if ! wait_for_pod "llama-stack-service" 90; then
+        # Konflux: setup-from-source init (dnf, git, uv) often needs 6–15 min before the main container is Ready.
+        local llama_wait_attempts=90
+        if [[ "${E2E_KONFLUX_E2E:-0}" == "1" ]]; then
+            llama_wait_attempts=360
+        fi
+        if ! wait_for_pod "llama-stack-service" "$llama_wait_attempts"; then
             echo "===== Llama-stack restore FAILED (pod not ready) ====="
             return 1
         fi

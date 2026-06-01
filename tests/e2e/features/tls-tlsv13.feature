@@ -3,7 +3,8 @@ Feature: TLS configuration — TLS minimum version 1.3
   Validate Llama Stack NetworkConfig.tls min_version TLSv1.3 against the mock
   HTTPS inference provider.
 
-  # Only Llama run.yaml changes per scenario; LCS uses lightspeed-stack-tls.yaml throughout.
+  # Only Llama run.yaml changes per scenario; LCS uses lightspeed-stack-tls.yaml
+  # throughout (Background). ``Llama Stack is restarted`` also refreshes LCS.
 
   Background:
     Given The service is started locally
@@ -18,7 +19,6 @@ Feature: TLS configuration — TLS minimum version 1.3
   Scenario: Inference succeeds with TLS minimum version TLSv1.3
     Given Llama Stack is configured with TLS minimum version "TLSv1.3" and CA certificate path "/certs/ca.crt"
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -28,7 +28,6 @@ Feature: TLS configuration — TLS minimum version 1.3
   Scenario: Inference fails with TLS minimum version TLSv1.3 and untrusted CA certificate
     Given Llama Stack is configured with TLS minimum version "TLSv1.3" and CA certificate path "/certs/untrusted-ca.crt"
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -39,7 +38,6 @@ Feature: TLS configuration — TLS minimum version 1.3
   Scenario: Inference fails with TLS minimum version TLSv1.3 and hostname mismatch
     Given Llama Stack is configured with TLS minimum version "TLSv1.3" and hostname mismatch server
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -50,7 +48,6 @@ Feature: TLS configuration — TLS minimum version 1.3
   Scenario: Inference fails with TLS minimum version TLSv1.3 and expired CA certificate
     Given Llama Stack is configured with TLS minimum version "TLSv1.3" and CA certificate path "/certs/expired-ca.crt"
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}

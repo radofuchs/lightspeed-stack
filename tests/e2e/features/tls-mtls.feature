@@ -3,7 +3,8 @@ Feature: TLS configuration — mutual TLS authentication
   Validate Llama Stack NetworkConfig.tls client certificate settings against the
   mock HTTPS inference provider (mTLS port).
 
-  # Only Llama run.yaml changes per scenario; LCS uses lightspeed-stack-tls.yaml throughout.
+  # Only Llama run.yaml changes per scenario; LCS uses lightspeed-stack-tls.yaml
+  # throughout (Background). ``Llama Stack is restarted`` also refreshes LCS.
 
   Background:
     Given The service is started locally
@@ -18,7 +19,6 @@ Feature: TLS configuration — mutual TLS authentication
   Scenario: Inference succeeds with mutual TLS authentication
     Given Llama Stack is configured with mutual TLS authentication
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -28,7 +28,6 @@ Feature: TLS configuration — mutual TLS authentication
   Scenario: Inference fails when mTLS is required but no client certificate is provided
     Given Llama Stack is configured for mTLS without client certificate
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -39,7 +38,6 @@ Feature: TLS configuration — mutual TLS authentication
   Scenario: Inference fails when mTLS is required but wrong client certificate is provided
     Given Llama Stack is configured for mTLS with wrong client certificate
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -50,7 +48,6 @@ Feature: TLS configuration — mutual TLS authentication
   Scenario: Inference fails when mTLS is required but untrusted client certificate is provided
     Given Llama Stack is configured for mTLS with untrusted client certificate
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -61,7 +58,6 @@ Feature: TLS configuration — mutual TLS authentication
   Scenario: Inference fails when mTLS is required but expired client certificate is provided
     Given Llama Stack is configured for mTLS with expired client certificate
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -72,7 +68,6 @@ Feature: TLS configuration — mutual TLS authentication
   Scenario: Inference fails with mutual TLS and hostname mismatch
     Given Llama Stack is configured with mutual TLS and hostname mismatch server
       And Llama Stack is restarted
-      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}

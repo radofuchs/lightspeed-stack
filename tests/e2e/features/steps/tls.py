@@ -108,15 +108,38 @@ def _prepare_tls_prow_llama_restart_env() -> None:
     os.environ["E2E_COPY_MOCK_TLS_CERTS_TO_LLAMA"] = "1"
 
 
+def _restart_lightspeed_after_llama_tls(context: Context) -> None:
+    """Restart LCS after Llama recreate so the in-process Llama client reconnects.
+
+    TLS scenarios only change Llama run.yaml; LCS yaml is unchanged. Without this,
+    queries through LCS often fail with 503/connection errors after Llama pod
+    recreate on Prow (stale HTTP connections). Replaces per-scenario Gherkin
+    ``Lightspeed Stack is restarted`` steps.
+    """
+    from tests.e2e.utils.utils import (
+        restart_container,
+        wait_for_lightspeed_stack_http_ready,
+    )
+
+    scenario = getattr(getattr(context, "scenario", None), "name", "") or "?"
+    feature_file = os.path.basename(
+        getattr(getattr(context, "feature", None), "filename", "") or "tls.feature"
+    )
+    print(
+        f"[{feature_file}] Lightspeed Stack refresh after Llama recreate "
+        f"scenario={scenario!r}",
+        flush=True,
+    )
+    restart_container("lightspeed-stack")
+    wait_for_lightspeed_stack_http_ready()
+
+
 def restart_llama_for_tls_feature(context: Context) -> None:
-    """Restart Llama for TLS tests (full pod recreate on Prow/Konflux)."""
+    """Restart Llama for TLS tests, then refresh LCS (full pod recreate on Prow/Konflux)."""
     from tests.e2e.utils.utils import restart_container
 
-    if not is_prow_environment():
-        restart_container("llama-stack")
-        return
-
-    _prepare_tls_prow_llama_restart_env()
+    if is_prow_environment():
+        _prepare_tls_prow_llama_restart_env()
     scenario = getattr(getattr(context, "scenario", None), "name", "") or "?"
     feature_file = os.path.basename(
         getattr(getattr(context, "feature", None), "filename", "") or "tls.feature"
@@ -126,6 +149,7 @@ def restart_llama_for_tls_feature(context: Context) -> None:
         flush=True,
     )
     restart_container("llama-stack")
+    _restart_lightspeed_after_llama_tls(context)
 
 
 def _cluster_mock_tls_inference_host() -> str:
