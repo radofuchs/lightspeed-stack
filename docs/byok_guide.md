@@ -15,7 +15,7 @@ The BYOK (Bring Your Own Knowledge) feature in Lightspeed Core enables users to 
   * [Step 1: Prepare Your Knowledge Sources](#step-1-prepare-your-knowledge-sources)
   * [Step 2: Create Vector Database](#step-2-create-vector-database)
   * [Step 3: Configure Embedding Model](#step-3-configure-embedding-model)
-  * [Step 4: Configure Llama Stack](#step-4-configure-llama-stack)
+  * [Step 4: Configure BYOK Knowledge Sources](#step-4-configure-byok-knowledge-sources)
   * [Step 5: Configure RAG Strategy](#step-5-configure-rag-strategy)
 * [Supported Vector Database Types](#supported-vector-database-types)
 * [Configuration Examples](#configuration-examples)
@@ -148,15 +148,13 @@ class CustomMetadataProcessor(MetadataProcessor):
 ```
 
 **Important Notes:**
-- The vector database must be compatible with Llama Stack
 - Supported formats: 
-  - Llama-Stack Faiss Vector-IO
-  - Llama-Stack SQLite-vec Vector-IO
+  - Faiss Vector-IO
 - The same embedding model must be used for both creation and querying
 
 ### Step 3: Configure Embedding Model
 
-You have two options for configuring your embedding model:
+You have two options for obtaining your embedding model:
 
 #### Option 1: Use rag-content Download Script (Optional)
 You can use the embedding generation step mentioned in the rag-content repo:
@@ -171,131 +169,62 @@ Alternatively, you can download your own embedding model and update the path in 
 
 1. **Download your preferred embedding model** from Hugging Face or other sources
 2. **Place the model** in your desired directory (e.g., `/path/to/your/embedding_models/`)
-3. **Update the YAML configuration** to point to your model path:
 
-```yaml
-models:
-  - model_id: sentence-transformers/all-mpnet-base-v2
-    metadata:
-        embedding_dimension: 768
-    model_type: embedding
-    provider_id: sentence-transformers
-    provider_model_id: /path/to/your/embedding_models/all-mpnet-base-v2
-```
+The embedding model is specified per knowledge source in the `byok_rag` section of `lightspeed-stack.yaml` via the `embedding_model` field. The default is `sentence-transformers/all-mpnet-base-v2` with a dimension of `768`.
 
 **Note**: Ensure the same embedding model is used for both vector database creation and querying.
 
-### Step 4: Configure Llama Stack
+### Step 4: Configure BYOK Knowledge Sources
 
-Edit your `run.yaml` file to include BYOK configuration:
+Declare your knowledge sources in the `byok_rag` section of your `lightspeed-stack.yaml`. The required configuration is automatically generated at startup when using `make run`, `make run-stack`, `docker-compose`, or library mode.
 
 ```yaml
-version: 2
-image_name: byok-configuration
-
-# Required APIs for BYOK
-apis:
-- agents
-- inference
-- vector_io
-- tool_runtime
-- safety
-
-providers:
-  inference:
-  - provider_id: sentence-transformers
-    provider_type: inline::sentence-transformers
-    config: {}
-  - provider_id: openai
-    provider_type: remote::openai
-    config:
-      api_key: ${env.OPENAI_API_KEY}
-
-  agents:
-  - provider_id: meta-reference
-    provider_type: inline::meta-reference
-    config:
-      persistence:
-        agent_state:
-          namespace: agents_state
-          backend: kv_default
-        responses:
-          table_name: agents_responses
-          backend: sql_default
-
-  safety:
-  - provider_id: llama-guard
-    provider_type: inline::llama-guard
-    config:
-      excluded_categories: []
-
-  vector_io:
-  - provider_id: your-knowledge-base
-    provider_type: inline::faiss
-    config:
-      persistence:
-        namespace: vector_io::faiss
-        backend: byok_backend  # References storage.backends
-
-  tool_runtime:
-  - provider_id: rag-runtime
-    provider_type: inline::rag-runtime
-    config: {}
-
-storage:
-  backends:
-    kv_default:
-      type: kv_sqlite
-      db_path: ~/.llama/storage/kv_store.db
-    sql_default:
-      type: sql_sqlite
-      db_path: ~/.llama/storage/sql_store.db
-    byok_backend:
-      type: kv_sqlite
-      db_path: /path/to/vector_db/faiss_store.db
-
-registered_resources:
-  models:
-  - model_id: your-llm-model
-    provider_id: openai
-    model_type: llm
-    provider_model_id: gpt-4o-mini
-  - model_id: sentence-transformers/all-mpnet-base-v2
-    model_type: embedding
-    provider_id: sentence-transformers
-    provider_model_id: /path/to/embedding_models/all-mpnet-base-v2
-    metadata:
-      embedding_dimension: 768
-  vector_stores:
-  - vector_store_id: your-index-id  # ID used during index generation
-    provider_id: your-knowledge-base
-    embedding_model: sentence-transformers/all-mpnet-base-v2
-    embedding_dimension: 768
-  tool_groups:
-  - toolgroup_id: builtin::rag
-    provider_id: rag-runtime
+byok_rag:
+  - rag_id: my-docs                                    # Unique identifier for this knowledge source
+    rag_type: inline::faiss                             # Vector store type (default: inline::faiss)
+    embedding_model: sentence-transformers/all-mpnet-base-v2  # Embedding model (default)
+    embedding_dimension: 768                            # Must match your embedding model's output
+    vector_db_id: vs_8c94967b-81cc-4028-a294-9cfac6fd9ae2                              # Generated by rag-content during index creation
+    db_path: /path/to/vector_db/faiss_store.db          # Path to the vector database file
+    score_multiplier: 1.0                               # Weight for Inline RAG result ranking (default: 1.0)
 ```
 
-**⚠️ Important**: The `vector_store_id` value must exactly match the ID you provided when creating the vector database using the rag-content tool. This identifier links your Llama Stack configuration to the specific vector database index you created.
+**`byok_rag` field reference:**
 
-> [!TIP]
-> Instead of manually editing `run.yaml`, you can declare your knowledge sources in the `byok_rag`
-> section of `lightspeed-stack.yaml`. The lightspeed-stack service automatically generates the required configuration
-> at startup.
->
-> ```yaml
-> byok_rag:
->   - rag_id: my-docs           # Unique identifier for this knowledge source
->     rag_type: inline::faiss
->     embedding_model: sentence-transformers/all-mpnet-base-v2
->     embedding_dimension: 768
->     vector_db_id: your-index-id  # Llama Stack vector store ID (from index generation)
->     db_path: /path/to/vector_db/faiss_store.db
->     score_multiplier: 1.0       # Optional: weight results when mixing multiple sources
-> ```
->
-> When multiple BYOK sources are configured, `score_multiplier` adjusts the relative importance of
-> each store's results during Inline RAG retrieval. Values above 1.0 boost a store; below 1.0 reduce it.
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `rag_id` | Yes | — | Unique identifier for the knowledge source |
+| `rag_type` | No | `inline::faiss` | Vector store provider type |
+| `embedding_model` | No | `sentence-transformers/all-mpnet-base-v2` | Embedding model identifier or path |
+| `embedding_dimension` | No | `768` | Embedding vector dimensionality |
+| `vector_db_id` | Yes | — | Vector store ID generated by rag-content (e.g. `vs_8c94967b-81cc-4028-a294-9cfac6fd9ae2`) |
+| `db_path` | Yes | — | Path to the vector database file |
+| `score_multiplier` | No | `1.0` | Weight for Inline RAG ranking (values > 1.0 boost; < 1.0 reduce) |
+
+**Multiple knowledge sources:**
+
+You can configure multiple BYOK sources. When using Inline RAG, `score_multiplier` adjusts the relative importance of each store's results:
+
+```yaml
+byok_rag:
+  - rag_id: ocp-docs
+    rag_type: inline::faiss
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+    vector_db_id: vs_3a7f9b2e-45dc-4e1a-b8f2-1c9d0e3f5a6b
+    db_path: /data/vector_dbs/ocp_docs/faiss_store.db
+    score_multiplier: 1.0
+
+  - rag_id: internal-kb
+    rag_type: inline::faiss
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+    vector_db_id: vs_d4c8e1f0-92ab-4d3c-a5e7-6b8f0c2d1e3a
+    db_path: /data/vector_dbs/internal_kb/faiss_store.db
+    score_multiplier: 1.2       # Boost results from this store
+```
+
+**⚠️ Important**: The `vector_db_id` value must exactly match the ID generated by the rag-content tool during index creation (e.g. `vs_8c94967b-81cc-4028-a294-9cfac6fd9ae2`). This identifier links your configuration to the specific vector database index.
 
 ### Step 5: Configure RAG Strategy
 
@@ -338,24 +267,17 @@ Both modes can be enabled simultaneously. Choose based on your latency and contr
 ### 1. FAISS (Recommended)
 - **Type**: Local vector database with SQLite metadata
 - **Best for**: Small to medium-sized knowledge bases
-- **Configuration**: `inline::faiss`
+- **Configuration**: `rag_type: inline::faiss`
 - **Storage**: SQLite database file
 
 ```yaml
-providers:
-  vector_io:
-  - provider_id: faiss-knowledge
-    provider_type: inline::faiss
-    config:
-      persistence:
-        namespace: vector_io::faiss
-        backend: faiss_backend
-
-storage:
-  backends:
-    faiss_backend:
-      type: kv_sqlite
-      db_path: /path/to/faiss_store.db
+byok_rag:
+  - rag_id: faiss-knowledge
+    rag_type: inline::faiss
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+    vector_db_id: vs_8c94967b-81cc-4028-a294-9cfac6fd9ae2
+    db_path: /path/to/faiss_store.db
 ```
 
 ### 2. pgvector (PostgreSQL)
@@ -363,6 +285,10 @@ storage:
 - **Best for**: Large-scale deployments, shared knowledge bases
 - **Configuration**: `remote::pgvector`
 - **Requirements**: PostgreSQL with pgvector extension
+
+> [!NOTE]
+> pgvector is not yet supported via `byok_rag` in `lightspeed-stack.yaml` (see [LCORE-2437](https://redhat.atlassian.net/browse/LCORE-2437)).
+> It must be configured directly in the Llama Stack configuration file.
 
 ```yaml
 vector_io:
@@ -373,7 +299,7 @@ vector_io:
     port: 5432
     db: knowledge_db
     user: lightspeed_user
-    password: ${env.DB_PASSWORD}
+    password: ${env.POSTGRES_PASSWORD}
     kvstore:
       type: sqlite
       db_path: .llama/distributions/pgvector/registry.db
@@ -388,181 +314,93 @@ vector_io:
 
 ## Configuration Examples
 
-### Example 1: OpenAI + FAISS
-Complete configuration for OpenAI LLM with local FAISS knowledge base:
+### Example 1: FAISS Knowledge Base
+
+A minimal `lightspeed-stack.yaml` configuration with a FAISS-based BYOK knowledge source:
 
 ```yaml
-version: 2
-image_name: openai-faiss-byok
+name: Lightspeed Core Service (LCS)
+service:
+  host: localhost
+  port: 8080
+  auth_enabled: false
 
-apis:
-- agents
-- inference
-- vector_io
-- tool_runtime
-- safety
-
-providers:
-  inference:
-  - provider_id: sentence-transformers
-    provider_type: inline::sentence-transformers
-    config: {}
-  - provider_id: openai
-    provider_type: remote::openai
-    config:
-      api_key: ${env.OPENAI_API_KEY}
-
-  agents:
-  - provider_id: meta-reference
-    provider_type: inline::meta-reference
-    config:
-      persistence:
-        agent_state:
-          namespace: agents_state
-          backend: kv_default
-        responses:
-          table_name: agents_responses
-          backend: sql_default
-
-  safety:
-  - provider_id: llama-guard
-    provider_type: inline::llama-guard
-    config:
-      excluded_categories: []
-
-  vector_io:
-  - provider_id: company-docs
-    provider_type: inline::faiss
-    config:
-      persistence:
-        namespace: vector_io::faiss
-        backend: company_docs_backend
-
-  tool_runtime:
-  - provider_id: rag-runtime
-    provider_type: inline::rag-runtime
-    config: {}
-
-storage:
-  backends:
-    kv_default:
-      type: kv_sqlite
-      db_path: ~/.llama/storage/kv_store.db
-    sql_default:
-      type: sql_sqlite
-      db_path: ~/.llama/storage/sql_store.db
-    company_docs_backend:
-      type: kv_sqlite
-      db_path: /home/user/vector_dbs/company_docs/faiss_store.db
-
-registered_resources:
-  models:
-  - model_id: gpt-4o-mini
-    provider_id: openai
-    model_type: llm
-    provider_model_id: gpt-4o-mini
-  - model_id: sentence-transformers/all-mpnet-base-v2
-    model_type: embedding
-    provider_id: sentence-transformers
-    provider_model_id: /home/user/embedding_models/all-mpnet-base-v2
-    metadata:
-      embedding_dimension: 768
-  vector_stores:
-  - vector_store_id: company-knowledge-index
-    provider_id: company-docs
+byok_rag:
+  - rag_id: company-docs
+    rag_type: inline::faiss
     embedding_model: sentence-transformers/all-mpnet-base-v2
     embedding_dimension: 768
-  tool_groups:
-  - toolgroup_id: builtin::rag
-    provider_id: rag-runtime
+    vector_db_id: vs_f1a2b3c4-56de-4f78-90ab-cdef12345678
+    db_path: /home/user/vector_dbs/company_docs/faiss_store.db
+
+rag:
+  inline:
+    - company-docs
+  tool:
+    - company-docs
 ```
 
-### Example 2: vLLM + pgvector
-Configuration for local vLLM inference with PostgreSQL knowledge base:
+> [!NOTE]
+> Your LLM inference provider (e.g., OpenAI, vLLM) must also be configured in your `run.yaml`.
+> For OpenAI, set the `OPENAI_API_KEY` environment variable.
+
+### Example 2: Multiple Knowledge Sources with pgvector
+
+A configuration combining a local FAISS store (via `byok_rag`) with a remote pgvector store (configured directly in the Llama Stack configuration file):
+
+> [!NOTE]
+> pgvector is not yet supported via `byok_rag` in `lightspeed-stack.yaml` (see [LCORE-2437](https://redhat.atlassian.net/browse/LCORE-2437)).
+> The pgvector provider must be configured directly in the Llama Stack configuration file.
+
+**`lightspeed-stack.yaml`** — FAISS store and RAG strategy:
 
 ```yaml
-version: 2
-image_name: vllm-pgvector-byok
+name: Lightspeed Core Service (LCS)
+service:
+  host: localhost
+  port: 8080
+  auth_enabled: false
 
-apis:
-- agents
-- inference
-- vector_io
-- tool_runtime
-- safety
+byok_rag:
+  - rag_id: local-docs
+    rag_type: inline::faiss
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+    vector_db_id: vs_e9d8c7b6-43af-4b2d-8e1f-0a9b8c7d6e5f
+    db_path: /data/vector_dbs/local/faiss_store.db
+    score_multiplier: 1.0
 
-models:
-- model_id: meta-llama/Llama-3.1-8B-Instruct
-  provider_id: vllm
-  model_type: llm
-  provider_model_id: null
-
-- model_id: sentence-transformers/all-mpnet-base-v2
-  metadata:
-      embedding_dimension: 768
-  model_type: embedding
-  provider_id: sentence-transformers
-  provider_model_id: sentence-transformers/all-mpnet-base-v2
-
-providers:
-  inference:
-  - provider_id: sentence-transformers
-    provider_type: inline::sentence-transformers
-    config: {}
-  - provider_id: vllm
-    provider_type: remote::vllm
-    config:
-      url: http://localhost:8000/v1/
-      api_token: your-token-here
-
-  agents:
-  - provider_id: meta-reference
-    provider_type: inline::meta-reference
-    config:
-      persistence:
-        agent_state:
-          namespace: agents_state
-          backend: kv_default
-        responses:
-          table_name: agents_responses
-          backend: sql_default
-
-  safety:
-  - provider_id: llama-guard
-    provider_type: inline::llama-guard
-    config:
-      excluded_categories: []
-
-  vector_io:
-  - provider_id: enterprise-knowledge
-    provider_type: remote::pgvector
-    config:
-      host: postgres.company.com
-      port: 5432
-      db: enterprise_kb
-      user: rag_user
-      password: ${env.POSTGRES_PASSWORD}
-      kvstore:
-        type: sqlite
-        db_path: .llama/distributions/pgvector/registry.db
-
-  tool_runtime:
-  - provider_id: rag-runtime
-    provider_type: inline::rag-runtime
-    config: {}
-
-tool_groups:
-- provider_id: rag-runtime
-  toolgroup_id: builtin::rag
-  args: null
-  mcp_endpoint: null
-
-vector_stores:
-- embedding_dimension: 768
-  embedding_model: sentence-transformers/all-mpnet-base-v2
-  provider_id: enterprise-knowledge
-  vector_store_id: enterprise-docs
+rag:
+  inline:
+    - local-docs
+  tool:
+    - local-docs
 ```
+
+**Llama Stack configuration file** — pgvector provider:
+
+```yaml
+vector_io:
+- provider_id: enterprise-kb
+  provider_type: remote::pgvector
+  config:
+    host: localhost
+    port: 5432
+    db: knowledge_db
+    user: lightspeed_user
+    password: ${env.POSTGRES_PASSWORD}
+    kvstore:
+      type: sqlite
+      db_path: .llama/distributions/pgvector/registry.db
+```
+
+> [!NOTE]
+> For pgvector, ensure your PostgreSQL credentials are available via environment variables
+> (e.g., `POSTGRES_PASSWORD`).
+
+> [!TIP]
+> A complete working example combining BYOK and OKP is available at
+> [`examples/lightspeed-stack-byok-okp-rag.yaml`](../examples/lightspeed-stack-byok-okp-rag.yaml).
 
 ---
 
@@ -572,7 +410,6 @@ The BYOK (Bring Your Own Knowledge) feature in Lightspeed Core provides powerful
 
 For additional support and advanced configurations, refer to:
 - [RAG Configuration Guide](rag_guide.md)
-- [Llama Stack Documentation](https://llama-stack.readthedocs.io/)
 - [rag-content Tool Repository](https://github.com/lightspeed-core/rag-content)
 
 Remember to regularly update your knowledge sources and monitor system performance to maintain optimal BYOK functionality.

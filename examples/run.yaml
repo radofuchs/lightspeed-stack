@@ -64,13 +64,6 @@ providers:
   - config: {} # Enable the MCP tool
     provider_id: model-context-protocol
     provider_type: remote::model-context-protocol
-  vector_io:
-  - config: # Define the storage backend for RAG
-      persistence:
-        namespace: vector_io::faiss
-        backend: kv_default
-    provider_id: faiss
-    provider_type: inline::faiss
   agents:
   - config:
       persistence:
@@ -113,10 +106,10 @@ scoring_fns: []
 server:
   port: 8321
 storage:
-  backends:
-    kv_default: # Define the storage backend type for RAG, in this case registry and RAG are unified i.e. information on registered resources (e.g. models, vector_stores) are saved together with the RAG chunks
+  backends: # Define the storage backends type for metadata storage of registered resources (e.g. models, vector_stores)
+    kv_default:
       type: kv_sqlite
-      db_path: ${env.KV_STORE_PATH:=~/.llama/storage/rag/kv_store.db}
+      db_path: ${env.KV_STORE_PATH:=~/.llama/storage/kv_store.db}
     sql_default:
       type: sql_sqlite
       db_path: ${env.SQL_STORE_PATH:=~/.llama/storage/sql_store.db}
@@ -141,17 +134,6 @@ registered_resources:
     provider_id: openai
     model_type: llm
     provider_model_id: gpt-4o-mini
-  - model_id: sentence-transformers/all-mpnet-base-v2
-    model_type: embedding
-    provider_id: sentence-transformers
-    provider_model_id: sentence-transformers/all-mpnet-base-v2
-    metadata:
-      embedding_dimension: 768
-  vector_stores:
-  - embedding_dimension: 768
-    embedding_model: sentence-transformers/nomic-ai/nomic-embed-text-v1.5
-    provider_id: faiss
-    vector_store_id: vs_503a2261-c256-45ff-90aa-580a80de64b8
   shields:
   - shield_id: llama-guard
     provider_id: llama-guard
