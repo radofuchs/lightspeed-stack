@@ -1,5 +1,7 @@
 """Unit tests for QuotaLimiterConfig model."""
 
+from typing import Any
+
 import pytest
 from pytest_subtests import SubTests
 
@@ -161,3 +163,154 @@ def test_quota_limiter_configuration_improper_values(subtests: SubTests) -> None
                 period=3,
             )
 
+
+correct_configurations = [
+    {
+        "type": "cluster_limiter",
+        "name": "John Williams",
+        "initial_quota": 212,
+        "quota_increase": 583,
+        "period": "Series trouble fund skill.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Frank Levine",
+        "initial_quota": 616,
+        "quota_increase": 40,
+        "period": "Eye idea western skill able although happy. Positi",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Susan Walters",
+        "initial_quota": 9,
+        "quota_increase": 855,
+        "period": "One stock pressure. Save worker benefit blue speak",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Pamela Farmer",
+        "initial_quota": 223,
+        "quota_increase": 62,
+        "period": "Expect chance or stop hard southern particularly.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Bobby Chandler",
+        "initial_quota": 496,
+        "quota_increase": 217,
+        "period": "Where animal outside.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Jeffrey Butler",
+        "initial_quota": 445,
+        "quota_increase": 78,
+        "period": "Song child mind. Sit win miss gas as.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Lydia Sweeney",
+        "initial_quota": 375,
+        "quota_increase": 953,
+        "period": "Feel husband phone together summer.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Jacqueline Allen",
+        "initial_quota": 147,
+        "quota_increase": 277,
+        "period": "Whose environmental life food bit young.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Matthew Williams",
+        "initial_quota": 696,
+        "quota_increase": 25,
+        "period": "Perhaps girl organization ok continue.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Shawn Stone",
+        "initial_quota": 126,
+        "quota_increase": 547,
+        "period": "Develop teach data.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "John Williams",
+        "initial_quota": 212,
+        "quota_increase": 583,
+        "period": "Series trouble fund skill.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Frank Levine",
+        "initial_quota": 616,
+        "quota_increase": 40,
+        "period": "Eye idea western skill able although happy. Positi",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Susan Walters",
+        "initial_quota": 9,
+        "quota_increase": 855,
+        "period": "One stock pressure. Save worker benefit blue speak",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Pamela Farmer",
+        "initial_quota": 223,
+        "quota_increase": 62,
+        "period": "Expect chance or stop hard southern particularly.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Bobby Chandler",
+        "initial_quota": 496,
+        "quota_increase": 217,
+        "period": "Where animal outside.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Jeffrey Butler",
+        "initial_quota": 445,
+        "quota_increase": 78,
+        "period": "Song child mind. Sit win miss gas as.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Lydia Sweeney",
+        "initial_quota": 375,
+        "quota_increase": 953,
+        "period": "Feel husband phone together summer.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Jacqueline Allen",
+        "initial_quota": 147,
+        "quota_increase": 277,
+        "period": "Whose environmental life food bit young.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Matthew Williams",
+        "initial_quota": 696,
+        "quota_increase": 25,
+        "period": "Perhaps girl organization ok continue.",
+    },
+    {
+        "type": "user_limiter",
+        "name": "Shawn Stone",
+        "initial_quota": 126,
+        "quota_increase": 547,
+        "period": "Develop teach data.",
+    },
+]
+
+
+@pytest.mark.parametrize("config_dict", correct_configurations)
+def test_configure_quota_handlers_from_dict(config_dict: dict[str, Any]) -> None:
+    """Test the configuration initialization from dictionary with config values."""
+    # try to initialize the app config and load configuration from a Python
+    # dictionary
+    QuotaLimiterConfiguration(**config_dict)
