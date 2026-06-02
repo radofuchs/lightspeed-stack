@@ -17,13 +17,14 @@ LLAMA_STACK_IMAGE ?= lightspeed-llama-stack:local
 LLAMA_STACK_PORT ?= 8321
 CONTAINER_RUNTIME ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
-.PHONY: run run-stack build-llama-stack-image remove-llama-stack-container start-llama-stack-container wait-for-llama-stack-health clean-llama-stack
+.PHONY: run run-stack build-llama-stack-image remove-llama-stack-container stop-llama-stack-container start-llama-stack-container wait-for-llama-stack-health clean-llama-stack
 
 run-stack: ## Run lightspeed-stack directly, without building dependent service/s
 	uv run src/lightspeed_stack.py -c $(CONFIG)
 
 run: start-llama-stack-container ## Run the service locally with dependent services
 	@echo "Starting Lightspeed Core Stack..."
+	@trap 'echo ""; echo "Stopping services..."; $(MAKE) stop-llama-stack-container' EXIT INT TERM; \
 	$(MAKE) run-stack
 
 build-llama-stack-image: remove-llama-stack-container ## Build llama-stack container image
@@ -34,10 +35,26 @@ build-llama-stack-image: remove-llama-stack-container ## Build llama-stack conta
 	fi
 	$(CONTAINER_RUNTIME) build -f deploy/llama-stack/test.containerfile -t $(LLAMA_STACK_IMAGE) .
 
-remove-llama-stack-container: ## Remove existing llama-stack container
+stop-llama-stack-container: ## Gracefully stop llama-stack container
 	@if [ -n "$(CONTAINER_RUNTIME)" ] && $(CONTAINER_RUNTIME) inspect $(LLAMA_STACK_CONTAINER_NAME) >/dev/null 2>&1; then \
-		echo "Removing existing llama-stack container..."; \
+		echo "Stopping llama-stack container (timeout: 10s)..."; \
+		if $(CONTAINER_RUNTIME) stop -t 10 $(LLAMA_STACK_CONTAINER_NAME) 2>/dev/null; then \
+			echo "✓ Container stopped gracefully"; \
+		else \
+			echo "⚠ Container did not stop gracefully, capturing logs..."; \
+			$(CONTAINER_RUNTIME) logs $(LLAMA_STACK_CONTAINER_NAME) > /tmp/llama-stack-failure.log 2>&1 || true; \
+			echo "Logs saved to /tmp/llama-stack-failure.log"; \
+			$(CONTAINER_RUNTIME) kill $(LLAMA_STACK_CONTAINER_NAME) 2>/dev/null || true; \
+		fi; \
+	fi
+
+remove-llama-stack-container: ## Remove llama-stack container (saves logs first)
+	@if [ -n "$(CONTAINER_RUNTIME)" ] && $(CONTAINER_RUNTIME) inspect $(LLAMA_STACK_CONTAINER_NAME) >/dev/null 2>&1; then \
+		echo "Saving container logs before removal..."; \
+		$(CONTAINER_RUNTIME) logs $(LLAMA_STACK_CONTAINER_NAME) > /tmp/llama-stack-last-run.log 2>&1 || true; \
+		echo "Removing llama-stack container..."; \
 		$(CONTAINER_RUNTIME) rm -f $(LLAMA_STACK_CONTAINER_NAME); \
+		echo "✓ Container removed (logs saved to /tmp/llama-stack-last-run.log)"; \
 	fi
 
 start-llama-stack-container: build-llama-stack-image ## Start llama-stack container
