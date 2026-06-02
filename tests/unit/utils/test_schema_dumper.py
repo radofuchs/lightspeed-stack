@@ -90,6 +90,107 @@ def test_recursive_recurse_into_subdicts() -> None:
     assert result is not original
 
 
+def test_exclusive_minimum_handling_positive_value() -> None:
+    """Test how minimum integer value description is transformed by recursive_update function."""
+    original = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "exclusiveMinimum": 100},
+        },
+    }
+    expected = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "minimum": 100},
+        },
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+    # ensure a new dict is returned, not the same object
+    assert result is not original
+
+
+def test_exclusive_minimum_handling_zero_value() -> None:
+    """Test how minimum integer value description is transformed by recursive_update function."""
+    original = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "exclusiveMinimum": 0},
+        },
+    }
+    expected = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "minimum": 0},
+        },
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+    # ensure a new dict is returned, not the same object
+    assert result is not original
+
+
+def test_exclusive_minimum_handling_negative_value() -> None:
+    """Test how minimum integer value description is transformed by recursive_update function."""
+    original = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "exclusiveMinimum": -100},
+        },
+    }
+    expected = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "minimum": -100},
+        },
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+    # ensure a new dict is returned, not the same object
+    assert result is not original
+
+
+def test_anyof_with_null_transformed_to_nullable() -> None:
+    """Test how the de-facto Optional type is transformed."""
+    original = {
+        "anyOf": [
+            {"type": "string"},
+            {"type": "null"},
+        ]
+    }
+    expected = {
+        "type": "string",
+        "nullable": True,
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
 def test_handles_none_values() -> None:
     """None values should be preserved."""
     original = {"key": None}
