@@ -118,6 +118,7 @@ from utils.prompts import get_system_prompt, get_topic_summary_system_prompt
 from utils.query import (
     extract_provider_and_model_from_model_id,
     handle_known_apistatus_errors,
+    normalize_vertex_ai_model_id,
     prepare_input,
 )
 from utils.suid import to_llama_stack_conversation_id
@@ -178,11 +179,14 @@ async def get_topic_summary(  # pylint: disable=too-many-nested-blocks
         The topic summary for the question
     """
     try:
+        # Normalize Vertex AI model IDs to work around llama-stack 0.6.x bug
+        normalized_model = normalize_vertex_ai_model_id(model_id)
+
         response = cast(
             ResponseObject,
             await client.responses.create(
                 input=question,
-                model=model_id,
+                model=normalized_model,
                 instructions=get_topic_summary_system_prompt(),
                 stream=False,
                 store=False,  # Don't store topic summary requests
@@ -389,9 +393,13 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
 
     # Build x-llamastack-provider-data header from MCP tool headers
     extra_headers = _build_provider_data_headers(tools)
+
+    # Normalize Vertex AI model IDs to work around llama-stack 0.6.x bug
+    normalized_model = normalize_vertex_ai_model_id(model)
+
     return ResponsesApiParams(
         input=input_text,
-        model=model,
+        model=normalized_model,
         instructions=system_prompt,
         tools=tools,
         conversation=llama_stack_conv_id,

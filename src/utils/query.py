@@ -534,6 +534,34 @@ def extract_provider_and_model_from_model_id(model_id: str) -> tuple[str, str]:
     return "", model_id
 
 
+def normalize_vertex_ai_model_id(model_id: str) -> str:
+    """Normalize Vertex AI model ID to work around llama-stack 0.6.x bug.
+
+    llama-stack 0.6.x has a bug in the inline::meta-reference responses provider
+    where it normalizes model IDs before checking against allowed_models, but doesn't
+    normalize the allowed_models list itself. This causes Vertex AI models to fail
+    validation because:
+    - Model is registered as: publishers/google/models/gemini-2.5-flash
+    - llama-stack strips to: google/gemini-2.5-flash internally
+    - Checks against allowed list: ['publishers/google/models/gemini-2.5-flash']
+    - Mismatch → 500 error
+
+    This workaround strips the publishers/google/models/ prefix to match what
+    llama-stack expects internally.
+
+    Fixed in llama-stack 0.7.0 via https://github.com/ogx-ai/ogx/pull/5169
+
+    Args:
+        model_id: The model ID, possibly in Vertex AI format
+
+    Returns:
+        Normalized model ID with Vertex AI prefix stripped if present
+    """
+    if model_id.startswith("publishers/google/models/"):
+        return model_id.replace("publishers/google/models/", "google/", 1)
+    return model_id
+
+
 def handle_known_apistatus_errors(
     error: LLSApiStatusError | OpenAIAPIStatusError, model_id: str
 ) -> AbstractErrorResponse:

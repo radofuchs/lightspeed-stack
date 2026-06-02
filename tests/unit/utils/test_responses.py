@@ -57,6 +57,7 @@ import constants
 from models.api.requests import QueryRequest
 from models.common.responses.types import InputTool, InputToolMCP
 from models.config import ApprovalFilter, ByokRag, ModelContextProtocolServer
+from utils.query import normalize_vertex_ai_model_id
 from utils.responses import (
     _build_chunk_attributes,
     _merge_tools,
@@ -3577,3 +3578,32 @@ class TestResolveToolChoiceMerge:
         )
         assert tools is not None
         assert len(tools) == 1
+
+
+class TestNormalizeVertexAIModelId:
+    """Tests for normalize_vertex_ai_model_id function."""
+
+    def test_normalizes_vertex_ai_model_id(self) -> None:
+        """Test that Vertex AI model IDs are normalized correctly."""
+        input_model = "publishers/google/models/gemini-2.5-flash"
+        expected = "google/gemini-2.5-flash"
+        assert normalize_vertex_ai_model_id(input_model) == expected
+
+    def test_normalizes_vertex_ai_model_id_with_version(self) -> None:
+        """Test normalization with versioned Vertex AI model ID."""
+        input_model = "publishers/google/models/gemini-1.5-pro-001"
+        expected = "google/gemini-1.5-pro-001"
+        assert normalize_vertex_ai_model_id(input_model) == expected
+
+    def test_preserves_non_vertex_ai_model_ids(self) -> None:
+        """Test that non-Vertex AI model IDs are returned unchanged."""
+        # Regular model IDs should pass through
+        assert normalize_vertex_ai_model_id("gpt-4") == "gpt-4"
+        assert normalize_vertex_ai_model_id("openai/gpt-4") == "openai/gpt-4"
+        assert normalize_vertex_ai_model_id("watsonx/model") == "watsonx/model"
+
+    def test_preserves_gemini_api_format(self) -> None:
+        """Test that Gemini API format (models/...) is preserved."""
+        # Gemini API format doesn't have the publishers prefix
+        gemini_api_format = "models/gemini-2.5-flash"
+        assert normalize_vertex_ai_model_id(gemini_api_format) == gemini_api_format

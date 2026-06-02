@@ -34,6 +34,7 @@ from llama_stack_client import AsyncLlamaStackClient
 
 from log import get_logger
 from models.compaction import ConversationSummary
+from utils.query import normalize_vertex_ai_model_id
 from utils.token_estimator import (
     estimate_conversation_tokens,
     estimate_tokens,
@@ -266,10 +267,14 @@ async def summarize_chunk(
     # by utils.responses.get_topic_summary and protects the directives from
     # prompt-injection via user message content that ends up in the
     # transcript.
+
+    # Normalize Vertex AI model IDs to work around llama-stack 0.6.x bug
+    normalized_model = normalize_vertex_ai_model_id(model)
+
     response = await client.responses.create(
         input=f"Conversation:\n{transcript}",
         instructions=SUMMARIZATION_PROMPT,
-        model=model,
+        model=normalized_model,
         stream=False,
         store=False,
     )
@@ -374,10 +379,14 @@ async def recursively_resummarize(
         model,
     )
     # Same instructions/input split as summarize_chunk — see comment there.
+
+    # Normalize Vertex AI model IDs to work around llama-stack 0.6.x bug
+    normalized_model = normalize_vertex_ai_model_id(model)
+
     response = await client.responses.create(
         input=transcript,
         instructions=RECURSIVE_RESUMMARIZATION_PROMPT,
-        model=model,
+        model=normalized_model,
         stream=False,
         store=False,
     )
