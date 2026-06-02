@@ -1,6 +1,6 @@
 # RAG Configuration Guide
 
-This document explains how to configure and customize your RAG pipeline using the `llama-stack` configuration YAML file. You will:
+This document explains how to configure and customize your RAG pipeline. You will:
 
 * Initialize a vector store
 * Download and point to a local embedding model
@@ -15,8 +15,7 @@ This document explains how to configure and customize your RAG pipeline using th
 * [Prerequisites](#prerequisites)
    * [Set Up the Vector Database](#set-up-the-vector-database)
    * [Download an Embedding Model](#download-an-embedding-model)
-* [Automatic Configuration Enrichment](#automatic-configuration-enrichment)
-* [Manual Configuration](#manual-configuration)
+* [Configure BYOK Knowledge Sources](#configure-byok-knowledge-sources)
 * [Add an Inference Model (LLM)](#add-an-inference-model-llm)
 * [Complete Configuration Reference](#complete-configuration-reference)
 * [System Prompt Guidance for RAG (as a tool)](#system-prompt-guidance-for-rag-as-a-tool)
@@ -58,90 +57,32 @@ Use the [`rag-content`](https://github.com/lightspeed-core/rag-content) reposito
 Download a local embedding model such as `sentence-transformers/all-mpnet-base-v2` by using the script in [`rag-content`](https://github.com/lightspeed-core/rag-content) or manually download and place in your desired path.
 
 > [!NOTE]
-> Llama Stack can also download a model for you, which will make the first start-up slower. In the YAML configuration file `run.yaml` specify a supported model name as `provider_model_id` instead of a path. LLama Stack will then download the model to the `~/.cache/huggingface/hub` folder.
+> Llama Stack can also download a model for you, which will make the first start-up slower. In the `byok_rag` section of `lightspeed-stack.yaml`, specify a supported model name as `embedding_model` instead of a local path. Llama Stack will then download the model to the `~/.cache/huggingface/hub` folder.
 
 ---
 
-## Automatic Configuration Enrichment
+## Configure BYOK Knowledge Sources
 
-For users with BYOK or OKP configurations, you can automatically enrich your `run.yaml` file using the `llama_stack_configuration.py` script:
-
-```bash
-# Enrich run.yaml with BYOK and/or OKP configurations from lightspeed-stack.yaml
-uv run src/llama_stack_configuration.py -c lightspeed-stack.yaml -i run.yaml -o run_enriched.yaml
-```
-
-This script automatically adds the necessary:
-- **Storage backends** for BYOK vector databases
-- **Vector IO providers** for BYOK and OKP
-- **Vector stores** and **embedding models** registration
-- **OKP provider configuration** when `okp` is enabled in your RAG configuration
-
-The script reads your `lightspeed-stack.yaml` configuration and enriches a base `run.yaml` file with all required Llama Stack sections, eliminating the need to manually configure complex vector store setups.
-
-**Command line options:**
-- `-c, --config`: Lightspeed config file (default: `lightspeed-stack.yaml`)
-- `-i, --input`: Input Llama Stack config (default: `run.yaml`)
-- `-o, --output`: Output enriched config (default: `run_.yaml`)
-
-> [!TIP]
-> Use this script to generate your initial `run.yaml` configuration, then manually customize as needed for your specific setup.
-
----
-
-## Manual Configuration
-
-If you prefer to manually configure your `run.yaml` file, update it to point to:
-
-* Your downloaded **embedding model**
-* Your generated **vector database**
+BYOK knowledge sources are configured in the `byok_rag` section of `lightspeed-stack.yaml`. The Lightspeed Stack service automatically generates the required Llama Stack configuration at startup — no manual enrichment is needed.
 
 ### FAISS example
 
 ```yaml
-providers:
-  inference:
-  - provider_id: sentence-transformers
-    provider_type: inline::sentence-transformers
-    config: {}
-
-  # FAISS vector store
-  vector_io:
-  - provider_id: custom-index
-    provider_type: inline::faiss
-    config:
-      persistence:
-        namespace: vector_io::faiss
-        backend: rag_backend  # References storage.backends.rag_backend
-
-storage:
-  backends:
-    rag_backend:
-      type: kv_sqlite
-      db_path: <path-to-vector-index>  # e.g. /home/USER/vector_db/faiss_store.db
-
-registered_resources:
-  models:
-  - model_id: <embedding-model-name> # e.g. sentence-transformers/all-mpnet-base-v2
-    metadata:
-        embedding_dimension: <embedding-dimension> # e.g. 768
-    model_type: embedding
-    provider_id: sentence-transformers
-    provider_model_id: <path-to-embedding-model> # e.g. /home/USER/embedding_model
-
-  vector_stores:
-  - embedding_dimension: <embedding-dimension> # e.g. 768
-    embedding_model: <embedding-model-name> # e.g. sentence-transformers/all-mpnet-base-v2
-    provider_id: custom-index
-    vector_store_id: <index-id> 
+byok_rag:
+  - rag_id: custom-index
+    rag_type: inline::faiss
+    embedding_model: sentence-transformers/all-mpnet-base-v2  # or path to local model
+    embedding_dimension: 768
+    vector_db_id: <index-id>                                   # ID used during index generation
+    db_path: <path-to-vector-index>                            # e.g. /home/USER/vector_db/faiss_store.db
 ```
 
 Where:
-- `provider_model_id` is the path to the folder of the embedding model (or alternatively, the supported embedding model to download)
+- `embedding_model` is the embedding model identifier or path to the local model folder
 - `db_path` is the path to the vector index (.db file in this case)
-- `vector_store_id` is the index ID used to generate the db
+- `vector_db_id` is the index ID used to generate the db
 
-See the full working [config example](examples/run.yaml) for more details.
+See the full working [config example](../examples/lightspeed-stack-byok-okp-rag.yaml) for more details.
 
 ### pgvector example
 
@@ -152,8 +93,6 @@ This example shows how to configure a remote PostgreSQL database with the [pgvec
 > CREATE EXTENSION IF NOT EXISTS vector;
 > ```
 
-Update the connection details (`host`, `port`, `db`, `user`, `password`) to match your PostgreSQL setup.
-
 Each pgvector-backed table follows this schema:
 
 - `id` (`text`): UUID identifier of the chunk
@@ -161,37 +100,26 @@ Each pgvector-backed table follows this schema:
 - `embedding` (`vector(n)`): the embedding vector, where `n` is the embedding dimension and will match the model's output size (e.g. 768 for `all-mpnet-base-v2`) 
 
 > [!NOTE]
-> The `vector_store_id` (e.g. `rhdocs`) is used to point to the table named `vector_store_rhdocs` in the specified database, which stores the vector embeddings.
-
+> The `vector_db_id` (e.g. `rhdocs`) is used to point to the table named `vector_store_rhdocs` in the specified database, which stores the vector embeddings.
 
 ```yaml
-[...]
-providers:
-  [...]
-  vector_io:
-  - provider_id: pgvector-example 
-    provider_type: remote::pgvector
-    config:
-      host: localhost
-      port: 5432
-      db: pgvector_example # PostgreSQL database (psql -d pgvector_example)
-      user: lightspeed # PostgreSQL user
-      password: password123
-      kvstore:
-        type: sqlite
-        db_path: .llama/distributions/pgvector/pgvector_registry.db
-
-vector_stores:
-- embedding_dimension: 768
-  embedding_model: sentence-transformers/all-mpnet-base-v2
-  provider_id: pgvector-example 
-  # A unique ID that becomes the PostgreSQL table name, prefixed with 'vector_store_'.
-  # e.g., 'rhdocs' will create the table 'vector_store_rhdocs'.
-  # If the table was already created, this value must match the ID used at creation.
-  vector_store_id: rhdocs
+byok_rag:
+  - rag_id: pgvector-example
+    rag_type: remote::pgvector
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+    # A unique ID that becomes the PostgreSQL table name, prefixed with 'vector_store_'.
+    # e.g., 'rhdocs' will create the table 'vector_store_rhdocs'.
+    # If the table was already created, this value must match the ID used at creation.
+    vector_db_id: rhdocs
+    db_path: .llama/distributions/pgvector/pgvector_registry.db
 ```
 
-See the full working [config example](examples/openai-pgvector-run.yaml) for more details.
+> [!NOTE]
+> For pgvector, the PostgreSQL connection details (host, port, database, user, password) are configured
+> in the Llama Stack provider configuration. Use environment variables for credentials.
+
+See the full working [config example](../examples/lightspeed-stack-byok-okp-rag.yaml) for more details.
 
 ---
 
@@ -223,7 +151,7 @@ podman run \
 > For other supported models and configuration options, see the vLLM documentation:
 > [vLLM: Tool Calling](https://docs.vllm.ai/en/stable/features/tool_calling.html)
 
-After starting the container edit your `run.yaml` file, matching `model_id` with the model provided in the `podman run` command.
+After starting the container, configure the vLLM provider in your Llama Stack configuration file, matching `model_id` with the model provided in the `podman run` command.
 
 ```yaml
 [...]
@@ -244,7 +172,9 @@ providers:
       api_token: <your-key-here> # if any
 ```
 
-See the full working [config example](examples/vllm-llama-faiss-run.yaml) for more details.
+> [!TIP]
+> The Llama Stack configuration file path is set in `lightspeed-stack.yaml` under
+> `llama_stack.library_client_config_path` when using library mode.
 
 ### OpenAI example
 
@@ -276,8 +206,6 @@ export OPENAI_API_KEY=<your-key-here>
 > [!NOTE]
 > When experimenting with different `models`, `providers` and `vector_dbs`, you might need to manually unregister the old ones with the Llama Stack client CLI (e.g. `llama-stack-client vector_dbs list`)
 
-
-See the full working [config example](examples/openai-faiss-run.yaml) for more details.
 
 ### Azure OpenAI
 
@@ -321,7 +249,7 @@ Set `rhokp_url` to the base URL of your OKP server. Use `${env.RH_SERVER_OKP}` t
 
 > [!NOTE]
 > When `okp` is listed in `rag.inline` or `rag.tool`, Lightspeed Stack automatically enriches
-> the Llama Stack `run.yaml` at startup with the required `vector_io` provider and `registered_resources`
+> the Llama Stack configuration at startup with the required `vector_io` provider and `registered_resources`
 > entries for the OKP vector store. No manual registration is needed.
 
 **Query Request Example:**
@@ -397,103 +325,44 @@ the number of retrieved chunks, set the constants in `src/constants.py`:
 
 # Complete Configuration Reference
 
-To enable RAG functionality, make sure the `agents`, `tool_runtime`, and `safety` APIs are included and properly configured in your YAML. 
+To enable RAG functionality, configure the `byok_rag` and `rag` sections in your `lightspeed-stack.yaml`, and ensure the Llama Stack configuration includes `agents`, `tool_runtime`, and `safety` APIs.
 
-Below is a real example of a working config, with:
+Below is an example of a working `lightspeed-stack.yaml` configuration with:
 
 * A local `all-mpnet-base-v2` embedding model
 * A `FAISS`-based vector store
-* `OpenAI` as the inference provider
-* Agent-based RAG setup
+* Inline and Tool RAG enabled
 
 > [!TIP]
-> We recommend starting with a minimal working configuration (one is automatically generated by the `rag-content` tool when generating the database) and extending it as needed by adding more APIs and providers.
+> We recommend starting with a minimal working configuration and extending it as needed.
 
 ```yaml
-version: 2
-image_name: rag-configuration
+name: Lightspeed Core Service (LCS)
+service:
+  host: localhost
+  port: 8080
+  auth_enabled: false
 
-apis:
-- agents
-- inference
-- vector_io
-- tool_runtime
-- safety
+llama_stack:
+  use_as_library_client: true
+  library_client_config_path: /path/to/llama-stack-config.yaml
 
-providers:
-  inference:
-  - provider_id: sentence-transformers
-    provider_type: inline::sentence-transformers
-    config: {}
-  - provider_id: openai
-    provider_type: remote::openai
-    config:
-      api_key: ${env.OPENAI_API_KEY}
-
-  agents:
-  - provider_id: meta-reference
-    provider_type: inline::meta-reference
-    config:
-      persistence:
-        agent_state:
-          namespace: agents_state
-          backend: kv_default
-        responses:
-          table_name: agents_responses
-          backend: sql_default
-
-  safety:
-  - provider_id: llama-guard
-    provider_type: inline::llama-guard
-    config:
-      excluded_categories: []
-
-  vector_io:
-  - provider_id: ocp-docs
-    provider_type: inline::faiss
-    config:
-      persistence:
-        namespace: vector_io::faiss
-        backend: ocp_docs_backend  # References storage.backends
-
-  tool_runtime:
-  - provider_id: rag-runtime
-    provider_type: inline::rag-runtime
-    config: {}
-
-storage:
-  backends:
-    kv_default:
-      type: kv_sqlite
-      db_path: ~/.llama/storage/kv_store.db
-    sql_default:
-      type: sql_sqlite
-      db_path: ~/.llama/storage/sql_store.db
-    ocp_docs_backend:
-      type: kv_sqlite
-      db_path: /home/USER/lightspeed-stack/vector_dbs/ocp_docs/faiss_store.db
-
-registered_resources:
-  models:
-  - model_id: gpt-test
-    provider_id: openai
-    model_type: llm
-    provider_model_id: gpt-4o-mini
-  - model_id: sentence-transformers/all-mpnet-base-v2
-    model_type: embedding
-    provider_id: sentence-transformers
-    provider_model_id: /home/USER/lightspeed-stack/embedding_models/all-mpnet-base-v2
-    metadata:
-      embedding_dimension: 768
-  vector_stores:
-  - vector_store_id: openshift-index  # This ID was defined during index generation
-    provider_id: ocp-docs  # References providers.vector_io
+byok_rag:
+  - rag_id: ocp-docs
+    rag_type: inline::faiss
     embedding_model: sentence-transformers/all-mpnet-base-v2
     embedding_dimension: 768
-  tool_groups:
-  - toolgroup_id: builtin::rag
-    provider_id: rag-runtime
+    vector_db_id: openshift-index
+    db_path: /home/USER/lightspeed-stack/vector_dbs/ocp_docs/faiss_store.db
+
+rag:
+  inline:
+    - ocp-docs
+  tool:
+    - ocp-docs
 ```
+
+The Llama Stack configuration file (referenced by `library_client_config_path`) should include your inference provider, agents, safety, and tool runtime configuration. The BYOK vector store providers and registered resources are automatically generated by Lightspeed Stack at startup from the `byok_rag` entries above.
 
 ---
 
@@ -509,12 +378,12 @@ You are a helpful assistant with access to a 'knowledge_search' tool. When users
 ---
 # Llama Stack RAG annotations
 
-The top-level `vector_stores` block in  Llama Stack configuration may include `annotation_prompt_params` to control whether Llama Stack injects extra RAG annotation instructions into the model prompt (for example, citation-style markers). The [`run.yaml`](../run.yaml) in this repository sets `enable_annotations: false` under that block to avoid unwanted annotations. For a configuration that enables annotations and customizes the instruction template, see [`examples/run.yaml`](../examples/run.yaml).
+The top-level `vector_stores` block in Llama Stack configuration may include `annotation_prompt_params` to control whether Llama Stack injects extra RAG annotation instructions into the model prompt (for example, citation-style markers). The default Llama Stack configuration sets `enable_annotations: false` under that block to avoid unwanted annotations.
 
 ---
 
 # References
 
 * [Llama Stack - RAG](https://llama-stack.readthedocs.io/en/latest/building_applications/rag.html)
-* [Llama Stack - Configuring a “Stack"](https://llama-stack.readthedocs.io/en/latest/distributions/configuration.html)
+* [Llama Stack - Configuring a "Stack"](https://llama-stack.readthedocs.io/en/latest/distributions/configuration.html)
 * [Llama Stack - Sample configurations](https://github.com/meta-llama/llama-stack/tree/main/llama_stack/distributions)
