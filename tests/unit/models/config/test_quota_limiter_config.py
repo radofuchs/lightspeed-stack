@@ -314,3 +314,95 @@ def test_configure_quota_handlers_from_dict(config_dict: dict[str, Any]) -> None
     # try to initialize the app config and load configuration from a Python
     # dictionary
     QuotaLimiterConfiguration(**config_dict)
+
+
+incorrect_configurations = [
+    {
+        "type": "cluster_limiter",
+        "name": "John Williams",
+        "initial_quota": "foo",
+        "quota_increase": 583,
+        "period": "Series trouble fund skill.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Frank Levine",
+        "initial_quota": 616,
+        "quota_increase": "bar",
+        "period": "Eye idea western skill able although happy. Positi",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Susan Walters",
+        "initial_quota": "foo",
+        "quota_increase": "bar",
+        "period": "One stock pressure. Save worker benefit blue speak",
+    },
+    {
+        "type": "foo",
+        "name": "Pamela Farmer",
+        "initial_quota": 223,
+        "quota_increase": 62,
+        "period": "Expect chance or stop hard southern particularly.",
+    },
+    {
+        "type": "bar",
+        "name": "Bobby Chandler",
+        "initial_quota": 496,
+        "quota_increase": 217,
+        "period": "Where animal outside.",
+    },
+    {
+        "type": None,
+        "name": "Jeffrey Butler",
+        "initial_quota": 445,
+        "quota_increase": 78,
+        "period": "Song child mind. Sit win miss gas as.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": None,
+        "initial_quota": 375,
+        "quota_increase": 953,
+        "period": "Feel husband phone together summer.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Jacqueline Allen",
+        "initial_quota": None,
+        "quota_increase": 277,
+        "period": "Whose environmental life food bit young.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Matthew Williams",
+        "initial_quota": 696,
+        "quota_increase": None,
+        "period": "Perhaps girl organization ok continue.",
+    },
+    {
+        "type": "cluster_limiter",
+        "name": "Shawn Stone",
+        "initial_quota": 126,
+        "quota_increase": 547,
+        "period": None,
+    },
+    {
+        "type": None,
+        "name": None,
+        "initial_quota": None,
+        "quota_increase": None,
+        "period": None,
+    },
+]
+
+
+@pytest.mark.parametrize("config_dict", incorrect_configurations)
+def test_configure_quota_handlers_from_dict_negative_cases(
+    config_dict: dict[str, Any],
+) -> None:
+    """Test the configuration initialization from dictionary with config values."""
+    with pytest.raises(ValueError, match="validation error"):
+        # try to initialize the app config and load configuration from a Python
+        # dictionary
+        QuotaLimiterConfiguration(**config_dict)
