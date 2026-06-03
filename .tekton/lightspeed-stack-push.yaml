@@ -2,6 +2,10 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
+    # Cross-repo nudge: after each push build, the Konflux nudge controller
+    # opens an MR in lscore-deploy (gitlab.cee.redhat.com/rhel-lightspeed/lscore-deploy)
+    # to bump the image digest in openshift/lightspeed-stack.yml. See RSPEED-3082.
+    build.appstudio.openshift.io/build-nudge-files: "openshift/lightspeed-stack.yml"
     build.appstudio.openshift.io/repo: https://github.com/lightspeed-core/lightspeed-stack?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
