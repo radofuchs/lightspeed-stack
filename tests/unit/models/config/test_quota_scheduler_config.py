@@ -111,3 +111,63 @@ def test_configure_quota_scheduler_from_dict(
 ) -> None:
     """Test the configuration initialization from dictionary with config values."""
     QuotaSchedulerConfiguration(**config_dict)
+
+
+incorrect_configurations = [
+    {
+        "period": -1,
+        "database_reconnection_count": 125,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 1,
+        "database_reconnection_count": -1,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 959,
+        "database_reconnection_count": 1,
+        "database_reconnection_delay": -1,
+    },
+    {
+        "period": None,
+        "database_reconnection_count": 125,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 1,
+        "database_reconnection_count": None,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 959,
+        "database_reconnection_count": 1,
+        "database_reconnection_delay": None,
+    },
+    {
+        "period": "not a number",
+        "database_reconnection_count": 125,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 1,
+        "database_reconnection_count": "not a number",
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 959,
+        "database_reconnection_count": 1,
+        "database_reconnection_delay": "not a number",
+    },
+]
+
+
+@pytest.mark.parametrize("config_dict", incorrect_configurations)
+def test_configure_quota_scheduler_from_dict_negative_cases(
+    config_dict: dict[str, Any],
+) -> None:
+    """Test the configuration initialization from dictionary with config values."""
+    with pytest.raises(ValueError, match="validation error"):
+        # try to initialize the app config and load configuration from a Python
+        # dictionary
+        QuotaSchedulerConfiguration(**config_dict)
