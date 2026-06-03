@@ -31,39 +31,39 @@ The tables below summarize each provider category, containing the following atri
 
 ## Inference Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| meta-reference | inline | `accelerate`, `fairscale`, `torch`, `torchvision`, `transformers`, `zmq`, `lm-format-enforcer`, `sentence-transformers`, `torchao==0.8.0`, `fbgemm-gpu-genai==1.1.2` | ❌ |
-| sentence-transformers | inline | `torch torchvision torchao>=0.12.0 --extra-index-url https://download.pytorch.org/whl/cpu`, `sentence-transformers --no-deps` | ❌ |
-| anthropic | remote | `litellm` | ❌ |
-| azure | remote | — | ✅ |
-| bedrock | remote | - | ✅ |
-| cerebras | remote | `cerebras_cloud_sdk` | ❌ |
-| databricks | remote | — | ❌ |
-| fireworks | remote | `fireworks-ai<=0.17.16` | ❌ |
-| gemini | remote | `litellm` | ❌ |
-| groq | remote | `litellm` | ❌ |
-| hf::endpoint | remote | `huggingface_hub`, `aiohttp` | ❌ |
-| hf::serverless | remote | `huggingface_hub`, `aiohttp` | ❌ |
-| llama-openai-compat | remote | `litellm` | ❌ |
-| nvidia | remote | — | ❌ |
-| ollama | remote | `ollama`, `aiohttp`, `h11>=0.16.0` | ❌ |
-| openai | remote | `litellm` | ✅ |
-| passthrough | remote | — | ❌ |
-| runpod | remote | — | ❌ |
-| sambanova | remote | `litellm` | ❌ |
-| tgi | remote | `huggingface_hub`, `aiohttp` | ❌ |
-| together | remote | `together` | ❌ |
-| vertexai | remote | `google-auth` | ✅ |
-| watsonx | remote | `litellm` | ✅ |
+| Name                  | Type   | Pip Dependencies                                                                                                                                                      | Supported in LCS |
+|-----------------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------:|
+| meta-reference        | inline | `accelerate`, `fairscale`, `torch`, `torchvision`, `transformers`, `zmq`, `lm-format-enforcer`, `sentence-transformers`, `torchao==0.8.0`, `fbgemm-gpu-genai==1.1.2`  | ❌               |
+| sentence-transformers | inline | `torch torchvision torchao>=0.12.0 --extra-index-url https://download.pytorch.org/whl/cpu`, `sentence-transformers --no-deps`                                         | ❌               |
+| anthropic             | remote | `litellm`                                                                                                                                                             | ❌               |
+| azure                 | remote | —                                                                                                                                                                     | ✅               |
+| bedrock               | remote | -                                                                                                                                                                     | ✅               |
+| cerebras              | remote | `cerebras_cloud_sdk`                                                                                                                                                  | ❌               |
+| databricks            | remote | —                                                                                                                                                                     | ❌               |
+| fireworks             | remote | `fireworks-ai<=0.17.16`                                                                                                                                               | ❌               |
+| gemini                | remote | `litellm`                                                                                                                                                             | ❌               |
+| groq                  | remote | `litellm`                                                                                                                                                             | ❌               |
+| hf::endpoint          | remote | `huggingface_hub`, `aiohttp`                                                                                                                                          | ❌               |
+| hf::serverless        | remote | `huggingface_hub`, `aiohttp`                                                                                                                                          | ❌               |
+| llama-openai-compat   | remote | `litellm`                                                                                                                                                             | ❌               |
+| nvidia                | remote | —                                                                                                                                                                     | ❌               |
+| ollama                | remote | `ollama`, `aiohttp`, `h11>=0.16.0`                                                                                                                                    | ❌               |
+| openai                | remote | `litellm`                                                                                                                                                             | ✅               |
+| passthrough           | remote | —                                                                                                                                                                     | ❌               |
+| runpod                | remote | —                                                                                                                                                                     | ❌               |
+| sambanova             | remote | `litellm`                                                                                                                                                             | ❌               |
+| tgi                   | remote | `huggingface_hub`, `aiohttp`                                                                                                                                          | ❌               |
+| together              | remote | `together`                                                                                                                                                            | ❌               |
+| vertexai              | remote | `google-auth`                                                                                                                                                         | ✅               |
+| watsonx               | remote | `litellm`                                                                                                                                                             | ✅               |
 
 Red Hat providers:
 
-| Name | Version Tested | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|---|:---:|
-| RHOAI (vllm) | latest operator | remote | `openai` | ✅ |
-| RHAIIS (vllm) | 3.2.3 (on RHEL 9.20250429.0.4) | remote | `openai` | ✅ |
-| RHEL AI (vllm) | 1.5.2 | remote | `openai` | ✅ |
+| Name           | Version Tested                 | Type   | Pip Dependencies | Supported in LCS |
+|----------------|--------------------------------|--------|------------------|:----------------:|
+| RHOAI (vllm)   | latest operator                | remote | `openai`         | ✅               |
+| RHAIIS (vllm)  | 3.2.3 (on RHEL 9.20250429.0.4) | remote | `openai`         | ✅               |
+| RHEL AI (vllm) | 1.5.2                          | remote | `openai`         | ✅               |
 
 ### Azure Provider - Entra ID Authentication Guide
 
@@ -73,12 +73,12 @@ Lightspeed Core supports secure authentication using Microsoft Entra ID (formerl
 
 To enable Entra ID authentication, the `azure_entra_id` block must be included in your LCS configuration. The `tenant_id`, `client_id`, and `client_secret` attributes are required:
 
-| Attribute | Required | Description |
-|-----------|----------|-------------|
-| `tenant_id` | Yes | Azure AD tenant ID |
-| `client_id` | Yes | Application (client) ID |
-| `client_secret` | Yes | Client secret value |
-| `scope` | No | Token scope (default: `https://cognitiveservices.azure.com/.default`) |
+| Attribute       | Required | Description                                                           |
+|-----------------|----------|-----------------------------------------------------------------------|
+| `tenant_id`     | Yes      | Azure AD tenant ID                                                    |
+| `client_id`     | Yes      | Application (client) ID                                               |
+| `client_secret` | Yes      | Client secret value                                                   |
+| `scope`         | No       | Token scope (default: `https://cognitiveservices.azure.com/.default`) |
 
 Example of LCS config section:
 
@@ -172,116 +172,116 @@ make run CONFIG=examples/lightspeed-stack-azure-entraid-service.yaml
 
 ## Agent Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| meta-reference | inline | `matplotlib`, `pillow`, `pandas`, `scikit-learn`, `mcp>=1.8.1` `aiosqlite`, `psycopg2-binary`, `redis`, `pymongo` | ✅ |
+| Name           | Type   | Pip Dependencies                                                                                                  | Supported in LCS |
+|----------------|--------|-------------------------------------------------------------------------------------------------------------------|:----------------:|
+| meta-reference | inline | `matplotlib`, `pillow`, `pandas`, `scikit-learn`, `mcp>=1.8.1` `aiosqlite`, `psycopg2-binary`, `redis`, `pymongo` | ✅               |
 
 ---
 
 ## Evaluation Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| meta-reference | inline | `tree_sitter`, `pythainlp`, `langdetect`, `emoji`, `nltk` | ✅ |
-| meta-reference | remote | `requests` | ❌ |
+| Name           | Type   | Pip Dependencies                                          | Supported in LCS |
+|----------------|--------|-----------------------------------------------------------|:----------------:|
+| meta-reference | inline | `tree_sitter`, `pythainlp`, `langdetect`, `emoji`, `nltk` | ✅               |
+| meta-reference | remote | `requests`                                                | ❌               |
 
 ---
 
 ## Datasetio Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| localfs | inline | `pandas` | ✅ |
-| huggingface | remote | `datasets>=4.0.0` | ✅ |
-| nvidia | remote | `datasets>=4.0.0` | ❌ |
+| Name        | Type   | Pip Dependencies  | Supported in LCS |
+|-------------|--------|-------------------|:----------------:|
+| localfs     | inline | `pandas`          | ✅               |
+| huggingface | remote | `datasets>=4.0.0` | ✅               |
+| nvidia      | remote | `datasets>=4.0.0` | ❌               |
 
 ---
 
 ## Safety Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| code-scanner | inline | `codeshield` | ❌ |
-| llama-guard | inline | — | ❌ |
-| prompt-guard | inline | `transformers[accelerate]`, `torch --index-url https://download.pytorch.org/whl/cpu` | ❌ |
-| bedrock | remote | `boto3` | ❌ |
-| nvidia | remote | `requests` | ❌ |
-| sambanova | remote | `litellm`, `requests` | ❌ |
+| Name         | Type   | Pip Dependencies                                                                     | Supported in LCS |
+|--------------|--------|--------------------------------------------------------------------------------------|:----------------:|
+| code-scanner | inline | `codeshield`                                                                         | ❌               |
+| llama-guard  | inline | —                                                                                    | ❌               |
+| prompt-guard | inline | `transformers[accelerate]`, `torch --index-url https://download.pytorch.org/whl/cpu` | ❌               |
+| bedrock      | remote | `boto3`                                                                              | ❌               |
+| nvidia       | remote | `requests`                                                                           | ❌               |
+| sambanova    | remote | `litellm`, `requests`                                                                | ❌               |
 
 ---
 
 ## Scoring Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| basic | inline | `requests` | ✅ |
-| llm-as-judge | inline | — | ✅ |
-| braintrust | inline | `autoevals` | ✅ |
+| Name         | Type   | Pip Dependencies | Supported in LCS |
+|--------------|--------|------------------|:----------------:|
+| basic        | inline | `requests`       | ✅               |
+| llm-as-judge | inline | —                | ✅               |
+| braintrust   | inline | `autoevals`      | ✅               |
 
 ---
 
 ## Telemetry Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| meta-reference | inline | `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` | ✅ |
+| Name           | Type   | Pip Dependencies                                              | Supported in LCS |
+|----------------|--------|---------------------------------------------------------------|:----------------:|
+| meta-reference | inline | `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` | ✅               |
 
 ---
 ## Post Training Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| torchtune-cpu | inline | `numpy`, `torch torchtune>=0.5.0`, `torchao>=0.12.0 --extra-index-url https://download.pytorch.org/whl/cpu`| ❌ |
-| torchtune-gpu | inline | `numpy`,`torch torchtune>=0.5.0`, `torchao>=0.12.0` | ❌ |
-| huggingface-gpu | inline | `trl`, `transformers`, `peft`, `datasets>=4.0.0`, `torch` | ✅ |
-| nvidia | remote | `requests`, `aiohttp` | ❌ |
+| Name            | Type   | Pip Dependencies                                                                                            | Supported in LCS |
+|-----------------|--------|-------------------------------------------------------------------------------------------------------------|:----------------:|
+| torchtune-cpu   | inline | `numpy`, `torch torchtune>=0.5.0`, `torchao>=0.12.0 --extra-index-url https://download.pytorch.org/whl/cpu` | ❌               |
+| torchtune-gpu   | inline | `numpy`,`torch torchtune>=0.5.0`, `torchao>=0.12.0`                                                         | ❌               |
+| huggingface-gpu | inline | `trl`, `transformers`, `peft`, `datasets>=4.0.0`, `torch`                                                   | ✅               |
+| nvidia          | remote | `requests`, `aiohttp`                                                                                       | ❌               |
 
 ---
 ## VectorIO Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| meta-reference | inline | `faiss-cpu` | ❌ |
-| chromadb | inline | `chromadb` | ❌ |
-| faiss | inline | `faiss-cpu` | ✅ |
-| milvus | inline | `pymilvus>=2.4.10` | ❌ |
-| qdrant | inline | `qdrant-client` | ❌ |
-| sqlite-vec | inline | `sqlite-vec` | ❌ |
-| chromadb | remote | `chromadb-client` | ❌ |
-| milvus | remote | `pymilvus>=2.4.10` | ❌ |
-| pgvector | remote | `psycopg2-binary` | ❌ |
-| qdrant | remote | `qdrant-client` | ❌ |
-| weaviate | remote | `weaviate-client` | ❌ |
+| Name           | Type   | Pip Dependencies   | Supported in LCS |
+|----------------|--------|--------------------|:----------------:|
+| meta-reference | inline | `faiss-cpu`        | ❌               |
+| chromadb       | inline | `chromadb`         | ❌               |
+| faiss          | inline | `faiss-cpu`        | ✅               |
+| milvus         | inline | `pymilvus>=2.4.10` | ❌               |
+| qdrant         | inline | `qdrant-client`    | ❌               |
+| sqlite-vec     | inline | `sqlite-vec`       | ❌               |
+| chromadb       | remote | `chromadb-client`  | ❌               |
+| milvus         | remote | `pymilvus>=2.4.10` | ❌               |
+| pgvector       | remote | `psycopg2-binary`  | ❌               |
+| qdrant         | remote | `qdrant-client`    | ❌               |
+| weaviate       | remote | `weaviate-client`  | ❌               |
 
 ---
 
 ## Tool Runtime Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| rag-runtime | inline | `chardet`,`pypdf`, `tqdm`, `numpy`, `scikit-learn`, `scipy`, `nltk`, `sentencepiece`, `transformers` | ✅ |
-| bing-search | remote | `requests` | ❌ |
-| brave-search | remote | `requests` | ❌ |
-| model-context-protocol | remote | `mcp>=1.8.1` | ✅ |
-| tavily-search | remote | `requests` | ❌ |
-| wolfram-alpha | remote | `requests` | ❌ |
+| Name                   | Type   | Pip Dependencies                                                                                     | Supported in LCS |
+|------------------------|--------|------------------------------------------------------------------------------------------------------|:----------------:|
+| rag-runtime            | inline | `chardet`,`pypdf`, `tqdm`, `numpy`, `scikit-learn`, `scipy`, `nltk`, `sentencepiece`, `transformers` | ✅               |
+| bing-search            | remote | `requests`                                                                                           | ❌               |
+| brave-search           | remote | `requests`                                                                                           | ❌               |
+| model-context-protocol | remote | `mcp>=1.8.1`                                                                                         | ✅               |
+| tavily-search          | remote | `requests`                                                                                           | ❌               |
+| wolfram-alpha          | remote | `requests`                                                                                           | ❌               |
 
 ---
 
 ## Files Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| localfs | inline | `sqlalchemy[asyncio]`, `aiosqlite`, `asyncpg` | ❌ |
-| s3 | remote | `sqlalchemy[asyncio]`, `aiosqlite`, `asyncpg`, `boto3` | ❌ |
+| Name    | Type   | Pip Dependencies                                       | Supported in LCS |
+|---------|--------|--------------------------------------------------------|:----------------:|
+| localfs | inline | `sqlalchemy[asyncio]`, `aiosqlite`, `asyncpg`          | ❌               |
+| s3      | remote | `sqlalchemy[asyncio]`, `aiosqlite`, `asyncpg`, `boto3` | ❌               |
 
 ---
 
 ## Batches Providers
 
-| Name | Type | Pip Dependencies | Supported in LCS |
-|---|---|---|:---:|
-| reference | inline | `openai` | ❌ |
+| Name      | Type   | Pip Dependencies | Supported in LCS |
+|-----------|--------|------------------|:----------------:|
+| reference | inline | `openai`         | ❌               |
 
 ---
 
