@@ -1,5 +1,7 @@
 """Unit tests for QuotaSchedulerConfig model."""
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -77,3 +79,35 @@ def test_quota_scheduler_custom_configuration_negative_reconnection_delay() -> N
         QuotaSchedulerConfiguration(
             database_reconnection_delay=-10
         )  # pyright: ignore[reportCallIssue]
+
+
+correct_configurations = [
+    {
+        "period": 959,
+        "database_reconnection_count": 125,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 1,
+        "database_reconnection_count": 125,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 959,
+        "database_reconnection_count": 1,
+        "database_reconnection_delay": 94,
+    },
+    {
+        "period": 959,
+        "database_reconnection_count": 125,
+        "database_reconnection_delay": 1,
+    },
+]
+
+
+@pytest.mark.parametrize("config_dict", correct_configurations)
+def test_configure_quota_scheduler_from_dict(
+    config_dict: dict[str, Any],
+) -> None:
+    """Test the configuration initialization from dictionary with config values."""
+    QuotaSchedulerConfiguration(**config_dict)
