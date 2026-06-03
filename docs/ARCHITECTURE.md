@@ -44,7 +44,7 @@ To enhance LLM responses, LCore leverages **RAG (Retrieval-Augmented Generation)
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   Client Applications                   │
-│  (Web UI, CLI, VS Code Extension, Mobile Apps, etc.)   │
+│  (Web UI, CLI, VS Code Extension, Mobile Apps, etc.)    │
 └────────────────────┬────────────────────────────────────┘
                      │ REST/A2A/JSON-RPC
                      ▼
@@ -150,14 +150,14 @@ LCore requires two main configuration files:
 
 **Authentication Providers:**
 
-| Provider | Use Case | Token Handling |
-|----------|----------|----------------|
-| **No Auth** | Development, testing | No token (empty string) |
-| **No Auth + Token** | Testing with token passthrough | Bearer token passed through |
-| **Kubernetes** | K8s service accounts | K8s service account token validated and forwarded |
-| **Red Hat SSO** | Red Hat environments | X-RH-Identity header (no separate token) |
-| **API Key** | API key authentication | API key from Authorization header |
-| **JWK/JWT** | JWT tokens | JWT validated and forwarded |
+| Provider            | Use Case                       | Token Handling                                    |
+|---------------------|--------------------------------|---------------------------------------------------|
+| **No Auth**         | Development, testing           | No token (empty string)                           |
+| **No Auth + Token** | Testing with token passthrough | Bearer token passed through                       |
+| **Kubernetes**      | K8s service accounts           | K8s service account token validated and forwarded |
+| **Red Hat SSO**     | Red Hat environments           | X-RH-Identity header (no separate token)          |
+| **API Key**         | API key authentication         | API key from Authorization header                 |
+| **JWK/JWT**         | JWT tokens                     | JWT validated and forwarded                       |
 
 **Authentication Result (AuthTuple):**
 
@@ -427,12 +427,12 @@ LCore uses a multi-database strategy to optimize for different data access patte
 
 The system uses **4 separate databases** for different purposes:
 
-| Database | Purpose | Technology | Size |
-|----------|---------|------------|------|
-| **User DB** | Conversation metadata | SQLAlchemy ORM | Small |
-| **Cache DB** | Full conversation transcripts | psycopg2/sqlite3 | Large |
-| **Quota DB** | Token usage and limits | psycopg2/sqlite3 | Medium |
-| **A2A DB** | Agent-to-agent protocol state | SQLAlchemy async | Small |
+| Database     | Purpose                       | Technology       | Size   |
+|--------------|-------------------------------|------------------|--------|
+| **User DB**  | Conversation metadata         | SQLAlchemy ORM   | Small  |
+| **Cache DB** | Full conversation transcripts | psycopg2/sqlite3 | Large  |
+| **Quota DB** | Token usage and limits        | psycopg2/sqlite3 | Medium |
+| **A2A DB**   | Agent-to-agent protocol state | SQLAlchemy async | Small  |
 
 ### 4.2 Why Separate Databases?
 

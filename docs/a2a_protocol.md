@@ -354,14 +354,14 @@ A2A Request
 
 ### Task States
 
-| State | Description |
-|-------|-------------|
-| `submitted` | Task has been received and queued |
-| `working` | Task is being processed |
-| `completed` | Task finished successfully |
-| `failed` | Task failed with an error |
+| State            | Description                                |
+|------------------|--------------------------------------------|
+| `submitted`      | Task has been received and queued          |
+| `working`        | Task is being processed                    |
+| `completed`      | Task finished successfully                 |
+| `failed`         | Task failed with an error                  |
 | `input_required` | Agent needs additional input from the user |
-| `auth_required` | Authentication is required to continue |
+| `auth_required`  | Authentication is required to continue     |
 
 ### Multi-Turn Conversations
 
@@ -527,10 +527,10 @@ curl -X POST http://localhost:8090/a2a \
 
 A2A messages support an optional `metadata` field that can be used to pass additional parameters to control request routing and behavior. The following metadata fields are supported:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `model` | `string` | Specify the LLM model to use for this request (e.g., `"gpt-4"`, `"llama3.1"`) |
-| `provider` | `string` | Specify the LLM provider to use (e.g., `"openai"`, `"watsonx"`) |
+| Field              | Type           | Description                                                                                            |
+|--------------------|----------------|--------------------------------------------------------------------------------------------------------|
+| `model`            | `string`       | Specify the LLM model to use for this request (e.g., `"gpt-4"`, `"llama3.1"`)                          |
+| `provider`         | `string`       | Specify the LLM provider to use (e.g., `"openai"`, `"watsonx"`)                                        |
 | `vector_store_ids` | `list[string]` | Specify which vector stores to query for RAG. If not provided, all available vector stores are queried |
 
 #### Example: Using Metadata
