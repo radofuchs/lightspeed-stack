@@ -17,10 +17,12 @@ from models.common.moderation import (
 from models.common.query import Attachment, SolrVectorSearchRequest
 from models.common.transcripts import Transcript, TranscriptMetadata
 from models.common.turn_summary import (
+    MCPListToolsSummary,
     RAGChunk,
     RAGContext,
     ReferencedDocument,
     ToolCallSummary,
+    ToolInfoSummary,
     ToolResultSummary,
     TurnSummary,
 )
@@ -48,4 +50,6 @@ __all__ = [
     "Transcript",
     "TranscriptMetadata",
     "TurnSummary",
+    "ToolInfoSummary",
+    "MCPListToolsSummary",
 ]
