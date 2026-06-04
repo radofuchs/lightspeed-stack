@@ -191,6 +191,121 @@ def test_anyof_with_null_transformed_to_nullable() -> None:
     assert result == expected
 
 
+def test_anyof_with_null_transformed_to_nullable_different_type() -> None:
+    """Test how the de-facto Optional type is transformed."""
+    original = {
+        "anyOf": [
+            {"type": "integer"},
+            {"type": "null"},
+        ]
+    }
+    expected = {
+        "type": "integer",
+        "nullable": True,
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_anyof_list_with_more_complex_first_entry() -> None:
+    """Test how the de-facto Optional type is transformed."""
+    original = {
+        "anyOf": [
+            {"type": "array", "items": {"type": "integer"}},
+            {"type": "null"},
+        ]
+    }
+    expected = {
+        "type": "array",
+        "nullable": True,
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_anyof_not_transformed_when_conditions_not_met() -> None:
+    """Test various conditions where anyOf should be left unchanged."""
+    cases = [
+        {"anyOf": "not-a-list"},
+        {"anyOf": [{"type": "string"}]},  # length < 2
+        {"anyOf": [{"notype": "x"}, {"type": "null"}]},  # first item missing type
+        {"anyOf": [{"type": "string"}, {"type": "number"}]},  # second not null
+        {
+            "anyOf": [{"type": "integer"}, {"type": "integer"}]
+        },  # both types are the same
+    ]
+
+    for original in cases:
+        # perform the update
+        result = recursive_update(original)
+
+        # non-empty dict with known content should be returned
+        assert result == original
+
+
+def test_mixed_keys_preserve_order_like_behavior() -> None:
+    """Verify that keys other than handled ones are preserved."""
+    original = {
+        "exclusiveMinimum": 5,
+        "anyOf": [
+            {"type": "integer"},
+            {"type": "null"},
+        ],
+        "description": "example",
+    }
+    # exclusiveMinimum should become minimum; anyOf -> type+nullable and description preserved
+    expected = {
+        "minimum": 5,
+        "type": "integer",
+        "nullable": True,
+        "description": "example",
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_deeply_nested_anyof_and_exclusive_minimum() -> None:
+    """More complicated structures."""
+    original = {
+        "level1": {
+            "level2": {
+                "anyOf": [
+                    {"type": "object", "properties": {"x": {"type": "string"}}},
+                    {"type": "null"},
+                ],
+                "exclusiveMinimum": 1,
+            }
+        }
+    }
+    expected = {
+        "level1": {
+            "level2": {
+                "type": "object",
+                "nullable": True,
+                "minimum": 1,
+            }
+        }
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
 def test_handles_none_values() -> None:
     """None values should be preserved."""
     original = {"key": None}
