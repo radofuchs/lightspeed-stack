@@ -135,14 +135,23 @@ class RHIdentityData:
         if "cn" not in system:
             logger.warning("Identity validation failed: missing 'cn' in system data")
             raise HTTPException(status_code=400, detail="Invalid identity data")
-        if "account_number" not in identity:
+        self._validate_string_field("cn", system["cn"])
+
+        # org_id is the required organizational identifier for System identities
+        # (per the canonical Red Hat identity spec). account_number is optional:
+        # no-cost RHEL developer subscriptions send an empty account_number.
+        org_id = identity.get("org_id")
+        if org_id is None or org_id == "":
             logger.warning(
-                "Identity validation failed: "
-                "missing 'account_number' for System type"
+                "Identity validation failed: missing 'org_id' for System type"
             )
             raise HTTPException(status_code=400, detail="Invalid identity data")
-        self._validate_string_field("cn", system["cn"])
-        self._validate_string_field("account_number", identity["account_number"])
+
+        # account_number is optional, but when present and non-empty it must be
+        # a well-formed string.
+        account_number = identity.get("account_number")
+        if account_number is not None and account_number != "":
+            self._validate_string_field("account_number", account_number)
 
     def _validate_string_field(
         self, field_name: str, value: Any, max_length: int = 256
@@ -207,14 +216,24 @@ class RHIdentityData:
     def get_username(self) -> str:
         """Extract username based on identity type.
 
+        For System identities the account_number is preferred when present and
+        non-empty, falling back to the system common name (cn). No-cost RHEL
+        developer subscriptions send an empty account_number, so the cn provides
+        a stable non-empty identifier in that case.
+
         Returns:
-            Username (user.username for User type, account_number for System type)
+            Username (user.username for User type; account_number or system.cn
+            for System type)
         """
         identity = self.identity_data["identity"]
 
         if self._get_identity_type() == "User":
             return identity["user"]["username"]
-        return identity["account_number"]
+
+        account_number = identity.get("account_number")
+        if account_number:
+            return account_number
+        return identity["system"]["cn"]
 
     def get_org_id(self) -> str:
         """Extract organization ID from identity data.

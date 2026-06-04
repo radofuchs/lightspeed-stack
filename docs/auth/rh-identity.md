@@ -114,7 +114,13 @@ directly (e.g., Insights client, subscription-manager).
 
 **Identity extraction:**
 - `user_id`: From `identity.system.cn` (certificate Common Name)
-- `username`: From `identity.account_number`
+- `username`: From `identity.account_number` when present and non-empty,
+  otherwise falls back to `identity.system.cn`
+
+`org_id` is the required organizational identifier for System identities.
+`account_number` is optional: no-cost RHEL developer subscriptions send an
+empty `account_number` with a populated `org_id`. A System identity is rejected
+only when `org_id` or `system.cn` is empty or absent.
 
 **Header structure:**
 ```json
@@ -134,6 +140,22 @@ directly (e.g., Insights client, subscription-manager).
 }
 ```
 
+A developer-subscription System identity omits the account number:
+```json
+{
+  "identity": {
+    "account_number": "",
+    "org_id": "18939564",
+    "type": "System",
+    "auth_type": "cert-auth",
+    "system": {
+      "cn": "14b75b86-6f99-411d-b41d-f400268b5807",
+      "cert_type": "system"
+    }
+  }
+}
+```
+
 **Available System fields:**
 
 | Field | Type | Description |
@@ -147,8 +169,8 @@ Both identity types share these top-level fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `account_number` | string | Red Hat account number |
-| `org_id` | string | Organization ID |
+| `account_number` | string | Red Hat account number (optional for System identities; may be empty for developer subscriptions) |
+| `org_id` | string | Organization ID (required for System identities) |
 | `type` | string | Identity type: "User" or "System" |
 
 ## Entitlements
@@ -269,7 +291,7 @@ curl http://localhost:8080/v1/query \
 | 400 | Missing `username` in user | `{"detail": "Missing 'username' in user data"}` |
 | 400 | Missing `system` for System type | `{"detail": "Missing 'system' field for System type"}` |
 | 400 | Missing `cn` in system | `{"detail": "Missing 'cn' in system data"}` |
-| 400 | Missing `account_number` for System | `{"detail": "Missing 'account_number' for System type"}` |
+| 400 | Missing `org_id` for System | `{"detail": "Missing 'org_id' for System type"}` |
 | 400 | Unsupported identity type | `{"detail": "Unsupported identity type: X"}` |
 | 403 | Missing required entitlements | `{"detail": "Missing required entitlement: rhel"}` |
 

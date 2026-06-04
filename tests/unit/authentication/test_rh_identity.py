@@ -282,11 +282,22 @@ class TestRHIdentityData:
                 {"identity": {"type": "System", "org_id": "123", "system": {}}},
                 "Invalid identity data",
             ),
+            # System identity without org_id is rejected (org_id is required).
             (
                 {
                     "identity": {
                         "type": "System",
-                        "org_id": "123",
+                        "system": {"cn": "test"},
+                    }
+                },
+                "Invalid identity data",
+            ),
+            # System identity with empty org_id is rejected.
+            (
+                {
+                    "identity": {
+                        "type": "System",
+                        "org_id": "",
                         "system": {"cn": "test"},
                     }
                 },
@@ -719,9 +730,9 @@ class TestRHIdentityFieldValidation:
             (("system", "cn"), True),
             (("system", "cn"), []),
             (("system", "cn"), {}),
-            (("account_number",), None),
+            # account_number is optional: None/absent is allowed, but a present,
+            # non-empty, non-string value is still rejected.
             (("account_number",), 12345),
-            (("account_number",), False),
             (("account_number",), []),
             (("account_number",), {}),
         ],
@@ -826,3 +837,89 @@ class TestRHIdentityFieldValidation:
     def test_valid_system_data_still_passes(self, system_identity_data: dict) -> None:
         """Regression: valid System identity data passes validation."""
         RHIdentityData(system_identity_data)
+
+    @pytest.mark.parametrize("account_number", ["", None])
+    def test_system_empty_or_absent_account_number_accepted(
+        self, system_identity_data: dict, account_number: Optional[str]
+    ) -> None:
+        """Accept System identity with empty or absent account_number.
+
+        No-cost RHEL developer subscriptions send an empty account_number with a
+        populated org_id. These must authenticate successfully, falling back to
+        the system cn as the username.
+        """
+        identity = system_identity_data["identity"]
+        if account_number is None:
+            identity.pop("account_number", None)
+        else:
+            identity["account_number"] = account_number
+
+        rh_identity = RHIdentityData(system_identity_data)
+        # username falls back to the system cn when account_number is empty/absent
+        assert rh_identity.get_username() == identity["system"]["cn"]
+        assert rh_identity.get_user_id() == identity["system"]["cn"]
+
+    def test_system_developer_subscription_identity_accepted(self) -> None:
+        """Accept a real developer-subscription System identity end-to-end.
+
+        Mirrors the cert-auth payload sent by no-cost RHEL developer
+        subscriptions: empty account_number, populated org_id, valid system cn.
+        """
+        identity_data = {
+            "identity": {
+                "system": {
+                    "cert_type": "system",
+                    "cn": "14b75b86-6f99-411d-b41d-f400268b5807",
+                },
+                "auth_type": "cert-auth",
+                "account_number": "",
+                "type": "System",
+                "org_id": "18939564",
+                "internal": {
+                    "cross_access": False,
+                    "auth_time": 0,
+                    "org_id": "18939564",
+                },
+            }
+        }
+
+        rh_identity = RHIdentityData(identity_data)
+        assert rh_identity.get_username() == "14b75b86-6f99-411d-b41d-f400268b5807"
+        assert rh_identity.get_user_id() == "14b75b86-6f99-411d-b41d-f400268b5807"
+        assert rh_identity.get_org_id() == "18939564"
+
+    def test_system_present_account_number_unchanged(
+        self, system_identity_data: dict
+    ) -> None:
+        """Regression: System with a present, non-empty account_number is unchanged.
+
+        get_username() must still return the account_number when it is present
+        and non-empty.
+        """
+        rh_identity = RHIdentityData(system_identity_data)
+        assert rh_identity.get_username() == "123"
+
+    @pytest.mark.parametrize("org_id", ["", None])
+    def test_system_missing_org_id_rejected(
+        self, system_identity_data: dict, org_id: Optional[str]
+    ) -> None:
+        """Reject System identity when org_id is empty or absent.
+
+        org_id is the required organizational identifier for System identities.
+        """
+        identity = system_identity_data["identity"]
+        if org_id is None:
+            identity.pop("org_id", None)
+        else:
+            identity["org_id"] = org_id
+
+        with pytest.raises(HTTPException) as exc_info:
+            RHIdentityData(system_identity_data)
+        assert exc_info.value.status_code == 400
+
+    def test_system_empty_cn_rejected(self, system_identity_data: dict) -> None:
+        """Reject System identity when system cn is empty."""
+        system_identity_data["identity"]["system"]["cn"] = ""
+        with pytest.raises(HTTPException) as exc_info:
+            RHIdentityData(system_identity_data)
+        assert exc_info.value.status_code == 400
