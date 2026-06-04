@@ -90,9 +90,9 @@ from utils.responses import (
     extract_text_from_response_items,
     extract_token_usage,
     extract_vector_store_ids_from_tools,
-    get_topic_summary,
     get_zero_usage,
     is_server_deployed_output,
+    maybe_get_topic_summary,
     parse_rag_chunks,
     parse_referenced_documents,
     resolve_client_tool_choice,
@@ -252,25 +252,6 @@ async def _append_previous_response_turn(
             api_params.input,
             output,
         )
-
-
-async def _maybe_get_topic_summary(
-    api_params: ResponsesApiParams,
-    context: ResponsesContext,
-) -> Optional[str]:
-    """Generate a topic summary when requested for the current response.
-
-    Args:
-        api_params: Responses API parameters containing the selected model.
-        context: Request-scoped Responses API context.
-
-    Returns:
-        Generated topic summary, or None when topic summaries are disabled.
-    """
-    if not context.generate_topic_summary:
-        return None
-    logger.debug("Generating topic summary for new conversation")
-    return await get_topic_summary(context.input_text, context.client, api_params.model)
 
 
 def _store_response_query_results(
@@ -981,7 +962,12 @@ async def generate_response(
     async for event in generator:
         yield event
 
-    topic_summary = await _maybe_get_topic_summary(api_params, context)
+    topic_summary = await maybe_get_topic_summary(
+        generate_topic_summary=context.generate_topic_summary,
+        input_text=context.input_text,
+        client=context.client,
+        model_id=api_params.model,
+    )
     completed_at = datetime.now(UTC)
     _store_response_query_results(
         api_params,
@@ -1083,7 +1069,12 @@ async def handle_non_streaming_response(
     available_quotas = get_available_quotas(
         quota_limiters=configuration.quota_limiters, user_id=user_id
     )
-    topic_summary = await _maybe_get_topic_summary(api_params, context)
+    topic_summary = await maybe_get_topic_summary(
+        generate_topic_summary=context.generate_topic_summary,
+        input_text=context.input_text,
+        client=context.client,
+        model_id=api_params.model,
+    )
 
     vector_store_ids = extract_vector_store_ids_from_tools(api_params.tools)
     turn_summary = build_turn_summary(

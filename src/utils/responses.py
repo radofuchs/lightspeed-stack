@@ -205,6 +205,29 @@ async def get_topic_summary(  # pylint: disable=too-many-nested-blocks
     return extract_text_from_response_items(response.output)
 
 
+async def maybe_get_topic_summary(
+    generate_topic_summary: bool,
+    input_text: str,
+    client: AsyncLlamaStackClient,
+    model_id: str,
+) -> Optional[str]:
+    """Generate a topic summary when requested for the current response.
+
+    Args:
+        generate_topic_summary: Whether topic summary generation is enabled.
+        input_text: User input text to summarize.
+        client: Llama Stack client for the summary request.
+        model_id: Model identifier in provider/model format.
+
+    Returns:
+        Generated topic summary, or None when topic summaries are disabled.
+    """
+    if not generate_topic_summary:
+        return None
+    logger.debug("Generating topic summary for new conversation")
+    return await get_topic_summary(input_text, client, model_id)
+
+
 async def prepare_tools(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     client: AsyncLlamaStackClient,
     vector_store_ids: Optional[list[str]],

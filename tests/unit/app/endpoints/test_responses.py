@@ -233,7 +233,7 @@ def _patch_handle_non_streaming_common(
     mocker.patch(f"{MODULE}.configuration", config)
     mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
     mocker.patch(
-        f"{MODULE}.get_topic_summary",
+        f"{MODULE}.maybe_get_topic_summary",
         new=mocker.AsyncMock(return_value=None),
     )
     mocker.patch(f"{MODULE}.store_query_results")
@@ -1177,7 +1177,7 @@ class TestHandleStreamingResponse:
             return_value=VALID_CONV_ID_NORMALIZED,
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -1256,7 +1256,7 @@ class TestHandleStreamingResponse:
             return_value=TurnSummary(referenced_documents=[]),
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -1343,7 +1343,7 @@ class TestHandleStreamingResponse:
             return_value=TurnSummary(referenced_documents=[]),
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -1427,7 +1427,7 @@ class TestHandleStreamingResponse:
             return_value=(mocker.Mock(), mocker.Mock()),
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -1509,7 +1509,7 @@ class TestHandleStreamingResponse:
             return_value=TurnSummary(referenced_documents=[]),
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -2346,7 +2346,7 @@ class TestSanitizesOutputAndModel:
             return_value=[],
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -2461,7 +2461,7 @@ class TestSanitizesOutputAndModel:
             return_value=TurnSummary(referenced_documents=[]),
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -2587,7 +2587,7 @@ class TestMcpEventsFilteredUnconditionally:
             return_value=TurnSummary(referenced_documents=[]),
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -2683,7 +2683,7 @@ class TestMcpEventsFilteredUnconditionally:
             return_value=TurnSummary(referenced_documents=[]),
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")

@@ -62,7 +62,7 @@ def _patch_handle_non_streaming_common(
     mocker.patch(f"{MODULE}.configuration", config)
     mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
     mocker.patch(
-        f"{MODULE}.get_topic_summary",
+        f"{MODULE}.maybe_get_topic_summary",
         new=mocker.AsyncMock(return_value=None),
     )
     mocker.patch(f"{MODULE}.store_query_results")
@@ -485,7 +485,7 @@ class TestSplunkTelemetryHooks:
             return_value=VALID_CONV_ID_NORMALIZED,
         )
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
@@ -646,7 +646,7 @@ class TestSplunkTelemetryHooks:
         mock_turn_summary.token_usage = mock_token_usage
         mocker.patch(f"{MODULE}.build_turn_summary", return_value=mock_turn_summary)
         mocker.patch(
-            f"{MODULE}.get_topic_summary",
+            f"{MODULE}.maybe_get_topic_summary",
             new=mocker.AsyncMock(return_value=None),
         )
         mocker.patch(f"{MODULE}.store_query_results")
