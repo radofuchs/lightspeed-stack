@@ -26,6 +26,8 @@ product questions using backend LLM services, agents, and RAG databases.
 
 [Deployment Guide](https://lightspeed-core.github.io/lightspeed-stack/deployment_guide.html)
 
+[Container Orchestration Guide](https://lightspeed-core.github.io/lightspeed-stack/container_orchestration.html)
+
 [Linux](https://lightspeed-core.github.io/lightspeed-stack/installation_linux.html)
 
 [MacOS](https://lightspeed-core.github.io/lightspeed-stack/installation_macos.html)

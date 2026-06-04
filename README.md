@@ -188,7 +188,7 @@ To quickly get hands on LCS, we can run it using the default configurations prov
    ```
 4. access LCS web UI at [http://localhost:8080/](http://localhost:8080/)
 
-**Note**: `make run` uses containerized llama-stack (service mode). To run llama-stack manually instead, see the [Llama Stack as separate server](#llama-stack-as-separate-server) section below.
+**Note**: `make run` uses containerized llama-stack (service mode). For details on container lifecycle management, customization, and troubleshooting, see the [Container Orchestration Guide](docs/container_orchestration.md). To run llama-stack manually instead, see the [Llama Stack as separate server](#llama-stack-as-separate-server) section below.
 
 ## Container Runtime Requirements
 
@@ -198,6 +198,8 @@ The Makefile requires either Podman or Docker to launch the Llama Stack containe
 - **Docker**: Install from [docker.com](https://docs.docker.com/get-docker/)
 
 The Makefile will auto-detect which runtime is available.
+
+**For advanced usage** including customization options, cleanup commands, and troubleshooting, see the [Container Orchestration Guide](docs/container_orchestration.md).
 
 
 # Configuration
