@@ -884,18 +884,16 @@ def parse_referenced_documents(  # pylint: disable=too-many-locals
     id_mapping = rag_id_mapping or {}
 
     for output_item in response.output:
-        item_type = getattr(output_item, "type", None)
+        item_type = output_item.type
 
         if item_type == "file_search_call":
-            results = getattr(output_item, "results", []) or []
+            item = cast(FileSearchCall, output_item)
+            results = item.results or []
             for result in results:
-                resolved_source = _resolve_source_for_result(result, vs_ids, id_mapping)
-
-                # Handle both object and dict access
-                if isinstance(result, dict):
-                    attributes = result.get("attributes", {})
-                else:
-                    attributes = getattr(result, "attributes", {})
+                attributes = result.attributes
+                resolved_source = resolve_source_for_result(
+                    attributes, vs_ids, id_mapping
+                )
 
                 # Try to get URL from attributes
                 # Look for common URL fields in attributes
@@ -1197,8 +1195,8 @@ def build_tool_result_from_mcp_output_item_done(
     )
 
 
-def _resolve_source_for_result(
-    result: Any,
+def resolve_source_for_result(
+    attributes: dict[str, Any],
     vector_store_ids: list[str],
     rag_id_mapping: dict[str, str],
 ) -> Optional[str]:
@@ -1209,7 +1207,7 @@ def _resolve_source_for_result(
 
     Parameters:
     ----------
-        result: A file search result object with optional attributes.
+        attributes: A dictionary of attributes from a file search result.
         vector_store_ids: The vector store IDs used in this query.
         rag_id_mapping: Mapping from vector_db_id to user-facing rag_id.
 
@@ -1221,22 +1219,17 @@ def _resolve_source_for_result(
         store_id = vector_store_ids[0]
         return rag_id_mapping.get(store_id, store_id)
 
-    if len(vector_store_ids) > 1:
-        attributes = getattr(result, "attributes", {}) or {}
+    # source is the user-facing source name, no mapping needed
+    if source := attributes.get("source"):
+        return str(source)
 
-        # Primary: read index name embedded directly by rag-content.
-        # This value is already the user-facing rag_id, not a vector_db_id,
-        # so no mapping is needed.
-        attr_source: Optional[str] = attributes.get("source")
-        if attr_source:
-            return attr_source
+    # Fallback: if llama-stack ever populates vector_store_id in results,
+    # use it with the rag_id_mapping.
+    if vector_store_id := attributes.get("vector_store_id"):
+        vector_store_id = str(vector_store_id)
+        return rag_id_mapping.get(vector_store_id, vector_store_id)
 
-        # Fallback: if llama-stack ever populates vector_store_id in results,
-        # use it with the rag_id_mapping.
-        attr_store_id: Optional[str] = attributes.get("vector_store_id")
-        if attr_store_id:
-            return rag_id_mapping.get(attr_store_id, attr_store_id)
-
+    # ambiguous: multiple vector stores, no source or vector store id
     return None
 
 
@@ -1279,8 +1272,8 @@ def extract_rag_chunks_from_file_search_item(
 
     rag_chunks: list[RAGChunk] = []
     for result in item.results:
-        source = _resolve_source_for_result(
-            result, vector_store_ids or [], rag_id_mapping or {}
+        source = resolve_source_for_result(
+            result.attributes, vector_store_ids or [], rag_id_mapping or {}
         )
         attributes = _build_chunk_attributes(result)
         rag_chunk = RAGChunk(
