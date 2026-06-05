@@ -1776,7 +1776,7 @@ class ByokRag(ConfigurationBase):
         constants.DEFAULT_RAG_TYPE,
         min_length=1,
         title="RAG type",
-        description="Type of RAG database.",
+        description="Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
     )
 
     embedding_model: str = Field(
@@ -1799,10 +1799,10 @@ class ByokRag(ConfigurationBase):
         description="Vector database identification.",
     )
 
-    db_path: str = Field(
-        ...,
+    db_path: Optional[str] = Field(
+        default=None,
         title="DB path",
-        description="Path to RAG database.",
+        description="Path to RAG database. Required for inline::faiss.",
     )
 
     score_multiplier: float = Field(
@@ -1813,6 +1813,60 @@ class ByokRag(ConfigurationBase):
         "Used to weight results when querying multiple knowledge sources. "
         "Values > 1 boost this store's results; values < 1 reduce them.",
     )
+
+    host: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL host",
+        description="PostgreSQL host for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
+    )
+
+    port: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL port",
+        description="PostgreSQL port for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+    )
+
+    db: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL database",
+        description="PostgreSQL database name for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.",
+    )
+
+    user: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL user",
+        description="PostgreSQL user for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.",
+    )
+
+    password: Optional[SecretStr] = Field(
+        default=None,
+        title="PostgreSQL password",
+        description="PostgreSQL password for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.",
+    )
+
+    @model_validator(mode="after")
+    def validate_rag_type_fields(self) -> Self:
+        """Validate and populate fields based on rag_type."""
+        if self.rag_type == "inline::faiss":
+            if not self.db_path:
+                raise ValueError("db_path is required when rag_type is 'inline::faiss'")
+        elif self.rag_type == "remote::pgvector":
+            pgvector_defaults: dict[str, str | SecretStr] = {
+                "host": "${env.POSTGRES_HOST}",
+                "port": "${env.POSTGRES_PORT}",
+                "db": "${env.POSTGRES_DATABASE}",
+                "user": "${env.POSTGRES_USER}",
+                "password": SecretStr("${env.POSTGRES_PASSWORD}"),
+            }
+            for field_name, default_value in pgvector_defaults.items():
+                if getattr(self, field_name) is None:
+                    object.__setattr__(self, field_name, default_value)
+        return self
 
 
 class QuotaLimiterConfiguration(ConfigurationBase):

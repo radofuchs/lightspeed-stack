@@ -88,10 +88,6 @@ See the full working [config example](../examples/lightspeed-stack-byok-okp-rag.
 
 This example shows how to configure a remote PostgreSQL database with the [pgvector](https://github.com/pgvector/pgvector) extension for storing embeddings.
 
-> [!NOTE]
-> pgvector is not yet supported via `byok_rag` in `lightspeed-stack.yaml` (see [LCORE-2437](https://redhat.atlassian.net/browse/LCORE-2437)).
-> It must be configured directly in the Llama Stack configuration file.
-
 > You will need to install PostgreSQL with a matching version to pgvector, then log in with `psql` and enable the extension with:
 > ```sql
 > CREATE EXTENSION IF NOT EXISTS vector;
@@ -107,33 +103,22 @@ Each pgvector-backed table follows this schema:
 > The `vector_store_id` (e.g. `rhdocs`) is used to point to the table named `vector_store_rhdocs` in the specified database, which stores the vector embeddings.
 
 ```yaml
-providers:
-  [...]
-  vector_io:
-  - provider_id: pgvector-example
-    provider_type: remote::pgvector
-    config:
-      host: localhost
-      port: 5432
-      db: pgvector_example # PostgreSQL database (psql -d pgvector_example)
-      user: lightspeed # PostgreSQL user
-      password: password123
-      kvstore:
-        type: sqlite
-        db_path: .llama/distributions/pgvector/pgvector_registry.db
-vector_stores:
-- embedding_dimension: 768
-  embedding_model: sentence-transformers/all-mpnet-base-v2
-  provider_id: pgvector-example
-  # A unique ID that becomes the PostgreSQL table name, prefixed with 'vector_store_'.
-  # e.g., 'rhdocs' will create the table 'vector_store_rhdocs'.
-  # If the table was already created, this value must match the ID used at creation.
-  vector_store_id: rhdocs
+byok_rag:
+  - rag_id: pgvector-example
+    rag_type: remote::pgvector
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+    vector_db_id: rhdocs  # becomes PostgreSQL table 'vector_store_rhdocs'
+    host: ${env.POSTGRES_HOST}
+    port: ${env.POSTGRES_PORT}
+    db: ${env.POSTGRES_DATABASE}
+    user: ${env.POSTGRES_USER}
+    password: ${env.POSTGRES_PASSWORD}
 ```
 
 > [!NOTE]
-> For pgvector, the PostgreSQL connection details (host, port, database, user, password) are configured
-> in the provider configuration. Use environment variables for credentials.
+> Connection fields (`host`, `port`, `db`, `user`, `password`) default to `${env.POSTGRES_*}`
+> environment variable references when omitted. Use environment variables for credentials.
 
 ---
 

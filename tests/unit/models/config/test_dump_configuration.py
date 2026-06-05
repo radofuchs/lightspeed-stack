@@ -1244,6 +1244,11 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                     "rag_type": "inline::faiss",
                     "vector_db_id": "vector_db_id",
                     "score_multiplier": 1.0,
+                    "host": None,
+                    "port": None,
+                    "db": None,
+                    "user": None,
+                    "password": None,
                 },
             ],
             "quota_handlers": {

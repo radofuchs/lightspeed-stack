@@ -11,11 +11,33 @@ from urllib.parse import urljoin
 
 import yaml
 from llama_stack.core.stack import replace_env_vars
+from pydantic import SecretStr
 
 import constants
 from log import get_logger
 
 logger = get_logger(__name__)
+
+VECTOR_IO_TEMPLATES: dict[str, dict[str, Any]] = {
+    "inline::faiss": {
+        "persistence_backend": "{backend_name}",
+        "persistence_namespace": "vector_io::faiss",
+        "needs_storage_backend": True,
+        "extra_fields": {},
+    },
+    "remote::pgvector": {
+        "persistence_backend": "kv_default",
+        "persistence_namespace": "vector_io::pgvector",
+        "needs_storage_backend": False,
+        "extra_fields": {
+            "host": "${env.POSTGRES_HOST}",
+            "port": "${env.POSTGRES_PORT}",
+            "db": "${env.POSTGRES_DATABASE}",
+            "user": "${env.POSTGRES_USER}",
+            "password": "${env.POSTGRES_PASSWORD}",
+        },
+    },
+}
 
 
 class YamlDumper(yaml.Dumper):  # pylint: disable=too-many-ancestors
@@ -137,19 +159,25 @@ def construct_storage_backends_section(
     if "storage" in ls_config and "backends" in ls_config["storage"]:
         output = ls_config["storage"]["backends"].copy()
 
-    # add new backends for each BYOK RAG
+    # add new backends for each BYOK RAG (skip types that don't need one)
+    added = 0
     for brag in byok_rag:
         if not brag.get("rag_id"):
             raise ValueError(f"BYOK RAG entry is missing required 'rag_id': {brag}")
+        rag_type = brag.get("rag_type", constants.DEFAULT_RAG_TYPE)
+        template = VECTOR_IO_TEMPLATES.get(rag_type, {})
+        if not template.get("needs_storage_backend", True):
+            continue
         rag_id = brag["rag_id"]
         backend_name = f"byok_{rag_id}_storage"
         output[backend_name] = {
             "type": "kv_sqlite",
             "db_path": brag.get("db_path", f".llama/{rag_id}.db"),
         }
+        added += 1
     logger.info(
         "Added %s backends into storage.backends section, total backends %s",
-        len(byok_rag),
+        added,
         len(output),
     )
     return output
@@ -284,6 +312,44 @@ def construct_models_section(
     return output
 
 
+def _build_vector_io_config(
+    rag_type: str, backend_name: str, brag: dict[str, Any]
+) -> dict[str, Any]:
+    """Build the provider config dict from VECTOR_IO_TEMPLATES.
+
+    Parameters:
+        rag_type: Llama Stack provider type (e.g. 'inline::faiss', 'remote::pgvector').
+        backend_name: Storage backend name (used when template has '{backend_name}').
+        brag: BYOK RAG entry dict — extra_fields are read from here.
+
+    Returns:
+        dict[str, Any]: Provider config mapping.
+    """
+    template = VECTOR_IO_TEMPLATES.get(rag_type)
+    if template is None:
+        raise ValueError(
+            f"Unsupported rag_type '{rag_type}'. "
+            f"Supported types: {list(VECTOR_IO_TEMPLATES.keys())}"
+        )
+    persistence_backend = template["persistence_backend"].format(
+        backend_name=backend_name
+    )
+    config: dict[str, Any] = {
+        "persistence": {
+            "namespace": template["persistence_namespace"],
+            "backend": persistence_backend,
+        }
+    }
+    for field, default in template.get("extra_fields", {}).items():
+        value = brag.get(field)
+        if isinstance(value, SecretStr):
+            value = value.get_secret_value()
+        if value is None or (isinstance(value, str) and not value.strip()):
+            value = default
+        config[field] = value
+    return config
+
+
 def construct_vector_io_providers_section(
     ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -335,16 +401,13 @@ def construct_vector_io_providers_section(
             continue
         existing_ids.add(provider_id)
         added += 1
+        rag_type = brag.get("rag_type", constants.DEFAULT_RAG_TYPE)
+        config = _build_vector_io_config(rag_type, backend_name, brag)
         output.append(
             {
                 "provider_id": provider_id,
-                "provider_type": brag.get("rag_type", "inline::faiss"),
-                "config": {
-                    "persistence": {
-                        "namespace": "vector_io::faiss",
-                        "backend": backend_name,
-                    }
-                },
+                "provider_type": rag_type,
+                "config": config,
             }
         )
     logger.info(
