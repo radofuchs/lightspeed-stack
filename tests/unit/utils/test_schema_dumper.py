@@ -306,10 +306,103 @@ def test_deeply_nested_anyof_and_exclusive_minimum() -> None:
     assert result == expected
 
 
+def test_preserve_other_types_and_lists() -> None:
+    """Nullable/optional types handling."""
+    original = {
+        "type": "object",
+        "required": ["a", "b"],
+        "properties": {
+            "a": {"type": "integer"},
+            "b": {"anyOf": [{"type": "boolean"}, {"type": "null"}]},
+        },
+    }
+    expected = {
+        "type": "object",
+        "required": ["a", "b"],
+        "properties": {
+            "a": {"type": "integer"},
+            "b": {"type": "boolean", "nullable": True},
+        },
+    }
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
 def test_handles_none_values() -> None:
     """None values should be preserved."""
     original = {"key": None}
     expected = original.copy()
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_handles_empty_lists() -> None:
+    """Empty list values should be preserved."""
+    original: dict[str, Any] = {"key": []}
+    expected = original.copy()
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_handles_empty_maps() -> None:
+    """Empty maps values should be preserved."""
+    original: dict[str, Any] = {"key": {}}
+    expected = original.copy()
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_anyof_with_additional_fields_on_first_item() -> None:
+    """Optional (nullable) types with additional fields."""
+    original = {
+        "anyOf": [
+            {"type": "string", "format": "email", "maxLength": 50},
+            {"type": "null"},
+        ]
+    }
+    expected = {
+        "type": "string",
+        "nullable": True,
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_anyof_with_additional_fields_more_items() -> None:
+    """Optional (nullable) types with additional fields."""
+    original = {
+        "exclusiveMinimum": 5,
+        "anyOf": [
+            {"type": "string", "format": "email", "maxLength": 50},
+            {"type": "null"},
+        ],
+        "description": "example",
+    }
+    expected = {
+        "minimum": 5,
+        "type": "string",
+        "nullable": True,
+        "description": "example",
+    }
 
     # perform the update
     result = recursive_update(original)
