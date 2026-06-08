@@ -37,6 +37,8 @@ def _reset_feedback_config():
     yield
     configuration.user_data_collection_configuration.feedback_enabled = original_enabled
     configuration.user_data_collection_configuration.feedback_storage = original_storage
+
+
 VALID_BASE = {
     "conversation_id": "12345678-abcd-0000-0123-456789abcdef",
     "user_question": "What is Kubernetes?",
@@ -407,9 +409,7 @@ def test_update_feedback_status_concurrent(mocker: MockerFixture) -> None:
         except Exception as exc:  # pylint: disable=broad-exception-caught
             errors[index] = exc
 
-    threads = [
-        threading.Thread(target=worker, args=args) for args in thread_args
-    ]
+    threads = [threading.Thread(target=worker, args=args) for args in thread_args]
     for t in threads:
         t.start()
     barrier.wait()
