@@ -5,6 +5,7 @@
 import asyncio
 import json
 import threading
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -30,8 +31,11 @@ MOCK_AUTH = ("mock_user_id", "mock_username", False, "mock_token")
 
 
 @pytest.fixture(autouse=True)
-def _reset_feedback_config():
+def _reset_feedback_config() -> Generator[None]:
     """Save and restore feedback configuration so tests don't leak state."""
+    if configuration._configuration is None:
+        yield
+        return
     original_enabled = configuration.user_data_collection_configuration.feedback_enabled
     original_storage = configuration.user_data_collection_configuration.feedback_storage
     yield
