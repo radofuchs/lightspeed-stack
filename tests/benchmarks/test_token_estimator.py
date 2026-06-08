@@ -56,3 +56,31 @@ def _test_lorem_ipsum_times_1000_times(benchmark: BenchmarkFixture) -> None:
     """The lorem ipsum tokenizes to the known cl100k_base count."""
     input_string = LOREM_IPSUM * 1000
     benchmark(estimate_tokens, input_string)
+
+
+def benchmark_file_tokenization(benchmark: BenchmarkFixture, filename: str) -> None:
+    """Read the given file and tokenize it."""
+    with open("tests/benchmarks/data/" + filename, encoding="utf-8") as fin:
+        input_string = fin.read()
+        # tokenize the file content
+        benchmark(estimate_tokens, input_string)
+
+
+def test_xml_file_10_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing XML file containing just 10 lines."""
+    benchmark_file_tokenization(benchmark, "xml_10_lines.xml")
+
+
+def test_yaml_file_10_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing YAML file containing just 10 lines."""
+    benchmark_file_tokenization(benchmark, "yaml_10_lines.yml")
+
+
+def test_json_file_10_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing JSON file containing just 10 lines."""
+    benchmark_file_tokenization(benchmark, "json_10_lines.json")
+
+
+def test_python_source_10_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing Python script containing just 10 lines."""
+    benchmark_file_tokenization(benchmark, "python_10_lines.py")
