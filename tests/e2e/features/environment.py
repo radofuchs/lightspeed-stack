@@ -196,10 +196,10 @@ def before_scenario(context: Context, scenario: Scenario) -> None:
     resetting per-scenario Lightspeed override tracking and skip-restart flags.
 
     Skips the scenario if it has the `skip` tag, if it has the `local` tag
-    while the test run is not in local mode, or if it has
-    `skip-in-library-mode` when running in library mode. Scenario-specific
-    Lightspeed YAML is applied in the feature files (``The service uses the
-    ... configuration`` steps).
+    while the test run is not in local mode, if it has `skip-in-library-mode`
+    when running in library mode, or if it has `skip-in-server-mode` when running
+    in server mode. Scenario-specific Lightspeed YAML is applied in the feature
+    files (``The service uses the ... configuration`` steps).
     """
     if "skip" in scenario.effective_tags:
         scenario.skip("Marked with @skip")
@@ -211,6 +211,17 @@ def before_scenario(context: Context, scenario: Scenario) -> None:
     # Skip scenarios that require separate llama-stack container in library mode
     if context.is_library_mode and "skip-in-library-mode" in scenario.effective_tags:
         scenario.skip("Skipped in library mode (no separate llama-stack container)")
+        return
+
+    # Skip scenarios that rely on a non-default BYOK store. Only library mode
+    # re-enriches the (in-process) llama-stack with the active config's byok_rag
+    # on restart; in server mode the external llama-stack keeps its startup
+    # config, so a feature-specific store would not be loaded.
+    if not context.is_library_mode and "skip-in-server-mode" in scenario.effective_tags:
+        scenario.skip(
+            "Skipped in server mode (feature-specific BYOK store is not loaded "
+            "into the external llama-stack)"
+        )
         return
 
     # Skip scenarios that depend on services not deployed in Prow/OpenShift

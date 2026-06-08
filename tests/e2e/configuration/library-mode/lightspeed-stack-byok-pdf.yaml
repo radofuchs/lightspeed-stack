@@ -37,7 +37,7 @@ byok_rag:
     embedding_model: sentence-transformers/all-mpnet-base-v2
     embedding_dimension: 768
     vector_db_id: vs_4a27375c-b8da-4134-96fc-b8198d111015
-    db_path: ${env.PDF_KV_RAG_PATH:=tests/e2e/rag/pdf_kv_store.db}
+    db_path: ${env.PDF_KV_RAG_PATH:=~/.llama/storage/rag/pdf_kv_store.db}
     score_multiplier: 1.0
 
 rag:
