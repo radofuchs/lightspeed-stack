@@ -250,8 +250,8 @@ async def test_shields_endpoint_llama_stack_connection_error(
 
     Simulates the Llama Stack client raising an APIConnectionError and asserts
     that calling the endpoint raises an HTTPException with status 503, a detail
-    response of "Service unavailable", and a detail cause that contains "Unable
-    to connect to Llama Stack".
+    response of "Unable to connect to Llama Stack", and a detail cause that
+    contains "Connection error".
     """
     mock_authorization_resolvers(mocker)
 
@@ -290,6 +290,8 @@ async def test_shields_endpoint_llama_stack_connection_error(
 
     cfg = AppConfig()
     cfg.init_from_dict(config_dict)
+
+    mocker.patch("app.endpoints.shields.configuration", cfg)
 
     request = Request(
         scope={
@@ -475,10 +477,10 @@ async def test_shields_endpoint_handler_malformed_shield_objects(
 
     mock_client = mocker.AsyncMock()
     mock_client.shields.list.return_value = [mock_shield_minimal]
-    mock_lsc = mocker.patch("client.AsyncLlamaStackClientHolder.get_client")
-    mock_lsc.return_value = mock_client
-    mock_config = mocker.Mock()
-    mocker.patch("app.endpoints.shields.configuration", mock_config)
+    mock_client_holder = mocker.patch(
+        "app.endpoints.shields.AsyncLlamaStackClientHolder"
+    )
+    mock_client_holder.return_value.get_client.return_value = mock_client
 
     request = Request(
         scope={
