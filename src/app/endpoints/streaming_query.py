@@ -36,6 +36,7 @@ from llama_stack_client import (
     APIStatusError as LLSApiStatusError,
 )
 from openai._exceptions import APIStatusError as OpenAIAPIStatusError
+from typing_extensions import deprecated
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
@@ -74,6 +75,10 @@ from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.responses.types import ResponseInput
 from models.common.turn_summary import TurnSummary
 from models.config import Action
+from utils.agents.streaming import (
+    generate_agent_response,
+    retrieve_agent_response_generator,
+)
 from utils.conversation_compaction import (
     CompactionResult,
     CompactionStartedEvent,
@@ -329,7 +334,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
             media_type=response_media_type,
         )
 
-    generator, turn_summary = await retrieve_response_generator(
+    generator, turn_summary = await retrieve_agent_response_generator(
         responses_params=responses_params,
         context=context,
         endpoint_path=endpoint_path,
@@ -342,16 +347,21 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         )
 
     return StreamingResponse(
-        generate_response(
+        generate_agent_response(
             generator=generator,
             context=context,
             responses_params=responses_params,
             turn_summary=turn_summary,
+            background_topic_summary_tasks=_background_topic_summary_tasks,
         ),
         media_type=response_media_type,
     )
 
 
+@deprecated(
+    "Deprecated in favor of utils.agents.streaming.retrieve_agent_response_generator.",
+    stacklevel=2,
+)
 async def retrieve_response_generator(
     responses_params: ResponsesApiParams,
     context: ResponseGeneratorContext,
@@ -474,7 +484,6 @@ async def generate_response_with_compaction(
         request_id=context.request_id,
     )
 
-    compacted = False
     compacted_original_input: Optional[ResponseInput] = None
     try:
         async for item in apply_compaction(
@@ -491,10 +500,9 @@ async def generate_response_with_compaction(
                 yield stream_compaction_event(context.conversation_id)
             elif isinstance(item, CompactionResult):
                 responses_params = item.params
-                compacted = item.compacted
                 compacted_original_input = item.original_input
 
-        generator, turn_summary = await retrieve_response_generator(
+        generator, turn_summary = await retrieve_agent_response_generator(
             responses_params=responses_params,
             context=context,
             endpoint_path=endpoint_path,
@@ -531,18 +539,22 @@ async def generate_response_with_compaction(
 
     # The start event was already emitted above; delegate the rest (re-yield,
     # finalization, compacted-turn storage) to the shared generator.
-    async for event in generate_response(
+    async for event in generate_agent_response(
         generator,
         context,
         responses_params,
         turn_summary,
+        background_topic_summary_tasks=_background_topic_summary_tasks,
         emit_start=False,
-        compacted=compacted,
         original_input=compacted_original_input,
     ):
         yield event
 
 
+@deprecated(
+    "Deprecated in favor of utils.agents.streaming.generate_agent_response.",
+    stacklevel=2,
+)
 async def generate_response(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
     generator: AsyncIterator[str],
     context: ResponseGeneratorContext,
@@ -711,6 +723,10 @@ async def generate_response(  # pylint: disable=too-many-arguments,too-many-posi
     )
 
 
+@deprecated(
+    "Deprecated in favor of utils.agents.streaming.agent_response_generator.",
+    stacklevel=2,
+)
 async def response_generator(  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
     turn_response: AsyncIterator[OpenAIResponseObjectStream],
     context: ResponseGeneratorContext,

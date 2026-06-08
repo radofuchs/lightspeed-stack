@@ -1,7 +1,7 @@
 """Shared fixtures for integration tests."""
 
 import os
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Generator
 from pathlib import Path
 from typing import Any, Optional
 
@@ -10,12 +10,15 @@ from fastapi import Request, Response
 from fastapi.testclient import TestClient
 from llama_stack_api.openai_responses import OpenAIResponseObject
 from llama_stack_client.types import VersionInfo
+from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
     NativeToolCallPart,
     NativeToolReturnPart,
+    PartEndEvent,
+    PartStartEvent,
     TextPart,
     ToolCallPart,
     ToolReturnPart,
@@ -345,6 +348,96 @@ def set_query_agent_run(
 ) -> None:
     """Configure mock agent.run return value for /query integration tests."""
     mock_query_agent.run.return_value = create_agent_run_result(mocker, **kwargs)
+
+
+def mock_agent_run_stream(events: list[Any]) -> Any:
+    """Build an async context manager that yields pydantic-ai stream events."""
+
+    async def _event_stream() -> AsyncIterator[Any]:
+        for event in events:
+            yield event
+
+    class _RunStreamCtx:
+        """Minimal async context manager matching agent.run_stream_events."""
+
+        async def __aenter__(self) -> AsyncIterator[Any]:
+            return _event_stream()
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    return _RunStreamCtx()
+
+
+def create_text_agent_stream_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    mocker: MockerFixture,
+    *,
+    content: str = "This is a test response about Ansible.",
+    response_id: str = "response-123",
+    input_tokens: int = 10,
+    output_tokens: int = 5,
+) -> list[Any]:
+    """Create pydantic-ai stream events for a simple text agent run."""
+    run_result = create_agent_run_result(
+        mocker,
+        content=content,
+        response_id=response_id,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+    return [
+        PartStartEvent(index=0, part=TextPart(content=content)),
+        AgentRunResultEvent(result=run_result),
+    ]
+
+
+def create_file_search_agent_stream_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    mocker: MockerFixture,
+    *,
+    content: str,
+    response_id: str = "response-tool-rag",
+    queries: Optional[list[str]] = None,
+    results: Optional[list[dict[str, Any]]] = None,
+    input_tokens: int = 10,
+    output_tokens: int = 5,
+) -> list[Any]:
+    """Create pydantic-ai stream events for a file_search tool agent run."""
+    run_result = create_file_search_agent_run_result(
+        mocker,
+        content=content,
+        response_id=response_id,
+        queries=queries,
+        results=results,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+    call = NativeToolCallPart(
+        tool_name=FileSearchTool.kind,
+        args={"queries": queries or ["test query"]},
+        tool_call_id="call-fs-1",
+    )
+    return_part = NativeToolReturnPart(
+        tool_name=FileSearchTool.kind,
+        tool_call_id="call-fs-1",
+        content={"status": "success", "results": results or []},
+    )
+    return [
+        PartEndEvent(index=0, part=call),
+        PartStartEvent(index=1, part=return_part),
+        PartStartEvent(index=2, part=TextPart(content=content)),
+        AgentRunResultEvent(result=run_result),
+    ]
+
+
+def set_streaming_query_agent_run(
+    mock_streaming_query_agent: Any,
+    mocker: MockerFixture,
+    **kwargs: Any,
+) -> None:
+    """Configure mock agent.run_stream_events for /streaming_query integration tests."""
+    mock_streaming_query_agent.run_stream_events.return_value = mock_agent_run_stream(
+        create_text_agent_stream_events(mocker, **kwargs)
+    )
 
 
 # ==========================================
@@ -712,6 +805,20 @@ def mock_query_agent_fixture(mocker: MockerFixture) -> Any:
     mock_agent.run = mocker.AsyncMock(return_value=create_agent_run_result(mocker))
     mock_agent.build_agent_mock = mocker.patch(
         "utils.agents.query.build_agent",
+        return_value=mock_agent,
+    )
+    return mock_agent
+
+
+@pytest.fixture(name="mock_streaming_query_agent")
+def mock_streaming_query_agent_fixture(mocker: MockerFixture) -> Any:
+    """Patch build_agent for /streaming_query and return the mock agent."""
+    mock_agent = mocker.Mock()
+    mock_agent.run_stream_events = mocker.Mock(
+        return_value=mock_agent_run_stream(create_text_agent_stream_events(mocker))
+    )
+    mock_agent.build_agent_mock = mocker.patch(
+        "utils.agents.streaming.build_agent",
         return_value=mock_agent,
     )
     return mock_agent
