@@ -27,6 +27,16 @@ from models.config import UserDataCollection
 from tests.unit.utils.auth_helpers import mock_authorization_resolvers
 
 MOCK_AUTH = ("mock_user_id", "mock_username", False, "mock_token")
+
+
+@pytest.fixture(autouse=True)
+def _reset_feedback_config():
+    """Save and restore feedback configuration so tests don't leak state."""
+    original_enabled = configuration.user_data_collection_configuration.feedback_enabled
+    original_storage = configuration.user_data_collection_configuration.feedback_storage
+    yield
+    configuration.user_data_collection_configuration.feedback_enabled = original_enabled
+    configuration.user_data_collection_configuration.feedback_storage = original_storage
 VALID_BASE = {
     "conversation_id": "12345678-abcd-0000-0123-456789abcdef",
     "user_question": "What is Kubernetes?",
@@ -383,24 +393,26 @@ def test_update_feedback_status_concurrent(mocker: MockerFixture) -> None:
     configuration.user_data_collection_configuration.feedback_enabled = True
 
     auth: AuthTuple = ("test_user_id", "test_user", True, "test_token")
-    results: list[Any] = [None, None, None]
-    errors: list[Exception | None] = [None, None, None]
+    thread_args = [(0, False), (1, True), (2, False)]
+    results: list[Any] = [None] * len(thread_args)
+    errors: list[Exception | None] = [None] * len(thread_args)
+    barrier = threading.Barrier(len(thread_args) + 1)
 
     def worker(index: int, desired_status: bool) -> None:
         """Thread worker that calls update_feedback_status."""
         req = FeedbackStatusUpdateRequest(status=desired_status)
         try:
+            barrier.wait()
             results[index] = asyncio.run(update_feedback_status(req, auth=auth))
         except Exception as exc:  # pylint: disable=broad-exception-caught
             errors[index] = exc
 
     threads = [
-        threading.Thread(target=worker, args=(0, False)),
-        threading.Thread(target=worker, args=(1, True)),
-        threading.Thread(target=worker, args=(2, False)),
+        threading.Thread(target=worker, args=args) for args in thread_args
     ]
     for t in threads:
         t.start()
+    barrier.wait()
     for t in threads:
         t.join()
 
