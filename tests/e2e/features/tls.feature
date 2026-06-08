@@ -21,6 +21,7 @@ Feature: TLS configuration for remote inference providers
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
     """
      Then The status code of the response is 200
+      And The body of the response contains Hello from the TLS mock inference server
 
   Scenario: Inference succeeds with CA certificate verification
     Given Llama Stack is configured with CA certificate verification
@@ -31,6 +32,7 @@ Feature: TLS configuration for remote inference providers
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
     """
      Then The status code of the response is 200
+      And The body of the response contains Hello from the TLS mock inference server
 
   Scenario: Inference fails with an untrusted CA certificate
     Given Llama Stack is configured with CA certificate path "/certs/untrusted-ca.crt"
@@ -74,6 +76,7 @@ Feature: TLS configuration for remote inference providers
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
     """
      Then The status code of the response is 200
+      And The body of the response contains Hello from the TLS mock inference server
 
   Scenario: Inference fails when mTLS is required but no client certificate is provided
     Given Llama Stack is configured for mTLS without client certificate
@@ -150,6 +153,7 @@ Feature: TLS configuration for remote inference providers
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
     """
      Then The status code of the response is 200
+      And The body of the response contains Hello from the TLS mock inference server
 
   Scenario: Inference fails with TLS minimum version TLSv1.3 and untrusted CA certificate
     Given Llama Stack is configured with TLS minimum version "TLSv1.3" and CA certificate path "/certs/untrusted-ca.crt"
