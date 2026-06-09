@@ -433,9 +433,11 @@ def enrich_solr(  # pylint: disable=too-many-locals
     )
 
     rhokp_raw = okp_config.get("rhokp_url")
-    base_url = (
+    base_url_raw = (
         str(rhokp_raw) if rhokp_raw is not None else constants.RH_SERVER_OKP_DEFAULT_URL
     )
+    # Resolve environment variables in the URL (e.g., ${env.RH_SERVER_OKP})
+    base_url = replace_env_vars(base_url_raw)
     solr_url = urljoin(base_url, "/solr")
 
     logger.info("Enriching Llama Stack config with OKP")
