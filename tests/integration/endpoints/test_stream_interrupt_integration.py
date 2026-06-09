@@ -34,6 +34,7 @@ async def test_stream_interrupt_full_round_trip(
     """Full lifecycle: register, interrupt, then verify deregistration."""
     # test_config loads configuration so @authorize on the handler can resolve.
     _ = test_config
+
     async def pending_stream() -> None:
         await asyncio.sleep(10)
 
