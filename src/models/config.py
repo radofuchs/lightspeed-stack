@@ -1265,6 +1265,40 @@ class APIKeyTokenConfiguration(ConfigurationBase):
     )
 
 
+class TrustedProxyServiceAccount(ConfigurationBase):
+    """A Kubernetes ServiceAccount identity for trusted-proxy allowlist."""
+
+    namespace: str = Field(
+        ...,
+        title="Namespace",
+        description="Kubernetes namespace of the ServiceAccount.",
+    )
+    name: str = Field(
+        ...,
+        title="Name",
+        description="Name of the Kubernetes ServiceAccount.",
+    )
+
+
+class TrustedProxyConfiguration(ConfigurationBase):
+    """Configuration for trusted-proxy auth module."""
+
+    user_header: str = Field(
+        "X-Forwarded-User",
+        title="User identity header",
+        description="HTTP header containing the forwarded user identity.",
+    )
+    allowed_service_accounts: Optional[list[TrustedProxyServiceAccount]] = Field(
+        None,
+        title="Allowed service accounts",
+        description="Optional allowlist of Kubernetes ServiceAccount identities "
+        "permitted to act as trusted proxies. "
+        "When set to null/omitted, any ServiceAccount with a valid token is accepted. "
+        "When set to a non-empty list, only the listed ServiceAccounts are allowed. "
+        "An empty list behaves the same as null (no restriction).",
+    )
+
+
 class AuthenticationConfiguration(ConfigurationBase):
     """Authentication configuration."""
 
@@ -1287,6 +1321,7 @@ class AuthenticationConfiguration(ConfigurationBase):
     jwk_config: Optional[JwkConfiguration] = None
     api_key_config: Optional[APIKeyTokenConfiguration] = None
     rh_identity_config: Optional[RHIdentityConfiguration] = None
+    trusted_proxy_config: Optional[TrustedProxyConfiguration] = None
 
     @model_validator(mode="after")
     def check_authentication_model(self) -> Self:
@@ -1333,6 +1368,13 @@ class AuthenticationConfiguration(ConfigurationBase):
             if self.api_key_config.api_key.get_secret_value() is None:
                 raise ValueError(
                     "api_key parameter must be specified when using API_KEY token authentication"
+                )
+
+        if self.module == constants.AUTH_MOD_TRUSTED_PROXY:
+            if self.trusted_proxy_config is None:
+                raise ValueError(
+                    "Trusted proxy configuration must be specified "
+                    "when using trusted-proxy authentication"
                 )
 
         return self
@@ -1387,6 +1429,26 @@ class AuthenticationConfiguration(ConfigurationBase):
         if self.api_key_config is None:
             raise ValueError("API Key configuration should not be None")
         return self.api_key_config
+
+    @property
+    def trusted_proxy_configuration(self) -> TrustedProxyConfiguration:
+        """Return trusted-proxy configuration if the module is trusted-proxy.
+
+        Returns:
+            TrustedProxyConfiguration: The configured trusted-proxy settings.
+
+        Raises:
+            ValueError: If the active authentication module is not trusted-proxy.
+            ValueError: If the trusted-proxy configuration is missing.
+        """
+        if self.module != constants.AUTH_MOD_TRUSTED_PROXY:
+            raise ValueError(
+                "Trusted proxy configuration is only available "
+                "for trusted-proxy authentication module"
+            )
+        if self.trusted_proxy_config is None:
+            raise ValueError("Trusted proxy configuration should not be None")
+        return self.trusted_proxy_config
 
 
 @dataclass
