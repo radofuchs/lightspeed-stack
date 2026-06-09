@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from llama_stack_configuration import (
+    _build_vector_io_config,
     construct_models_section,
     construct_storage_backends_section,
     construct_vector_io_providers_section,
@@ -878,3 +879,14 @@ def test_enrich_solr_user_chunk_filter_query_is_conjoined() -> None:
     assert provider["config"]["chunk_window_config"]["chunk_filter_query"] == (
         "is_chunk:true AND product:ansible"
     )
+
+
+# =============================================================================
+# Test _build_vector_io_config
+# =============================================================================
+
+
+def test_build_vector_io_config_rejects_unsupported_rag_type() -> None:
+    """Test that an unsupported rag_type raises ValueError."""
+    with pytest.raises(ValueError, match="Unsupported rag_type 'remote::chromadb'"):
+        _build_vector_io_config("remote::chromadb", "some_backend", {})

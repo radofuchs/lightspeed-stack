@@ -1,7 +1,5 @@
 """Unit tests for ByokRag model."""
 
-# pylint: disable=no-member
-
 import pytest
 from pydantic import ValidationError
 
@@ -225,7 +223,8 @@ def test_byok_rag_pgvector_defaults() -> None:
     assert store.port == "${env.POSTGRES_PORT}"
     assert store.db == "${env.POSTGRES_DATABASE}"
     assert store.user == "${env.POSTGRES_USER}"
-    assert store.password.get_secret_value() == "${env.POSTGRES_PASSWORD}"
+    password = store.password.get_secret_value()  # pylint: disable=no-member
+    assert password == "${env.POSTGRES_PASSWORD}"
     assert store.db_path is None
 
 
@@ -245,7 +244,7 @@ def test_byok_rag_pgvector_custom_connection_fields() -> None:
     assert store.port == "5433"
     assert store.db == "my_knowledge"
     assert store.user == "admin"
-    assert store.password.get_secret_value() == "secret"
+    assert store.password.get_secret_value() == "secret"  # pylint: disable=no-member
 
 
 def test_byok_rag_pgvector_partial_overrides() -> None:
