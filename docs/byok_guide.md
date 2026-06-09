@@ -105,9 +105,9 @@ Before implementing BYOK, ensure you have:
 - **LLM Provider**: OpenAI, vLLM, or other supported inference provider
 
 ### Knowledge Sources
-- **Directly supported**: Markdown (.md) and plain text (.txt) files
-- **Requires conversion**: PDFs, AsciiDoc, HTML, and other formats must be converted to markdown or TXT
-- Documentation, manuals, FAQs, knowledge bases (after format conversion)
+- **Directly supported**: Markdown (`.md`), plain text (`.txt`), PDF (`.pdf`), and HTML (`.html`/`.htm`) files. PDF and HTML are converted to Markdown automatically by [`rag-content`](https://github.com/lightspeed-core/rag-content) (via docling) — no manual pre-conversion step is needed. See the rag-content README's [Supported Input Formats](https://github.com/lightspeed-core/rag-content#supported-input-formats) section.
+- **Requires conversion**: AsciiDoc and other formats must be converted to Markdown or plain text first.
+- Documentation, manuals, FAQs, knowledge bases
 
 ---
 
@@ -116,11 +116,10 @@ Before implementing BYOK, ensure you have:
 ### Step 1: Prepare Your Knowledge Sources
 
 1. **Collect your documents**: Gather all knowledge sources you want to include
-2. **Convert formats**: Convert non-supported formats to markdown (.md) or plain text (.txt)
-   - **PDF conversion**: Use tools like [docling](https://github.com/DS4SD/docling) to convert PDFs to markdown
-   - **Adoc conversion**: Use [custom scripts](https://github.com/openshift/lightspeed-rag-content/blob/main/scripts/asciidoctor-text/convert-it-all.py) to convert AsciiDoc to plain text
-3. **Organize content**: Structure your converted documents for optimal indexing
-4. **Format validation**: Ensure all documents are in supported formats (.md or .txt)
+2. **Markdown, text, PDF, and HTML ingest directly**: Place `.md`, `.txt`, `.pdf`, and `.html` files in your input directory and pass them to `rag-content` with the matching document type (`-t pdf` or `-t html`). `rag-content` converts PDF and HTML to Markdown for you via docling — no manual pre-conversion step is required.
+   - **PDF note**: Scanned / image-only PDFs are out of scope (OCR is disabled); they index as empty and `rag-content` logs a warning naming the file. Run such PDFs through a separate OCR step first.
+   - **AsciiDoc and other formats**: Convert to Markdown or plain text first — e.g. use [custom scripts](https://github.com/openshift/lightspeed-rag-content/blob/main/scripts/asciidoctor-text/convert-it-all.py) for AsciiDoc.
+3. **Organize content**: Structure your documents for optimal indexing
 
 ### Step 2: Create Vector Database
 
@@ -150,7 +149,7 @@ class CustomMetadataProcessor(MetadataProcessor):
 **Important Notes:**
 - Supported formats: 
   - Faiss Vector-IO
-- The same embedding model must be used for both creation and querying
+- **The embedding model (and its dimension) used to *build* the vector store must exactly match the one configured for querying** in the `byok_rag` section (see Step 3). A mismatch does not raise an error — it silently returns no or irrelevant results, because the query vector and the stored vectors are then incomparable. The default is `sentence-transformers/all-mpnet-base-v2` (dimension `768`).
 
 ### Step 3: Configure Embedding Model
 

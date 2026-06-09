@@ -10,6 +10,7 @@ features/conversations.feature
 features/prompts.feature
 features/faiss.feature
 features/inline_rag.feature
+features/byok_pdf.feature
 features/feedback.feature
 features/query.feature
 features/responses.feature
