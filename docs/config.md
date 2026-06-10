@@ -155,6 +155,11 @@ BYOK (Bring Your Own Knowledge) RAG configuration.
 | vector_db_id        | string  | Vector database identification.                                                                                                                                                                 |
 | db_path             | string  | Path to RAG database.                                                                                                                                                                           |
 | score_multiplier    | number  | Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them.  |
+| host | string | PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector. |
+| port | string | PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. |
+| db | string | PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector. |
+| user | string | PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector. |
+| password | string | PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector. |
 
 
 ## CORSConfiguration

@@ -316,7 +316,7 @@
           },
           "rag_type": {
             "default": "inline::faiss",
-            "description": "Type of RAG database.",
+            "description": "Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
             "minLength": 1,
             "title": "RAG type",
             "type": "string"
@@ -342,9 +342,11 @@
             "type": "string"
           },
           "db_path": {
-            "description": "Path to RAG database.",
-            "title": "DB path",
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "Path to RAG database. Required for inline::faiss.",
+            "title": "DB path"
           },
           "score_multiplier": {
             "default": 1.0,
@@ -352,12 +354,46 @@
             "minimum": 0,
             "title": "Score multiplier",
             "type": "number"
+          },
+          "host": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL host"
+          },
+          "port": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL port"
+          },
+          "db": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL database"
+          },
+          "user": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL user"
+          },
+          "password": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL password"
           }
         },
         "required": [
           "rag_id",
-          "vector_db_id",
-          "db_path"
+          "vector_db_id"
         ],
         "title": "ByokRag",
         "type": "object"
