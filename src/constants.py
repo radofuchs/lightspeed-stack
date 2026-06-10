@@ -119,6 +119,7 @@ AUTH_MOD_NOOP_WITH_TOKEN: Final[str] = "noop-with-token"
 AUTH_MOD_APIKEY_TOKEN: Final[str] = "api-key-token"
 AUTH_MOD_JWK_TOKEN: Final[str] = "jwk-token"
 AUTH_MOD_RH_IDENTITY: Final[str] = "rh-identity"
+AUTH_MOD_TRUSTED_PROXY: Final[str] = "trusted-proxy"
 # Supported authentication modules
 SUPPORTED_AUTHENTICATION_MODULES: Final[frozenset[str]] = frozenset(
     {
@@ -128,6 +129,7 @@ SUPPORTED_AUTHENTICATION_MODULES: Final[frozenset[str]] = frozenset(
         AUTH_MOD_JWK_TOKEN,
         AUTH_MOD_APIKEY_TOKEN,
         AUTH_MOD_RH_IDENTITY,
+        AUTH_MOD_TRUSTED_PROXY,
     }
 )
 DEFAULT_AUTHENTICATION_MODULE: Final[str] = AUTH_MOD_NOOP

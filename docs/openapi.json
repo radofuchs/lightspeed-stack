@@ -11613,6 +11613,16 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "trusted_proxy_config": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/TrustedProxyConfiguration"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "additionalProperties": false,
@@ -19824,6 +19834,57 @@
                         ]
                     }
                 ]
+            },
+            "TrustedProxyConfiguration": {
+                "properties": {
+                    "user_header": {
+                        "type": "string",
+                        "title": "User identity header",
+                        "description": "HTTP header containing the forwarded user identity.",
+                        "default": "X-Forwarded-User"
+                    },
+                    "allowed_service_accounts": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "$ref": "#/components/schemas/TrustedProxyServiceAccount"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Allowed service accounts",
+                        "description": "Optional allowlist of Kubernetes ServiceAccount identities permitted to act as trusted proxies. When set to null/omitted, any ServiceAccount with a valid token is accepted. When set to a non-empty list, only the listed ServiceAccounts are allowed. An empty list behaves the same as null (no restriction)."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "TrustedProxyConfiguration",
+                "description": "Configuration for trusted-proxy auth module."
+            },
+            "TrustedProxyServiceAccount": {
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "title": "Namespace",
+                        "description": "Kubernetes namespace of the ServiceAccount."
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name",
+                        "description": "Name of the Kubernetes ServiceAccount."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                    "namespace",
+                    "name"
+                ],
+                "title": "TrustedProxyServiceAccount",
+                "description": "A Kubernetes ServiceAccount identity for trusted-proxy allowlist."
             },
             "UnauthorizedResponse": {
                 "properties": {
