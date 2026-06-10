@@ -84,18 +84,20 @@ def map_agent_inference_error(
         RuntimeError: Re-raised when ``exc`` is a non-agent ``RuntimeError`` that is
             not a recognized context-length failure.
     """
-    if isinstance(exc, AgentRunError):
-        return map_pydantic_agent_run_error(exc, model_id)
-    if isinstance(exc, APIStatusError):
-        return handle_known_apistatus_errors(exc, model_id)
-    if isinstance(exc, APIConnectionError):
-        return ServiceUnavailableResponse(
-            backend_name="Llama Stack",
-            cause=str(exc),
-        )
-    if isinstance(exc, RuntimeError) and is_context_length_error(str(exc)):
-        return PromptTooLongResponse(model=model_id)
-    return InternalServerErrorResponse.generic()
+    match exc:
+        case AgentRunError() as agent_exc:
+            return map_pydantic_agent_run_error(agent_exc, model_id)
+        case APIStatusError() as status_exc:
+            return handle_known_apistatus_errors(status_exc, model_id)
+        case APIConnectionError() as connection_exc:
+            return ServiceUnavailableResponse(
+                backend_name="Llama Stack",
+                cause=str(connection_exc),
+            )
+        case RuntimeError() as runtime_exc if is_context_length_error(str(runtime_exc)):
+            return PromptTooLongResponse(model=model_id)
+        case _:
+            return InternalServerErrorResponse.generic()
 
 
 def map_pydantic_agent_run_error(
@@ -110,26 +112,26 @@ def map_pydantic_agent_run_error(
     Returns:
         Structured error response for HTTP or SSE error events.
     """
-    if isinstance(exc, ContentFilterError):
-        return InternalServerErrorResponse.query_failed(str(exc))
-    if isinstance(exc, IncompleteToolCall):
-        return PromptTooLongResponse(model=model_id)
-    if isinstance(exc, UnexpectedModelBehavior):
-        return PromptTooLongResponse(model=model_id)
-    if isinstance(exc, UsageLimitExceeded):
-        return QuotaExceededResponse.model(model_id)
-    if isinstance(exc, ModelHTTPError):
-        if is_context_length_error(str(exc)):
+    match exc:
+        case ContentFilterError() as filter_exc:
+            return InternalServerErrorResponse.query_failed(str(filter_exc))
+        case IncompleteToolCall() | UnexpectedModelBehavior():
             return PromptTooLongResponse(model=model_id)
-        if exc.status_code == 429:
+        case UsageLimitExceeded():
             return QuotaExceededResponse.model(model_id)
-        return InternalServerErrorResponse.generic()
-    if isinstance(exc, ModelAPIError):
-        return ServiceUnavailableResponse(
-            backend_name="Llama Stack",
-            cause=str(exc),
-        )
-    return InternalServerErrorResponse.query_failed(str(exc))
+        case ModelHTTPError() as http_exc if is_context_length_error(str(http_exc)):
+            return PromptTooLongResponse(model=model_id)
+        case ModelHTTPError(status_code=429):
+            return QuotaExceededResponse.model(model_id)
+        case ModelHTTPError():
+            return InternalServerErrorResponse.generic()
+        case ModelAPIError() as api_exc:
+            return ServiceUnavailableResponse(
+                backend_name="Llama Stack",
+                cause=str(api_exc),
+            )
+        case _:
+            return InternalServerErrorResponse.query_failed(str(exc))
 
 
 def get_agent_finish_reason(response: ModelResponse) -> AgentFinishReason:
