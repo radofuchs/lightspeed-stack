@@ -153,6 +153,20 @@ def test_xml_file_10_lines(benchmark: BenchmarkFixture) -> None:
     benchmark_file_tokenization(benchmark, "xml_10_lines.xml")
 
 
+def test_xml_file_100_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing XML file containing just 100 lines.
+
+    Parameters:
+    ----------
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+    -------
+        None
+    """
+    benchmark_file_tokenization(benchmark, "xml_100_lines.xml")
+
+
 def test_yaml_file_10_lines(benchmark: BenchmarkFixture) -> None:
     """Test tokenizing YAML file containing just 10 lines.
 
@@ -165,6 +179,20 @@ def test_yaml_file_10_lines(benchmark: BenchmarkFixture) -> None:
         None
     """
     benchmark_file_tokenization(benchmark, "yaml_10_lines.yml")
+
+
+def test_yaml_file_100_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing YAML file containing just 100 lines.
+
+    Parameters:
+    ----------
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+    -------
+        None
+    """
+    benchmark_file_tokenization(benchmark, "yaml_100_lines.yml")
 
 
 def test_json_file_10_lines(benchmark: BenchmarkFixture) -> None:
@@ -181,6 +209,20 @@ def test_json_file_10_lines(benchmark: BenchmarkFixture) -> None:
     benchmark_file_tokenization(benchmark, "json_10_lines.json")
 
 
+def test_json_file_100_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing JSON file containing just 100 lines.
+
+    Parameters:
+    ----------
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+    -------
+        None
+    """
+    benchmark_file_tokenization(benchmark, "json_100_lines.json")
+
+
 def test_python_source_10_lines(benchmark: BenchmarkFixture) -> None:
     """Test tokenizing Python script containing just 10 lines.
 
@@ -195,6 +237,20 @@ def test_python_source_10_lines(benchmark: BenchmarkFixture) -> None:
     benchmark_file_tokenization(benchmark, "python_10_lines.py")
 
 
+def test_python_source_100_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing Python script containing just 100 lines.
+
+    Parameters:
+    ----------
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+    -------
+        None
+    """
+    benchmark_file_tokenization(benchmark, "python_100_lines.py")
+
+
 def test_javascript_source_10_lines(benchmark: BenchmarkFixture) -> None:
     """Test tokenizing JavaScript script containing just 10 lines.
 
@@ -207,3 +263,17 @@ def test_javascript_source_10_lines(benchmark: BenchmarkFixture) -> None:
         None
     """
     benchmark_file_tokenization(benchmark, "js_10_lines.js")
+
+
+def test_javascript_source_100_lines(benchmark: BenchmarkFixture) -> None:
+    """Test tokenizing JavaScript script containing just 100 lines.
+
+    Parameters:
+    ----------
+        benchmark (BenchmarkFixture): pytest-benchmark fixture.
+
+    Returns:
+    -------
+        None
+    """
+    benchmark_file_tokenization(benchmark, "js_100_lines.js")
