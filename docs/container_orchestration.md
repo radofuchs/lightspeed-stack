@@ -311,7 +311,6 @@ See [OKP Guide](okp_guide.md) for detailed setup instructions.
 
 #### Other Configuration
 
-- `EXTERNAL_PROVIDERS_DIR`: Path to external providers directory (default: `/opt/app-root/external_providers`)
 - `E2E_OPENAI_MODEL`: OpenAI model for E2E tests (default: `gpt-4o-mini`)
 - `LLAMA_STACK_LOGGING`: Enable debug logging in llama-stack
 - `FAISS_VECTOR_STORE_ID`: FAISS vector store identifier
