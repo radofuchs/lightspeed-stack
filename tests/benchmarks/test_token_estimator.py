@@ -1,5 +1,7 @@
 """Benchmarks for token estimator."""
 
+from pathlib import Path
+
 from pytest_benchmark.fixture import BenchmarkFixture
 
 from utils.token_estimator import (
@@ -133,7 +135,8 @@ def benchmark_file_tokenization(benchmark: BenchmarkFixture, filename: str) -> N
     -------
         None
     """
-    with open("tests/benchmarks/data/" + filename, encoding="utf-8") as fin:
+    data_dir = Path(__file__).parent / "data"
+    with (data_dir / filename).open(encoding="utf-8") as fin:
         input_string = fin.read()
         # tokenize the file content
         benchmark(estimate_tokens, input_string)
