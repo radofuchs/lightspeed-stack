@@ -493,6 +493,36 @@ using a different Azure service.</td>
 to weight results when querying multiple knowledge sources. Values &gt;
 1 boost this store&#x2019;s results; values &lt; 1 reduce them.</td>
         </tr>
+        <tr class="even">
+          <td>host</td>
+          <td>string</td>
+          <td>PostgreSQL host for remote::pgvector. Defaults to
+${env.POSTGRES_HOST} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="odd">
+          <td>port</td>
+          <td>string</td>
+          <td>PostgreSQL port for remote::pgvector. Defaults to
+${env.POSTGRES_PORT} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="even">
+          <td>db</td>
+          <td>string</td>
+          <td>PostgreSQL database name for remote::pgvector. Defaults to
+${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="odd">
+          <td>user</td>
+          <td>string</td>
+          <td>PostgreSQL user for remote::pgvector. Defaults to
+${env.POSTGRES_USER} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="even">
+          <td>password</td>
+          <td>string</td>
+          <td>PostgreSQL password for remote::pgvector. Defaults to
+${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.</td>
+        </tr>
       </tbody>
     </table>
     <h2 id="corsconfiguration">CORSConfiguration</h2>
