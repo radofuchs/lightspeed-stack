@@ -113,6 +113,7 @@ Authentication configuration.
 | jwk_config             |         |                                                      |
 | api_key_config         |         |                                                      |
 | rh_identity_config     |         |                                                      |
+| trusted_proxy_config   |         |                                                      |
 
 
 ## AuthorizationConfiguration
@@ -149,17 +150,17 @@ BYOK (Bring Your Own Knowledge) RAG configuration.
 | Field               | Type    | Description                                                                                                                                                                                     |
 |---------------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | rag_id              | string  | Unique RAG ID                                                                                                                                                                                   |
-| rag_type            | string  | Type of RAG database.                                                                                                                                                                           |
+| rag_type            | string  | Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').                                                                                                                                |
 | embedding_model     | string  | Embedding model identification                                                                                                                                                                  |
 | embedding_dimension | integer | Dimensionality of embedding vectors.                                                                                                                                                            |
 | vector_db_id        | string  | Vector database identification.                                                                                                                                                                 |
-| db_path             | string  | Path to RAG database.                                                                                                                                                                           |
-| score_multiplier    | number  | Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them.  |
-| host | string | PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector. |
-| port | string | PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. |
-| db | string | PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector. |
-| user | string | PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector. |
-| password | string | PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector. |
+| db_path             | string  | Path to RAG database. Required for inline::faiss.                                                                                                                                               |
+| score_multiplier    | number  | Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them. |
+| host                | string  | PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.                                                                                       |
+| port                | string  | PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.                                                                                       |
+| db                  | string  | PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.                                                                          |
+| user                | string  | PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.                                                                                       |
+| password            | string  | PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.                                                                               |
 
 
 ## CORSConfiguration
@@ -748,6 +749,30 @@ Useful resources:
 | tls_certificate_path | string | SSL/TLS certificate file path for HTTPS support.                         |
 | tls_key_path         | string | SSL/TLS private key file path for HTTPS support.                         |
 | tls_key_password     | string | Path to file containing the password to decrypt the SSL/TLS private key. |
+
+
+## TrustedProxyConfiguration
+
+
+Configuration for trusted-proxy auth module.
+
+
+| Field                    | Type   | Description                                                                                                                                                                                                                                                                                                      |
+|--------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| user_header              | string | HTTP header containing the forwarded user identity.                                                                                                                                                                                                                                                              |
+| allowed_service_accounts | array  | Optional allowlist of Kubernetes ServiceAccount identities permitted to act as trusted proxies. When set to null/omitted, any ServiceAccount with a valid token is accepted. When set to a non-empty list, only the listed ServiceAccounts are allowed. An empty list behaves the same as null (no restriction). |
+
+
+## TrustedProxyServiceAccount
+
+
+A Kubernetes ServiceAccount identity for trusted-proxy allowlist.
+
+
+| Field     | Type   | Description                                 |
+|-----------|--------|---------------------------------------------|
+| namespace | string | Kubernetes namespace of the ServiceAccount. |
+| name      | string | Name of the Kubernetes ServiceAccount.      |
 
 
 ## UserDataCollection

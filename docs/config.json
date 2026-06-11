@@ -246,6 +246,17 @@
               }
             ],
             "default": null
+          },
+          "trusted_proxy_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrustedProxyConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "AuthenticationConfiguration",
@@ -1626,6 +1637,49 @@
           }
         },
         "title": "TLSConfiguration",
+        "type": "object"
+      },
+      "TrustedProxyConfiguration": {
+        "additionalProperties": false,
+        "description": "Configuration for trusted-proxy auth module.",
+        "properties": {
+          "user_header": {
+            "default": "X-Forwarded-User",
+            "description": "HTTP header containing the forwarded user identity.",
+            "title": "User identity header",
+            "type": "string"
+          },
+          "allowed_service_accounts": {
+            "type": "array",
+            "nullable": true,
+            "default": null,
+            "description": "Optional allowlist of Kubernetes ServiceAccount identities permitted to act as trusted proxies. When set to null/omitted, any ServiceAccount with a valid token is accepted. When set to a non-empty list, only the listed ServiceAccounts are allowed. An empty list behaves the same as null (no restriction).",
+            "title": "Allowed service accounts"
+          }
+        },
+        "title": "TrustedProxyConfiguration",
+        "type": "object"
+      },
+      "TrustedProxyServiceAccount": {
+        "additionalProperties": false,
+        "description": "A Kubernetes ServiceAccount identity for trusted-proxy allowlist.",
+        "properties": {
+          "namespace": {
+            "description": "Kubernetes namespace of the ServiceAccount.",
+            "title": "Namespace",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the Kubernetes ServiceAccount.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace",
+          "name"
+        ],
+        "title": "TrustedProxyServiceAccount",
         "type": "object"
       },
       "UserDataCollection": {
