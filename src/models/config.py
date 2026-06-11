@@ -2176,6 +2176,24 @@ class SkillsConfiguration(ConfigurationBase):
     )
 
 
+class QuestionValidityConfig(ConfigurationBase):
+    """Configuration for the question validity guardrail."""
+
+    model_id: str = Field(
+        ..., title="Model id", description="The model_id to use for the guard"
+    )
+    model_prompt: str = Field(
+        default=constants.DEFAULT_MODEL_PROMPT,
+        title="Model prompt",
+        description="The default prompt sent to the LLM used to validate the Users' question.",
+    )
+    invalid_question_response: str = Field(
+        default=constants.DEFAULT_INVALID_QUESTION_RESPONSE,
+        title="Invalid question response",
+        description="The default response when the Users' question is determined to be invalid.",
+    )
+
+
 class Configuration(ConfigurationBase):
     """Global service configuration."""
 
