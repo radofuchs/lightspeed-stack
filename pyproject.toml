@@ -125,6 +125,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.0",
     "pytest-asyncio>=1.0.0",
+    "pytest-order>=1.2.0",
     "pyright>=1.1.401",
     "pylint>=3.3.7",
     "pydocstyle>=6.3.0",
@@ -219,6 +220,10 @@ pythonpath = [
 ]
 addopts = [
     "--import-mode=importlib",
+]
+markers = [
+    "destructive: marks tests as destructive (deselect with '-m \"not destructive\"')",
+    "order: controls test execution order (requires pytest-order plugin)",
 ]
 
 [tool.pylint.main]
