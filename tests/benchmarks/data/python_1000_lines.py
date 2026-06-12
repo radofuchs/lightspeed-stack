@@ -800,10 +800,10 @@ print(f"File ingest response: {file_ingest_response}")
 
 # * textový dokument je v této chvíli již zpracován
 # * získání odpovědi z dokumentu
-# * tisk hodnoty
 
 models = client.models.list()
 model_id = models[0].identifier
+model_provider = models[0].identifier
 
 print(f"Using model {model_id}")
 
@@ -811,7 +811,7 @@ MODEL_ID = "openai/gpt-4-turbo"
 
 
 def print_rag_response(response):
-    """Display response from a RAG."""
+    """Pomocná funkce pro tisk celé odpovědi."""
     print(f"ID: {response.id}")
     print(f"Status: {response.status}")
     print(f"Model: {response.model}")
