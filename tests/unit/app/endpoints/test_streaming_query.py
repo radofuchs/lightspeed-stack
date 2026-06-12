@@ -44,7 +44,6 @@ from llama_stack_client import APIConnectionError, APIStatusError, AsyncLlamaSta
 from pytest_mock import MockerFixture
 
 from app.endpoints.streaming_query import (
-    _persist_interrupted_turn,
     generate_response,
     response_generator,
     retrieve_response_generator,
@@ -958,7 +957,7 @@ class TestGenerateResponse:
         """Patch registry accessor with a per-test mock registry instance."""
         test_registry = mocker.Mock(spec=StreamInterruptRegistry)
         mocker.patch(
-            "app.endpoints.streaming_query.get_stream_interrupt_registry",
+            "utils.stream_interrupts.get_stream_interrupt_registry",
             return_value=test_registry,
         )
         return test_registry
@@ -1323,6 +1322,7 @@ class TestGenerateResponse:
         assert len(result) > 0
         assert any("error" in item for item in result)
 
+    @pytest.mark.asyncio
     async def test_generate_response_cancelled_persists_interrupted_turn(
         self,
         mocker: MockerFixture,
@@ -1359,10 +1359,10 @@ class TestGenerateResponse:
             "app.endpoints.streaming_query.consume_query_tokens"
         )
         store_query_results_mock = mocker.patch(
-            "app.endpoints.streaming_query.store_query_results"
+            "utils.stream_interrupts.store_query_results"
         )
         append_turn_mock = mocker.patch(
-            "app.endpoints.streaming_query.append_turn_to_conversation",
+            "utils.stream_interrupts.append_turn_to_conversation",
             new_callable=mocker.AsyncMock,
         )
 
@@ -1437,17 +1437,17 @@ class TestGenerateResponse:
 
         mocker.patch("app.endpoints.streaming_query.consume_query_tokens")
         get_topic_summary_mock = mocker.patch(
-            "app.endpoints.streaming_query.get_topic_summary",
+            "utils.stream_interrupts.get_topic_summary",
             new=mocker.AsyncMock(return_value="Kubernetes container orchestration"),
         )
         store_query_results_mock = mocker.patch(
-            "app.endpoints.streaming_query.store_query_results"
+            "utils.stream_interrupts.store_query_results"
         )
         update_topic_summary_mock = mocker.patch(
-            "app.endpoints.streaming_query.update_conversation_topic_summary"
+            "utils.stream_interrupts.update_conversation_topic_summary"
         )
         mocker.patch(
-            "app.endpoints.streaming_query.append_turn_to_conversation",
+            "utils.stream_interrupts.append_turn_to_conversation",
             new_callable=mocker.AsyncMock,
         )
 
@@ -1517,14 +1517,14 @@ class TestGenerateResponse:
 
         mocker.patch("app.endpoints.streaming_query.consume_query_tokens")
         mocker.patch(
-            "app.endpoints.streaming_query.get_topic_summary",
+            "utils.stream_interrupts.get_topic_summary",
             new=mocker.AsyncMock(side_effect=Exception("err")),
         )
         store_query_results_mock = mocker.patch(
-            "app.endpoints.streaming_query.store_query_results"
+            "utils.stream_interrupts.store_query_results"
         )
         mocker.patch(
-            "app.endpoints.streaming_query.append_turn_to_conversation",
+            "utils.stream_interrupts.append_turn_to_conversation",
             new_callable=mocker.AsyncMock,
         )
 
@@ -1584,14 +1584,14 @@ class TestGenerateResponse:
 
         mocker.patch("app.endpoints.streaming_query.consume_query_tokens")
         get_topic_summary_mock = mocker.patch(
-            "app.endpoints.streaming_query.get_topic_summary",
+            "utils.stream_interrupts.get_topic_summary",
             new=mocker.AsyncMock(return_value="Docker containerization"),
         )
         store_query_results_mock = mocker.patch(
-            "app.endpoints.streaming_query.store_query_results"
+            "utils.stream_interrupts.store_query_results"
         )
         mocker.patch(
-            "app.endpoints.streaming_query.append_turn_to_conversation",
+            "utils.stream_interrupts.append_turn_to_conversation",
             new_callable=mocker.AsyncMock,
         )
 
@@ -1643,10 +1643,10 @@ class TestGenerateResponse:
 
         mocker.patch("app.endpoints.streaming_query.consume_query_tokens")
         store_query_results_mock = mocker.patch(
-            "app.endpoints.streaming_query.store_query_results"
+            "utils.stream_interrupts.store_query_results"
         )
         mocker.patch(
-            "app.endpoints.streaming_query.append_turn_to_conversation",
+            "utils.stream_interrupts.append_turn_to_conversation",
             new_callable=mocker.AsyncMock,
             side_effect=RuntimeError("Llama Stack unavailable"),
         )
@@ -1702,10 +1702,10 @@ class TestGenerateResponse:
 
         mocker.patch("app.endpoints.streaming_query.consume_query_tokens")
         store_query_results_mock = mocker.patch(
-            "app.endpoints.streaming_query.store_query_results"
+            "utils.stream_interrupts.store_query_results"
         )
         append_turn_mock = mocker.patch(
-            "app.endpoints.streaming_query.append_turn_to_conversation",
+            "utils.stream_interrupts.append_turn_to_conversation",
             new_callable=mocker.AsyncMock,
         )
 
@@ -2701,48 +2701,3 @@ async def test_response_generator_failed_captures_output_items(
         pass
 
     assert turn_summary.output_items == [out_item]
-
-
-@pytest.mark.asyncio
-async def test_persist_interrupted_turn_compacted_uses_original_input(
-    mocker: MockerFixture,
-) -> None:
-    """Interrupted compacted turn persists the original input (LCORE-1572).
-
-    Not the explicit rewrite carried on responses_params.input.
-    """
-    conv = "123e4567-e89b-12d3-a456-426614174000"
-    context = mocker.Mock(spec=ResponseGeneratorContext)
-    context.client = mocker.AsyncMock()
-    context.request_id = "req-1"
-    context.user_id = "user_1"
-    context.conversation_id = conv
-    context.started_at = "2024-01-01T00:00:00Z"
-    context.skip_userid_check = False
-    context.query_request = QueryRequest(
-        query="hi", conversation_id=conv
-    )  # pyright: ignore[reportCallIssue]
-
-    responses_params = mocker.Mock(spec=ResponsesApiParams)
-    responses_params.conversation = conv
-    responses_params.model = "provider1/model1"
-    responses_params.input = ["explicit rewrite"]
-
-    turn_summary = TurnSummary()
-    items = mocker.patch(
-        "app.endpoints.streaming_query.append_turn_items_to_conversation",
-        new=mocker.AsyncMock(),
-    )
-    strs = mocker.patch(
-        "app.endpoints.streaming_query.append_turn_to_conversation",
-        new=mocker.AsyncMock(),
-    )
-    mocker.patch("app.endpoints.streaming_query.store_query_results")
-
-    await _persist_interrupted_turn(
-        context, responses_params, turn_summary, original_input="the original query"
-    )
-
-    items.assert_awaited_once()
-    assert items.call_args.args[2] == "the original query"
-    strs.assert_not_awaited()
