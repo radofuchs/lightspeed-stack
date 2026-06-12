@@ -56,7 +56,7 @@ jobs:
       - name: Check manifest
         run: |
           set -x
-          buildah manifest inspect ${{ steps.build_image.outputs.image }}:${{ env.LATEST_TAG }}
+          buildah manifest inspect ${{ steps.build_image.outputs.image-with-tag }}
       - name: Push image to Quay.io
         uses: redhat-actions/push-to-registry@v2
         with:
