@@ -41,7 +41,7 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: |
+          tags: >-
             ${{ env.GIT_TAG }}
             ${{ steps.check_latest.outputs.apply_latest == 'true' && env.LATEST_TAG || '' }}
           containerfiles: |
