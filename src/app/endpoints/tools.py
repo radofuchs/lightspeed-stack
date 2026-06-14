@@ -121,9 +121,9 @@ async def tools_endpoint_handler(  # pylint: disable=too-many-locals,too-many-st
     - mcp_headers: Headers that should be passed to MCP servers.
 
     ### Raises:
-    - HTTPException: with status status 401 for unauthorized access.
-    - HTTPException: with status status 403 if permission is denied.
-    - HTTPException: with status status 422 if mcp_headers parameter is
+    - HTTPException: with status 401 for unauthorized access.
+    - HTTPException: with status 403 if permission is denied.
+    - HTTPException: with status 422 if mcp_headers parameter is
       improper.
     - HTTPException: with status 500 and a detail object containing `response`
       and `cause` when service configuration is wrong or incomplete.

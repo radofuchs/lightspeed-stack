@@ -5,7 +5,6 @@ Lightspeed Core Service (LCS) service API specification.
 
 <!-- vim-markdown-toc GFM -->
 
-    * [🌍 Base URL](#-base-url)
 * [🛠️ APIs](#-apis)
     * [List of REST API endpoints](#list-of-rest-api-endpoints)
     * [GET `/`](#get-)
@@ -474,6 +473,10 @@ Handle GET requests to the root ("/") endpoint and returns the static HTML index
 - request: The incoming HTTP request (used by middleware).
 - auth: Authentication tuple from the auth dependency (used by middleware).
 
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+
 ### Returns:
 - HTMLResponse: The HTML content of the index page, including a heading,
   embedded image with the service icon, and links to the API documentation
@@ -533,10 +536,10 @@ service name, version and Llama-stack version.
 - auth: Authentication tuple from the auth dependency (used by middleware).
 
 ### Raises:
-- HTTPException: with status 500 and a detail object
-  containing `response` and `cause` when unable to connect to
-  Llama Stack. It can also return status 401 or 403 for
-  unauthorized access.
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
 
 ### Returns:
 - InfoResponse: An object containing the service's name and version.
@@ -668,8 +671,14 @@ will be returned.
 - model_type: Optional filter to return only models matching this type.
 
 ### Raises:
-- HTTPException: If unable to connect to the Llama Stack server or if
-  model retrieval fails for any reason.
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 422 if model_type parameter is
+  improper.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
 
 ### Returns:
 - ModelsResponse: An object containing the list of available models.
@@ -754,9 +763,16 @@ available tools from all configured MCP servers.
 - request: The incoming HTTP request (used by middleware).
 - auth: Authentication tuple from the auth dependency (used by middleware).
 - mcp_headers: Headers that should be passed to MCP servers.
+
 ### Raises:
-- HTTPException: If unable to connect to the Llama Stack server or if tool
-  retrieval fails for any reason.
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 422 if mcp_headers parameter is
+  improper.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
 
 ### Returns:
 - ToolsResponse: An object containing the consolidated list of available

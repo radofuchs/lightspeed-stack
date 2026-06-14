@@ -98,9 +98,9 @@ async def models_endpoint_handler(
     - model_type: Optional filter to return only models matching this type.
 
     ### Raises:
-    - HTTPException: with status status 401 for unauthorized access.
-    - HTTPException: with status status 403 if permission is denied.
-    - HTTPException: with status status 422 if model_type parameter is
+    - HTTPException: with status 401 for unauthorized access.
+    - HTTPException: with status 403 if permission is denied.
+    - HTTPException: with status 422 if model_type parameter is
       improper.
     - HTTPException: with status 500 and a detail object containing `response`
       and `cause` when service configuration is wrong or incomplete.
