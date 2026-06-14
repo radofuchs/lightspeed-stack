@@ -119,9 +119,16 @@ async def tools_endpoint_handler(  # pylint: disable=too-many-locals,too-many-st
     - request: The incoming HTTP request (used by middleware).
     - auth: Authentication tuple from the auth dependency (used by middleware).
     - mcp_headers: Headers that should be passed to MCP servers.
+
     ### Raises:
-    - HTTPException: If unable to connect to the Llama Stack server or if tool
-      retrieval fails for any reason.
+    - HTTPException: with status status 401 for unauthorized access.
+    - HTTPException: with status status 403 if permission is denied.
+    - HTTPException: with status status 422 if mcp_headers parameter is
+      improper.
+    - HTTPException: with status 500 and a detail object containing `response`
+      and `cause` when service configuration is wrong or incomplete.
+    - HTTPException: with status 503 and a detail object containing `response`
+      and `cause` when unable to connect to Llama Stack.
 
     ### Returns:
     - ToolsResponse: An object containing the consolidated list of available
