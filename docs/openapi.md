@@ -1,11 +1,11 @@
-# Lightspeed Core Service (LCS) service - OpenAPI
+# Lightspeed Core Stack (LCS) service - OpenAPI
 
-Lightspeed Core Service (LCS) service API specification.
+Lightspeed Core Stack (LCS) service API specification.
 
 
 <!-- vim-markdown-toc GFM -->
 
-* [🛠️ APIs](#-apis)
+* [🛠️ APIs](#apis)
     * [List of REST API endpoints](#list-of-rest-api-endpoints)
     * [GET `/`](#get-)
         * [Parameters:](#parameters)
@@ -192,7 +192,6 @@ Lightspeed Core Service (LCS) service API specification.
         * [✅ Responses](#-responses-42)
     * [GET `/a2a/health`](#get-a2ahealth)
         * [✅ Responses](#-responses-43)
-    * [| 200 | Successful Response | object |](#-200--successful-response--object-)
 * [📋 Components](#-components)
     * [A2AStateConfiguration](#a2astateconfiguration)
     * [APIKeySecurityScheme](#apikeysecurityscheme)
@@ -398,7 +397,7 @@ Lightspeed Core Service (LCS) service API specification.
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:8080/ | Locally running service |
+| http://localhost:8080 | Locally running service |
 
 
 # 🛠️ APIs
@@ -1248,12 +1247,16 @@ shields from the Llama Stack service.
 - request: The incoming HTTP request (used by middleware).
 - auth: Authentication tuple from the auth dependency (used by middleware).
 
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
 ### Returns:
 - ShieldsResponse: An object containing the list of available shields.
-
-### Raises:
-- HTTPException: If unable to connect to the Llama Stack server or if
-  shield retrieval fails for any reason.
 
 
 
@@ -1343,15 +1346,17 @@ List all available providers grouped by API type.
 - request: The incoming HTTP request.
 - auth: Authentication tuple from the auth dependency.
 
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
 ### Returns:
 - ProvidersListResponse: Mapping from API type to list of providers.
 
-### Raises:
-- HTTPException:
-- 401: Authentication failed
-- 403: Authorization failed
-- 500: Lightspeed Stack configuration not loaded
-- 503: Unable to connect to Llama Stack
 
 
 
@@ -2174,15 +2179,20 @@ Examples
 
 List all available RAGs.
 
-Returns:
-    RAGListResponse: List of RAG identifiers.
+### Parameters:
+- request: The incoming HTTP request (used by middleware).
+- auth: Authentication tuple from the auth dependency (used by middleware).
 
-Raises:
-    HTTPException:
-        - 401: Authentication failed
-        - 403: Authorization failed
-        - 500: Lightspeed Stack configuration not loaded
-        - 503: Unable to connect to Llama Stack
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
+### Returns:
+    - RAGListResponse: List of RAG identifiers.
 
 
 
