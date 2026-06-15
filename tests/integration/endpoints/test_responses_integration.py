@@ -348,9 +348,13 @@ async def test_streaming_blocked_returns_sse_and_persists_turn(
             body += bytes(part)
     body_str = body.decode()
 
-    assert "event: response.created" in body_str
-    assert "event: response.completed" in body_str
-    assert "data: [DONE]" in body_str
+    created_idx = body_str.find("event: response.created")
+    completed_idx = body_str.find("event: response.completed")
+    done_idx = body_str.find("data: [DONE]")
+    assert created_idx != -1
+    assert completed_idx != -1
+    assert done_idx != -1
+    assert created_idx < completed_idx < done_idx
     assert "Content blocked by safety shield" in body_str
 
     mock_client.responses.create.assert_not_called()
