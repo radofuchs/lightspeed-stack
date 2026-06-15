@@ -86,6 +86,8 @@ product questions using backend LLM services, agents, and RAG databases.
 
 ## Releasing
 
+[Branching](https://lightspeed-core.github.io/lightspeed-stack/branching.html)
+
 [Releasing](https://lightspeed-core.github.io/lightspeed-stack/releasing.html)
 
 ## Demos
