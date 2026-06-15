@@ -11,6 +11,7 @@ features/prompts.feature
 features/faiss.feature
 features/inline_rag.feature
 features/byok_pdf.feature
+features/vector_stores.feature
 features/feedback.feature
 features/query.feature
 features/responses.feature
@@ -31,4 +32,3 @@ features/tls-ca.feature
 features/tls-mtls.feature
 features/tls-tlsv13.feature
 features/opentelemetry.feature
-features/vector_stores.feature
