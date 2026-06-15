@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Final, cast
+from typing import Any, Final, Optional, cast
 
 from llama_stack.core.library_client import AsyncLlamaStackAsLibraryClient
 from llama_stack_client import AsyncLlamaStackClient
-from pydantic_ai import Agent
+from pydantic_ai import Agent, AgentCapability
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
+from pydantic_ai_skills import SkillsCapability
 
 from models.common.responses.responses_api_params import ResponsesApiParams
+from models.config import SkillsConfiguration
 from pydantic_ai_lightspeed.llamastack import LlamaStackProvider
 
 _LLS_RESPONSES_EXTRA_FIELDS: Final[frozenset[str]] = frozenset(
@@ -70,9 +72,46 @@ def _model_settings_from_responses_params(
     return cast(OpenAIResponsesModelSettings, settings_dict)
 
 
+def _skills_capability(
+    skills_config: Optional[SkillsConfiguration],
+) -> Optional[SkillsCapability]:
+    """Return a skills capability when skill paths are configured.
+
+    Args:
+        skills_config: Agent skills configuration from LCS, or None when skills are disabled.
+
+    Returns:
+        SkillsCapability when skill paths are configured, or None when skills are disabled.
+    """
+    if skills_config is None or not skills_config.paths:
+        return None
+    return SkillsCapability(
+        directories=[str(path) for path in skills_config.paths],
+        validate=False,
+    )
+
+
+def _agent_capabilities(
+    skills: Optional[SkillsConfiguration],
+) -> Optional[list[AgentCapability[None]]]:
+    """Assemble pydantic-ai capabilities for an LCS agent.
+
+    Args:
+        skills: Agent skills configuration from LCS, or None when skills are disabled.
+
+    Returns:
+        Configured capabilities, or None when no capabilities are enabled.
+    """
+    capabilities: list[AgentCapability[None]] = []
+    if skills_capability := _skills_capability(skills):
+        capabilities.append(skills_capability)
+    return capabilities or None
+
+
 def build_agent(
     client: AsyncLlamaStackClient | AsyncLlamaStackAsLibraryClient,
     responses_params: ResponsesApiParams,
+    skills: Optional[SkillsConfiguration],
 ) -> Agent[None, str]:
     """Build a Pydantic AI agent that mirrors ``responses_params`` on the Llama Stack backend.
 
@@ -84,6 +123,7 @@ def build_agent(
     Parameters:
         client: Initialized Llama Stack client from ``AsyncLlamaStackClientHolder().get_client()``.
         responses_params: Parameters produced by ``prepare_responses_params`` for this turn.
+        skills: Agent skills configuration from LCS, or None when skills are disabled.
 
     Returns:
         ``Agent`` configured for ``await agent.run(...)`` (or streaming) against the same
@@ -100,5 +140,6 @@ def build_agent(
     return Agent(
         model,
         instructions=responses_params.instructions,
+        capabilities=_agent_capabilities(skills),
         defer_model_check=True,
     )

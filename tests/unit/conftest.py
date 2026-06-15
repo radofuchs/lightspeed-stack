@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from pathlib import Path
 
+import httpx
 import pytest
+from llama_stack_client import AsyncLlamaStackClient
 from pytest_mock import AsyncMockType, MockerFixture
 
 from configuration import AppConfig
+from models.common.responses.responses_api_params import ResponsesApiParams
+from models.config import SkillsConfiguration
 
 type AgentFixtures = Generator[
     tuple[
@@ -72,3 +77,41 @@ def minimal_config_fixture() -> AppConfig:
         }
     )
     return cfg
+
+
+@pytest.fixture(name="mock_client")
+def mock_client_fixture(  # pylint: disable=protected-access
+    mocker: MockerFixture,
+) -> AsyncLlamaStackClient:
+    """Remote Llama Stack client mock for build_agent tests."""
+    client = mocker.Mock(spec=AsyncLlamaStackClient)
+    client.base_url = "http://localhost:8321"
+    client.api_key = "test-key"
+    client._client = mocker.Mock(spec=httpx.AsyncClient)
+    return client
+
+
+@pytest.fixture(name="mock_params")
+def mock_params_fixture() -> ResponsesApiParams:
+    """Minimal ResponsesApiParams for build_agent and similar utils tests."""
+    return ResponsesApiParams(
+        model="provider/my-model",
+        input="test",
+        conversation="conv-test",
+        instructions="Be helpful.",
+        store=False,
+        stream=False,
+    )
+
+
+@pytest.fixture(name="mock_skills_configuration")
+def mock_skills_configuration_fixture(tmp_path: Path) -> SkillsConfiguration:
+    """Filesystem-backed SkillsConfiguration with a single test skill."""
+    skills_root = tmp_path / "skills"
+    skill_dir = skills_root / "test-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: test-skill\ndescription: Test skill.\n---\n\nDo the thing.\n",
+        encoding="utf-8",
+    )
+    return SkillsConfiguration(paths=[skills_root])

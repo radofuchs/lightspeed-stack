@@ -32,6 +32,7 @@ from models.config import (
     RerankerConfiguration,
     RlsapiV1Configuration,
     ServiceConfiguration,
+    SkillsConfiguration,
     SplunkConfiguration,
     UserDataCollection,
 )
@@ -503,6 +504,13 @@ class AppConfig:  # pylint: disable=too-many-public-methods
         if self._configuration is None:
             raise LogicError("logic error: configuration is not loaded")
         return self._configuration.reranker
+
+    @property
+    def skills(self) -> Optional[SkillsConfiguration]:
+        """Return agent skills configuration, or None if not provided."""
+        if self._configuration is None:
+            raise LogicError("logic error: configuration is not loaded")
+        return self._configuration.skills
 
     @property
     def rag_id_mapping(self) -> dict[str, str]:
