@@ -426,9 +426,6 @@ _restart_lightspeed_core() {
     fi
 
     oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n "$NAMESPACE" --overwrite
-    # Grace period: readiness probe passing does not guarantee port 8080 is bound yet.
-    # Skipping this sleep causes immediate EOF on the first port-forward attempts.
-    sleep 15
 
     if ! cmd_restart_port_forward; then
         echo "⚠️  Lightspeed port-forward failed"
@@ -472,7 +469,7 @@ cmd_restart_lightspeed() {
 cmd_restart_port_forward() {
     local local_port="${LOCAL_PORT:-8080}"
     local remote_port="${REMOTE_PORT:-8080}"
-    local max_attempts=10
+    local max_attempts=6
     local pf_pid
     local pf_resource
 
@@ -499,14 +496,12 @@ cmd_restart_port_forward() {
         disown "$pf_pid" 2>/dev/null || true
         sleep 3
 
-        # Bind error or API error: process exits quickly — surface /tmp/port-forward.log every time.
-        # Sleep longer on EOF ("dialing backend: EOF") since it means the container port is not
-        # bound yet; 2s was too short and caused all retries to be exhausted before the app was ready.
+        # Bind error or API error: process exits quickly — surface /tmp/port-forward.log every time
         if ! kill -0 "$pf_pid" 2>/dev/null; then
             echo "Port-forward process exited immediately:"
             e2e_ops_emit_port_forward_immediate_failure_diag
             kill_stale_lightspeed_forward "$local_port"
-            sleep 10
+            sleep 5
             continue
         fi
         sleep 6

@@ -412,12 +412,7 @@ if [[ -n "${E2E_LLAMA_PORT_FORWARD_PID_FILE:-}" && -f "$E2E_LLAMA_PORT_FORWARD_P
   fi
   rm -f "$E2E_LLAMA_PORT_FORWARD_PID_FILE"
 fi
-# Disown before kill so bash drops the jobs from its table and suppresses
-# "Killed" job-control noise on wait (the useful diagnostics are in the curl
-# readiness loops above, not in these terminal notifications).
-disown $PF_LCS_PID 2>/dev/null || true
-disown $PF_JWKS_PID 2>/dev/null || true
-disown $PF_LLAMA_PID 2>/dev/null || true
+
 kill $PF_LCS_PID 2>/dev/null || true
 kill $PF_JWKS_PID 2>/dev/null || true
 kill $PF_LLAMA_PID 2>/dev/null || true
