@@ -3,9 +3,6 @@ Feature: TLS configuration — CA certificate verification
   Validate Llama Stack NetworkConfig.tls CA trust settings against the mock HTTPS
   inference provider (standard TLS port).
 
-  # Only Llama run.yaml changes per scenario; LCS uses lightspeed-stack-tls.yaml
-  # throughout (Background). ``Llama Stack is restarted`` also refreshes LCS.
-
   Background:
     Given The service is started locally
       And The system is in default state
@@ -19,6 +16,7 @@ Feature: TLS configuration — CA certificate verification
   Scenario: Inference succeeds with TLS verification disabled
     Given Llama Stack is configured with TLS verification disabled
       And Llama Stack is restarted
+      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -29,6 +27,7 @@ Feature: TLS configuration — CA certificate verification
   Scenario: Inference succeeds with CA certificate verification
     Given Llama Stack is configured with CA certificate verification
       And Llama Stack is restarted
+      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -39,6 +38,7 @@ Feature: TLS configuration — CA certificate verification
   Scenario: Inference fails with an untrusted CA certificate
     Given Llama Stack is configured with CA certificate path "/certs/untrusted-ca.crt"
       And Llama Stack is restarted
+      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -49,6 +49,7 @@ Feature: TLS configuration — CA certificate verification
   Scenario: Inference fails with an expired CA certificate
     Given Llama Stack is configured with CA certificate path "/certs/expired-ca.crt"
       And Llama Stack is restarted
+      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -59,6 +60,7 @@ Feature: TLS configuration — CA certificate verification
   Scenario: Inference fails when TLS verify is true against self-signed cert
     Given Llama Stack is configured with TLS verification enabled
       And Llama Stack is restarted
+      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}
@@ -69,6 +71,7 @@ Feature: TLS configuration — CA certificate verification
   Scenario: Inference fails with CA certificate verification and hostname mismatch
     Given Llama Stack is configured with CA certificate and hostname mismatch server
       And Llama Stack is restarted
+      And Lightspeed Stack is restarted
      When I use "query" to ask question
     """
     {"query": "Say hello", "model": "mock-tls-model", "provider": "tls-openai"}

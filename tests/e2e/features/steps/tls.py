@@ -117,7 +117,7 @@ def _restart_lightspeed_after_llama_tls(context: Context) -> None:
 
 
 def restart_llama_for_tls_feature(context: Context) -> None:
-    """Restart Llama for TLS tests, then refresh LCS (full pod recreate on Prow/Konflux)."""
+    """Restart Llama for TLS tests (full pod recreate on Prow/Konflux)."""
     from tests.e2e.utils.utils import restart_container
 
     if is_prow_environment():
@@ -132,7 +132,6 @@ def restart_llama_for_tls_feature(context: Context) -> None:
         flush=True,
     )
     restart_container("llama-stack")
-    _restart_lightspeed_after_llama_tls(context)
 
 
 def _cluster_mock_tls_inference_host() -> str:
