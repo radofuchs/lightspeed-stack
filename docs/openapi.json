@@ -6710,7 +6710,7 @@
                     "config"
                 ],
                 "summary": "Config Endpoint Handler",
-                "description": "Handle requests to the /config endpoint.\n\nProcess GET requests to the /config endpoint and returns the\ncurrent service configuration.\n\nEnsures the application configuration is loaded before returning it.\n\n### Parameters:\n- request: The incoming HTTP request.\n- auth: Authentication tuple from the auth dependency.\n\n### Returns:\n- ConfigurationResponse: The loaded service configuration response.",
+                "description": "Handle requests to the /config endpoint.\n\nProcess GET requests to the /config endpoint and returns the\ncurrent service configuration.\n\nEnsures the application configuration is loaded before returning it.\n\n### Parameters:\n- request: The incoming HTTP request.\n- auth: Authentication tuple from the auth dependency.\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- ConfigurationResponse: The loaded service configuration response.",
                 "operationId": "config_endpoint_handler_v1_config_get",
                 "responses": {
                     "200": {
@@ -9964,7 +9964,7 @@
                     "health"
                 ],
                 "summary": "Readiness Probe Get Method",
-                "description": "Handle the readiness probe endpoint, returning service readiness.\n\nIf any provider reports an error status, responds with HTTP 503\nand details of unhealthy providers; otherwise, indicates the\nservice is ready.\n\n### Parameters:\n- response: The outgoing HTTP response (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Returns:\n- ReadinessResponse: Object with `ready` indicating overall readiness,\n  `reason` explaining the outcome, and `providers` containing the list of\n  unhealthy ProviderHealthStatus entries (empty when ready).",
+                "description": "Handle the readiness probe endpoint, returning service readiness.\n\nIf any provider reports an error status, responds with HTTP 503\nand details of unhealthy providers; otherwise, indicates the\nservice is ready.\n\n### Parameters:\n- response: The outgoing HTTP response (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- ReadinessResponse: Object with `ready` indicating overall readiness,\n  `reason` explaining the outcome, and `providers` containing the list of\n  unhealthy ProviderHealthStatus entries (empty when ready).",
                 "operationId": "readiness_probe_get_method_readiness_get",
                 "responses": {
                     "200": {
@@ -10115,7 +10115,7 @@
                     "health"
                 ],
                 "summary": "Liveness Probe Get Method",
-                "description": "Return the liveness status of the service.\n\n### Parameters:\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Returns:\n- LivenessResponse: Indicates that the service is alive.",
+                "description": "Return the liveness status of the service.\n\n### Parameters:\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- LivenessResponse: Indicates that the service is alive.",
                 "operationId": "liveness_probe_get_method_liveness_get",
                 "responses": {
                     "200": {
