@@ -2010,7 +2010,7 @@ wrong_configurations = [
                 "embedding_dimension": 619,
                 "vector_db_id": "Learn computer positive nor yet notice.",
                 "db_path": "Sort rule soldier relationship. Wife front kid cit",
-                "score_multiplier": 310.63,
+                "score_multiplier": 319.63,
             },
             {
                 "rag_id": "Question to front often.",
