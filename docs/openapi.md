@@ -3035,6 +3035,14 @@ Ensures the application configuration is loaded before returning it.
 - request: The incoming HTTP request.
 - auth: Authentication tuple from the auth dependency.
 
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
 ### Returns:
 - ConfigurationResponse: The loaded service configuration response.
 
@@ -4800,6 +4808,14 @@ service is ready.
 - response: The outgoing HTTP response (used by middleware).
 - auth: Authentication tuple from the auth dependency (used by middleware).
 
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
 ### Returns:
 - ReadinessResponse: Object with `ready` indicating overall readiness,
   `reason` explaining the outcome, and `providers` containing the list of
@@ -4879,6 +4895,14 @@ Return the liveness status of the service.
 
 ### Parameters:
 - auth: Authentication tuple from the auth dependency (used by middleware).
+
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
 
 ### Returns:
 - LivenessResponse: Indicates that the service is alive.
