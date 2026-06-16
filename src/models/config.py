@@ -1265,6 +1265,40 @@ class APIKeyTokenConfiguration(ConfigurationBase):
     )
 
 
+class TrustedProxyServiceAccount(ConfigurationBase):
+    """A Kubernetes ServiceAccount identity for trusted-proxy allowlist."""
+
+    namespace: str = Field(
+        ...,
+        title="Namespace",
+        description="Kubernetes namespace of the ServiceAccount.",
+    )
+    name: str = Field(
+        ...,
+        title="Name",
+        description="Name of the Kubernetes ServiceAccount.",
+    )
+
+
+class TrustedProxyConfiguration(ConfigurationBase):
+    """Configuration for trusted-proxy auth module."""
+
+    user_header: str = Field(
+        "X-Forwarded-User",
+        title="User identity header",
+        description="HTTP header containing the forwarded user identity.",
+    )
+    allowed_service_accounts: Optional[list[TrustedProxyServiceAccount]] = Field(
+        None,
+        title="Allowed service accounts",
+        description="Optional allowlist of Kubernetes ServiceAccount identities "
+        "permitted to act as trusted proxies. "
+        "When set to null/omitted, any ServiceAccount with a valid token is accepted. "
+        "When set to a non-empty list, only the listed ServiceAccounts are allowed. "
+        "An empty list behaves the same as null (no restriction).",
+    )
+
+
 class AuthenticationConfiguration(ConfigurationBase):
     """Authentication configuration."""
 
@@ -1287,6 +1321,7 @@ class AuthenticationConfiguration(ConfigurationBase):
     jwk_config: Optional[JwkConfiguration] = None
     api_key_config: Optional[APIKeyTokenConfiguration] = None
     rh_identity_config: Optional[RHIdentityConfiguration] = None
+    trusted_proxy_config: Optional[TrustedProxyConfiguration] = None
 
     @model_validator(mode="after")
     def check_authentication_model(self) -> Self:
@@ -1333,6 +1368,13 @@ class AuthenticationConfiguration(ConfigurationBase):
             if self.api_key_config.api_key.get_secret_value() is None:
                 raise ValueError(
                     "api_key parameter must be specified when using API_KEY token authentication"
+                )
+
+        if self.module == constants.AUTH_MOD_TRUSTED_PROXY:
+            if self.trusted_proxy_config is None:
+                raise ValueError(
+                    "Trusted proxy configuration must be specified "
+                    "when using trusted-proxy authentication"
                 )
 
         return self
@@ -1387,6 +1429,26 @@ class AuthenticationConfiguration(ConfigurationBase):
         if self.api_key_config is None:
             raise ValueError("API Key configuration should not be None")
         return self.api_key_config
+
+    @property
+    def trusted_proxy_configuration(self) -> TrustedProxyConfiguration:
+        """Return trusted-proxy configuration if the module is trusted-proxy.
+
+        Returns:
+            TrustedProxyConfiguration: The configured trusted-proxy settings.
+
+        Raises:
+            ValueError: If the active authentication module is not trusted-proxy.
+            ValueError: If the trusted-proxy configuration is missing.
+        """
+        if self.module != constants.AUTH_MOD_TRUSTED_PROXY:
+            raise ValueError(
+                "Trusted proxy configuration is only available "
+                "for trusted-proxy authentication module"
+            )
+        if self.trusted_proxy_config is None:
+            raise ValueError("Trusted proxy configuration should not be None")
+        return self.trusted_proxy_config
 
 
 @dataclass
@@ -1776,7 +1838,7 @@ class ByokRag(ConfigurationBase):
         constants.DEFAULT_RAG_TYPE,
         min_length=1,
         title="RAG type",
-        description="Type of RAG database.",
+        description="Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
     )
 
     embedding_model: str = Field(
@@ -1799,10 +1861,10 @@ class ByokRag(ConfigurationBase):
         description="Vector database identification.",
     )
 
-    db_path: str = Field(
-        ...,
+    db_path: Optional[str] = Field(
+        default=None,
         title="DB path",
-        description="Path to RAG database.",
+        description="Path to RAG database. Required for inline::faiss.",
     )
 
     score_multiplier: float = Field(
@@ -1813,6 +1875,60 @@ class ByokRag(ConfigurationBase):
         "Used to weight results when querying multiple knowledge sources. "
         "Values > 1 boost this store's results; values < 1 reduce them.",
     )
+
+    host: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL host",
+        description="PostgreSQL host for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
+    )
+
+    port: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL port",
+        description="PostgreSQL port for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+    )
+
+    db: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL database",
+        description="PostgreSQL database name for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.",
+    )
+
+    user: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL user",
+        description="PostgreSQL user for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.",
+    )
+
+    password: Optional[SecretStr] = Field(
+        default=None,
+        title="PostgreSQL password",
+        description="PostgreSQL password for remote::pgvector. "
+        "Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.",
+    )
+
+    @model_validator(mode="after")
+    def validate_rag_type_fields(self) -> Self:
+        """Validate and populate fields based on rag_type."""
+        if self.rag_type == "inline::faiss":
+            if not self.db_path:
+                raise ValueError("db_path is required when rag_type is 'inline::faiss'")
+        elif self.rag_type == "remote::pgvector":
+            pgvector_defaults: dict[str, str | SecretStr] = {
+                "host": "${env.POSTGRES_HOST}",
+                "port": "${env.POSTGRES_PORT}",
+                "db": "${env.POSTGRES_DATABASE}",
+                "user": "${env.POSTGRES_USER}",
+                "password": SecretStr("${env.POSTGRES_PASSWORD}"),
+            }
+            for field_name, default_value in pgvector_defaults.items():
+                if getattr(self, field_name) is None:
+                    object.__setattr__(self, field_name, default_value)
+        return self
 
 
 class QuotaLimiterConfiguration(ConfigurationBase):

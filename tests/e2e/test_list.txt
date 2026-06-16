@@ -10,6 +10,7 @@ features/conversations.feature
 features/prompts.feature
 features/faiss.feature
 features/inline_rag.feature
+features/byok_pdf.feature
 features/feedback.feature
 features/query.feature
 features/responses.feature
@@ -28,3 +29,4 @@ features/mcp_servers_api_no_config.feature
 features/proxy.feature
 features/tls.feature
 features/opentelemetry.feature
+features/vector_stores.feature

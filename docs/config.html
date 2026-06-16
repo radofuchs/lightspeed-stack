@@ -381,6 +381,11 @@ retain decided approvals for audit purposes before cleanup.</p>
           <td/>
           <td/>
         </tr>
+        <tr class="even">
+          <td>trusted_proxy_config</td>
+          <td/>
+          <td/>
+        </tr>
       </tbody>
     </table>
     <h2 id="authorizationconfiguration">AuthorizationConfiguration</h2>
@@ -464,7 +469,8 @@ using a different Azure service.</td>
         <tr class="even">
           <td>rag_type</td>
           <td>string</td>
-          <td>Type of RAG database.</td>
+          <td>Type of RAG database (e.g.&#xA0;&#x2018;inline::faiss&#x2019;,
+&#x2018;remote::pgvector&#x2019;).</td>
         </tr>
         <tr class="odd">
           <td>embedding_model</td>
@@ -484,7 +490,7 @@ using a different Azure service.</td>
         <tr class="even">
           <td>db_path</td>
           <td>string</td>
-          <td>Path to RAG database.</td>
+          <td>Path to RAG database. Required for inline::faiss.</td>
         </tr>
         <tr class="odd">
           <td>score_multiplier</td>
@@ -492,6 +498,36 @@ using a different Azure service.</td>
           <td>Multiplier applied to relevance scores from this vector store. Used
 to weight results when querying multiple knowledge sources. Values &gt;
 1 boost this store&#x2019;s results; values &lt; 1 reduce them.</td>
+        </tr>
+        <tr class="even">
+          <td>host</td>
+          <td>string</td>
+          <td>PostgreSQL host for remote::pgvector. Defaults to
+${env.POSTGRES_HOST} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="odd">
+          <td>port</td>
+          <td>string</td>
+          <td>PostgreSQL port for remote::pgvector. Defaults to
+${env.POSTGRES_PORT} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="even">
+          <td>db</td>
+          <td>string</td>
+          <td>PostgreSQL database name for remote::pgvector. Defaults to
+${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="odd">
+          <td>user</td>
+          <td>string</td>
+          <td>PostgreSQL user for remote::pgvector. Defaults to
+${env.POSTGRES_USER} when rag_type is remote::pgvector.</td>
+        </tr>
+        <tr class="even">
+          <td>password</td>
+          <td>string</td>
+          <td>PostgreSQL password for remote::pgvector. Defaults to
+${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.</td>
         </tr>
       </tbody>
     </table>
@@ -1960,6 +1996,61 @@ is TLS</a>
           <td>string</td>
           <td>Path to file containing the password to decrypt the SSL/TLS private
 key.</td>
+        </tr>
+      </tbody>
+    </table>
+    <h2 id="trustedproxyconfiguration">TrustedProxyConfiguration</h2>
+    <p>Configuration for trusted-proxy auth module.</p>
+    <table>
+      <colgroup>
+        <col style="width: 26%"/>
+        <col style="width: 23%"/>
+        <col style="width: 50%"/>
+      </colgroup>
+      <thead>
+        <tr class="header">
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="odd">
+          <td>user_header</td>
+          <td>string</td>
+          <td>HTTP header containing the forwarded user identity.</td>
+        </tr>
+        <tr class="even">
+          <td>allowed_service_accounts</td>
+          <td>array</td>
+          <td>Optional allowlist of Kubernetes ServiceAccount identities permitted
+to act as trusted proxies. When set to null/omitted, any ServiceAccount
+with a valid token is accepted. When set to a non-empty list, only the
+listed ServiceAccounts are allowed. An empty list behaves the same as
+null (no restriction).</td>
+        </tr>
+      </tbody>
+    </table>
+    <h2 id="trustedproxyserviceaccount">TrustedProxyServiceAccount</h2>
+    <p>A Kubernetes ServiceAccount identity for trusted-proxy allowlist.</p>
+    <table>
+      <thead>
+        <tr class="header">
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="odd">
+          <td>namespace</td>
+          <td>string</td>
+          <td>Kubernetes namespace of the ServiceAccount.</td>
+        </tr>
+        <tr class="even">
+          <td>name</td>
+          <td>string</td>
+          <td>Name of the Kubernetes ServiceAccount.</td>
         </tr>
       </tbody>
     </table>

@@ -28,7 +28,7 @@
                     "root"
                 ],
                 "summary": "Root Endpoint Handler",
-                "description": "Handle GET requests to the root (\"/\") endpoint and returns the static HTML index page.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Returns:\n- HTMLResponse: The HTML content of the index page, including a heading,\n  embedded image with the service icon, and links to the API documentation\n  via Swagger UI and ReDoc.",
+                "description": "Handle GET requests to the root (\"/\") endpoint and returns the static HTML index page.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n\n### Returns:\n- HTMLResponse: The HTML content of the index page, including a heading,\n  embedded image with the service icon, and links to the API documentation\n  via Swagger UI and ReDoc.",
                 "operationId": "root_endpoint_handler__get",
                 "responses": {
                     "200": {
@@ -172,7 +172,7 @@
                     "info"
                 ],
                 "summary": "Info Endpoint Handler",
-                "description": "Handle request to the /info endpoint.\n\nProcess GET requests to the /info endpoint, returning the\nservice name, version and Llama-stack version.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 500 and a detail object\n  containing `response` and `cause` when unable to connect to\n  Llama Stack. It can also return status 401 or 403 for\n  unauthorized access.\n\n### Returns:\n- InfoResponse: An object containing the service's name and version.",
+                "description": "Handle request to the /info endpoint.\n\nProcess GET requests to the /info endpoint, returning the\nservice name, version and Llama-stack version.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- InfoResponse: An object containing the service's name and version.",
                 "operationId": "info_endpoint_handler_v1_info_get",
                 "responses": {
                     "200": {
@@ -323,7 +323,7 @@
                     "models"
                 ],
                 "summary": "Models Endpoint Handler",
-                "description": "Handle requests to the /models endpoint.\n\nProcess GET requests to the /models endpoint, returning a list of available\nmodels from the Llama Stack service. It is possible to specify \"model_type\"\nquery parameter that is used as a filter. For example, if model type is set\nto \"llm\", only LLM models will be returned:\n\n    curl http://localhost:8080/v1/models?model_type=llm\n\nThe \"model_type\" query parameter is optional. When not specified, all models\nwill be returned.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- model_type: Optional filter to return only models matching this type.\n\n### Raises:\n- HTTPException: If unable to connect to the Llama Stack server or if\n  model retrieval fails for any reason.\n\n### Returns:\n- ModelsResponse: An object containing the list of available models.",
+                "description": "Handle requests to the /models endpoint.\n\nProcess GET requests to the /models endpoint, returning a list of available\nmodels from the Llama Stack service. It is possible to specify \"model_type\"\nquery parameter that is used as a filter. For example, if model type is set\nto \"llm\", only LLM models will be returned:\n\n    curl http://localhost:8080/v1/models?model_type=llm\n\nThe \"model_type\" query parameter is optional. When not specified, all models\nwill be returned.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- model_type: Optional filter to return only models matching this type.\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 422 if model_type parameter is\n  improper.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- ModelsResponse: An object containing the list of available models.",
                 "operationId": "models_endpoint_handler_v1_models_get",
                 "parameters": [
                     {
@@ -536,7 +536,7 @@
                     "tools"
                 ],
                 "summary": "Tools Endpoint Handler",
-                "description": "Handle requests to the /tools endpoint.\n\nProcess GET requests to the /tools endpoint, returning a consolidated list of\navailable tools from all configured MCP servers.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- mcp_headers: Headers that should be passed to MCP servers.\n### Raises:\n- HTTPException: If unable to connect to the Llama Stack server or if tool\n  retrieval fails for any reason.\n\n### Returns:\n- ToolsResponse: An object containing the consolidated list of available\n  tools with metadata including tool name, description, parameters, and\n  server source.",
+                "description": "Handle requests to the /tools endpoint.\n\nProcess GET requests to the /tools endpoint, returning a consolidated list of\navailable tools from all configured MCP servers.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- mcp_headers: Headers that should be passed to MCP servers.\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 422 if mcp_headers parameter is\n  improper.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- ToolsResponse: An object containing the consolidated list of available\n  tools with metadata including tool name, description, parameters, and\n  server source.",
                 "operationId": "tools_endpoint_handler_v1_tools_get",
                 "responses": {
                     "200": {
@@ -1500,7 +1500,7 @@
                     "shields"
                 ],
                 "summary": "Shields Endpoint Handler",
-                "description": "Handle requests to the /shields endpoint.\n\nProcess GET requests to the /shields endpoint, returning a list of available\nshields from the Llama Stack service.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Returns:\n- ShieldsResponse: An object containing the list of available shields.\n\n### Raises:\n- HTTPException: If unable to connect to the Llama Stack server or if\n  shield retrieval fails for any reason.",
+                "description": "Handle requests to the /shields endpoint.\n\nProcess GET requests to the /shields endpoint, returning a list of available\nshields from the Llama Stack service.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- ShieldsResponse: An object containing the list of available shields.",
                 "operationId": "shields_endpoint_handler_v1_shields_get",
                 "responses": {
                     "200": {
@@ -1677,7 +1677,7 @@
                     "providers"
                 ],
                 "summary": "Providers Endpoint Handler",
-                "description": "List all available providers grouped by API type.\n\n### Parameters:\n- request: The incoming HTTP request.\n- auth: Authentication tuple from the auth dependency.\n\n### Returns:\n- ProvidersListResponse: Mapping from API type to list of providers.\n\n### Raises:\n- HTTPException:\n- 401: Authentication failed\n- 403: Authorization failed\n- 500: Lightspeed Stack configuration not loaded\n- 503: Unable to connect to Llama Stack",
+                "description": "List all available providers grouped by API type.\n\n### Parameters:\n- request: The incoming HTTP request.\n- auth: Authentication tuple from the auth dependency.\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- ProvidersListResponse: Mapping from API type to list of providers.",
                 "operationId": "providers_endpoint_handler_v1_providers_get",
                 "responses": {
                     "200": {
@@ -3211,7 +3211,7 @@
                     "rags"
                 ],
                 "summary": "Rags Endpoint Handler",
-                "description": "List all available RAGs.\n\nReturns:\n    RAGListResponse: List of RAG identifiers.\n\nRaises:\n    HTTPException:\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to Llama Stack",
+                "description": "List all available RAGs.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n    - RAGListResponse: List of RAG identifiers.",
                 "operationId": "rags_endpoint_handler_v1_rags_get",
                 "responses": {
                     "200": {
@@ -11613,6 +11613,16 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "trusted_proxy_config": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/TrustedProxyConfiguration"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "additionalProperties": false,
@@ -11818,7 +11828,7 @@
                         "type": "string",
                         "minLength": 1,
                         "title": "RAG type",
-                        "description": "Type of RAG database.",
+                        "description": "Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
                         "default": "inline::faiss"
                     },
                     "embedding_model": {
@@ -11842,9 +11852,16 @@
                         "description": "Vector database identification."
                     },
                     "db_path": {
-                        "type": "string",
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
                         "title": "DB path",
-                        "description": "Path to RAG database."
+                        "description": "Path to RAG database. Required for inline::faiss."
                     },
                     "score_multiplier": {
                         "type": "number",
@@ -11852,14 +11869,75 @@
                         "title": "Score multiplier",
                         "description": "Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them.",
                         "default": 1.0
+                    },
+                    "host": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL host",
+                        "description": "PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector."
+                    },
+                    "port": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL port",
+                        "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector."
+                    },
+                    "db": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL database",
+                        "description": "PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector."
+                    },
+                    "user": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL user",
+                        "description": "PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector."
+                    },
+                    "password": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "password",
+                                "writeOnly": true
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL password",
+                        "description": "PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector."
                     }
                 },
                 "additionalProperties": false,
                 "type": "object",
                 "required": [
                     "rag_id",
-                    "vector_db_id",
-                    "db_path"
+                    "vector_db_id"
                 ],
                 "title": "ByokRag",
                 "description": "BYOK (Bring Your Own Knowledge) RAG configuration."
@@ -19756,6 +19834,57 @@
                         ]
                     }
                 ]
+            },
+            "TrustedProxyConfiguration": {
+                "properties": {
+                    "user_header": {
+                        "type": "string",
+                        "title": "User identity header",
+                        "description": "HTTP header containing the forwarded user identity.",
+                        "default": "X-Forwarded-User"
+                    },
+                    "allowed_service_accounts": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "$ref": "#/components/schemas/TrustedProxyServiceAccount"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Allowed service accounts",
+                        "description": "Optional allowlist of Kubernetes ServiceAccount identities permitted to act as trusted proxies. When set to null/omitted, any ServiceAccount with a valid token is accepted. When set to a non-empty list, only the listed ServiceAccounts are allowed. An empty list behaves the same as null (no restriction)."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "TrustedProxyConfiguration",
+                "description": "Configuration for trusted-proxy auth module."
+            },
+            "TrustedProxyServiceAccount": {
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "title": "Namespace",
+                        "description": "Kubernetes namespace of the ServiceAccount."
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name",
+                        "description": "Name of the Kubernetes ServiceAccount."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                    "namespace",
+                    "name"
+                ],
+                "title": "TrustedProxyServiceAccount",
+                "description": "A Kubernetes ServiceAccount identity for trusted-proxy allowlist."
             },
             "UnauthorizedResponse": {
                 "properties": {

@@ -160,8 +160,23 @@ Lightspeed Core Stack is based on the FastAPI framework (Uvicorn). The service i
 
 # Installation
 
-Installation steps depends on operation system. Please look at instructions for your system:
+## Clone the Repository
 
+Lightspeed Stack uses a git submodule for external providers (required for features like OKP RAG). Clone with submodules:
+
+```bash
+git clone --recursive https://github.com/lightspeed-core/lightspeed-stack.git
+cd lightspeed-stack
+```
+
+**If you already cloned without `--recursive`:**
+```bash
+git submodule update --init
+```
+
+## System-Specific Installation
+
+Installation steps depends on operation system. Please look at instructions for your system:
 
 - [Linux installation](https://lightspeed-core.github.io/lightspeed-stack/installation_linux)
 - [macOS installation](https://lightspeed-core.github.io/lightspeed-stack/installation_macos)

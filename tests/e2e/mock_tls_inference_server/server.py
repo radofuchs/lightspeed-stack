@@ -75,10 +75,49 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             request_data = {}
 
         model = request_data.get("model", MODEL_ID)
+        completion_id = "chatcmpl-tls-test-001"
+        response_text = "Hello from the TLS mock inference server."
+
+        # Llama Stack calls remote chat completions with stream=True and reads
+        # assistant text from delta.content chunks.
+        if request_data.get("stream"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            content_chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": 1700000000,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {"role": "assistant", "content": response_text},
+                        "finish_reason": None,
+                    }
+                ],
+            }
+            self.wfile.write(f"data: {json.dumps(content_chunk)}\n\n".encode())
+            finish_chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": 1700000000,
+                "model": model,
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                "usage": {
+                    "prompt_tokens": 8,
+                    "completion_tokens": 9,
+                    "total_tokens": 17,
+                },
+            }
+            self.wfile.write(f"data: {json.dumps(finish_chunk)}\n\n".encode())
+            self.wfile.write(b"data: [DONE]\n\n")
+            return
 
         self._send_json(
             {
-                "id": "chatcmpl-tls-test-001",
+                "id": completion_id,
                 "object": "chat.completion",
                 "created": 1700000000,
                 "model": model,
@@ -87,7 +126,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": "Hello from the TLS mock inference server.",
+                            "content": response_text,
                         },
                         "finish_reason": "stop",
                     }

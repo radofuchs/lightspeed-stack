@@ -72,7 +72,6 @@ start-llama-stack-container: build-llama-stack-image ## Start llama-stack contai
 		-v $(PWD)/scripts/llama-stack-entrypoint.sh:/opt/app-root/enrich-entrypoint.sh:ro,z \
 		-v $(PWD)/src/llama_stack_configuration.py:/opt/app-root/llama_stack_configuration.py:ro,z \
 		-e OPENAI_API_KEY \
-		-e EXTERNAL_PROVIDERS_DIR=$${EXTERNAL_PROVIDERS_DIR:-/opt/app-root/external_providers} \
 		-e BRAVE_SEARCH_API_KEY \
 		-e TAVILY_SEARCH_API_KEY \
 		-e E2E_OPENAI_MODEL=$${E2E_OPENAI_MODEL:-gpt-4o-mini} \

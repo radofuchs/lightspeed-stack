@@ -77,6 +77,8 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 
 ## Releasing
 
+[Branching](https://lightspeed-core.github.io/lightspeed-stack/branching.html)
+
 [Releasing](https://lightspeed-core.github.io/lightspeed-stack/releasing.html)
 
 ## Demos

@@ -246,6 +246,17 @@
               }
             ],
             "default": null
+          },
+          "trusted_proxy_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrustedProxyConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "AuthenticationConfiguration",
@@ -316,7 +327,7 @@
           },
           "rag_type": {
             "default": "inline::faiss",
-            "description": "Type of RAG database.",
+            "description": "Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
             "minLength": 1,
             "title": "RAG type",
             "type": "string"
@@ -342,9 +353,11 @@
             "type": "string"
           },
           "db_path": {
-            "description": "Path to RAG database.",
-            "title": "DB path",
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "Path to RAG database. Required for inline::faiss.",
+            "title": "DB path"
           },
           "score_multiplier": {
             "default": 1.0,
@@ -352,12 +365,46 @@
             "minimum": 0,
             "title": "Score multiplier",
             "type": "number"
+          },
+          "host": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL host"
+          },
+          "port": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL port"
+          },
+          "db": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL database"
+          },
+          "user": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL user"
+          },
+          "password": {
+            "type": "string",
+            "nullable": true,
+            "default": null,
+            "description": "PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.",
+            "title": "PostgreSQL password"
           }
         },
         "required": [
           "rag_id",
-          "vector_db_id",
-          "db_path"
+          "vector_db_id"
         ],
         "title": "ByokRag",
         "type": "object"
@@ -1590,6 +1637,49 @@
           }
         },
         "title": "TLSConfiguration",
+        "type": "object"
+      },
+      "TrustedProxyConfiguration": {
+        "additionalProperties": false,
+        "description": "Configuration for trusted-proxy auth module.",
+        "properties": {
+          "user_header": {
+            "default": "X-Forwarded-User",
+            "description": "HTTP header containing the forwarded user identity.",
+            "title": "User identity header",
+            "type": "string"
+          },
+          "allowed_service_accounts": {
+            "type": "array",
+            "nullable": true,
+            "default": null,
+            "description": "Optional allowlist of Kubernetes ServiceAccount identities permitted to act as trusted proxies. When set to null/omitted, any ServiceAccount with a valid token is accepted. When set to a non-empty list, only the listed ServiceAccounts are allowed. An empty list behaves the same as null (no restriction).",
+            "title": "Allowed service accounts"
+          }
+        },
+        "title": "TrustedProxyConfiguration",
+        "type": "object"
+      },
+      "TrustedProxyServiceAccount": {
+        "additionalProperties": false,
+        "description": "A Kubernetes ServiceAccount identity for trusted-proxy allowlist.",
+        "properties": {
+          "namespace": {
+            "description": "Kubernetes namespace of the ServiceAccount.",
+            "title": "Namespace",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the Kubernetes ServiceAccount.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace",
+          "name"
+        ],
+        "title": "TrustedProxyServiceAccount",
         "type": "object"
       },
       "UserDataCollection": {

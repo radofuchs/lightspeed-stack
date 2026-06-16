@@ -1,8 +1,10 @@
 """Unit tests for utils/schema_dumper module."""
 
+from json import load
+from pathlib import Path
 from typing import Any
 
-from utils.schema_dumper import recursive_update
+from utils.schema_dumper import dump_schema, recursive_update
 
 
 def test_update_empty_input() -> None:
@@ -306,6 +308,31 @@ def test_deeply_nested_anyof_and_exclusive_minimum() -> None:
     assert result == expected
 
 
+def test_preserve_other_types_and_lists() -> None:
+    """Nullable/optional types handling."""
+    original = {
+        "type": "object",
+        "required": ["a", "b"],
+        "properties": {
+            "a": {"type": "integer"},
+            "b": {"anyOf": [{"type": "boolean"}, {"type": "null"}]},
+        },
+    }
+    expected = {
+        "type": "object",
+        "required": ["a", "b"],
+        "properties": {
+            "a": {"type": "integer"},
+            "b": {"type": "boolean", "nullable": True},
+        },
+    }
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
 def test_handles_none_values() -> None:
     """None values should be preserved."""
     original = {"key": None}
@@ -316,3 +343,178 @@ def test_handles_none_values() -> None:
 
     # non-empty dict with known content should be returned
     assert result == expected
+
+
+def test_handles_empty_lists() -> None:
+    """Empty list values should be preserved."""
+    original: dict[str, Any] = {"key": []}
+    expected = original.copy()
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_handles_empty_maps() -> None:
+    """Empty maps values should be preserved."""
+    original: dict[str, Any] = {"key": {}}
+    expected = original.copy()
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_anyof_with_additional_fields_on_first_item() -> None:
+    """Optional (nullable) types with additional fields."""
+    original = {
+        "anyOf": [
+            {"type": "string", "format": "email", "maxLength": 50},
+            {"type": "null"},
+        ]
+    }
+    expected = {
+        "type": "string",
+        "nullable": True,
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_anyof_with_additional_fields_more_items() -> None:
+    """Optional (nullable) types with additional fields."""
+    original = {
+        "exclusiveMinimum": 5,
+        "anyOf": [
+            {"type": "string", "format": "email", "maxLength": 50},
+            {"type": "null"},
+        ],
+        "description": "example",
+    }
+    expected = {
+        "minimum": 5,
+        "type": "string",
+        "nullable": True,
+        "description": "example",
+    }
+
+    # perform the update
+    result = recursive_update(original)
+
+    # non-empty dict with known content should be returned
+    assert result == expected
+
+
+def test_dump_schema(tmpdir: Path) -> None:
+    """Test that schema can be dump into a JSON file.
+
+    An example of schema dump:
+    {
+        "openapi": "3.0.0",
+        "info": {
+            "title": "Lightspeed Core Stack",
+            "version": "0.3.0"
+        },
+        "components": {
+            "schemas": {
+                "A2AStateConfiguration": {
+                    "additionalProperties": false,
+                    "description": "xyzzy",
+                    "properties": {
+                        "sqlite": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/components/schemas/SQLiteDatabaseConfiguration"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "default": null,
+                            "description": "SQLite database configuration for A2A state storage.",
+                            "title": "SQLite configuration"
+                        },
+                    ...
+                }
+                ...
+                ...
+                ...
+        },
+        "paths": {}
+    }
+    """
+    filename = tmpdir / "foo.json"
+    dump_schema(str(filename))
+
+    with open(filename, "r", encoding="utf-8") as fin:
+        # schema should be stored in JSON format
+        content = load(fin)
+        assert content is not None
+
+        # top-level keys test
+        keys = ("openapi", "info", "components", "paths")
+        for key in keys:
+            assert key in content
+
+        # components should be top-level node
+        components = content["components"]
+        assert components is not None
+
+        # schemas should be a node stored inside components node
+        assert "schemas" in components
+        schemas = components["schemas"]
+        assert schemas is not None
+
+        # list of schemas expected in a dump
+        expected_schemas = (
+            "A2AStateConfiguration",
+            "APIKeyTokenConfiguration",
+            "AccessRule",
+            "Action",
+            "ApprovalFilter",
+            "ApprovalsConfiguration",
+            "AuthenticationConfiguration",
+            "AuthorizationConfiguration",
+            "AzureEntraIdConfiguration",
+            "ByokRag",
+            "CORSConfiguration",
+            "CompactionConfiguration",
+            "Configuration",
+            "ConversationHistoryConfiguration",
+            "CustomProfile",
+            "Customization",
+            "DatabaseConfiguration",
+            "InMemoryCacheConfig",
+            "InferenceConfiguration",
+            "JsonPathOperator",
+            "JwkConfiguration",
+            "JwtConfiguration",
+            "JwtRoleRule",
+            "LlamaStackConfiguration",
+            "ModelContextProtocolServer",
+            "OkpConfiguration",
+            "PostgreSQLDatabaseConfiguration",
+            "QuotaHandlersConfiguration",
+            "QuotaLimiterConfiguration",
+            "QuotaSchedulerConfiguration",
+            "RHIdentityConfiguration",
+            "RagConfiguration",
+            "RerankerConfiguration",
+            "RlsapiV1Configuration",
+            "SQLiteDatabaseConfiguration",
+            "ServiceConfiguration",
+            "SkillsConfiguration",
+            "SplunkConfiguration",
+            "TLSConfiguration",
+            "UserDataCollection",
+        )
+        for expected_schema in expected_schemas:
+            assert expected_schema in schemas

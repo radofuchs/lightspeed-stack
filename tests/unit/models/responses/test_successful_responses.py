@@ -90,7 +90,7 @@ class TestModelsResponse:
     def test_missing_required_parameter(self) -> None:
         """Test ModelsResponse raises ValidationError when models is missing."""
         with pytest.raises(ValidationError):
-            ModelsResponse()  # type: ignore[call-arg]
+            ModelsResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ModelsResponse.openapi_response() method.
@@ -150,7 +150,7 @@ class TestToolsResponse:
     def test_missing_required_parameter(self) -> None:
         """Test ToolsResponse raises ValidationError when tools is missing."""
         with pytest.raises(ValidationError):
-            ToolsResponse()  # type: ignore[call-arg]
+            ToolsResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ToolsResponse.openapi_response() method."""
@@ -181,7 +181,7 @@ class TestShieldsResponse:
     def test_missing_required_parameter(self) -> None:
         """Test ShieldsResponse raises ValidationError when shields is missing."""
         with pytest.raises(ValidationError):
-            ShieldsResponse()  # type: ignore[call-arg]
+            ShieldsResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ShieldsResponse.openapi_response() method."""
@@ -218,7 +218,7 @@ class TestProvidersListResponse:
     def test_missing_required_parameter(self) -> None:
         """Test ProvidersListResponse raises ValidationError when providers is missing."""
         with pytest.raises(ValidationError):
-            ProvidersListResponse()  # type: ignore[call-arg]
+            ProvidersListResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ProvidersListResponse.openapi_response() method.
@@ -268,9 +268,9 @@ class TestProviderResponse:
     def test_missing_required_parameters(self) -> None:
         """Test ProviderResponse raises ValidationError when required fields are missing."""
         with pytest.raises(ValidationError):
-            ProviderResponse()  # type: ignore[call-arg]
+            ProviderResponse()  # pyright: ignore[reportCallIssue]
         with pytest.raises(ValidationError):
-            ProviderResponse(api="inference")  # type: ignore[call-arg]
+            ProviderResponse(api="inference")  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ProviderResponse.openapi_response() method."""
@@ -292,7 +292,9 @@ class TestQueryResponse:
 
     def test_constructor_minimal(self) -> None:
         """Test QueryResponse with only required fields."""
-        response_obj = QueryResponse(response="Test response")  # type: ignore[call-arg]
+        response_obj = QueryResponse(
+            response="Test response"
+        )  # pyright: ignore[reportCallIssue]
         assert isinstance(response_obj, AbstractSuccessfulResponse)
         assert response_obj.response == "Test response"
         assert response_obj.conversation_id is None
@@ -328,7 +330,7 @@ class TestQueryResponse:
             )
         ]
 
-        response = QueryResponse(  # type: ignore[call-arg]
+        response = QueryResponse(  # pyright: ignore[reportCallIssue]
             conversation_id="conv-123",
             response="Test response",
             tool_calls=tool_calls,
@@ -350,7 +352,7 @@ class TestQueryResponse:
     def test_missing_required_parameter(self) -> None:
         """Test QueryResponse raises ValidationError when response is missing."""
         with pytest.raises(ValidationError):
-            QueryResponse()  # type: ignore[call-arg]
+            QueryResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test QueryResponse.openapi_response() method."""
@@ -385,9 +387,9 @@ class TestInfoResponse:
     def test_missing_required_parameters(self) -> None:
         """Test InfoResponse raises ValidationError when required fields are missing."""
         with pytest.raises(ValidationError):
-            InfoResponse()  # type: ignore[call-arg]
+            InfoResponse()  # pyright: ignore[reportCallIssue]
         with pytest.raises(ValidationError):
-            InfoResponse(name="Test")  # type: ignore[call-arg]
+            InfoResponse(name="Test")  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test InfoResponse.openapi_response() method."""
@@ -434,9 +436,9 @@ class TestReadinessResponse:
     def test_missing_required_parameters(self) -> None:
         """Test ReadinessResponse raises ValidationError when required fields are missing."""
         with pytest.raises(ValidationError):
-            ReadinessResponse()  # type: ignore[call-arg]
+            ReadinessResponse()  # pyright: ignore[reportCallIssue]
         with pytest.raises(ValidationError):
-            ReadinessResponse(ready=True)  # type: ignore[call-arg]
+            ReadinessResponse(ready=True)  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ReadinessResponse.openapi_response() method.
@@ -479,7 +481,7 @@ class TestLivenessResponse:
     def test_missing_required_parameter(self) -> None:
         """Test LivenessResponse raises ValidationError when alive is missing."""
         with pytest.raises(ValidationError):
-            LivenessResponse()  # type: ignore[call-arg]
+            LivenessResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test LivenessResponse.openapi_response() method."""
@@ -508,7 +510,7 @@ class TestFeedbackResponse:
     def test_missing_required_parameter(self) -> None:
         """Test FeedbackResponse raises ValidationError when response is missing."""
         with pytest.raises(ValidationError):
-            FeedbackResponse()  # type: ignore[call-arg]
+            FeedbackResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test FeedbackResponse.openapi_response() method.
@@ -561,9 +563,9 @@ class TestStatusResponse:
     def test_missing_required_parameters(self) -> None:
         """Test StatusResponse raises ValidationError when required fields are missing."""
         with pytest.raises(ValidationError):
-            StatusResponse()  # type: ignore[call-arg]
+            StatusResponse()  # pyright: ignore[reportCallIssue]
         with pytest.raises(ValidationError):
-            StatusResponse(functionality="feedback")  # type: ignore[call-arg]
+            StatusResponse(functionality="feedback")  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test StatusResponse.openapi_response() method.
@@ -618,9 +620,9 @@ class TestAuthorizedResponse:
     def test_missing_required_parameters(self) -> None:
         """Test AuthorizedResponse raises ValidationError when required fields are missing."""
         with pytest.raises(ValidationError):
-            AuthorizedResponse()  # type: ignore[call-arg]
+            AuthorizedResponse()  # pyright: ignore[reportCallIssue]
         with pytest.raises(ValidationError):
-            AuthorizedResponse(user_id="user-123")  # type: ignore[call-arg]
+            AuthorizedResponse(user_id="user-123")  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test AuthorizedResponse.openapi_response() method."""
@@ -681,7 +683,7 @@ class TestConversationResponse:
         ]
         response = ConversationResponse(
             conversation_id="123e4567-e89b-12d3-a456-426614174000",
-            chat_history=chat_history,
+            chat_history=chat_history,  # pyright: ignore[reportArgumentType]
         )
         assert isinstance(response, AbstractSuccessfulResponse)
         assert response.conversation_id == "123e4567-e89b-12d3-a456-426614174000"
@@ -699,9 +701,11 @@ class TestConversationResponse:
     def test_missing_required_parameters(self) -> None:
         """Test ConversationResponse raises ValidationError when required fields are missing."""
         with pytest.raises(ValidationError):
-            ConversationResponse()  # type: ignore[call-arg]
+            ConversationResponse()  # pyright: ignore[reportCallIssue]
         with pytest.raises(ValidationError):
-            ConversationResponse(conversation_id="conv-123")  # type: ignore[call-arg]
+            ConversationResponse(
+                conversation_id="conv-123"
+            )  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ConversationResponse.openapi_response() method."""
@@ -877,7 +881,7 @@ class TestConversationsListResponse:
     def test_missing_required_parameter(self) -> None:
         """Test ConversationsListResponse raises ValidationError when conversations is missing."""
         with pytest.raises(ValidationError):
-            ConversationsListResponse()  # type: ignore[call-arg]
+            ConversationsListResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ConversationsListResponse.openapi_response() method."""
@@ -937,7 +941,7 @@ class TestConversationsListResponseV2:
     def test_missing_required_parameter(self) -> None:
         """Test ConversationsListResponseV2 raises ValidationError when conversations is missing."""
         with pytest.raises(ValidationError):
-            ConversationsListResponseV2()  # type: ignore[call-arg]
+            ConversationsListResponseV2()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ConversationsListResponseV2.openapi_response() method."""
@@ -980,7 +984,7 @@ class TestFeedbackStatusUpdateResponse:
     def test_missing_required_parameter(self) -> None:
         """Test FeedbackStatusUpdateResponse raises ValidationError when status is missing."""
         with pytest.raises(ValidationError):
-            FeedbackStatusUpdateResponse()  # type: ignore[call-arg]
+            FeedbackStatusUpdateResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test FeedbackStatusUpdateResponse.openapi_response() method."""
@@ -1023,9 +1027,11 @@ class TestConversationUpdateResponse:
     def test_missing_required_parameters(self) -> None:
         """Test ConversationUpdateResponse raises ValidationError when required fields missing."""
         with pytest.raises(ValidationError):
-            ConversationUpdateResponse()  # type: ignore[call-arg]
+            ConversationUpdateResponse()  # pyright: ignore[reportCallIssue]
         with pytest.raises(ValidationError):
-            ConversationUpdateResponse(conversation_id="conv-123")  # type: ignore[call-arg]
+            ConversationUpdateResponse(
+                conversation_id="conv-123"
+            )  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ConversationUpdateResponse.openapi_response() method."""
@@ -1066,6 +1072,9 @@ class TestConfigurationResponse:
                 api_key=None,
                 library_client_config_path=None,
                 timeout=60,
+                max_retries=10,
+                retry_delay=10,
+                allow_degraded_mode=False,
             ),
             user_data_collection=UserDataCollection(
                 feedback_enabled=False,
@@ -1082,7 +1091,7 @@ class TestConfigurationResponse:
     def test_missing_required_parameter(self) -> None:
         """Test ConfigurationResponse raises ValidationError when configuration is missing."""
         with pytest.raises(ValidationError):
-            ConfigurationResponse()  # type: ignore[call-arg]
+            ConfigurationResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test ConfigurationResponse.openapi_response() method."""
@@ -1204,7 +1213,7 @@ class TestRAGInfoResponse:
     def test_missing_required_parameters(self) -> None:
         """Test RAGInfoResponse raises ValidationError when required fields are missing."""
         with pytest.raises(ValidationError):
-            RAGInfoResponse()  # type: ignore[call-arg]
+            RAGInfoResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test RAGInfoResponse.openapi_response() method."""
@@ -1242,7 +1251,7 @@ class TestRAGListResponse:
     def test_missing_required_parameter(self) -> None:
         """Test RAGListResponse raises ValidationError when rags is missing."""
         with pytest.raises(ValidationError):
-            RAGListResponse()  # type: ignore[call-arg]
+            RAGListResponse()  # pyright: ignore[reportCallIssue]
 
     def test_openapi_response(self) -> None:
         """Test RAGListResponse.openapi_response() method."""
