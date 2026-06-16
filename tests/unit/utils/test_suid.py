@@ -134,9 +134,11 @@ class TestSUID:
         assert suid.check_suid_prompt("pmpt_") is False
         assert suid.check_suid_prompt("pmpt_12345") is False
         # 47 hex chars (one short)
-        assert suid.check_suid_prompt("pmpt_e6afd7aaa97b49ce8f4f96a801b07893d9cb784d72e53e3") is False
+        short_hex = "e6afd7aaa97b49ce8f4f96a801b07893d9cb784d72e53e3"
+        assert suid.check_suid_prompt(f"pmpt_{short_hex}") is False
         # 49 hex chars (one extra)
-        assert suid.check_suid_prompt("pmpt_e6afd7aaa97b49ce8f4f96a801b07893d9cb784d72e53e3c1") is False
+        long_hex = "e6afd7aaa97b49ce8f4f96a801b07893d9cb784d72e53e3c1"
+        assert suid.check_suid_prompt(f"pmpt_{long_hex}") is False
 
     def test_check_suid_prompt_non_hex_chars(self) -> None:
         """Test that check_suid_prompt returns False for non-hex characters."""
@@ -149,4 +151,5 @@ class TestSUID:
         """Test that check_suid_prompt rejects other ID formats."""
         assert suid.check_suid_prompt("123e4567-e89b-12d3-a456-426614174000") is False
         assert suid.check_suid_prompt("modr-12345") is False
-        assert suid.check_suid_prompt("conv_e6afd7aaa97b49ce8f4f96a801b07893d9cb784d72e53e3c") is False
+        valid_hex = "e6afd7aaa97b49ce8f4f96a801b07893d9cb784d72e53e3c"
+        assert suid.check_suid_prompt(f"conv_{valid_hex}") is False
