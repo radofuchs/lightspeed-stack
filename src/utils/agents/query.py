@@ -310,7 +310,7 @@ async def retrieve_agent_response(
             llm_response=moderation_result.message,
         )
     try:
-        agent = build_agent(client, responses_params)
+        agent = build_agent(client, responses_params, configuration.skills)
         logger.debug("Starting agent non-streaming response processing")
         run_result = await agent.run(cast(str, responses_params.input))
     except (AgentRunError, APIStatusError, APIConnectionError, RuntimeError) as exc:

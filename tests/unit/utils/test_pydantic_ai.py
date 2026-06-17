@@ -5,12 +5,18 @@
 import httpx
 import pytest
 from llama_stack.core.library_client import AsyncLlamaStackAsLibraryClient
+from llama_stack_client import AsyncLlamaStackClient
+from pydantic_ai_skills import SkillsCapability
 from pytest_mock import MockerFixture
 
+from models.common.responses.responses_api_params import ResponsesApiParams
+from models.config import SkillsConfiguration
 from utils.pydantic_ai import (
     _LLS_RESPONSES_EXTRA_FIELDS,
+    _agent_capabilities,
     _llama_stack_provider_from_client,
     _model_settings_from_responses_params,
+    _skills_capability,
     build_agent,
 )
 
@@ -196,6 +202,45 @@ class TestLlsResponsesExtraFields:
         assert expected == _LLS_RESPONSES_EXTRA_FIELDS
 
 
+class TestSkillsCapability:
+    """Tests for _skills_capability."""
+
+    def test_returns_none_when_skills_not_configured(self) -> None:
+        """Test that missing skills configuration returns None."""
+        assert _skills_capability(None) is None
+
+    def test_returns_none_when_paths_empty(self) -> None:
+        """Test that an empty paths list returns None."""
+        assert _skills_capability(SkillsConfiguration(paths=[])) is None
+
+    def test_returns_capability_for_configured_paths(
+        self, mock_skills_configuration: SkillsConfiguration
+    ) -> None:
+        """Test that configured paths produce a SkillsCapability."""
+        capability = _skills_capability(mock_skills_configuration)
+
+        assert isinstance(capability, SkillsCapability)
+        assert list(capability.toolset.skills) == ["test-skill"]
+
+
+class TestAgentCapabilities:
+    """Tests for _agent_capabilities."""
+
+    def test_returns_none_when_no_capabilities_configured(self) -> None:
+        """Test that missing configuration yields None for Agent construction."""
+        assert _agent_capabilities(None) is None
+        assert _agent_capabilities(SkillsConfiguration(paths=[])) is None
+
+    def test_returns_skills_capability_when_configured(
+        self, mock_skills_configuration: SkillsConfiguration
+    ) -> None:
+        """Test that configured skills are included in the capability list."""
+        capabilities = _agent_capabilities(mock_skills_configuration) or []
+
+        assert len(capabilities) == 1
+        assert isinstance(capabilities[0], SkillsCapability)
+
+
 class TestBuildAgent:
     """Tests for the build_agent factory function."""
 
@@ -220,7 +265,7 @@ class TestBuildAgent:
         mock_params.store = False
         mock_params.previous_response_id = None
 
-        agent = build_agent(mock_client, mock_params)
+        agent = build_agent(mock_client, mock_params, None)
 
         assert agent is not None
 
@@ -242,7 +287,7 @@ class TestBuildAgent:
         mock_params.store = False
         mock_params.previous_response_id = None
 
-        agent = build_agent(mock_client, mock_params)
+        agent = build_agent(mock_client, mock_params, None)
 
         assert "You are a helpful assistant." in agent._instructions
 
@@ -265,6 +310,37 @@ class TestBuildAgent:
         mock_params.store = True
         mock_params.previous_response_id = None
 
-        agent = build_agent(mock_lib_client, mock_params)
+        agent = build_agent(mock_lib_client, mock_params, None)
 
         assert agent is not None
+
+    def test_agent_includes_skills_capability_when_configured(
+        self,
+        mock_client: AsyncLlamaStackClient,
+        mock_params: ResponsesApiParams,
+        mock_skills_configuration: SkillsConfiguration,
+    ) -> None:
+        """Test that build_agent attaches SkillsCapability when skills are passed."""
+        agent = build_agent(
+            mock_client,
+            mock_params,
+            mock_skills_configuration,
+        )
+
+        capability_types = {
+            type(capability) for capability in agent._root_capability.capabilities
+        }
+        assert SkillsCapability in capability_types
+
+    def test_agent_has_no_skills_capability_when_not_configured(
+        self,
+        mock_client: AsyncLlamaStackClient,
+        mock_params: ResponsesApiParams,
+    ) -> None:
+        """Test that build_agent omits SkillsCapability when skills are not passed."""
+        agent = build_agent(mock_client, mock_params, None)
+
+        capability_types = {
+            type(capability) for capability in agent._root_capability.capabilities
+        }
+        assert SkillsCapability not in capability_types

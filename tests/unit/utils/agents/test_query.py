@@ -116,10 +116,20 @@ def blocked_moderation_fixture() -> ShieldModerationBlocked:
     )
 
 
+@pytest.fixture(name="patch_query_configuration")
+def patch_query_configuration_fixture(mocker: MockerFixture) -> None:
+    """Patch query module configuration for isolated agent query tests."""
+    mock_config = mocker.MagicMock()
+    mock_config.skills = None
+    mock_config.rag_id_mapping = {}
+    mocker.patch("utils.agents.query.configuration", mock_config)
+
+
 @pytest.fixture(name="patch_recording_metrics")
 def patch_recording_metrics_fixture(mocker: MockerFixture) -> None:
     """Patch LLM recording helpers so token usage tests stay isolated."""
     mock_config = mocker.MagicMock()
+    mock_config.skills = None
     mock_config.rag_id_mapping = {}
     mocker.patch("utils.agents.query.configuration", mock_config)
     mocker.patch(
@@ -422,6 +432,7 @@ class TestRetrieveAgentResponse:
         assert summary.id == "resp-success"
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("patch_query_configuration")
     async def test_agent_connection_error_raises_http_exception(
         self,
         mocker: MockerFixture,
@@ -448,6 +459,7 @@ class TestRetrieveAgentResponse:
         assert exc_info.value.status_code == 503
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("patch_query_configuration")
     async def test_api_status_error_raises_http_exception(
         self,
         mocker: MockerFixture,
