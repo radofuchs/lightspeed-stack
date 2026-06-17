@@ -1863,7 +1863,7 @@
                     "providers"
                 ],
                 "summary": "Get Provider Endpoint Handler",
-                "description": "Retrieve a single provider identified by its unique ID.\n\n### Parameters:\n- request: The incoming HTTP request.\n- provider_id: Provider identification string\n- auth: Authentication tuple from the auth dependency.\n\n### Returns:\n- ProviderResponse: Provider details.\n\n### Raises:\n- HTTPException:\n- 401: Authentication failed\n- 403: Authorization failed\n- 404: Provider not found\n- 500: Lightspeed Stack configuration not loaded\n- 503: Unable to connect to Llama Stack",
+                "description": "Retrieve a single provider identified by its unique ID.\n\n### Parameters:\n- request: The incoming HTTP request.\n- provider_id: Provider identification string\n- auth: Authentication tuple from the auth dependency.\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 404 if provider is not found.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- ProviderResponse: Provider details.",
                 "operationId": "get_provider_endpoint_handler_v1_providers__provider_id__get",
                 "parameters": [
                     {
@@ -2082,7 +2082,7 @@
                     "prompts"
                 ],
                 "summary": "List Prompts Handler",
-                "description": "Handle requests to the GET /prompts endpoint.\n\nProcess GET requests that list all stored prompt templates from the Llama\nStack service. For example:\n\n    curl http://localhost:8080/v1/prompts\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: If configuration is not loaded, if unable to connect to\n  Llama Stack, or if the prompts API returns an error response.\n\n### Returns:\n- PromptsListResponse: An object containing the list of prompts.",
+                "description": "Handle requests to the GET /prompts endpoint.\n\nProcess GET requests that list all stored prompt templates from the Llama\nStack service. For example:\n\n    curl http://localhost:8080/v1/prompts\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- PromptsListResponse: An object containing the list of prompts.",
                 "operationId": "list_prompts_handler_v1_prompts_get",
                 "responses": {
                     "200": {
@@ -2267,7 +2267,7 @@
                     "prompts"
                 ],
                 "summary": "Create Prompt Handler",
-                "description": "Handle requests to the POST /prompts endpoint.\n\nProcess requests to create a stored prompt template in Llama Stack. The\nbody must include the prompt text and may include template variable names.\nFor example:\n\n    curl -X POST http://localhost:8080/v1/prompts \\\\\n      -H 'Content-Type: application/json' \\\\\n      -d '{\"prompt\": \"Hello {{name}}\", \"variables\": [\"name\"]}'\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- body: Prompt creation parameters.\n\n### Raises:\n- HTTPException: If configuration is not loaded, if unable to connect to\n  Llama Stack, or if the prompts API returns an error response.\n\n### Returns:\n- PromptResourceResponse: The created prompt as returned by Llama Stack.",
+                "description": "Handle requests to the POST /prompts endpoint.\n\nProcess requests to create a stored prompt template in Llama Stack. The\nbody must include the prompt text and may include template variable names.\nFor example:\n\n    curl -X POST http://localhost:8080/v1/prompts \\\\\n      -H 'Content-Type: application/json' \\\\\n      -d '{\"prompt\": \"Hello {{name}}\", \"variables\": [\"name\"]}'\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- body: Prompt creation parameters.\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 422 if the request body is improper.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- PromptResourceResponse: The created prompt as returned by Llama Stack.",
                 "operationId": "create_prompt_handler_v1_prompts_post",
                 "requestBody": {
                     "content": {
@@ -2470,7 +2470,7 @@
                     "prompts"
                 ],
                 "summary": "Get Prompt Handler",
-                "description": "Handle requests to the GET /prompts/{prompt_id} endpoint.\n\nProcess GET requests to retrieve a single prompt by identifier. The\n``version`` query parameter is optional; when omitted, the latest version is\nreturned. For example:\n\n    curl http://localhost:8080/v1/prompts/pmpt_abc123?version=1\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- prompt_id: The Llama Stack prompt identifier.\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- version: Optional version number (latest when omitted).\n\n### Raises:\n- HTTPException: If configuration is not loaded, if the prompt is not\n  found, if unable to connect to Llama Stack, or if the prompts API returns\n  an error response.\n\n### Returns:\n- PromptResourceResponse: The requested prompt object.",
+                "description": "Handle requests to the GET /prompts/{prompt_id} endpoint.\n\nProcess GET requests to retrieve a single prompt by identifier. The\n``version`` query parameter is optional; when omitted, the latest version is\nreturned. For example:\n\n    curl http://localhost:8080/v1/prompts/pmpt_abc123?version=1\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- prompt_id: The Llama Stack prompt identifier.\n- auth: Authentication tuple from the auth dependency (used by middleware).\n- version: Optional version number (latest when omitted).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 404 if prompt is not found.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- PromptResourceResponse: The requested prompt object.",
                 "operationId": "get_prompt_handler_v1_prompts__prompt_id__get",
                 "parameters": [
                     {
@@ -10573,7 +10573,7 @@
                     "a2a"
                 ],
                 "summary": "Get Agent Card",
-                "description": "Serve the A2A Agent Card at the well-known location.\n\nThis endpoint provides the agent card that describes Lightspeed's\ncapabilities according to the A2A protocol specification.\n\nReturns:\n    AgentCard: The agent card describing this agent's capabilities.",
+                "description": "Serve the A2A Agent Card at the well-known location.\n\nThis endpoint provides the agent card that describes Lightspeed's\ncapabilities according to the A2A protocol specification.\n\n### Parameters:\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- AgentCard: The agent card describing this agent's capabilities.",
                 "operationId": "get_agent_card__well_known_agent_card_json_get",
                 "responses": {
                     "200": {
@@ -10595,7 +10595,7 @@
                     "a2a"
                 ],
                 "summary": "Get Agent Card",
-                "description": "Serve the A2A Agent Card at the well-known location.\n\nThis endpoint provides the agent card that describes Lightspeed's\ncapabilities according to the A2A protocol specification.\n\nReturns:\n    AgentCard: The agent card describing this agent's capabilities.",
+                "description": "Serve the A2A Agent Card at the well-known location.\n\nThis endpoint provides the agent card that describes Lightspeed's\ncapabilities according to the A2A protocol specification.\n\n### Parameters:\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n- HTTPException: with status 503 and a detail object containing `response`\n  and `cause` when unable to connect to Llama Stack.\n\n### Returns:\n- AgentCard: The agent card describing this agent's capabilities.",
                 "operationId": "get_agent_card__well_known_agent_json_get",
                 "responses": {
                     "200": {
@@ -10687,7 +10687,7 @@
                     "a2a"
                 ],
                 "summary": "A2A Health Check",
-                "description": "Health check endpoint for A2A service.\n\nReturns:\n    Dict with health status information.",
+                "description": "Health check endpoint for A2A service.\n\n### Parameters:\n- None\n\n### Raises:\n- None\n\n### Returns:\n- Dict with health status information.",
                 "operationId": "a2a_health_check_a2a_health_get",
                 "responses": {
                     "200": {
