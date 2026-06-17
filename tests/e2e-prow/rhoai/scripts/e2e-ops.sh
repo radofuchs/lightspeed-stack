@@ -501,7 +501,7 @@ cmd_restart_port_forward() {
             echo "Port-forward process exited immediately:"
             e2e_ops_emit_port_forward_immediate_failure_diag
             kill_stale_lightspeed_forward "$local_port"
-            sleep 5
+            sleep 2
             continue
         fi
         sleep 6
