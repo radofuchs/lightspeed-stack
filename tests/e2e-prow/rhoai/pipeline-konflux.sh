@@ -143,6 +143,25 @@ log "✅ Mock servers deployed"
 #========================================
 progress "Deploying lightspeed-stack and llama-stack"
 
+# PVC for llama-stack app-root: caches dnf/uv/git install so TLS per-scenario pod
+# recreates skip the expensive init (~6-15 min → ~1-2 min). Delete first to guarantee
+# a fresh checkout for this pipeline revision; re-create immediately so the pod can bind.
+log "Recreating llama-stack-app-root PVC (fresh per pipeline run)..."
+oc delete pvc llama-stack-app-root -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+cat <<'EOF' | oc apply -n "$NAMESPACE" -f -
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llama-stack-app-root
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+EOF
+log "✅ llama-stack-app-root PVC created"
+
 # Llama run config: single source with GitHub E2E (tests/e2e/configs/run-ci.yaml).
 # Lightspeed stack: same tree as local/docker E2E (tests/e2e/configuration/server-mode).
 oc create configmap llama-stack-config -n "$NAMESPACE" \
@@ -393,6 +412,7 @@ if [[ -n "${E2E_LLAMA_PORT_FORWARD_PID_FILE:-}" && -f "$E2E_LLAMA_PORT_FORWARD_P
   fi
   rm -f "$E2E_LLAMA_PORT_FORWARD_PID_FILE"
 fi
+
 kill $PF_LCS_PID 2>/dev/null || true
 kill $PF_JWKS_PID 2>/dev/null || true
 kill $PF_LLAMA_PID 2>/dev/null || true
