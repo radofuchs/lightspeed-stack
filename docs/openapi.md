@@ -493,6 +493,11 @@ Handle GET requests to the root ("/") endpoint and returns the static HTML index
 | 401         | Unauthorized        | [UnauthorizedResponse](#unauthorizedresponse) |
 | 403         | Permission denied   | [ForbiddenResponse](#forbiddenresponse)       |
 
+Examples
+
+
+
+
 
 ```json
 {
@@ -503,6 +508,9 @@ Handle GET requests to the root ("/") endpoint and returns the static HTML index
 }
 ```
 
+
+
+
 ```json
 {
   "detail": {
@@ -512,11 +520,99 @@ Handle GET requests to the root ("/") endpoint and returns the static HTML index
 }
 ```
 
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token has expired",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Invalid token signature",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token signed by unknown key",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token missing claim: user_id",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Invalid or expired Kubernetes token",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Authentication key server returned invalid data",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
 ```json
 {
   "detail": {
     "cause": "User 6789 is not authorized to access this endpoint.",
     "response": "User does not have permission to access this endpoint"
+  }
+}
+```
+
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Failed to connect to Kubernetes API: Service Unavailable (status 503)",
+    "response": "Unable to connect to Kubernetes API"
   }
 }
 ```
@@ -558,6 +654,10 @@ service name, version and Llama-stack version.
 
 Examples
 
+
+
+
+
 ```json
 {
   "detail": {
@@ -566,6 +666,9 @@ Examples
   }
 }
 ```
+
+
+
 
 ```json
 {
@@ -576,6 +679,9 @@ Examples
 }
 ```
 
+
+
+
 ```json
 {
   "detail": {
@@ -584,6 +690,9 @@ Examples
   }
 }
 ```
+
+
+
 
 ```json
 {
@@ -594,6 +703,9 @@ Examples
 }
 ```
 
+
+
+
 ```json
 {
   "detail": {
@@ -602,6 +714,9 @@ Examples
   }
 }
 ```
+
+
+
 
 ```json
 {
@@ -612,6 +727,9 @@ Examples
 }
 ```
 
+
+
+
 ```json
 {
   "detail": {
@@ -620,6 +738,9 @@ Examples
   }
 }
 ```
+
+
+
 
 ```json
 {
@@ -644,6 +765,18 @@ Examples
   "detail": {
     "cause": "Connection error while trying to reach backend service.",
     "response": "Unable to connect to Llama Stack"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Failed to connect to Kubernetes API: Service Unavailable (status 503)",
+    "response": "Unable to connect to Kubernetes API"
   }
 }
 ```
@@ -704,6 +837,10 @@ will be returned.
 
 Examples
 
+
+
+
+
 ```json
 {
   "detail": {
@@ -713,6 +850,9 @@ Examples
 }
 ```
 
+
+
+
 ```json
 {
   "detail": {
@@ -721,6 +861,81 @@ Examples
   }
 }
 ```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token has expired",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Invalid token signature",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token signed by unknown key",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token missing claim: user_id",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Invalid or expired Kubernetes token",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Authentication key server returned invalid data",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
 
 ```json
 {
@@ -745,6 +960,18 @@ Examples
   "detail": {
     "cause": "Connection error while trying to reach backend service.",
     "response": "Unable to connect to Llama Stack"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Failed to connect to Kubernetes API: Service Unavailable (status 503)",
+    "response": "Unable to connect to Kubernetes API"
   }
 }
 ```
@@ -794,6 +1021,10 @@ available tools from all configured MCP servers.
 
 Examples
 
+
+
+
+
 ```json
 {
   "detail": {
@@ -802,6 +1033,9 @@ Examples
   }
 }
 ```
+
+
+
 
 ```json
 {
@@ -812,30 +1046,50 @@ Examples
 }
 ```
 
+
+
+
 ```json
 {
   "detail": {
-    "cause": "User 6789 is not authorized to access this endpoint.",
-    "response": "User does not have permission to access this endpoint"
+    "cause": "Token has expired",
+    "response": "Missing or invalid credentials provided by client"
   }
 }
 ```
 
 
-```json
-{
-  "detail": {
-    "cause": "Lightspeed Stack configuration has not been initialized.",
-    "response": "Configuration is not loaded"
-  }
-}
-```
+
 
 ```json
 {
   "detail": {
-    "cause": "Connection error while trying to reach backend service.",
-    "response": "Unable to connect to Llama Stack"
+    "cause": "Invalid token signature",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token signed by unknown key",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token missing claim: user_id",
+    "response": "Missing or invalid credentials provided by client"
   }
 }
 ```
@@ -877,6 +1131,10 @@ authenticate with using their own tokens.
 
 Examples
 
+
+
+
+
 ```json
 {
   "detail": {
@@ -898,6 +1156,8 @@ Examples
 }
 ```
 
+
+
 ```json
 {
   "detail": {
@@ -906,6 +1166,9 @@ Examples
   }
 }
 ```
+
+
+
 
 ```json
 {
@@ -916,6 +1179,73 @@ Examples
 }
 ```
 
+
+
+```json
+{
+  "detail": {
+    "cause": "User 6789 is not authorized to access this endpoint.",
+    "response": "User does not have permission to access this endpoint"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Lightspeed Stack configuration has not been initialized.",
+    "response": "Configuration is not loaded"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token signed by unknown key",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Token missing claim: user_id",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+```json
+{
+  "detail": {
+    "cause": "Invalid or expired Kubernetes token",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
+
+
+
+
+```json
+{
+  "detail": {
+    "cause": "Authentication key server returned invalid data",
+    "response": "Missing or invalid credentials provided by client"
+  }
+}
+```
 
 ## GET `/v1/mcp-servers`
 
@@ -948,6 +1278,7 @@ registered (via API) MCP servers.
 | 401         | Unauthorized          | [UnauthorizedResponse](#unauthorizedresponse)               |
 | 403         | Permission denied     | [ForbiddenResponse](#forbiddenresponse)                     |
 | 500         | Internal server error | [InternalServerErrorResponse](#internalservererrorresponse) |
+| 503         | Service unavailable   | [ServiceUnavailableResponse](#serviceunavailableresponse)   |
 
 Examples
 
@@ -1788,9 +2119,13 @@ returned. For example:
 - version: Optional version number (latest when omitted).
 
 ### Raises:
-- HTTPException: If configuration is not loaded, if the prompt is not
-  found, if unable to connect to Llama Stack, or if the prompts API returns
-  an error response.
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 404 if prompt is not found.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
 
 ### Returns:
 - PromptResourceResponse: The requested prompt object.
@@ -1807,15 +2142,16 @@ returned. For example:
 
 ### ✅ Responses
 
-| Status Code | Description           | Component                                                   |
-|-------------|-----------------------|-------------------------------------------------------------|
-| 200         | Successful response   | [PromptResourceResponse](#promptresourceresponse)           |
-| 401         | Unauthorized          | [UnauthorizedResponse](#unauthorizedresponse)               |
-| 403         | Permission denied     | [ForbiddenResponse](#forbiddenresponse)                     |
-| 404         | Resource not found    | [NotFoundResponse](#notfoundresponse)                       |
-| 500         | Internal server error | [InternalServerErrorResponse](#internalservererrorresponse) |
-| 503         | Service unavailable   | [ServiceUnavailableResponse](#serviceunavailableresponse)   |
-| 422         | Validation Error      | [HTTPValidationError](#httpvalidationerror)                 |
+| Status Code | Description            | Component                                                   |
+|-------------|------------------------|-------------------------------------------------------------|
+| 200         | Successful response    | [PromptResourceResponse](#promptresourceresponse)           |
+| 400         | Invalid request format | [BadRequestResponse](#badrequestresponse)                   |
+| 401         | Unauthorized           | [UnauthorizedResponse](#unauthorizedresponse)               |
+| 403         | Permission denied      | [ForbiddenResponse](#forbiddenresponse)                     |
+| 404         | Resource not found     | [NotFoundResponse](#notfoundresponse)                       |
+| 500         | Internal server error  | [InternalServerErrorResponse](#internalservererrorresponse) |
+| 503         | Service unavailable    | [ServiceUnavailableResponse](#serviceunavailableresponse)   |
+| 422         | Validation Error       | [HTTPValidationError](#httpvalidationerror)                 |
 
 
 
@@ -1948,15 +2284,16 @@ For example:
 
 ### ✅ Responses
 
-| Status Code | Description           | Component                                                   |
-|-------------|-----------------------|-------------------------------------------------------------|
-| 200         | Successful response   | [PromptResourceResponse](#promptresourceresponse)           |
-| 401         | Unauthorized          | [UnauthorizedResponse](#unauthorizedresponse)               |
-| 403         | Permission denied     | [ForbiddenResponse](#forbiddenresponse)                     |
-| 404         | Resource not found    | [NotFoundResponse](#notfoundresponse)                       |
-| 500         | Internal server error | [InternalServerErrorResponse](#internalservererrorresponse) |
-| 503         | Service unavailable   | [ServiceUnavailableResponse](#serviceunavailableresponse)   |
-| 422         | Validation Error      | [HTTPValidationError](#httpvalidationerror)                 |
+| Status Code | Description            | Component                                                   |
+|-------------|------------------------|-------------------------------------------------------------|
+| 200         | Successful response    | [PromptResourceResponse](#promptresourceresponse)           |
+| 400         | Invalid request format | [BadRequestResponse](#badrequestresponse)                   |
+| 401         | Unauthorized           | [UnauthorizedResponse](#unauthorizedresponse)               |
+| 403         | Permission denied      | [ForbiddenResponse](#forbiddenresponse)                     |
+| 404         | Resource not found     | [NotFoundResponse](#notfoundresponse)                       |
+| 500         | Internal server error  | [InternalServerErrorResponse](#internalservererrorresponse) |
+| 503         | Service unavailable    | [ServiceUnavailableResponse](#serviceunavailableresponse)   |
+| 422         | Validation Error       | [HTTPValidationError](#httpvalidationerror)                 |
 
 Examples
 
@@ -6268,6 +6605,7 @@ Inference configuration.
 |-------|------|-------------|
 | default_model |  | Identification of default model used when no other model is specified. |
 | default_provider |  | Identification of default provider used when no other model is specified. |
+| context_windows | object | Map of fully-qualified model identifier (e.g., "openai/gpt-4o-mini") to context window size in tokens. Used by the conversation compaction trigger to decide when older turns must be summarized before the input exceeds the window. Models absent from this map have no registered window — callers fall back to their own default or skip the token-based trigger. |
 
 
 ## InfoResponse
@@ -6389,11 +6727,6 @@ Model representing a response to a liveness request.
 Attributes:
     alive: If app is alive.
 
-Example:
-    ```python
-    liveness_response = LivenessResponse(alive=True)
-    ```
-
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6424,12 +6757,18 @@ Useful resources:
 | use_as_library_client |  | When set to true Llama Stack will be used in library mode, not in server mode (default) |
 | library_client_config_path |  | Path to configuration file used when Llama Stack is run in library mode |
 | timeout | integer | Timeout in seconds for requests to Llama Stack service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
+| max_retries | integer | Maximum number of connection attempts before giving up. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod). |
+| retry_delay | integer | Delay in seconds between retry attempts. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod). |
+| allow_degraded_mode |  | If enabled, Lightspeed Core can be started even when Llama Stack is not accessible (valid for server mode only) |
 
 
 ## MCPClientAuthOptionsResponse
 
 
 Response containing MCP servers that accept client-provided authorization.
+
+Attributes:
+    servers: MCP servers that declare client authentication headers.
 
 
 | Field | Type | Description |
@@ -6469,13 +6808,19 @@ Information about MCP server client authentication options.
 ## MCPServerDeleteResponse
 
 
-Response for a successful MCP server deletion.
+Response indicating the outcome of an MCP server delete operation.
+
+Attributes:
+    name: Name of the MCP server targeted for deletion.
+    deleted: Whether the server was successfully deleted (True) or not found (False).
+    response: Description of the result, e.g. "MCP server deleted successfully".
 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| name | string | Deleted MCP server name |
-| message | string | Status message |
+| deleted | boolean | Whether the deletion was successful. |
+| name | string | MCP server name that was passed to delete. |
+| response | string | Human-readable outcome of the delete operation. |
 
 
 ## MCPServerInfo
@@ -6503,6 +6848,9 @@ Attributes:
 
 Response listing all registered MCP servers.
 
+Attributes:
+    servers: All registered MCP servers (static and dynamic).
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6521,14 +6869,6 @@ Attributes:
     authorization_headers: Optional headers to send to the MCP server.
     headers: Optional list of HTTP header names to forward from incoming requests.
     timeout: Optional request timeout in seconds.
-
-Example:
-    ```python
-    request = MCPServerRegistrationRequest(
-        name="my-tools",
-        url="http://localhost:8888/mcp",
-    )
-    ```
 
 
 | Field | Type | Description |
@@ -7625,11 +7965,7 @@ Attributes:
     media_type: The optional media type for response format (application/json or text/plain).
     vector_store_ids: The optional list of specific vector store IDs to query for RAG.
     shield_ids: The optional list of safety shield IDs to apply.
-
-Example:
-    ```python
-    query_request = QueryRequest(query="Tell me about Kubernetes")
-    ```
+    solr: Optional Solr inline RAG options (mode, filters) or legacy filter-only dict.
 
 
 | Field | Type | Description |
@@ -7847,21 +8183,6 @@ Attributes:
     ready: If service is ready.
     reason: The reason for the readiness.
     providers: List of unhealthy providers in case of readiness failure.
-
-Example:
-    ```python
-    readiness_response = ReadinessResponse(
-        ready=False,
-        reason="Service is not ready",
-        providers=[
-            ProviderHealthStatus(
-                provider_id="ollama",
-                status="unhealthy",
-                message="Server is unavailable"
-            )
-        ]
-    )
-    ```
 
 
 | Field | Type | Description |
@@ -8428,14 +8749,6 @@ Attributes:
     functionality: The functionality of the service.
     status: The status of the service.
 
-Example:
-    ```python
-    status_response = StatusResponse(
-        functionality="feedback",
-        status={"enabled": True},
-    )
-    ```
-
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -8466,15 +8779,6 @@ Attributes:
     request_id: The streaming request ID targeted by the interrupt call.
     interrupted: Whether an in-progress stream was interrupted.
     message: Human-readable interruption status message.
-
-Example:
-    ```python
-    response = StreamingInterruptResponse(
-        request_id="123e4567-e89b-12d3-a456-426614174000",
-        interrupted=True,
-        message="Streaming request interrupted",
-    )
-    ```
 
 
 | Field | Type | Description |
@@ -8547,6 +8851,30 @@ Model representing a response to tools request.
 | Field | Type | Description |
 |-------|------|-------------|
 | tools | array | List of tools available from all configured MCP servers and built-in toolgroups |
+
+
+## TrustedProxyConfiguration
+
+
+Configuration for trusted-proxy auth module.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| user_header | string | HTTP header containing the forwarded user identity. |
+| allowed_service_accounts |  | Optional allowlist of Kubernetes ServiceAccount identities permitted to act as trusted proxies. When set to null/omitted, any ServiceAccount with a valid token is accepted. When set to a non-empty list, only the listed ServiceAccounts are allowed. An empty list behaves the same as null (no restriction). |
+
+
+## TrustedProxyServiceAccount
+
+
+A Kubernetes ServiceAccount identity for trusted-proxy allowlist.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| namespace | string | Kubernetes namespace of the ServiceAccount. |
+| name | string | Name of the Kubernetes ServiceAccount. |
 
 
 ## UnauthorizedResponse
