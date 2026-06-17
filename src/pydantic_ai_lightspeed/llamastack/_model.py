@@ -225,7 +225,10 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
                     "Streamed response ended without content or tool calls"
                 )
 
-            assert isinstance(first_chunk, responses.ResponseCreatedEvent)
+            if not isinstance(first_chunk, responses.ResponseCreatedEvent):
+                raise UnexpectedModelBehavior(
+                    f"Expected ResponseCreatedEvent, got {type(first_chunk).__name__}"
+                )
 
             yield OpenAIResponsesStreamedResponse(
                 model_request_parameters=model_request_parameters,
