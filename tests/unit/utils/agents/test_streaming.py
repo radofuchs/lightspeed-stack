@@ -203,6 +203,14 @@ def patch_recording_metrics_fixture(mocker: MockerFixture) -> None:
     mocker.patch("utils.agents.query.recording.record_llm_call")
 
 
+@pytest.fixture(name="patch_streaming_configuration")
+def patch_streaming_configuration_fixture(mocker: MockerFixture) -> None:
+    """Patch streaming module configuration for isolated agent streaming tests."""
+    mock_config = mocker.MagicMock()
+    mock_config.skills = None
+    mocker.patch("utils.agents.streaming.configuration", mock_config)
+
+
 @pytest.fixture(autouse=True, name="stream_interrupt_mocks")
 def stream_interrupt_mocks_fixture(mocker: MockerFixture) -> dict[str, Any]:
     """Patch stream interrupt registry and deregister for wrapper tests."""
@@ -479,6 +487,7 @@ class TestDispatchStreamEvent:
         assert not turn_state.turn_summary.tool_calls
 
 
+@pytest.mark.usefixtures("patch_streaming_configuration")
 class TestRetrieveAgentResponseGenerator:
     """Tests for retrieve_agent_response_generator."""
 

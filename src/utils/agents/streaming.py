@@ -117,7 +117,7 @@ async def retrieve_agent_response_generator(
                 turn_summary,
             )
 
-        agent = build_agent(context.client, responses_params)
+        agent = build_agent(context.client, responses_params, configuration.skills)
 
         return (
             agent_response_generator(
