@@ -2616,16 +2616,23 @@ Accepts both user-facing rag_id (from LCORE config) and llama-stack
 vector_store_id. If a rag_id from config is provided, it is resolved
 to the underlying vector_store_id for the llama-stack lookup.
 
-Returns:
-    RAGInfoResponse: A single RAG's details.
+### Parameters:
+- request: The incoming HTTP request (used by middleware).
+- rag_id: rag_id or llama-stack vector_store_id
+- auth: Authentication tuple from the auth dependency (used by middleware).
 
-Raises:
-    HTTPException:
-        - 401: Authentication failed
-        - 403: Authorization failed
-        - 404: RAG with the given ID not found
-        - 500: Lightspeed Stack configuration not loaded
-        - 503: Unable to connect to Llama Stack
+### Raises:
+- HTTPException: with status 401 for unauthorized access.
+- HTTPException: with status 403 if permission is denied.
+- HTTPException: with status 404 if rag_id is not found.
+- HTTPException: with status 422 for incorrect request payload.
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
+### Returns:
+- RAGInfoResponse: A single RAG's details.
 
 
 
@@ -5461,8 +5468,17 @@ Serve the A2A Agent Card at the well-known location.
 This endpoint provides the agent card that describes Lightspeed's
 capabilities according to the A2A protocol specification.
 
-Returns:
-    AgentCard: The agent card describing this agent's capabilities.
+### Parameters:
+- auth: Authentication tuple from the auth dependency (used by middleware).
+
+### Raises:
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
+### Returns:
+- AgentCard: The agent card describing this agent's capabilities.
 
 
 
@@ -5483,8 +5499,17 @@ Serve the A2A Agent Card at the well-known location.
 This endpoint provides the agent card that describes Lightspeed's
 capabilities according to the A2A protocol specification.
 
-Returns:
-    AgentCard: The agent card describing this agent's capabilities.
+### Parameters:
+- auth: Authentication tuple from the auth dependency (used by middleware).
+
+### Raises:
+- HTTPException: with status 500 and a detail object containing `response`
+  and `cause` when service configuration is wrong or incomplete.
+- HTTPException: with status 503 and a detail object containing `response`
+  and `cause` when unable to connect to Llama Stack.
+
+### Returns:
+- AgentCard: The agent card describing this agent's capabilities.
 
 
 
@@ -5568,8 +5593,14 @@ Returns:
 
 Health check endpoint for A2A service.
 
-Returns:
-    Dict with health status information.
+### Parameters:
+- None
+
+### Raises:
+- None
+
+### Returns:
+- Dict with health status information.
 
 
 
@@ -5879,6 +5910,7 @@ Authentication configuration.
 | jwk_config |  |  |
 | api_key_config |  |  |
 | rh_identity_config |  |  |
+| trusted_proxy_config |  |  |
 
 
 ## AuthorizationCodeOAuthFlow
@@ -5974,6 +6006,11 @@ BYOK (Bring Your Own Knowledge) RAG configuration.
 | vector_db_id | string | Vector database identification. |
 | db_path | string | Path to RAG database. |
 | score_multiplier | number | Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them. |
+| host |  | PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector. |
+| port |  | PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. |
+| db |  | PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector. |
+| user |  | PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector. |
+| password |  | PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector. |
 
 
 ## CORSConfiguration
@@ -6142,6 +6179,7 @@ Attributes:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| deleted | boolean | Whether the deletion was successful. |
 | conversation_id | string | The conversation ID (UUID) that was deleted. |
 | success | boolean | Whether the deletion was successful. |
 | response | string | A message about the deletion result. |
@@ -6250,13 +6288,6 @@ Model representing a request to update a conversation topic summary.
 Attributes:
     topic_summary: The new topic summary for the conversation.
 
-Example:
-    ```python
-    update_request = ConversationUpdateRequest(
-        topic_summary="Discussion about machine learning algorithms"
-    )
-    ```
-
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6272,15 +6303,6 @@ Attributes:
     conversation_id: The conversation ID (UUID) that was updated.
     success: Whether the update was successful.
     message: A message about the update result.
-
-Example:
-    ```python
-    update_response = ConversationUpdateResponse(
-        conversation_id="123e4567-e89b-12d3-a456-426614174000",
-        success=True,
-        message="Topic summary updated successfully",
-    )
-    ```
 
 
 | Field | Type | Description |
@@ -6397,18 +6419,6 @@ Attributes:
     user_feedback: The optional user feedback.
     categories: The optional list of feedback categories (multi-select for negative feedback).
 
-Example:
-    ```python
-    feedback_request = FeedbackRequest(
-        conversation_id="12345678-abcd-0000-0123-456789abcdef",
-        user_question="what are you doing?",
-        user_feedback="This response is not helpful",
-        llm_response="I don't know",
-        sentiment=-1,
-        categories=[FeedbackCategory.INCORRECT, FeedbackCategory.INCOMPLETE]
-    )
-    ```
-
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6428,11 +6438,6 @@ Model representing a response to a feedback request.
 Attributes:
     response: The response of the feedback request.
 
-Example:
-    ```python
-    feedback_response = FeedbackResponse(response="feedback received")
-    ```
-
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6447,13 +6452,6 @@ Model representing a feedback status update request.
 Attributes:
     status: Value of the desired feedback enabled state.
 
-Example:
-    ```python
-    feedback_request = FeedbackRequest(
-        status=false
-    )
-    ```
-
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -6467,18 +6465,6 @@ Model representing a response to a feedback status update request.
 
 Attributes:
     status: The previous and current status of the service and who updated it.
-
-Example:
-    ```python
-    status_response = StatusResponse(
-        status={
-            "previous_status": true,
-            "updated_status": false,
-            "updated_by": "user/test",
-            "timestamp": "2023-03-15 12:34:56"
-        },
-    )
-    ```
 
 
 | Field | Type | Description |
@@ -6618,21 +6604,30 @@ Attributes:
     service_version: Service version.
     llama_stack_version: Llama Stack version.
 
-Example:
-    ```python
-    info_response = InfoResponse(
-        name="Lightspeed Stack",
-        service_version="1.0.0",
-        llama_stack_version="0.2.22",
-    )
-    ```
-
 
 | Field | Type | Description |
 |-------|------|-------------|
 | name | string | Service name |
 | service_version | string | Service version |
 | llama_stack_version | string | Llama Stack version |
+
+
+## InputToolMCP
+
+
+MCP input tool with authorization included when serializing request bodies.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| type | string |  |
+| server_label | string |  |
+| connector_id |  |  |
+| server_url |  |  |
+| headers |  |  |
+| authorization |  |  |
+| require_approval |  |  |
+| allowed_tools |  |  |
 
 
 ## InternalServerErrorResponse
