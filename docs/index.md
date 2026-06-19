@@ -90,6 +90,8 @@ product questions using backend LLM services, agents, and RAG databases.
 
 [Releasing](https://lightspeed-core.github.io/lightspeed-stack/releasing.html)
 
+[LTS provess overview](https://lightspeed-core.github.io/lightspeed-stack/lts_flow.html)
+
 ## Demos
 
 [LCORE introduction](https://lightspeed-core.github.io/lightspeed-stack/demos/lcore/lcore.html#/)

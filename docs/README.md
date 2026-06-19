@@ -19,6 +19,8 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 
 [Deployment Guide](https://lightspeed-core.github.io/lightspeed-stack/deployment_guide.html)
 
+[Container Orchestration Guide](https://lightspeed-core.github.io/lightspeed-stack/container_orchestration.html)
+
 [Linux](https://lightspeed-core.github.io/lightspeed-stack/installation_linux.html)
 
 [MacOS](https://lightspeed-core.github.io/lightspeed-stack/installation_macos.html)
@@ -80,6 +82,8 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 [Branching](https://lightspeed-core.github.io/lightspeed-stack/branching.html)
 
 [Releasing](https://lightspeed-core.github.io/lightspeed-stack/releasing.html)
+
+[LTS provess overview](https://lightspeed-core.github.io/lightspeed-stack/lts_flow.html)
 
 ## Demos
 
