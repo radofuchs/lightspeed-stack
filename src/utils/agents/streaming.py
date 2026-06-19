@@ -210,7 +210,9 @@ async def generate_agent_response(
                 original_input,
             )
         yield serialize_event(
-            TokenStreamPayload.create(chunk_id=-1, token=suffix),
+            TokenStreamPayload.create(
+                chunk_id=turn_summary.next_chunk_id, token=suffix
+            ),
             media_type,
         )
         yield serialize_event(
@@ -359,6 +361,7 @@ def _process_token(
         token=text,
     )
     state.chunk_id += 1
+    state.turn_summary.next_chunk_id = state.chunk_id
     return payload
 
 
@@ -409,6 +412,7 @@ def _(
         token=final_text,
     )
     state.chunk_id += 1
+    state.turn_summary.next_chunk_id = state.chunk_id
     return payload
 
 

@@ -646,7 +646,7 @@ async def generate_response(  # pylint: disable=too-many-arguments,too-many-posi
                 original_input,
             )
         yield stream_event(
-            {"id": -1, "token": suffix},
+            {"id": turn_summary.next_chunk_id, "token": suffix},
             LLM_TOKEN_EVENT,
             context.query_request.media_type or MEDIA_TYPE_JSON,
         )
@@ -780,6 +780,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
                 media_type,
             )
             chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
 
         # Store MCP call item info for later lookup when arguments.done event occurs
         elif event_type == "response.output_item.added":
@@ -805,6 +806,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
                 media_type,
             )
             chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
 
         # Final text of the output (capture, but emit at response.completed)
         elif event_type == "response.output_text.done":
@@ -893,6 +895,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
                 media_type,
             )
             chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
 
         # Incomplete or failed response - emit error
         elif event_type in ("response.incomplete", "response.failed"):

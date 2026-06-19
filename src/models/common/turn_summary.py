@@ -119,6 +119,11 @@ class TurnSummary(BaseModel):
         description="Accumulated text deltas during streaming, used to reconstruct "
         "partial content on interruption.",
     )
+    next_chunk_id: int = Field(
+        default=0,
+        description="Next monotonic SSE chunk index, kept in sync with the inner "
+        "generator so the interrupt handler can emit a sequentially valid id.",
+    )
 
 
 class ToolInfoSummary(BaseModel):
