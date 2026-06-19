@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import HTTPException
 
@@ -54,7 +54,7 @@ def stream_http_error_event(
     )
 
 
-def format_stream_data(d: dict) -> str:
+def format_stream_data(d: dict[str, Any]) -> str:
     """Format a dictionary as an SSE data event string.
 
     Args:
@@ -182,7 +182,7 @@ def stream_end_event(
     )
 
 
-def stream_event(data: dict, event_type: str, media_type: str) -> str:
+def stream_event(data: dict[str, Any], event_type: str, media_type: str) -> str:
     """Build an SSE event string based on media type.
 
     Args:
@@ -195,7 +195,7 @@ def stream_event(data: dict, event_type: str, media_type: str) -> str:
     """
     if media_type == MEDIA_TYPE_TEXT:
         if event_type == LLM_TOKEN_EVENT:
-            return data.get("token", "")
+            return str(data.get("token", ""))
         if event_type == LLM_TOOL_CALL_EVENT:
             return f"[Tool Call: {data.get('function_name', 'unknown')}]\n"
         if event_type == LLM_TOOL_RESULT_EVENT:
