@@ -114,6 +114,11 @@ class TurnSummary(BaseModel):
         description="Structured response output items, captured for compacted-mode "
         "turn persistence (LCORE-1572). Empty on the non-compacted path.",
     )
+    partial_tokens: list[str] = Field(
+        default_factory=list,
+        description="Accumulated text deltas during streaming, used to reconstruct "
+        "partial content on interruption.",
+    )
 
 
 class ToolInfoSummary(BaseModel):

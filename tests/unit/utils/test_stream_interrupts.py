@@ -5,15 +5,19 @@ import asyncio
 import pytest
 from pytest_mock import MockerFixture
 
+from constants import INTERRUPTED_RESPONSE_MESSAGE
 from models.api.requests import QueryRequest
 from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.turn_summary import TurnSummary
 from utils.stream_interrupts import (
     StreamInterruptRegistry,
+    build_interrupted_response,
     persist_interrupted_turn,
     register_interrupt_callback,
 )
+
+INTERRUPTED_INDICATOR = f"\n\n*{INTERRUPTED_RESPONSE_MESSAGE}*"
 
 
 @pytest.mark.asyncio
@@ -158,3 +162,28 @@ def test_register_interrupt_callback_registers_current_task(
 
     asyncio.run(invoke_callback())
     persist_mock.assert_awaited_once()
+
+
+class TestBuildInterruptedResponse:
+    """Tests for build_interrupted_response helper."""
+
+    def test_plain_text_partial(self) -> None:
+        """Plain text tokens produce text + indicator."""
+        tokens = ["Hello ", "world"]
+        full, suffix = build_interrupted_response(tokens)
+        assert full == f"Hello world{INTERRUPTED_INDICATOR}"
+        assert suffix == INTERRUPTED_INDICATOR
+
+    def test_unclosed_code_fence(self) -> None:
+        """Unclosed code fence is closed before indicator."""
+        tokens = ["```python\n", "def foo():\n", "    pass"]
+        full, suffix = build_interrupted_response(tokens)
+        assert "```" in suffix
+        assert suffix.endswith(INTERRUPTED_INDICATOR)
+        assert full.startswith("```python\ndef foo():\n    pass")
+
+    def test_empty_tokens(self) -> None:
+        """Empty token list produces just the indicator."""
+        full, suffix = build_interrupted_response([])
+        assert full == INTERRUPTED_INDICATOR
+        assert suffix == INTERRUPTED_INDICATOR

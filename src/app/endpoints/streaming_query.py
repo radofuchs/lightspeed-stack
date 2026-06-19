@@ -789,6 +789,7 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
         elif event_type == "response.output_text.delta":
             delta_chunk = cast(TextDeltaChunk, chunk)
             text_parts.append(delta_chunk.delta)
+            turn_summary.partial_tokens.append(delta_chunk.delta)
             yield stream_event(
                 {
                     "id": chunk_id,
