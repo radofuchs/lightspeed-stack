@@ -64,6 +64,8 @@ from utils.agents.streaming import (
 )
 from utils.token_counter import TokenCounter
 
+INTERRUPTED_INDICATOR = f"\n\n*{INTERRUPTED_RESPONSE_MESSAGE}*"
+
 TEST_CONVERSATION_ID = "123e4567-e89b-12d3-a456-426614174000"
 
 
@@ -715,9 +717,9 @@ class TestGenerateAgentResponse:
             )
         ]
 
-        assert _sse_event_types(result) == ["start", "token", "interrupted"]
+        assert _sse_event_types(result) == ["start", "token", "token", "interrupted"]
         persist_mock.assert_awaited_once()
-        assert turn_summary.llm_response == INTERRUPTED_RESPONSE_MESSAGE
+        assert turn_summary.llm_response == INTERRUPTED_INDICATOR
         stream_interrupt_mocks["deregister"].assert_called_once_with(context.request_id)
 
     @pytest.mark.asyncio
@@ -808,7 +810,7 @@ class TestGenerateAgentResponse:
             )
         ]
 
-        assert _sse_event_types(result) == ["start", "token", "interrupted"]
+        assert _sse_event_types(result) == ["start", "token", "token", "interrupted"]
         persist_mock.assert_not_awaited()
 
 

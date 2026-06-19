@@ -274,7 +274,7 @@ async def persist_interrupted_turn(
                 original_input,
                 [
                     OpenAIResponseMessage(
-                        role="assistant", content=INTERRUPTED_RESPONSE_MESSAGE
+                        role="assistant", content=turn_summary.llm_response
                     )
                 ],
             )
@@ -283,7 +283,7 @@ async def persist_interrupted_turn(
                 context.client,
                 responses_params.conversation,
                 cast(str, responses_params.input),
-                INTERRUPTED_RESPONSE_MESSAGE,
+                turn_summary.llm_response,
             )
     except Exception:  # pylint: disable=broad-except
         logger.exception(
@@ -365,7 +365,8 @@ def register_interrupt_callback(
         if guard[0]:
             return
         guard[0] = True
-        turn_summary.llm_response = INTERRUPTED_RESPONSE_MESSAGE
+        full_text, _ = build_interrupted_response(turn_summary.partial_tokens)
+        turn_summary.llm_response = full_text
         await persist_interrupted_turn(
             context,
             responses_params,

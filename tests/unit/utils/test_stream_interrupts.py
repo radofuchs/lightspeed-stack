@@ -46,6 +46,7 @@ async def test_persist_interrupted_turn_compacted_uses_original_input(
     responses_params.input = ["explicit rewrite"]
 
     turn_summary = TurnSummary()
+    turn_summary.llm_response = f"partial content{INTERRUPTED_INDICATOR}"
     background_tasks: list[asyncio.Task[None]] = []
     items = mocker.patch(
         "utils.stream_interrupts.append_turn_items_to_conversation",
@@ -67,6 +68,8 @@ async def test_persist_interrupted_turn_compacted_uses_original_input(
 
     items.assert_awaited_once()
     assert items.call_args.args[2] == "the original query"
+    call_output = items.call_args.args[3]
+    assert call_output[0].content == f"partial content{INTERRUPTED_INDICATOR}"
     strs.assert_not_awaited()
 
 
@@ -94,6 +97,7 @@ async def test_persist_interrupted_turn_schedules_background_topic_summary(
     responses_params.input = "hello"
 
     turn_summary = TurnSummary()
+    turn_summary.llm_response = INTERRUPTED_INDICATOR
     background_tasks: list[asyncio.Task[None]] = []
 
     mocker.patch(

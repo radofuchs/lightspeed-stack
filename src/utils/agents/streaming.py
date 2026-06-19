@@ -25,7 +25,7 @@ from pydantic_ai.messages import (
 )
 
 from configuration import configuration
-from constants import INTERRUPTED_RESPONSE_MESSAGE, MEDIA_TYPE_JSON
+from constants import MEDIA_TYPE_JSON
 from log import get_logger
 from models.common.agents import (
     AgentTurnAccumulator,
@@ -65,6 +65,7 @@ from utils.responses import (
     maybe_get_topic_summary,
 )
 from utils.stream_interrupts import (
+    build_interrupted_response,
     deregister_stream,
     persist_interrupted_turn,
     register_interrupt_callback,
@@ -197,9 +198,10 @@ async def generate_agent_response(
         current_task = asyncio.current_task()
         if current_task is not None:
             current_task.uncancel()
+        full_text, suffix = build_interrupted_response(turn_summary.partial_tokens)
         if not persist_guard[0]:
             persist_guard[0] = True
-            turn_summary.llm_response = INTERRUPTED_RESPONSE_MESSAGE
+            turn_summary.llm_response = full_text
             await persist_interrupted_turn(
                 context,
                 responses_params,
@@ -207,6 +209,10 @@ async def generate_agent_response(
                 background_topic_summary_tasks,
                 original_input,
             )
+        yield serialize_event(
+            TokenStreamPayload.create(chunk_id=-1, token=suffix),
+            media_type,
+        )
         yield serialize_event(
             InterruptedStreamPayload.create(request_id=context.request_id),
             media_type,
@@ -347,6 +353,7 @@ def _process_token(
         Token stream payload containing the emitted token chunk.
     """
     state.text_parts.append(text)
+    state.turn_summary.partial_tokens.append(text)
     payload = TokenStreamPayload.create(
         chunk_id=state.chunk_id,
         token=text,
