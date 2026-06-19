@@ -204,19 +204,19 @@ class TestStreamingQueryEndpointHandler:
 
         mock_turn_summary = TurnSummary()
         mocker.patch(
-            "app.endpoints.streaming_query.retrieve_response_generator",
-            return_value=(mock_generator(), mock_turn_summary),
+            "app.endpoints.streaming_query.retrieve_agent_response_generator",
+            new=mocker.AsyncMock(return_value=(mock_generator(), mock_turn_summary)),
         )
 
-        async def mock_generate_response(
+        async def mock_generate_agent_response(
             *_args: Any, **_kwargs: Any
         ) -> AsyncIterator[str]:
             async for item in mock_generator():
                 yield item
 
         mocker.patch(
-            "app.endpoints.streaming_query.generate_response",
-            side_effect=mock_generate_response,
+            "app.endpoints.streaming_query.generate_agent_response",
+            side_effect=mock_generate_agent_response,
         )
         mocker.patch(
             "app.endpoints.streaming_query.normalize_conversation_id",
@@ -291,19 +291,19 @@ class TestStreamingQueryEndpointHandler:
 
         mock_turn_summary = TurnSummary()
         mocker.patch(
-            "app.endpoints.streaming_query.retrieve_response_generator",
-            return_value=(mock_generator(), mock_turn_summary),
+            "app.endpoints.streaming_query.retrieve_agent_response_generator",
+            new=mocker.AsyncMock(return_value=(mock_generator(), mock_turn_summary)),
         )
 
-        async def mock_generate_response(
+        async def mock_generate_agent_response(
             *_args: Any, **_kwargs: Any
         ) -> AsyncIterator[str]:
             async for item in mock_generator():
                 yield item
 
         mocker.patch(
-            "app.endpoints.streaming_query.generate_response",
-            side_effect=mock_generate_response,
+            "app.endpoints.streaming_query.generate_agent_response",
+            side_effect=mock_generate_agent_response,
         )
         mocker.patch(
             "app.endpoints.streaming_query.normalize_conversation_id",
@@ -389,19 +389,19 @@ class TestStreamingQueryEndpointHandler:
 
         mock_turn_summary = TurnSummary()
         mocker.patch(
-            "app.endpoints.streaming_query.retrieve_response_generator",
-            return_value=(mock_generator(), mock_turn_summary),
+            "app.endpoints.streaming_query.retrieve_agent_response_generator",
+            new=mocker.AsyncMock(return_value=(mock_generator(), mock_turn_summary)),
         )
 
-        async def mock_generate_response(
+        async def mock_generate_agent_response(
             *_args: Any, **_kwargs: Any
         ) -> AsyncIterator[str]:
             async for item in mock_generator():
                 yield item
 
         mocker.patch(
-            "app.endpoints.streaming_query.generate_response",
-            side_effect=mock_generate_response,
+            "app.endpoints.streaming_query.generate_agent_response",
+            side_effect=mock_generate_agent_response,
         )
         mocker.patch(
             "app.endpoints.streaming_query.normalize_conversation_id",
@@ -485,19 +485,19 @@ class TestStreamingQueryEndpointHandler:
 
         mock_turn_summary = TurnSummary()
         mocker.patch(
-            "app.endpoints.streaming_query.retrieve_response_generator",
-            return_value=(mock_generator(), mock_turn_summary),
+            "app.endpoints.streaming_query.retrieve_agent_response_generator",
+            new=mocker.AsyncMock(return_value=(mock_generator(), mock_turn_summary)),
         )
 
-        async def mock_generate_response(
+        async def mock_generate_agent_response(
             *_args: Any, **_kwargs: Any
         ) -> AsyncIterator[str]:
             async for item in mock_generator():
                 yield item
 
         mocker.patch(
-            "app.endpoints.streaming_query.generate_response",
-            side_effect=mock_generate_response,
+            "app.endpoints.streaming_query.generate_agent_response",
+            side_effect=mock_generate_agent_response,
         )
         mocker.patch(
             "app.endpoints.streaming_query.normalize_conversation_id",
@@ -583,19 +583,19 @@ class TestStreamingQueryEndpointHandler:
 
         mock_turn_summary = TurnSummary()
         mocker.patch(
-            "app.endpoints.streaming_query.retrieve_response_generator",
-            return_value=(mock_generator(), mock_turn_summary),
+            "app.endpoints.streaming_query.retrieve_agent_response_generator",
+            new=mocker.AsyncMock(return_value=(mock_generator(), mock_turn_summary)),
         )
 
-        async def mock_generate_response(
+        async def mock_generate_agent_response(
             *_args: Any, **_kwargs: Any
         ) -> AsyncIterator[str]:
             async for item in mock_generator():
                 yield item
 
         mocker.patch(
-            "app.endpoints.streaming_query.generate_response",
-            side_effect=mock_generate_response,
+            "app.endpoints.streaming_query.generate_agent_response",
+            side_effect=mock_generate_agent_response,
         )
         mocker.patch(
             "app.endpoints.streaming_query.normalize_conversation_id",

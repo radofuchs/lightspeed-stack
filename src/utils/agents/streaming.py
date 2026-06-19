@@ -24,7 +24,6 @@ from pydantic_ai.messages import (
     TextPartDelta,
 )
 
-from app.endpoints.streaming_query import shield_violation_generator
 from configuration import configuration
 from constants import INTERRUPTED_RESPONSE_MESSAGE, MEDIA_TYPE_JSON
 from log import get_logger
@@ -70,6 +69,7 @@ from utils.stream_interrupts import (
     persist_interrupted_turn,
     register_interrupt_callback,
 )
+from utils.streaming_sse import shield_violation_generator
 
 AgentDispatchEvent: TypeAlias = AgentStreamEvent | AgentRunResultEvent
 

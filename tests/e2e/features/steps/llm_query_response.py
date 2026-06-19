@@ -366,7 +366,6 @@ def _parse_streaming_response(response_text: str) -> dict:
     full_response = ""
     full_response_split = []
     finished = False
-    first_token = True
     stream_error = (
         None  # {"status_code": int, "response": str, "cause": str} if event "error"
     )
@@ -380,10 +379,6 @@ def _parse_streaming_response(response_text: str) -> dict:
                 if event == "start":
                     conversation_id = data["data"]["conversation_id"]
                 elif event == "token":
-                    # Skip the first token (shield status message)
-                    if first_token:
-                        first_token = False
-                        continue
                     full_response_split.append(data["data"]["token"])
                 elif event == "turn_complete":
                     full_response = data["data"]["token"]
