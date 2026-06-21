@@ -17,6 +17,15 @@ class "AccessRule" as src.models.config.AccessRule {
 class "Action" as src.models.config.Action {
   name
 }
+class "ApprovalFilter" as src.models.config.ApprovalFilter {
+  always : Optional[list[str]]
+  never : Optional[list[str]]
+  validate_no_overlap() -> Self
+}
+class "ApprovalsConfiguration" as src.models.config.ApprovalsConfiguration {
+  approval_retention_days : Optional[PositiveInt]
+  approval_timeout_seconds : Optional[PositiveInt]
+}
 class "AuthenticationConfiguration" as src.models.config.AuthenticationConfiguration {
   api_key_config : Optional[APIKeyTokenConfiguration]
   api_key_configuration : APIKeyTokenConfiguration
@@ -28,7 +37,10 @@ class "AuthenticationConfiguration" as src.models.config.AuthenticationConfigura
   rh_identity_config : Optional[RHIdentityConfiguration]
   rh_identity_configuration : RHIdentityConfiguration
   skip_for_health_probes : Optional[bool]
+  skip_for_metrics : Optional[bool]
   skip_tls_verification : bool
+  trusted_proxy_config : Optional[TrustedProxyConfiguration]
+  trusted_proxy_configuration : TrustedProxyConfiguration
   check_authentication_model() -> Self
 }
 class "AuthorizationConfiguration" as src.models.config.AuthorizationConfiguration {
@@ -41,13 +53,19 @@ class "AzureEntraIdConfiguration" as src.models.config.AzureEntraIdConfiguration
   tenant_id : SecretStr
 }
 class "ByokRag" as src.models.config.ByokRag {
+  db : Optional[str]
   db_path : Optional[str]
   embedding_dimension : Optional[PositiveInt]
   embedding_model : Optional[str]
+  host : Optional[str]
+  password : Optional[SecretStr]
+  port : Optional[str]
   rag_id : Optional[str]
   rag_type : Optional[str]
   score_multiplier : Optional[float]
+  user : Optional[str]
   vector_db_id : Optional[str]
+  validate_rag_type_fields() -> Self
 }
 class "CORSConfiguration" as src.models.config.CORSConfiguration {
   allow_credentials : Optional[bool]
@@ -56,12 +74,21 @@ class "CORSConfiguration" as src.models.config.CORSConfiguration {
   allow_origins : Optional[list[str]]
   check_cors_configuration() -> Self
 }
+class "CompactionConfiguration" as src.models.config.CompactionConfiguration {
+  buffer_max_ratio : Optional[float]
+  buffer_turns : Optional[NonNegativeInt]
+  enabled : Optional[bool]
+  threshold_ratio : Optional[float]
+  token_floor : Optional[NonNegativeInt]
+}
 class "Configuration" as src.models.config.Configuration {
   a2a_state : Optional[A2AStateConfiguration]
+  approvals : Optional[ApprovalsConfiguration]
   authentication : Optional[AuthenticationConfiguration]
   authorization : Optional[AuthorizationConfiguration]
   azure_entra_id : Optional[AzureEntraIdConfiguration]
   byok_rag : Optional[list[ByokRag]]
+  compaction : Optional[CompactionConfiguration]
   conversation_cache : Optional[ConversationHistoryConfiguration]
   customization : Optional[Customization]
   database : Optional[DatabaseConfiguration]
@@ -73,12 +100,15 @@ class "Configuration" as src.models.config.Configuration {
   okp : Optional[OkpConfiguration]
   quota_handlers : Optional[QuotaHandlersConfiguration]
   rag : Optional[RagConfiguration]
+  reranker : Optional[RerankerConfiguration]
   rlsapi_v1 : Optional[RlsapiV1Configuration]
   service : Optional[ServiceConfiguration]
+  skills : Optional[SkillsConfiguration]
   splunk : Optional[SplunkConfiguration]
   user_data_collection : Optional[UserDataCollection]
   dump(filename: str | Path) -> None
   validate_mcp_auth_headers() -> Self
+  validate_reranker_auto_enable() -> Self
   validate_rlsapi_v1_quota_configuration() -> Self
 }
 class "ConfigurationBase" as src.models.config.ConfigurationBase {
@@ -118,6 +148,7 @@ class "InMemoryCacheConfig" as src.models.config.InMemoryCacheConfig {
   max_entries : Optional[PositiveInt]
 }
 class "InferenceConfiguration" as src.models.config.InferenceConfiguration {
+  context_windows : Optional[dict[str, PositiveInt]]
   default_model : Optional[str]
   default_provider : Optional[str]
   check_default_model_and_provider() -> Self
@@ -146,8 +177,11 @@ class "JwtRoleRule" as src.models.config.JwtRoleRule {
   check_roles() -> Self
 }
 class "LlamaStackConfiguration" as src.models.config.LlamaStackConfiguration {
+  allow_degraded_mode : Optional[bool]
   api_key : Optional[SecretStr]
   library_client_config_path : Optional[str]
+  max_retries : Optional[PositiveInt]
+  retry_delay : Optional[PositiveInt]
   timeout : Optional[PositiveInt]
   url : Optional[AnyHttpUrl]
   use_as_library_client : Optional[bool]
@@ -158,6 +192,7 @@ class "ModelContextProtocolServer" as src.models.config.ModelContextProtocolServ
   headers : Optional[list[str]]
   name : Optional[str]
   provider_id : Optional[str]
+  require_approval : Optional[Literal['always', 'never'] | ApprovalFilter]
   resolved_authorization_headers : dict[str, str]
   timeout : Optional[PositiveInt]
   url : Optional[str]
@@ -172,12 +207,12 @@ class "OkpConfiguration" as src.models.config.OkpConfiguration {
 class "PostgreSQLDatabaseConfiguration" as src.models.config.PostgreSQLDatabaseConfiguration {
   ca_cert_path : Optional[FilePath]
   db : Optional[str]
-  gss_encmode : Optional[str]
+  gss_encmode : Optional[Literal['disable', 'prefer', 'require']]
   host : Optional[str]
   namespace : Optional[str]
   password : Optional[SecretStr]
   port : Optional[PositiveInt]
-  ssl_mode : Optional[str]
+  ssl_mode : Optional[Literal['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full']]
   user : Optional[str]
   check_postgres_configuration() -> Self
 }
@@ -208,6 +243,11 @@ class "RagConfiguration" as src.models.config.RagConfiguration {
   inline : Optional[list[str]]
   tool : Optional[list[str]]
 }
+class "RerankerConfiguration" as src.models.config.RerankerConfiguration {
+  enabled : Optional[bool]
+  model : Optional[str]
+  mark_as_explicitly_configured() -> Self
+}
 class "RlsapiV1Configuration" as src.models.config.RlsapiV1Configuration {
   allow_verbose_infer : Optional[bool]
   quota_subject : Optional[Literal['user_id', 'org_id', 'system_id']]
@@ -229,6 +269,9 @@ class "ServiceConfiguration" as src.models.config.ServiceConfiguration {
   check_service_configuration() -> Self
   validate_root_path(value: str) -> str
 }
+class "SkillsConfiguration" as src.models.config.SkillsConfiguration {
+  paths : Optional[list[Path]]
+}
 class "SplunkConfiguration" as src.models.config.SplunkConfiguration {
   enabled : Optional[bool]
   index : Optional[str]
@@ -245,6 +288,14 @@ class "TLSConfiguration" as src.models.config.TLSConfiguration {
   tls_key_path : Optional[FilePath]
   check_tls_configuration() -> Self
 }
+class "TrustedProxyConfiguration" as src.models.config.TrustedProxyConfiguration {
+  allowed_service_accounts : Optional[list[TrustedProxyServiceAccount]]
+  user_header : Optional[str]
+}
+class "TrustedProxyServiceAccount" as src.models.config.TrustedProxyServiceAccount {
+  name : Optional[str]
+  namespace : Optional[str]
+}
 class "UserDataCollection" as src.models.config.UserDataCollection {
   feedback_enabled : Optional[bool]
   feedback_storage : Optional[str]
@@ -255,11 +306,14 @@ class "UserDataCollection" as src.models.config.UserDataCollection {
 src.models.config.A2AStateConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.APIKeyTokenConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.AccessRule --|> src.models.config.ConfigurationBase
+src.models.config.ApprovalFilter --|> src.models.config.ConfigurationBase
+src.models.config.ApprovalsConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.AuthenticationConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.AuthorizationConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.AzureEntraIdConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.ByokRag --|> src.models.config.ConfigurationBase
 src.models.config.CORSConfiguration --|> src.models.config.ConfigurationBase
+src.models.config.CompactionConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.Configuration --|> src.models.config.ConfigurationBase
 src.models.config.ConversationHistoryConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.Customization --|> src.models.config.ConfigurationBase
@@ -278,11 +332,15 @@ src.models.config.QuotaLimiterConfiguration --|> src.models.config.Configuration
 src.models.config.QuotaSchedulerConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.RHIdentityConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.RagConfiguration --|> src.models.config.ConfigurationBase
+src.models.config.RerankerConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.RlsapiV1Configuration --|> src.models.config.ConfigurationBase
 src.models.config.SQLiteDatabaseConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.ServiceConfiguration --|> src.models.config.ConfigurationBase
+src.models.config.SkillsConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.SplunkConfiguration --|> src.models.config.ConfigurationBase
 src.models.config.TLSConfiguration --|> src.models.config.ConfigurationBase
+src.models.config.TrustedProxyConfiguration --|> src.models.config.ConfigurationBase
+src.models.config.TrustedProxyServiceAccount --|> src.models.config.ConfigurationBase
 src.models.config.UserDataCollection --|> src.models.config.ConfigurationBase
 src.models.config.CustomProfile --* src.models.config.Customization : custom_profile
 src.models.config.SQLiteDatabaseConfiguration --* src.models.config.DatabaseConfiguration : sqlite
