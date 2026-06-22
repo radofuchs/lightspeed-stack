@@ -12,7 +12,11 @@ from pydantic import ValidationError
 import constants
 from cache.in_memory_cache import InMemoryCache
 from cache.sqlite_cache import SQLiteCache
-from configuration import AppConfig, LogicError
+from configuration import (
+    AppConfig,
+    LogicError,
+    replace_env_vars_preserving_native_override,
+)
 from models.config import CustomProfile, ModelContextProtocolServer
 from utils.checks import InvalidConfigurationError
 
@@ -3886,3 +3890,52 @@ def test_init_from_dict_fake_data(config_dict: dict[str, Any]) -> None:
         # dictionary
         cfg = AppConfig()
         cfg.init_from_dict(config_dict)
+
+
+def test_native_override_env_refs_not_resolved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """${env.*} inside native_override is kept as a reference, not resolved.
+
+    Everything else in the config still resolves. This keeps LCORE from
+    eagerly resolving (and then logging at startup) secrets that belong to
+    Llama Stack's own raw schema.
+    """
+    monkeypatch.setenv("LCORE_TEST_SECRET", "supersecret")
+    monkeypatch.setenv("LCORE_TEST_MODEL", "gpt-4o-mini")
+    config_dict = {
+        "inference": {"default_model": "${env.LCORE_TEST_MODEL}"},
+        "llama_stack": {
+            "config": {
+                "baseline": "empty",
+                "native_override": {
+                    "providers": {
+                        "inference": [
+                            {"config": {"api_key": "${env.LCORE_TEST_SECRET}"}}
+                        ]
+                    }
+                },
+            }
+        },
+    }
+
+    resolved = replace_env_vars_preserving_native_override(config_dict)
+
+    # native_override keeps the reference verbatim — the secret never resolved
+    override_api_key = resolved["llama_stack"]["config"]["native_override"][
+        "providers"
+    ]["inference"][0]["config"]["api_key"]
+    assert override_api_key == "${env.LCORE_TEST_SECRET}"
+    assert "supersecret" not in str(resolved["llama_stack"])
+    # everything outside native_override still resolves
+    assert resolved["inference"]["default_model"] == "gpt-4o-mini"
+
+
+def test_replace_env_vars_without_native_override_resolves_all(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With no native_override, the helper resolves env refs like the plain call."""
+    monkeypatch.setenv("LCORE_TEST_MODEL", "gpt-4o-mini")
+    config_dict = {"inference": {"default_model": "${env.LCORE_TEST_MODEL}"}}
+    resolved = replace_env_vars_preserving_native_override(config_dict)
+    assert resolved["inference"]["default_model"] == "gpt-4o-mini"
