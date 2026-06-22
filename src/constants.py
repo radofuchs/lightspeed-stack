@@ -9,6 +9,19 @@ from typing import Final, Literal
 MINIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "0.2.17"
 MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "0.6.0"
 
+# Path to the lightspeed-stack.yaml, exported so uvicorn workers (separate
+# processes) can reload the configuration that the parent process selected.
+CONFIG_PATH_ENV_VAR: Final[str] = "LIGHTSPEED_STACK_CONFIG_PATH"
+
+# Environment variable through which the parent process passes the operator's
+# --synthesized-config-output override down to the uvicorn workers that perform
+# unified-mode library synthesis. Unset means use DEFAULT_SYNTHESIZED_CONFIG_PATH.
+SYNTHESIZED_CONFIG_PATH_ENV_VAR: Final[str] = "LIGHTSPEED_STACK_SYNTHESIZED_CONFIG_PATH"
+
+# Default persistent path for the synthesized Llama Stack run.yaml in unified
+# library mode. Overwritten on each boot and written with mode 0600 (R10).
+DEFAULT_SYNTHESIZED_CONFIG_PATH: Final[str] = "./.generated/run.yaml"
+
 UNABLE_TO_PROCESS_RESPONSE: Final[str] = "Unable to process this request"
 
 # Response stored in the conversation when the user interrupts a streaming request
