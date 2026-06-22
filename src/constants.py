@@ -25,7 +25,7 @@ DEFAULT_SYNTHESIZED_CONFIG_PATH: Final[str] = "./.generated/run.yaml"
 UNABLE_TO_PROCESS_RESPONSE: Final[str] = "Unable to process this request"
 
 # Response stored in the conversation when the user interrupts a streaming request
-INTERRUPTED_RESPONSE_MESSAGE: Final[str] = "You interrupted this request."
+INTERRUPTED_RESPONSE_MESSAGE: Final[str] = "Response stopped by the user."
 
 # Max seconds to wait for topic summary in background task after interrupt persist.
 TOPIC_SUMMARY_INTERRUPT_TIMEOUT_SECONDS: Final[float] = 30.0
