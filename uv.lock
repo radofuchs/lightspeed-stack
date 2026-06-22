@@ -620,14 +620,14 @@ name = "cohere"
 version = "7.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "fastavro" },
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "pydantic-core" },
-    { name = "requests" },
-    { name = "tokenizers" },
-    { name = "types-requests" },
-    { name = "typing-extensions" },
+    { name = "fastavro", marker = "sys_platform != 'emscripten'" },
+    { name = "httpx", marker = "sys_platform != 'emscripten'" },
+    { name = "pydantic", marker = "sys_platform != 'emscripten'" },
+    { name = "pydantic-core", marker = "sys_platform != 'emscripten'" },
+    { name = "requests", marker = "sys_platform != 'emscripten'" },
+    { name = "tokenizers", marker = "sys_platform != 'emscripten'" },
+    { name = "types-requests", marker = "sys_platform != 'emscripten'" },
+    { name = "typing-extensions", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cf/3c/670631ee223d7b64d157dc3f309bf93bde65efe0bb1a8341d9b575f407d3/cohere-7.0.4.tar.gz", hash = "sha256:35b6a397d35ae6eafa1a02921f42c2a98309a990874533e5238efaf3426b6a21", size = 208794, upload-time = "2026-06-11T15:17:52.994Z" }
 wheels = [
@@ -2031,7 +2031,6 @@ dev = [
     { name = "types-cachetools" },
     { name = "types-pyyaml" },
     { name = "types-requests" },
-    { name = "uv-build" },
 ]
 llslibdev = [
     { name = "aiosqlite" },
@@ -2067,6 +2066,7 @@ llslibdev = [
     { name = "transformers" },
     { name = "tree-sitter" },
     { name = "trl" },
+    { name = "uv-build" },
 ]
 
 [package.metadata]
@@ -2140,7 +2140,6 @@ dev = [
     { name = "types-cachetools", specifier = ">=6.1.0.20250717" },
     { name = "types-pyyaml", specifier = ">=6.0.2" },
     { name = "types-requests", specifier = ">=2.28.0" },
-    { name = "uv-build", specifier = "==0.11.8" },
 ]
 llslibdev = [
     { name = "aiosqlite", specifier = ">=0.21.0" },
@@ -2175,6 +2174,7 @@ llslibdev = [
     { name = "transformers", specifier = ">=4.34.0" },
     { name = "tree-sitter", specifier = ">=0.24.0" },
     { name = "trl", specifier = ">=0.18.2" },
+    { name = "uv-build", specifier = "==0.11.8" },
 ]
 
 [[package]]
