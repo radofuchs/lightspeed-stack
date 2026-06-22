@@ -60,6 +60,18 @@ class TestCloseOpenMarkdownCodeFences:
         result = close_open_markdown(text)
         assert result == "\n````"
 
+    def test_fence_with_trailing_text_not_closer(self) -> None:
+        """A fence marker with trailing non-whitespace inside a fence is content."""
+        text = "```python\nprint('x')\n```not a closer"
+        result = close_open_markdown(text)
+        assert result == "\n```"
+
+    def test_fence_with_trailing_whitespace_is_closer(self) -> None:
+        """A fence marker with only trailing whitespace is a valid closer."""
+        text = "```python\nprint('x')\n```   "
+        result = close_open_markdown(text)
+        assert result == ""
+
 
 class TestCloseOpenMarkdownHtmlTags:
     """Tests for closing unclosed HTML block tags."""

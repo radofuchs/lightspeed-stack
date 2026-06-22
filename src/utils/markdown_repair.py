@@ -86,7 +86,11 @@ def close_open_markdown(text: str) -> str:
             in_code_fence = True
             fence_char = char
             fence_len = len(matched_group)
-        elif char == fence_char and len(matched_group) >= fence_len:
+        elif (
+            char == fence_char
+            and len(matched_group) >= fence_len
+            and line[fence_match.end() :].strip(" \t") == ""
+        ):
             in_code_fence = False
             fence_char = ""
             fence_len = 0
