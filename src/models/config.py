@@ -653,6 +653,109 @@ class ModelContextProtocolServer(ConfigurationBase):
         return self
 
 
+class UnifiedInferenceProvider(ConfigurationBase):
+    """A high-level inference provider entry for unified-mode synthesis.
+
+    Operators describe inference providers at this high level (backend-agnostic
+    vocabulary) instead of authoring raw Llama Stack provider blocks. The
+    synthesizer (`apply_high_level_inference`) expands each entry into a Llama
+    Stack `providers.inference` entry, mapping `type` to a `provider_type` and
+    emitting `${env.<VAR>}` references for secrets (never literal values).
+
+    Attributes:
+        type: Canonical provider identifier. Vendor-neutral so it survives a
+            future backend change; each backend-specific synthesizer maps it to
+            its own provider vocabulary.
+        api_key_env: Name of the environment variable holding the provider API
+            key. Emitted verbatim as `${env.<name>}` so the secret never lands
+            on disk resolved.
+        allowed_models: Optional allow-list of model identifiers passed through
+            to the synthesized provider config.
+        extra: Additional provider-config keys merged verbatim into the
+            synthesized provider's `config` block — an escape hatch for
+            provider-specific knobs not modeled here.
+    """
+
+    type: Literal[
+        "openai",
+        "sentence_transformers",
+        "azure",
+        "vertexai",
+        "watsonx",
+        "vllm_rhaiis",
+        "vllm_rhel_ai",
+    ] = Field(
+        ...,
+        title="Provider type",
+        description="Canonical, backend-agnostic provider identifier mapped to a "
+        "Llama Stack provider_type by the synthesizer.",
+    )
+
+    api_key_env: Optional[str] = Field(
+        None,
+        title="API key environment variable",
+        description="Name of the environment variable holding the provider API "
+        "key. Emitted as a ${env.<name>} reference so the secret is never "
+        "written to disk in resolved form.",
+    )
+
+    allowed_models: Optional[list[str]] = Field(
+        None,
+        title="Allowed models",
+        description="Optional allow-list of model identifiers for this provider.",
+    )
+
+    extra: dict[str, Any] = Field(
+        default_factory=dict,
+        title="Extra provider config",
+        description="Additional provider-config keys merged verbatim into the "
+        "synthesized provider's config block.",
+    )
+
+
+class UnifiedLlamaStackConfig(ConfigurationBase):
+    """Backend-specific knobs for unified-mode Llama Stack synthesis.
+
+    Per Decision S5 of the design spike, backend-agnostic high-level sections
+    (inference, ...) live at the configuration root, not here. This block holds
+    only the Llama-Stack-specific synthesis controls: which baseline to start
+    from, an optional profile file, and a raw native_override escape hatch.
+
+    Attributes:
+        baseline: Synthesis starting point. "default" begins from LCORE's
+            built-in baseline (src/data/default_run.yaml); "empty" begins from
+            an empty dict (used by the migration tool for an exact round-trip).
+            Ignored when `profile` is set.
+        profile: Optional path to a user-authored run.yaml-shaped file used as
+            the synthesis baseline. Relative paths resolve against the directory
+            of the loaded lightspeed-stack.yaml.
+        native_override: Raw Llama Stack schema deep-merged last (maps merge
+            recursively, lists and scalars replace). The escape hatch for
+            anything the high-level sections do not express.
+    """
+
+    baseline: Literal["default", "empty"] = Field(
+        "default",
+        title="Baseline selector",
+        description="Synthesis starting point: 'default' uses LCORE's built-in "
+        "baseline, 'empty' starts from {}. Ignored when 'profile' is set.",
+    )
+
+    profile: Optional[str] = Field(
+        None,
+        title="Profile path",
+        description="Path to a run.yaml-shaped baseline file. Relative paths "
+        "resolve against the directory of the loaded lightspeed-stack.yaml.",
+    )
+
+    native_override: dict[str, Any] = Field(
+        default_factory=dict,
+        title="Native override",
+        description="Raw Llama Stack schema deep-merged last (maps merge "
+        "recursively; lists and scalars replace).",
+    )
+
+
 class LlamaStackConfiguration(ConfigurationBase):
     """Llama stack configuration.
 
@@ -726,25 +829,44 @@ class LlamaStackConfiguration(ConfigurationBase):
         "is not accessible (valid for server mode only)",
     )
 
+    config: Optional["UnifiedLlamaStackConfig"] = Field(
+        None,
+        title="Unified Llama Stack configuration",
+        description="Backend-specific knobs for unified mode, where LCORE "
+        "synthesizes the Llama Stack run.yaml instead of reading an external "
+        "file. Holds the baseline selector, an optional profile path, and a "
+        "raw native_override escape hatch. Backend-agnostic high-level "
+        "sections (e.g. inference.providers) live at the configuration root, "
+        "not here. Mutually exclusive with library_client_config_path; that "
+        "cross-field check lives on the root Configuration model. When set in "
+        "library mode, library_client_config_path is not required.",
+    )
+
     @model_validator(mode="after")
     def check_llama_stack_model(self) -> Self:
         """
         Validate the Llama Stack configuration and enforce mode-specific requirements.
 
         If no URL is provided, requires explicit library-client mode selection.
-        When library-client mode is enabled, requires a non-empty
-        `library_client_config_path` that points to a regular, readable YAML
-        file (checked via checks.file_check). Also normalizes a None
+        When a legacy `library_client_config_path` is given (and no unified
+        `config` block), it must point to a regular, readable YAML file
+        (checked via checks.file_check). Also normalizes a None
         `use_as_library_client` to False.
+
+        This validator does NOT require a run-configuration source in library
+        mode: a config may instead be driven by the root-level
+        `inference.providers` (which this nested model cannot see). The
+        requirement that library mode have *some* run source — and the mutual
+        exclusion between unified synthesis inputs and the legacy path — is
+        therefore enforced on the root Configuration model
+        (`check_unified_vs_legacy`).
 
         Returns:
             Self: The validated LlamaStackConfiguration instance.
 
         Raises:
-            ValueError: If the configuration is invalid, e.g. no
-            URL and library-client mode is unspecified or
-            disabled, or library-client mode is enabled but
-            `library_client_config_path` is not provided.
+            ValueError: If no URL is provided and library-client mode is
+            unspecified or disabled.
         """
         if self.url is None:
             # when URL is not set, it is supposed that Llama Stack should be run in library mode
@@ -763,20 +885,17 @@ class LlamaStackConfiguration(ConfigurationBase):
             self.use_as_library_client = False
 
         if self.use_as_library_client:
-            # when use_as_library_client is set to true, Llama Stack will be run in library mode
-            # it means that:
-            # - Llama Stack URL should not be set, and
-            # - library_client_config_path attribute must be set and must point to
-            #   a regular readable YAML file
-            if self.library_client_config_path is None:
-                # pylint: disable=line-too-long
-                raise ValueError(
-                    "Llama stack library client mode is enabled but a configuration file path is not specified"
+            # In library mode Llama Stack runs embedded. A legacy
+            # library_client_config_path (with no unified config block) must
+            # point to a regular readable YAML file. A unified config — driven
+            # by a config block here or by inference.providers at the root —
+            # needs no external file; whether *some* run source exists is
+            # checked on the root Configuration model.
+            if self.library_client_config_path is not None and self.config is None:
+                checks.file_check(
+                    Path(self.library_client_config_path),
+                    "Llama Stack configuration file",
                 )
-            # the configuration file must exists and be regular readable file
-            checks.file_check(
-                Path(self.library_client_config_path), "Llama Stack configuration file"
-            )
         return self
 
 
@@ -1594,6 +1713,18 @@ class InferenceConfiguration(ConfigurationBase):
         "must be summarized before the input exceeds the window. Models "
         "absent from this map have no registered window — callers fall "
         "back to their own default or skip the token-based trigger.",
+    )
+
+    providers: list[UnifiedInferenceProvider] = Field(
+        default_factory=list,
+        title="High-level inference providers",
+        description="Unified-mode synthesis input (Decision S5): a high-level, "
+        "backend-agnostic list of inference providers the synthesizer expands "
+        "into Llama Stack provider entries. Lives at the configuration root so "
+        "it survives a future backend change. A non-empty list signals unified "
+        "mode. Empty (the default) leaves legacy/remote modes unaffected. The "
+        "sibling default_model / default_provider keep their query-time routing "
+        "meaning and are independent of this list.",
     )
 
     @model_validator(mode="after")
@@ -2491,6 +2622,57 @@ class Configuration(ConfigurationBase):
             )
             self.reranker.enabled = True
 
+        return self
+
+    @model_validator(mode="after")
+    def check_unified_vs_legacy(self) -> Self:
+        """Reconcile unified synthesis inputs, legacy mode, and library-mode needs.
+
+        Unified-mode *synthesis inputs* span the configuration root: a non-empty
+        top-level ``inference.providers`` (Decision S5) and/or a
+        ``llama_stack.config`` block. The legacy path is
+        ``llama_stack.library_client_config_path`` pointing at an external
+        run.yaml. Both checks live here on the root model rather than on
+        ``LlamaStackConfiguration`` (which cannot see ``inference.providers``):
+
+        - A synthesis input and the legacy path are mutually exclusive — a
+          single file must pick one shape.
+        - Library mode needs *some* run source — a synthesis input or the
+          legacy path. ``inference.providers`` alone is sufficient; no
+          ``llama_stack.config`` block is required.
+
+        Returns:
+            Self: The validated configuration instance.
+
+        Raises:
+            ValueError: If a synthesis input and the legacy
+                ``library_client_config_path`` are set together, or if library
+                mode has no run source at all.
+        """
+        # pylint: disable=no-member
+        synthesis_input = (
+            bool(self.inference.providers) or self.llama_stack.config is not None
+        )
+        legacy_input = self.llama_stack.library_client_config_path is not None
+        if synthesis_input and legacy_input:
+            raise ValueError(
+                "Llama Stack configuration is ambiguous: unified synthesis "
+                "inputs (a non-empty inference.providers or a llama_stack.config "
+                "block) are mutually exclusive with the legacy "
+                "llama_stack.library_client_config_path. Use one or the other. "
+                "To convert a legacy two-file setup to unified mode, run "
+                "`lightspeed-stack --migrate-config`."
+            )
+        if (
+            self.llama_stack.use_as_library_client
+            and not synthesis_input
+            and not legacy_input
+        ):
+            raise ValueError(
+                "Llama Stack library mode requires a run-configuration source: "
+                "set a non-empty inference.providers, a llama_stack.config "
+                "block, or library_client_config_path."
+            )
         return self
 
     def dump(self, filename: str | Path = "configuration.json") -> None:
