@@ -1,6 +1,6 @@
 """Unit tests for Red Hat Identity authentication module."""
 
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name,too-many-lines
 
 import base64
 import json
@@ -84,6 +84,35 @@ def system_identity_data() -> dict:
     }
 
 
+@pytest.fixture
+def service_account_identity_data() -> dict:
+    """Fixture providing valid ServiceAccount identity data.
+
+    Mirrors the canonical ServiceAccount payload from the identity-schemas repo.
+    The service_account object contains client_id, username, and user_id.
+
+    Returns:
+        dict: A ServiceAccount identity dictionary with identity and entitlements.
+    """
+    return {
+        "identity": {
+            "account_number": "123",
+            "org_id": "321",
+            "type": "ServiceAccount",
+            "auth_type": "jwt-auth",
+            "service_account": {
+                "client_id": "b69eaf9e-e6a6-4f9e-805e-02987daddfbd",
+                "username": "service-account-b69eaf9e-e6a6-4f9e-805e-02987daddfbd",
+                "user_id": "60ce65dc-4b5a-4812-8b65-b48178d92b12",
+            },
+        },
+        "entitlements": {
+            "rhel": {"is_entitled": True, "is_trial": False},
+            "ansible": {"is_entitled": True, "is_trial": False},
+        },
+    }
+
+
 def create_auth_header(identity_data: dict) -> str:
     """Helper to create base64-encoded x-rh-identity header value.
 
@@ -145,8 +174,28 @@ class TestRHIdentityData:
         assert rh_identity.get_user_id() == "c87dcb4c-8af1-40dd-878e-60c744edddd0"
         assert rh_identity.get_username() == "123"
 
+    def test_service_account_type_extraction(
+        self, service_account_identity_data: dict
+    ) -> None:
+        """Test extraction of ServiceAccount identity fields."""
+        rh_identity = RHIdentityData(service_account_identity_data)
+
+        assert rh_identity.get_user_id() == "b69eaf9e-e6a6-4f9e-805e-02987daddfbd"
+        assert (
+            rh_identity.get_username()
+            == "service-account-b69eaf9e-e6a6-4f9e-805e-02987daddfbd"
+        )
+
+    def test_service_account_system_id_empty(
+        self, service_account_identity_data: dict
+    ) -> None:
+        """Test that get_system_id returns empty string for ServiceAccount type."""
+        rh_identity = RHIdentityData(service_account_identity_data)
+        assert rh_identity.get_system_id() == ""
+
     @pytest.mark.parametrize(
-        "fixture_name", ["user_identity_data", "system_identity_data"]
+        "fixture_name",
+        ["user_identity_data", "system_identity_data", "service_account_identity_data"],
     )
     def test_get_org_id(
         self, fixture_name: str, request: pytest.FixtureRequest
@@ -303,6 +352,38 @@ class TestRHIdentityData:
                 },
                 "Invalid identity data",
             ),
+            # ServiceAccount without service_account object is rejected.
+            (
+                {
+                    "identity": {
+                        "type": "ServiceAccount",
+                        "org_id": "123",
+                    }
+                },
+                "Invalid identity data",
+            ),
+            # ServiceAccount without client_id is rejected.
+            (
+                {
+                    "identity": {
+                        "type": "ServiceAccount",
+                        "org_id": "123",
+                        "service_account": {"username": "svc"},
+                    }
+                },
+                "Invalid identity data",
+            ),
+            # ServiceAccount without username is rejected.
+            (
+                {
+                    "identity": {
+                        "type": "ServiceAccount",
+                        "org_id": "123",
+                        "service_account": {"client_id": "abc"},
+                    }
+                },
+                "Invalid identity data",
+            ),
         ],
     )
     def test_validation_failures(
@@ -370,11 +451,31 @@ class TestRHIdentityAuthDependency:
         assert token == NO_USER_TOKEN
 
     @pytest.mark.asyncio
+    async def test_service_account_authentication_success(
+        self, mocker: MockerFixture, service_account_identity_data: dict
+    ) -> None:
+        """Test successful ServiceAccount authentication."""
+        auth_dep = RHIdentityAuthDependency()
+        header_value = create_auth_header(service_account_identity_data)
+        request = create_request_with_header(mocker, header_value)
+
+        user_id, username, skip_check, token = await auth_dep(request)
+
+        assert user_id == "b69eaf9e-e6a6-4f9e-805e-02987daddfbd"
+        assert username == "service-account-b69eaf9e-e6a6-4f9e-805e-02987daddfbd"
+        assert skip_check is False
+        assert token == NO_USER_TOKEN
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "fixture_name,expected_user_id",
         [
             ("user_identity_data", "abc123"),
             ("system_identity_data", "c87dcb4c-8af1-40dd-878e-60c744edddd0"),
+            (
+                "service_account_identity_data",
+                "b69eaf9e-e6a6-4f9e-805e-02987daddfbd",
+            ),
         ],
     )
     async def test_rh_identity_stored_in_request_state(
@@ -697,7 +798,7 @@ class TestRHIdentityHeaderSizeLimit:
         assert mock_warning.call_args.args[2] == max_size
 
 
-class TestRHIdentityFieldValidation:
+class TestRHIdentityFieldValidation:  # pylint: disable=too-many-public-methods
     """Test suite for RHIdentityData string field validation."""
 
     @pytest.mark.parametrize(
@@ -751,6 +852,32 @@ class TestRHIdentityFieldValidation:
             identity[field_path[0]][field_path[1]] = bad_value
         with pytest.raises(HTTPException) as exc_info:
             RHIdentityData(system_identity_data)
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.parametrize(
+        "field_path,bad_value",
+        [
+            (("service_account", "client_id"), None),
+            (("service_account", "client_id"), 12345),
+            (("service_account", "client_id"), True),
+            (("service_account", "client_id"), []),
+            (("service_account", "client_id"), {}),
+            (("service_account", "username"), None),
+            (("service_account", "username"), 12345),
+        ],
+    )
+    def test_service_account_non_string_types_rejected(
+        self,
+        service_account_identity_data: dict,
+        field_path: tuple[str, str],
+        bad_value: object,
+    ) -> None:
+        """Reject non-string values in ServiceAccount identity string fields."""
+        service_account_identity_data["identity"][field_path[0]][
+            field_path[1]
+        ] = bad_value
+        with pytest.raises(HTTPException) as exc_info:
+            RHIdentityData(service_account_identity_data)
         assert exc_info.value.status_code == 400
 
     @pytest.mark.parametrize("bad_value", ["", "   ", "\t", "\n"])
@@ -837,6 +964,12 @@ class TestRHIdentityFieldValidation:
     def test_valid_system_data_still_passes(self, system_identity_data: dict) -> None:
         """Regression: valid System identity data passes validation."""
         RHIdentityData(system_identity_data)
+
+    def test_valid_service_account_data_still_passes(
+        self, service_account_identity_data: dict
+    ) -> None:
+        """Regression: valid ServiceAccount identity data passes validation."""
+        RHIdentityData(service_account_identity_data)
 
     @pytest.mark.parametrize("account_number", ["", None])
     def test_system_empty_or_absent_account_number_accepted(
