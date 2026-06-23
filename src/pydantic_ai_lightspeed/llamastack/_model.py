@@ -243,14 +243,17 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
         return trimmed_messages, cast(ModelSettings, new_settings)
 
     @asynccontextmanager
-    async def request_stream(
+    async def request_stream(  # pylint: disable=unused-argument
         self,
         messages: list[ModelMessage],
         model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters,
         run_context: RunContext[Any] | None = None,
     ) -> AsyncIterator[StreamedResponse]:
-        """Request a streaming response, filtering Llama Stack-specific event quirks.
+        """Request a streaming response with Llama Stack compatibility fixes.
+
+        Applies the same conversation continuation handling as :meth:`request`
+        before calling the Responses API, then filters streaming tool-call events.
 
         Args:
             messages: Model messages for the request.
@@ -262,10 +265,10 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
             A StreamedResponse with the filtered event stream.
         """
         check_allow_model_requests()
-        model_settings, model_request_parameters = self.prepare_request(
-            model_settings,
-            model_request_parameters,
+        messages, model_settings = self._prepare_conversation_continuation(
+            messages, model_settings
         )
+
         model_settings_cast = cast(OpenAIResponsesModelSettings, model_settings or {})
         response = await self._responses_create(
             messages, True, model_settings_cast, model_request_parameters
