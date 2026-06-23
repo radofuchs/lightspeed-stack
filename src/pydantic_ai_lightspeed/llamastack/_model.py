@@ -181,6 +181,70 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
     before the corresponding ``McpCall`` or ``ResponseFunctionToolCall`` item.
     """
 
+    async def request(
+        self,
+        messages: list[ModelMessage],
+        model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
+        run_context: RunContext[Any] | None = None,
+    ) -> Any:
+        """Non-streaming request with Llama Stack conversation continuation fix.
+
+        Llama Stack rejects requests containing both ``conversation`` and
+        ``previous_response_id``.  On continuation turns (where a prior
+        ``ModelResponse`` exists), we trim messages to only the new input and
+        disable ``previous_response_id`` so that only ``conversation`` is sent.
+        This ensures all responses are persisted to the conversation.
+        """
+        messages, model_settings = self._prepare_conversation_continuation(
+            messages, model_settings
+        )
+        return await super().request(
+            messages, model_settings, model_request_parameters
+        )
+
+    def _prepare_conversation_continuation(
+        self,
+        messages: list[ModelMessage],
+        model_settings: ModelSettings | None,
+    ) -> tuple[list[ModelMessage], ModelSettings | None]:
+        """Trim messages and disable previous_response_id for conversation continuations.
+
+        Llama Stack rejects requests with both ``previous_response_id`` and
+        ``conversation``. When ``conversation`` is in ``extra_body`` and there's
+        already a ModelResponse in the history (a continuation turn), we:
+
+        1. Trim messages to only those AFTER the last ModelResponse (new input only)
+        2. Disable ``openai_previous_response_id`` so pydantic-ai won't resolve one
+
+        This means Llama Stack receives ``conversation`` (for persistence) plus only
+        the new input items. Llama Stack reconstructs prior history from the
+        conversation and appends the new input correctly.
+        """
+        from pydantic_ai.messages import ModelResponse  # noqa: PLC0415
+
+        if not model_settings or not isinstance(model_settings, dict):
+            return messages, model_settings
+
+        extra_body = model_settings.get("extra_body")
+        if not extra_body or "conversation" not in extra_body:
+            return messages, model_settings
+
+        last_response_idx = None
+        for i in range(len(messages) - 1, -1, -1):
+            if isinstance(messages[i], ModelResponse) and messages[i].provider_response_id:
+                last_response_idx = i
+                break
+
+        if last_response_idx is None:
+            return messages, model_settings
+
+        trimmed_messages = messages[last_response_idx + 1:]
+
+        new_settings = dict(model_settings)
+        new_settings.pop("openai_previous_response_id", None)
+        return trimmed_messages, cast(ModelSettings, new_settings)
+
     @asynccontextmanager
     async def request_stream(
         self,
