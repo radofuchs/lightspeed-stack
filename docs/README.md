@@ -63,6 +63,10 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 
 [Database structure](https://lightspeed-core.github.io/lightspeed-stack/DB/index.html)
 
+## Models
+
+[Reguests](https://lightspeed-core.github.io/lightspeed-stack/models/requests.html)
+
 ## Design documents
 
 [Conversation compaction](https://lightspeed-core.github.io/lightspeed-stack/design/conversation-compaction/conversation-compaction.html)
