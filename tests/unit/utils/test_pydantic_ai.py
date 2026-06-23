@@ -14,22 +14,22 @@ from models.config import SkillsConfiguration
 from utils.pydantic_ai import (
     _LLS_RESPONSES_EXTRA_FIELDS,
     _agent_capabilities,
-    _llama_stack_provider_from_client,
     _model_settings_from_responses_params,
     _skills_capability,
     build_agent,
+    llama_stack_provider_from_client,
 )
 
 
 class TestLlamaStackProviderFromClient:
-    """Tests for _llama_stack_provider_from_client factory."""
+    """Tests for llama_stack_provider_from_client factory."""
 
     def test_library_client(self, mocker: MockerFixture) -> None:
         """Test that a library client creates a provider with library_client kwarg."""
         mock_lib_client = mocker.Mock(spec=AsyncLlamaStackAsLibraryClient)
         mock_lib_client.provider_data = None
 
-        provider = _llama_stack_provider_from_client(mock_lib_client)
+        provider = llama_stack_provider_from_client(mock_lib_client)
 
         assert provider._library_client is mock_lib_client
 
@@ -40,7 +40,7 @@ class TestLlamaStackProviderFromClient:
         mock_client.api_key = "my-secret"
         mock_client._client = mocker.Mock(spec=httpx.AsyncClient)
 
-        provider = _llama_stack_provider_from_client(mock_client)
+        provider = llama_stack_provider_from_client(mock_client)
 
         assert provider.client.api_key == "my-secret"
         assert "my-server:8321" in provider.base_url
@@ -52,7 +52,7 @@ class TestLlamaStackProviderFromClient:
         mock_client.api_key = None
         mock_client._client = mocker.Mock(spec=httpx.AsyncClient)
 
-        provider = _llama_stack_provider_from_client(mock_client)
+        provider = llama_stack_provider_from_client(mock_client)
 
         assert provider.client.api_key == "not-needed"
 
@@ -64,7 +64,7 @@ class TestLlamaStackProviderFromClient:
         mock_client.api_key = "key"
         mock_client._client = mock_http_client
 
-        provider = _llama_stack_provider_from_client(mock_client)
+        provider = llama_stack_provider_from_client(mock_client)
 
         assert provider._client._client is mock_http_client
 

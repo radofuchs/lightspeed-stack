@@ -34,7 +34,7 @@ _LLS_RESPONSES_EXTRA_FIELDS: Final[frozenset[str]] = frozenset(
 )
 
 
-def _llama_stack_provider_from_client(
+def llama_stack_provider_from_client(
     client: AsyncLlamaStackClient | AsyncLlamaStackAsLibraryClient,
 ) -> LlamaStackProvider:
     """Construct a Pydantic AI Llama Stack provider backed by the same client as ``/query``."""
@@ -132,7 +132,7 @@ def build_agent(
         ``Agent`` configured for ``await agent.run(...)`` (or streaming) against the same
         stack configuration as ``client.responses.create(**responses_params.model_dump())``.
     """
-    provider = _llama_stack_provider_from_client(client)
+    provider = llama_stack_provider_from_client(client)
     settings = _model_settings_from_responses_params(responses_params)
 
     model = LlamaStackResponsesModel(
