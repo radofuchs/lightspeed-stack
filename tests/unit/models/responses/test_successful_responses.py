@@ -35,6 +35,7 @@ from models.api.responses.successful.bases import AbstractSuccessfulResponse
 from models.common import (
     ConversationData,
     ConversationDetails,
+    HealthStatus,
     MCPServerAuthInfo,
     ProviderHealthStatus,
 )
@@ -412,11 +413,15 @@ class TestReadinessResponse:
     def test_constructor_ready(self) -> None:
         """Test ReadinessResponse when service is ready."""
         response = ReadinessResponse(
-            ready=True, reason="Service is ready", providers=[]
+            ready=True,
+            reason="Service is ready",
+            overall_status=HealthStatus.HEALTHY,
+            providers=[],
         )
         assert isinstance(response, AbstractSuccessfulResponse)
         assert response.ready is True
         assert response.reason == "Service is ready"
+        assert response.overall_status == HealthStatus.HEALTHY
         assert response.providers == []
 
     def test_constructor_not_ready(self) -> None:
@@ -427,9 +432,13 @@ class TestReadinessResponse:
             )
         ]
         response = ReadinessResponse(
-            ready=False, reason="Service is not ready", providers=providers
+            ready=False,
+            reason="Service is not ready",
+            overall_status=HealthStatus.UNHEALTHY,
+            providers=providers,
         )
         assert response.ready is False
+        assert response.overall_status == HealthStatus.UNHEALTHY
         assert len(response.providers) == 1
         assert response.providers[0].provider_id == "provider1"
 
@@ -449,7 +458,7 @@ class TestReadinessResponse:
         Asserts the returned mapping has description "Successful response", the
         `model` is ReadinessResponse, and `content["application/json"]`
         contains an "example". Also verifies the number of examples in
-        ReadinessResponse.model_json_schema() equals 1.
+        ReadinessResponse.model_json_schema() equals 2 (healthy and degraded).
         """
         schema = ReadinessResponse.model_json_schema()
         model_examples = schema.get("examples", [])
@@ -460,8 +469,8 @@ class TestReadinessResponse:
         assert result["model"] == ReadinessResponse
         assert "example" in result["content"]["application/json"]
 
-        # Verify example count matches schema examples count (should be 1)
-        assert expected_count == 1
+        # Verify example count matches schema examples count (should be 2)
+        assert expected_count == 2
 
 
 class TestLivenessResponse:
