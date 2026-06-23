@@ -70,6 +70,10 @@ product questions using backend LLM services, agents, and RAG databases.
 
 [Database structure](https://lightspeed-core.github.io/lightspeed-stack/DB/index.html)
 
+## Models
+
+[Reguests](https://lightspeed-core.github.io/lightspeed-stack/models/requests.html)
+
 ## Design documents
 
 [Conversation compaction](https://lightspeed-core.github.io/lightspeed-stack/design/conversation-compaction/conversation-compaction.html)
