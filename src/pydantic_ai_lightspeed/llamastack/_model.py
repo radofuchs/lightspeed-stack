@@ -26,7 +26,7 @@ from openai.types import responses
 from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai._run_context import RunContext
 from pydantic_ai._utils import PeekableAsyncStream, Unset, number_to_datetime
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models import (
     ModelRequestParameters,
     StreamedResponse,
@@ -181,7 +181,7 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
     before the corresponding ``McpCall`` or ``ResponseFunctionToolCall`` item.
     """
 
-    async def request(
+    async def request(  # pylint: disable=unused-argument
         self,
         messages: list[ModelMessage],
         model_settings: ModelSettings | None,
@@ -199,9 +199,7 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
         messages, model_settings = self._prepare_conversation_continuation(
             messages, model_settings
         )
-        return await super().request(
-            messages, model_settings, model_request_parameters
-        )
+        return await super().request(messages, model_settings, model_request_parameters)
 
     def _prepare_conversation_continuation(
         self,
@@ -221,25 +219,24 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
         the new input items. Llama Stack reconstructs prior history from the
         conversation and appends the new input correctly.
         """
-        from pydantic_ai.messages import ModelResponse  # noqa: PLC0415
-
         if not model_settings or not isinstance(model_settings, dict):
             return messages, model_settings
 
         extra_body = model_settings.get("extra_body")
-        if not extra_body or "conversation" not in extra_body:
+        if not isinstance(extra_body, dict) or "conversation" not in extra_body:
             return messages, model_settings
 
         last_response_idx = None
         for i in range(len(messages) - 1, -1, -1):
-            if isinstance(messages[i], ModelResponse) and messages[i].provider_response_id:
+            msg = messages[i]
+            if isinstance(msg, ModelResponse) and msg.provider_response_id:
                 last_response_idx = i
                 break
 
         if last_response_idx is None:
             return messages, model_settings
 
-        trimmed_messages = messages[last_response_idx + 1:]
+        trimmed_messages = messages[last_response_idx + 1 :]
 
         new_settings = dict(model_settings)
         new_settings.pop("openai_previous_response_id", None)
