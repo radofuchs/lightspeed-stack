@@ -446,6 +446,10 @@ class TestCloseOpenMarkdownRawTags:
         result = close_open_markdown(text)
         assert result == ""
 
+
+class TestCloseOpenMarkdownRawTagCommentInteraction:
+    """Tests for raw-tag and comment interaction on the same line."""
+
     def test_script_close_then_comment_then_tag_same_line(self) -> None:
         """Closed script then closed comment then open tag on one line."""
         text = "<script>x</script><!-- ok --><div>text"

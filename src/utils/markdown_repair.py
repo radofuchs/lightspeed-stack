@@ -39,39 +39,6 @@ _COMMENT_OPEN: Final[str] = "<!--"
 _COMMENT_CLOSE: Final[str] = "-->"
 
 
-def _strip_comments(line: str, in_comment: bool) -> tuple[str, bool]:
-    """Remove HTML comment regions from *line* for scanning purposes.
-
-    Parameters:
-        line: A single line of text to process.
-        in_comment: Whether we are currently inside an HTML comment
-            from a previous line.
-
-    Returns:
-        A tuple of (visible_content, updated_in_comment) where
-        visible_content has comment regions removed and
-        updated_in_comment reflects whether a comment is still open.
-    """
-    result: list[str] = []
-    i = 0
-    while i < len(line):
-        if in_comment:
-            end = line.find(_COMMENT_CLOSE, i)
-            if end == -1:
-                break
-            i = end + len(_COMMENT_CLOSE)
-            in_comment = False
-        else:
-            start = line.find(_COMMENT_OPEN, i)
-            if start == -1:
-                result.append(line[i:])
-                break
-            result.append(line[i:start])
-            i = start + len(_COMMENT_OPEN)
-            in_comment = True
-    return "".join(result), in_comment
-
-
 def _process_html_tags(line: str, html_stack: list[str]) -> Optional[str]:
     """Update *html_stack* with block-level HTML open/close tags found in *line*.
 
