@@ -9,6 +9,7 @@ import os
 import sys
 from argparse import ArgumentParser
 
+import constants
 from configuration import configuration
 from constants import LIGHTSPEED_STACK_LOG_LEVEL_ENV_VAR
 from log import create_log_handler, get_logger, resolve_log_level
@@ -88,6 +89,14 @@ def create_argument_parser() -> ArgumentParser:
         help="path to configuration file (default: lightspeed-stack.yaml)",
         default="lightspeed-stack.yaml",
     )
+    parser.add_argument(
+        "--synthesized-config-output",
+        dest="synthesized_config_output",
+        help="path where the synthesized Llama Stack run.yaml is written in "
+        "unified library mode (overwritten each boot, mode 0600; default: "
+        f"{constants.DEFAULT_SYNTHESIZED_CONFIG_PATH})",
+        default=None,
+    )
 
     return parser
 
@@ -155,7 +164,18 @@ def main() -> None:
 
     # Store config path in env so each uvicorn worker can load it
     # (step is needed because process context isn't shared).
-    os.environ["LIGHTSPEED_STACK_CONFIG_PATH"] = args.config_file
+    os.environ[constants.CONFIG_PATH_ENV_VAR] = args.config_file
+
+    # Propagate the synthesized-config-output override to the workers (separate
+    # processes), which perform unified-mode library synthesis. When the flag is
+    # omitted, clear any inherited value so the workers fall back to
+    # constants.DEFAULT_SYNTHESIZED_CONFIG_PATH rather than a stale path.
+    if args.synthesized_config_output is not None:
+        os.environ[constants.SYNTHESIZED_CONFIG_PATH_ENV_VAR] = (
+            args.synthesized_config_output
+        )
+    else:
+        os.environ.pop(constants.SYNTHESIZED_CONFIG_PATH_ENV_VAR, None)
 
     # start the runners
     start_quota_scheduler(configuration.configuration)
