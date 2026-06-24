@@ -82,6 +82,7 @@ class TestModelSettingsFromResponsesParams:
         params.parallel_tool_calls = None
         params.extra_headers = None
         params.store = False
+        params.tools = None
         params.previous_response_id = None
         return params
 
@@ -138,7 +139,6 @@ class TestModelSettingsFromResponsesParams:
             "model": "test/model",
             "conversation": "conv-123",
             "max_infer_iters": 5,
-            "tools": [{"type": "function"}],
             "tool_choice": "auto",
         }
         params.max_output_tokens = None
@@ -147,14 +147,15 @@ class TestModelSettingsFromResponsesParams:
         params.extra_headers = None
         params.store = False
         params.previous_response_id = None
+        params.tools = [{"type": "function"}]
 
         settings = _model_settings_from_responses_params(params)
 
         assert "extra_body" in settings
         assert settings["extra_body"]["conversation"] == "conv-123"
         assert settings["extra_body"]["max_infer_iters"] == 5
-        assert settings["extra_body"]["tools"] == [{"type": "function"}]
         assert settings["extra_body"]["tool_choice"] == "auto"
+        assert settings["openai_native_tools"] == [{"type": "function"}]
 
     def test_extra_body_only_includes_known_fields(self, mocker: MockerFixture) -> None:
         """Test that extra_body only includes fields in _LLS_RESPONSES_EXTRA_FIELDS."""
@@ -189,7 +190,6 @@ class TestLlsResponsesExtraFields:
         expected = {
             "conversation",
             "max_infer_iters",
-            "tools",
             "tool_choice",
             "include",
             "text",
