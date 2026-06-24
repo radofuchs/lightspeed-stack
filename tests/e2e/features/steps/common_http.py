@@ -112,6 +112,19 @@ def check_response_body_does_not_contain(context: Context, substring: str) -> No
     ), f"The response text '{context.response.text}' contains '{substring}'"
 
 
+@then('The response body contains "{substring}"')
+def check_response_contains_substring(context: Context, substring: str) -> None:
+    """Check that response body contains a specific substring.
+
+    This step handles quoted strings and performs exact matching
+    (case-sensitive) for metrics and structured output validation.
+    """
+    assert context.response is not None, "Request needs to be performed first"
+    assert (
+        substring in context.response.text
+    ), f"Expected '{substring}' in response, but got: {context.response.text[:200]}"
+
+
 @then("The body of the response is the following")
 def check_prediction_result(context: Context) -> None:
     """Check the content of the response to be exactly the same.
