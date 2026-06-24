@@ -23,6 +23,7 @@ from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from log import get_logger
 from metrics import recording
+from metrics.utils import setup_model_metrics
 from models.api.responses.error import InternalServerErrorResponse
 from sentry import initialize_sentry
 from utils.common import register_mcp_servers_async
@@ -119,6 +120,14 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         AzureEntraIDManager().set_base_url(azure_base_url)
     logger.info("Registering MCP servers")
     await register_mcp_servers_async(logger, configuration.configuration)
+
+    # Set up model metrics if in healthy mode
+    if not degraded_tracker.is_degraded():
+        try:
+            await setup_model_metrics()
+        except APIConnectionError as e:
+            logger.warning("Failed to set up model metrics: %s", e, exc_info=True)
+
     logger.info("App startup complete")
 
     initialize_database()

@@ -10400,7 +10400,7 @@
                     "metrics"
                 ],
                 "summary": "Metrics Endpoint Handler",
-                "description": "Handle request to the /metrics endpoint.\n\nProcess GET requests to the /metrics endpoint, returning the\nlatest Prometheus metrics in form of a plain text.\n\nInitializes model metrics on the first request if not already\nset up, then responds with the current metrics snapshot in\nPrometheus format.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Returns:\n- PlainTextResponse: Response body containing the Prometheus metrics text\n  and the Prometheus content type.",
+                "description": "Handle request to the /metrics endpoint.\n\nProcess GET requests to the /metrics endpoint, returning the\nlatest Prometheus metrics in plain text Prometheus format.\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Returns:\n- PlainTextResponse: Response body containing the Prometheus metrics text\n  and the Prometheus content type.",
                 "operationId": "metrics_endpoint_handler_metrics_get",
                 "responses": {
                     "200": {

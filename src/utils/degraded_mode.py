@@ -6,6 +6,7 @@ running in degraded mode (i.e., without Llama Stack connectivity).
 
 from typing import Optional
 
+from metrics import recording
 from utils.types import Singleton
 
 
@@ -31,10 +32,16 @@ class DegradedModeTracker(metaclass=Singleton):
         self._is_degraded = True
         self._degraded_reason = reason
 
+        # Record startup state metric
+        recording.set_started_in_degraded_mode(True)
+
     def set_healthy(self) -> None:
         """Mark the service as running in healthy mode."""
         self._is_degraded = False
         self._degraded_reason = None
+
+        # Record startup state metric
+        recording.set_started_in_degraded_mode(False)
 
     def is_degraded(self) -> bool:
         """Check if the service is running in degraded mode.
