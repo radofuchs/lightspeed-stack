@@ -705,7 +705,7 @@ class UnifiedInferenceProvider(ConfigurationBase):
         description="Optional allow-list of model identifiers for this provider.",
     )
 
-    extra: dict[str, Any] = Field(
+    extra: dict[str, object] = Field(
         default_factory=dict,
         title="Extra provider config",
         description="Additional provider-config keys merged verbatim into the "
@@ -748,7 +748,7 @@ class UnifiedLlamaStackConfig(ConfigurationBase):
         "resolve against the directory of the loaded lightspeed-stack.yaml.",
     )
 
-    native_override: dict[str, Any] = Field(
+    native_override: dict[str, object] = Field(
         default_factory=dict,
         title="Native override",
         description="Raw Llama Stack schema deep-merged last (maps merge "

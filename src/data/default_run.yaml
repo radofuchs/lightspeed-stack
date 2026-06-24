@@ -100,6 +100,13 @@ storage:
 registered_resources:
   models: []
   shields:
+  # NOTE: this is a minimal placeholder shield for the zero-dependency default
+  # baseline (it mirrors the repo's root run.yaml). provider_shield_id points at
+  # a chat model, NOT a real Llama Guard checkpoint, so it does not perform real
+  # safety gating. A real guard model (e.g. meta-llama/Llama-Guard-3-8B) is
+  # configured per deployment via the high-level schema or native_override, and
+  # real shield gating is exercised by the e2e suite — deliberately not pinned
+  # here so the default baseline boots with only an OPENAI_API_KEY.
   - shield_id: llama-guard
     provider_id: llama-guard
     provider_shield_id: openai/gpt-4o-mini

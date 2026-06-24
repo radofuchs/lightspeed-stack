@@ -167,12 +167,15 @@ def main() -> None:
     os.environ[constants.CONFIG_PATH_ENV_VAR] = args.config_file
 
     # Propagate the synthesized-config-output override to the workers (separate
-    # processes), which perform unified-mode library synthesis. Unset means the
-    # workers fall back to constants.DEFAULT_SYNTHESIZED_CONFIG_PATH.
+    # processes), which perform unified-mode library synthesis. When the flag is
+    # omitted, clear any inherited value so the workers fall back to
+    # constants.DEFAULT_SYNTHESIZED_CONFIG_PATH rather than a stale path.
     if args.synthesized_config_output is not None:
         os.environ[constants.SYNTHESIZED_CONFIG_PATH_ENV_VAR] = (
             args.synthesized_config_output
         )
+    else:
+        os.environ.pop(constants.SYNTHESIZED_CONFIG_PATH_ENV_VAR, None)
 
     # start the runners
     start_quota_scheduler(configuration.configuration)
