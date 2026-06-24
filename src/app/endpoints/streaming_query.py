@@ -771,16 +771,17 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
 
         # Content part started - emit an empty token to kick off UI streaming
         if event_type == "response.content_part.added":
+            event_id = chunk_id
+            chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
             yield stream_event(
                 {
-                    "id": chunk_id,
+                    "id": event_id,
                     "token": "",
                 },
                 LLM_TOKEN_EVENT,
                 media_type,
             )
-            chunk_id += 1
-            turn_summary.next_chunk_id = chunk_id
 
         # Store MCP call item info for later lookup when arguments.done event occurs
         elif event_type == "response.output_item.added":
@@ -797,16 +798,17 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
             delta_chunk = cast(TextDeltaChunk, chunk)
             text_parts.append(delta_chunk.delta)
             turn_summary.partial_tokens.append(delta_chunk.delta)
+            event_id = chunk_id
+            chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
             yield stream_event(
                 {
-                    "id": chunk_id,
+                    "id": event_id,
                     "token": delta_chunk.delta,
                 },
                 LLM_TOKEN_EVENT,
                 media_type,
             )
-            chunk_id += 1
-            turn_summary.next_chunk_id = chunk_id
 
         # Final text of the output (capture, but emit at response.completed)
         elif event_type == "response.output_text.done":
@@ -886,16 +888,17 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
             # (LCORE-1572), so the persisted turn keeps non-text output items
             # rather than being flattened to the response text.
             turn_summary.output_items = list(latest_response_object.output or [])
+            event_id = chunk_id
+            chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
             yield stream_event(
                 {
-                    "id": chunk_id,
+                    "id": event_id,
                     "token": turn_summary.llm_response,
                 },
                 LLM_TURN_COMPLETE_EVENT,
                 media_type,
             )
-            chunk_id += 1
-            turn_summary.next_chunk_id = chunk_id
 
         # Incomplete or failed response - emit error
         elif event_type in ("response.incomplete", "response.failed"):

@@ -1052,9 +1052,11 @@ class TestInterruptPartialTokenAccumulation:
             and json.loads(e.removeprefix("data: ").strip())["event"] == "token"
         ]
         chunk_ids = [t["data"]["id"] for t in token_events]
+        num_chunks = len(chunk_ids)
         assert chunk_ids == sorted(chunk_ids), "chunk_ids must be monotonically ordered"
         assert all(cid >= 0 for cid in chunk_ids), "all chunk_ids must be non-negative"
-        assert chunk_ids[-1] == len(chunk_ids) - 1
+        assert num_chunks == len(set(chunk_ids)), "chunk_ids must not contain duplicates"
+        assert chunk_ids[-1] == num_chunks - 1
 
     @pytest.mark.asyncio
     async def test_interrupt_with_no_tokens_uses_zero_chunk_id(
