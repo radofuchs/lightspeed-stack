@@ -273,38 +273,6 @@ async def _resolve_validated_model_id() -> str:
     return model_id
 
 
-async def retrieve_simple_response(
-    question: str,
-    instructions: str,
-    tools: Optional[list[Any]] = None,
-    model_id: Optional[str] = None,
-    endpoint_path: str = ENDPOINT_PATH_INFER,
-) -> str:
-    """Retrieve a simple response from the LLM for a stateless query.
-
-    Uses the Responses API for simple stateless inference, consistent with
-    other endpoints (query, streaming_query).
-
-    Args:
-        question: The combined user input (question + context).
-        instructions: System instructions for the LLM.
-        tools: Optional list of MCP tool definitions for the LLM.
-        model_id: Fully qualified model identifier in provider/model format.
-            When omitted, the configured default model is used.
-
-    Returns:
-        The LLM-generated response text.
-
-    Raises:
-        APIConnectionError: If the Llama Stack service is unreachable.
-        HTTPException: 503 if no default model is configured.
-    """
-    resolved_model_id = model_id or await _get_default_model_id()
-    response = await _call_llm(question, instructions, tools, resolved_model_id)
-    extract_token_usage(response.usage, resolved_model_id, endpoint_path)
-    return extract_text_from_response_items(response.output)
-
-
 async def _call_llm(
     question: str,
     instructions: str,
