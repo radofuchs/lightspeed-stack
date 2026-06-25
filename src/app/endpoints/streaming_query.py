@@ -46,7 +46,6 @@ from client import AsyncLlamaStackClientHolder
 from configuration import configuration
 from constants import (
     ENDPOINT_PATH_STREAMING_QUERY,
-    INTERRUPTED_RESPONSE_MESSAGE,
     LLM_TOKEN_EVENT,
     LLM_TOOL_CALL_EVENT,
     LLM_TOOL_RESULT_EVENT,
@@ -122,6 +121,7 @@ from utils.shields import (
     validate_shield_ids_override,
 )
 from utils.stream_interrupts import (
+    build_interrupted_response,
     deregister_stream,
     persist_interrupted_turn,
     register_interrupt_callback,
@@ -634,9 +634,10 @@ async def generate_response(  # pylint: disable=too-many-arguments,too-many-posi
         current_task = asyncio.current_task()
         if current_task is not None:
             current_task.uncancel()
+        full_text, suffix = build_interrupted_response(turn_summary.partial_tokens)
         if not persist_guard[0]:
             persist_guard[0] = True
-            turn_summary.llm_response = INTERRUPTED_RESPONSE_MESSAGE
+            turn_summary.llm_response = full_text
             await persist_interrupted_turn(
                 context,
                 responses_params,
@@ -644,6 +645,11 @@ async def generate_response(  # pylint: disable=too-many-arguments,too-many-posi
                 _background_topic_summary_tasks,
                 original_input,
             )
+        yield stream_event(
+            {"id": turn_summary.next_chunk_id, "token": suffix},
+            LLM_TOKEN_EVENT,
+            context.query_request.media_type or MEDIA_TYPE_JSON,
+        )
         yield stream_interrupted_event(context.request_id)
     finally:
         deregister_stream(context.request_id)
@@ -765,15 +771,17 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
 
         # Content part started - emit an empty token to kick off UI streaming
         if event_type == "response.content_part.added":
+            event_id = chunk_id
+            chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
             yield stream_event(
                 {
-                    "id": chunk_id,
+                    "id": event_id,
                     "token": "",
                 },
                 LLM_TOKEN_EVENT,
                 media_type,
             )
-            chunk_id += 1
 
         # Store MCP call item info for later lookup when arguments.done event occurs
         elif event_type == "response.output_item.added":
@@ -789,15 +797,18 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
         elif event_type == "response.output_text.delta":
             delta_chunk = cast(TextDeltaChunk, chunk)
             text_parts.append(delta_chunk.delta)
+            turn_summary.partial_tokens.append(delta_chunk.delta)
+            event_id = chunk_id
+            chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
             yield stream_event(
                 {
-                    "id": chunk_id,
+                    "id": event_id,
                     "token": delta_chunk.delta,
                 },
                 LLM_TOKEN_EVENT,
                 media_type,
             )
-            chunk_id += 1
 
         # Final text of the output (capture, but emit at response.completed)
         elif event_type == "response.output_text.done":
@@ -877,15 +888,17 @@ async def response_generator(  # pylint: disable=too-many-branches,too-many-stat
             # (LCORE-1572), so the persisted turn keeps non-text output items
             # rather than being flattened to the response text.
             turn_summary.output_items = list(latest_response_object.output or [])
+            event_id = chunk_id
+            chunk_id += 1
+            turn_summary.next_chunk_id = chunk_id
             yield stream_event(
                 {
-                    "id": chunk_id,
+                    "id": event_id,
                     "token": turn_summary.llm_response,
                 },
                 LLM_TURN_COMPLETE_EVENT,
                 media_type,
             )
-            chunk_id += 1
 
         # Incomplete or failed response - emit error
         elif event_type in ("response.incomplete", "response.failed"):

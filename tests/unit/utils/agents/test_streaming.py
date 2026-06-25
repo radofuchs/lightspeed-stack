@@ -64,6 +64,8 @@ from utils.agents.streaming import (
 )
 from utils.token_counter import TokenCounter
 
+INTERRUPTED_INDICATOR = f"\n\n*{INTERRUPTED_RESPONSE_MESSAGE}*"
+
 TEST_CONVERSATION_ID = "123e4567-e89b-12d3-a456-426614174000"
 
 
@@ -715,9 +717,9 @@ class TestGenerateAgentResponse:
             )
         ]
 
-        assert _sse_event_types(result) == ["start", "token", "interrupted"]
+        assert _sse_event_types(result) == ["start", "token", "token", "interrupted"]
         persist_mock.assert_awaited_once()
-        assert turn_summary.llm_response == INTERRUPTED_RESPONSE_MESSAGE
+        assert turn_summary.llm_response == INTERRUPTED_INDICATOR
         stream_interrupt_mocks["deregister"].assert_called_once_with(context.request_id)
 
     @pytest.mark.asyncio
@@ -808,7 +810,7 @@ class TestGenerateAgentResponse:
             )
         ]
 
-        assert _sse_event_types(result) == ["start", "token", "interrupted"]
+        assert _sse_event_types(result) == ["start", "token", "token", "interrupted"]
         persist_mock.assert_not_awaited()
 
 
@@ -959,6 +961,151 @@ class TestAgentResponseGenerator:
 
         assert len(result) == 1
         assert turn_summary.token_usage.input_tokens == 0
+
+
+class TestInterruptPartialTokenAccumulation:
+    """Tests verifying real partial-text accumulation through the streaming pipeline on interrupt."""
+
+    @pytest.mark.asyncio
+    async def test_interrupt_accumulates_partial_tokens_and_persists(
+        self,
+        mocker: MockerFixture,
+        make_generator_context: Callable[..., ResponseGeneratorContext],
+        responses_params: ResponsesApiParams,
+    ) -> None:
+        """Cancel mid-stream through agent_response_generator and verify partial content is accumulated, repaired, and persisted."""
+        context = make_generator_context()
+        turn_summary = TurnSummary()
+        background_tasks: list[asyncio.Task[None]] = []
+
+        events_before_cancel = [
+            PartStartEvent(index=0, part=TextPart(content="Hello")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta=" world")),
+        ]
+
+        def _cancelling_run_stream(
+            events: list[Any],
+        ) -> Any:
+            async def _event_stream() -> AsyncIterator[Any]:
+                for event in events:
+                    yield event
+                raise asyncio.CancelledError()
+
+            class _Ctx:
+                """Async context manager that cancels after yielding events."""
+
+                async def __aenter__(self) -> AsyncIterator[Any]:
+                    return _event_stream()
+
+                async def __aexit__(self, *_args: object) -> None:
+                    return None
+
+            return _Ctx()
+
+        mock_agent = mocker.Mock()
+        mock_agent.run_stream_events.return_value = _cancelling_run_stream(
+            events_before_cancel
+        )
+
+        persist_mock = mocker.patch(
+            "utils.agents.streaming.persist_interrupted_turn",
+            new=mocker.AsyncMock(),
+        )
+        mocker.patch(
+            "utils.agents.streaming.register_interrupt_callback",
+            return_value=[False],
+        )
+
+        inner = agent_response_generator(
+            mock_agent,
+            responses_params,
+            context,
+            turn_summary,
+            ENDPOINT_PATH_STREAMING_QUERY,
+        )
+
+        result = [
+            event
+            async for event in generate_agent_response(
+                inner,
+                context,
+                responses_params,
+                turn_summary,
+                background_tasks,
+            )
+        ]
+
+        event_types = _sse_event_types(result)
+        assert event_types == ["start", "token", "token", "token", "interrupted"]
+
+        assert turn_summary.partial_tokens == ["Hello", " world"]
+
+        assert "Hello world" in turn_summary.llm_response
+        assert INTERRUPTED_RESPONSE_MESSAGE in turn_summary.llm_response
+
+        persist_mock.assert_awaited_once()
+
+        token_events = [
+            json.loads(e.removeprefix("data: ").strip())
+            for e in result
+            if e.startswith("data: ")
+            and json.loads(e.removeprefix("data: ").strip())["event"] == "token"
+        ]
+        chunk_ids = [t["data"]["id"] for t in token_events]
+        num_chunks = len(chunk_ids)
+        assert chunk_ids == sorted(chunk_ids), "chunk_ids must be monotonically ordered"
+        assert all(cid >= 0 for cid in chunk_ids), "all chunk_ids must be non-negative"
+        assert num_chunks == len(
+            set(chunk_ids)
+        ), "chunk_ids must not contain duplicates"
+        assert chunk_ids[-1] == num_chunks - 1
+
+    @pytest.mark.asyncio
+    async def test_interrupt_with_no_tokens_uses_zero_chunk_id(
+        self,
+        mocker: MockerFixture,
+        make_generator_context: Callable[..., ResponseGeneratorContext],
+        responses_params: ResponsesApiParams,
+    ) -> None:
+        """Cancel before any tokens are emitted; interrupt suffix should use chunk_id 0."""
+        context = make_generator_context()
+        turn_summary = TurnSummary()
+        background_tasks: list[asyncio.Task[None]] = []
+
+        async def inner() -> AsyncIterator[str]:
+            raise asyncio.CancelledError()
+            yield ""  # pragma: no cover
+
+        persist_mock = mocker.patch(
+            "utils.agents.streaming.persist_interrupted_turn",
+            new=mocker.AsyncMock(),
+        )
+        mocker.patch(
+            "utils.agents.streaming.register_interrupt_callback",
+            return_value=[False],
+        )
+
+        result = [
+            event
+            async for event in generate_agent_response(
+                inner(),
+                context,
+                responses_params,
+                turn_summary,
+                background_tasks,
+            )
+        ]
+
+        token_events = [
+            json.loads(e.removeprefix("data: ").strip())
+            for e in result
+            if e.startswith("data: ")
+            and json.loads(e.removeprefix("data: ").strip())["event"] == "token"
+        ]
+        assert len(token_events) == 1
+        assert token_events[0]["data"]["id"] == 0
+
+        persist_mock.assert_awaited_once()
 
 
 def _sse_event_types(events: list[str]) -> list[str]:

@@ -51,6 +51,7 @@ from app.endpoints.streaming_query import (
 )
 from configuration import AppConfig
 from constants import (
+    INTERRUPTED_RESPONSE_MESSAGE,
     MEDIA_TYPE_JSON,
     MEDIA_TYPE_TEXT,
 )
@@ -69,6 +70,8 @@ from models.common.turn_summary import (
 from models.config import Action
 from utils.stream_interrupts import StreamInterruptRegistry
 from utils.token_counter import TokenCounter
+
+INTERRUPTED_INDICATOR = f"\n\n*{INTERRUPTED_RESPONSE_MESSAGE}*"
 
 MOCK_AUTH_STREAMING = (
     "00000001-0001-0001-0001-000000000001",
@@ -1379,6 +1382,7 @@ class TestGenerateResponse:
             result.append(item)
 
         assert any("start" in item for item in result)
+        assert any('"event": "token"' in item for item in result)
         assert any('"event": "interrupted"' in item for item in result)
         assert not any('"event": "end"' in item for item in result)
         consume_query_tokens_mock.assert_not_called()
@@ -1387,13 +1391,13 @@ class TestGenerateResponse:
             mock_context.client,
             existing_conv_id,
             "test",
-            "You interrupted this request.",
+            INTERRUPTED_INDICATOR,
         )
         store_query_results_mock.assert_called_once()
         call_kwargs = store_query_results_mock.call_args[1]
         assert call_kwargs["user_id"] == "user_123"
         assert call_kwargs["conversation_id"] == existing_conv_id
-        assert call_kwargs["summary"].llm_response == "You interrupted this request."
+        assert call_kwargs["summary"].llm_response == INTERRUPTED_INDICATOR
         assert call_kwargs["topic_summary"] is None
 
         isolate_stream_interrupt_registry.deregister_stream.assert_called_once_with(

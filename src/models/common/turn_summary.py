@@ -114,6 +114,16 @@ class TurnSummary(BaseModel):
         description="Structured response output items, captured for compacted-mode "
         "turn persistence (LCORE-1572). Empty on the non-compacted path.",
     )
+    partial_tokens: list[str] = Field(
+        default_factory=list,
+        description="Accumulated text deltas during streaming, used to reconstruct "
+        "partial content on interruption.",
+    )
+    next_chunk_id: int = Field(
+        default=0,
+        description="Next monotonic SSE chunk index, kept in sync with the inner "
+        "generator so the interrupt handler can emit a sequentially valid id.",
+    )
 
 
 class ToolInfoSummary(BaseModel):

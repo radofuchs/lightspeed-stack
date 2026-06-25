@@ -20,6 +20,7 @@ from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.responses.types import ResponseInput
 from models.common.turn_summary import TurnSummary
 from utils.conversations import append_turn_items_to_conversation
+from utils.markdown_repair import close_open_markdown
 from utils.query import store_query_results, update_conversation_topic_summary
 from utils.responses import get_topic_summary
 from utils.shields import append_turn_to_conversation
@@ -215,6 +216,28 @@ async def background_update_topic_summary(
         )
 
 
+def build_interrupted_response(partial_tokens: list[str]) -> tuple[str, str]:
+    """Build the final interrupted response text from accumulated tokens.
+
+    Joins partial tokens, repairs any open markdown constructs, and appends
+    an italicized interruption indicator.
+
+    Parameters:
+        partial_tokens: List of text deltas accumulated during streaming.
+
+    Returns:
+        A tuple of (full_response_text, suffix_to_emit) where full_response_text
+        is the complete message for persistence and suffix_to_emit is the new
+        content to send as a final SSE token event.
+    """
+    partial_text = "".join(partial_tokens)
+    repaired_text = close_open_markdown(partial_text)
+    interrupted_indicator = f"\n\n*{INTERRUPTED_RESPONSE_MESSAGE}*"
+    suffix = repaired_text + interrupted_indicator
+    final_text = partial_text + suffix
+    return final_text, suffix
+
+
 async def persist_interrupted_turn(
     context: ResponseGeneratorContext,
     responses_params: ResponsesApiParams,
@@ -251,7 +274,7 @@ async def persist_interrupted_turn(
                 original_input,
                 [
                     OpenAIResponseMessage(
-                        role="assistant", content=INTERRUPTED_RESPONSE_MESSAGE
+                        role="assistant", content=turn_summary.llm_response
                     )
                 ],
             )
@@ -260,7 +283,7 @@ async def persist_interrupted_turn(
                 context.client,
                 responses_params.conversation,
                 cast(str, responses_params.input),
-                INTERRUPTED_RESPONSE_MESSAGE,
+                turn_summary.llm_response,
             )
     except Exception:  # pylint: disable=broad-except
         logger.exception(
@@ -342,7 +365,8 @@ def register_interrupt_callback(
         if guard[0]:
             return
         guard[0] = True
-        turn_summary.llm_response = INTERRUPTED_RESPONSE_MESSAGE
+        full_text, _ = build_interrupted_response(turn_summary.partial_tokens)
+        turn_summary.llm_response = full_text
         await persist_interrupted_turn(
             context,
             responses_params,
