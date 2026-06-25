@@ -191,11 +191,15 @@ generate-documentation:	## Generate documentation
 doc:	## Generate documentation for developers
 	scripts/gen_doc.py
 
-docs/models:	docs/models/requests.puml docs/models/common.puml	## Generate documentation about models
+docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/common.puml	## Generate documentation about models
 
 docs/models/requests.puml:
 	uv run pyreverse src/models/api/requests/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/requests.puml
+
+docs/models/responses.puml:
+	uv run pyreverse src/models/api/responses/ --output puml --output-directory=docs/models/
+	mv docs/models/classes.puml docs/models/responses.puml
 
 docs/models/common.puml:
 	uv run pyreverse src/models/common/ --output puml --output-directory=docs/models/
@@ -205,6 +209,13 @@ docs/models/requests.svg:	docs/models/requests.puml
 	pushd docs/models && \
 	java -jar ${PATH_TO_PLANTUML}/plantuml.jar requests.puml -tsvg && \
 	xmllint --format classes.svg > requests.svg && \
+	rm -f classes.svg && \
+	popd
+
+docs/models/responses.svg:	docs/models/responses.puml
+	pushd docs/models && \
+	java -jar ${PATH_TO_PLANTUML}/plantuml.jar responses.puml -tsvg && \
+	xmllint --format classes.svg > responses.svg && \
 	rm -f classes.svg && \
 	popd
 
