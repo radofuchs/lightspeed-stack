@@ -51,9 +51,6 @@ validating that queries return referenced chunks.
 
 ## Step 1: Launch OKP
 
-> **Warning:** The image referenced below is a **prototype**. The official OKP
-> RAG image is expected in **late March / early April** of 2026.
-
 Start the OKP RAG service with Podman:
 
 ```bash
