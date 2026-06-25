@@ -5,7 +5,6 @@ from the RHEL Lightspeed Command Line Assistant (CLA).
 """
 
 import functools
-import re
 import time
 from datetime import UTC, datetime
 from typing import Annotated, Any, Optional, cast
@@ -84,9 +83,6 @@ _INFER_HANDLED_EXCEPTIONS = (
     OpenAIAPIStatusError,
 )
 
-_PRIVATE_ERROR_BLOCK_PATTERN = re.compile(r"\bPRIVATE\b[^\r\n,;)]*", re.IGNORECASE)
-_SECRET_KEY_PATTERN = re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]*")
-
 
 infer_responses: dict[int | str, dict[str, Any]] = {
     200: RlsapiV1InferResponse.openapi_response(),
@@ -101,23 +97,6 @@ infer_responses: dict[int | str, dict[str, Any]] = {
         examples=["llama stack", "kubernetes api"]
     ),
 }
-
-
-def _redact_sensitive_error_text(error_text: str) -> str:
-    """Redact sensitive substrings from backend error text before telemetry.
-
-    Backend exceptions can include provider request snippets or credentials in
-    their string representation.  Splunk events need enough context to explain
-    the failure, but they must not contain private prompt blocks or API keys.
-
-    Args:
-        error_text: Raw exception string returned by ``str(error)``.
-
-    Returns:
-        Error text with known sensitive substrings replaced by placeholders.
-    """
-    redacted_text = _PRIVATE_ERROR_BLOCK_PATTERN.sub("PRIVATE [REDACTED]", error_text)
-    return _SECRET_KEY_PATTERN.sub("sk-[REDACTED]", redacted_text)
 
 
 def _build_instructions(systeminfo: RlsapiV1SystemInfo) -> str:
