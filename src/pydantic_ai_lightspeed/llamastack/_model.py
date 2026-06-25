@@ -26,7 +26,7 @@ from openai.types import responses
 from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai._run_context import RunContext
 from pydantic_ai._utils import PeekableAsyncStream, Unset, number_to_datetime
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models import (
     ModelRequestParameters,
     StreamedResponse,
@@ -181,15 +181,79 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
     before the corresponding ``McpCall`` or ``ResponseFunctionToolCall`` item.
     """
 
+    async def request(  # pylint: disable=unused-argument
+        self,
+        messages: list[ModelMessage],
+        model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
+        run_context: RunContext[Any] | None = None,
+    ) -> Any:
+        """Non-streaming request with Llama Stack conversation continuation fix.
+
+        Llama Stack rejects requests containing both ``conversation`` and
+        ``previous_response_id``.  On continuation turns (where a prior
+        ``ModelResponse`` exists), we trim messages to only the new input and
+        disable ``previous_response_id`` so that only ``conversation`` is sent.
+        This ensures all responses are persisted to the conversation.
+        """
+        messages, model_settings = self._prepare_conversation_continuation(
+            messages, model_settings
+        )
+        return await super().request(messages, model_settings, model_request_parameters)
+
+    def _prepare_conversation_continuation(
+        self,
+        messages: list[ModelMessage],
+        model_settings: ModelSettings | None,
+    ) -> tuple[list[ModelMessage], ModelSettings | None]:
+        """Trim messages and disable previous_response_id for conversation continuations.
+
+        Llama Stack rejects requests with both ``previous_response_id`` and
+        ``conversation``. When ``conversation`` is in ``extra_body`` and there's
+        already a ModelResponse in the history (a continuation turn), we:
+
+        1. Trim messages to only those AFTER the last ModelResponse (new input only)
+        2. Disable ``openai_previous_response_id`` so pydantic-ai won't resolve one
+
+        This means Llama Stack receives ``conversation`` (for persistence) plus only
+        the new input items. Llama Stack reconstructs prior history from the
+        conversation and appends the new input correctly.
+        """
+        if not model_settings or not isinstance(model_settings, dict):
+            return messages, model_settings
+
+        extra_body = model_settings.get("extra_body")
+        if not isinstance(extra_body, dict) or "conversation" not in extra_body:
+            return messages, model_settings
+
+        last_response_idx = None
+        for i in range(len(messages) - 1, -1, -1):
+            msg = messages[i]
+            if isinstance(msg, ModelResponse) and msg.provider_response_id:
+                last_response_idx = i
+                break
+
+        if last_response_idx is None:
+            return messages, model_settings
+
+        trimmed_messages = messages[last_response_idx + 1 :]
+
+        new_settings = dict(model_settings)
+        new_settings.pop("openai_previous_response_id", None)
+        return trimmed_messages, cast(ModelSettings, new_settings)
+
     @asynccontextmanager
-    async def request_stream(
+    async def request_stream(  # pylint: disable=unused-argument
         self,
         messages: list[ModelMessage],
         model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters,
         run_context: RunContext[Any] | None = None,
     ) -> AsyncIterator[StreamedResponse]:
-        """Request a streaming response, filtering Llama Stack-specific event quirks.
+        """Request a streaming response with Llama Stack compatibility fixes.
+
+        Applies the same conversation continuation handling as :meth:`request`
+        before calling the Responses API, then filters streaming tool-call events.
 
         Args:
             messages: Model messages for the request.
@@ -201,10 +265,10 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
             A StreamedResponse with the filtered event stream.
         """
         check_allow_model_requests()
-        model_settings, model_request_parameters = self.prepare_request(
-            model_settings,
-            model_request_parameters,
+        messages, model_settings = self._prepare_conversation_continuation(
+            messages, model_settings
         )
+
         model_settings_cast = cast(OpenAIResponsesModelSettings, model_settings or {})
         response = await self._responses_create(
             messages, True, model_settings_cast, model_request_parameters

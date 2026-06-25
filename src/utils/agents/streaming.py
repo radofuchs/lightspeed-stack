@@ -229,12 +229,29 @@ async def generate_agent_response(
         context.query_request.conversation_id is None
         and bool(context.query_request.generate_topic_summary)
     )
-    topic_summary = await maybe_get_topic_summary(
-        generate_topic_summary=should_generate_topic_summary,
-        input_text=context.query_request.query,
-        client=context.client,
-        model_id=responses_params.model,
-    )
+    try:
+        topic_summary = await maybe_get_topic_summary(
+            generate_topic_summary=should_generate_topic_summary,
+            input_text=context.query_request.query,
+            client=context.client,
+            model_id=responses_params.model,
+        )
+    except HTTPException as exc:
+        logger.warning(
+            "Topic summary failed for request %s: %s",
+            context.request_id,
+            exc.detail,
+        )
+        detail: dict[str, str] = exc.detail if isinstance(exc.detail, dict) else {}
+        yield serialize_event(
+            ErrorStreamPayload.create(
+                status_code=exc.status_code,
+                response=detail.get("response", "Internal server error"),
+                cause=detail.get("cause", str(exc.detail)),
+            ),
+            media_type,
+        )
+        return
     logger.info("Consuming tokens")
     consume_query_tokens(
         user_id=context.user_id,
