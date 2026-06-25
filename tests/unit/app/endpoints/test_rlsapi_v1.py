@@ -25,12 +25,12 @@ from app.endpoints.rlsapi_v1 import (
     AUTH_DISABLED,
     TemplateRenderError,
     _build_instructions,
+    _call_llm,
     _compile_prompt_template,
     _get_default_model_id,
     _redact_sensitive_error_text,
     _resolve_quota_subject,
     infer_endpoint,
-    retrieve_simple_response,
 )
 from authentication.interface import AuthTuple
 from authentication.rh_identity import RHIdentityData
@@ -478,40 +478,6 @@ async def test_get_default_model_id_auto_discovery_success(
     model_id = await _get_default_model_id()
 
     assert model_id == "openai/gpt-4o-mini"
-
-
-# --- Test retrieve_simple_response ---
-
-
-@pytest.mark.asyncio
-async def test_retrieve_simple_response_success(
-    mock_configuration: AppConfig, mock_llm_response: None
-) -> None:
-    """Test retrieve_simple_response returns LLM response text."""
-    response = await retrieve_simple_response(
-        "How do I list files?", constants.DEFAULT_SYSTEM_PROMPT
-    )
-    assert response == "This is a test LLM response."
-
-
-@pytest.mark.asyncio
-async def test_retrieve_simple_response_empty_output(
-    mock_configuration: AppConfig, mock_empty_llm_response: None
-) -> None:
-    """Test retrieve_simple_response handles empty LLM output."""
-    response = await retrieve_simple_response(
-        "Test question", constants.DEFAULT_SYSTEM_PROMPT
-    )
-    assert response == ""
-
-
-@pytest.mark.asyncio
-async def test_retrieve_simple_response_api_connection_error(
-    mock_configuration: AppConfig, mock_api_connection_error: None
-) -> None:
-    """Test retrieve_simple_response propagates APIConnectionError."""
-    with pytest.raises(APIConnectionError):
-        await retrieve_simple_response("Test question", constants.DEFAULT_SYSTEM_PROMPT)
 
 
 # --- Test get_rh_identity_context ---
@@ -982,8 +948,8 @@ async def test_infer_extract_token_usage_on_failure_depends_on_verbose(
         )
     else:
         mocker.patch(
-            "app.endpoints.rlsapi_v1.retrieve_simple_response",
-            side_effect=RuntimeError("retrieval failed"),
+            "app.endpoints.rlsapi_v1._call_llm",
+            new=mocker.AsyncMock(side_effect=RuntimeError("retrieval failed")),
         )
 
     mock_extract = mocker.patch("app.endpoints.rlsapi_v1.extract_token_usage")
@@ -1384,8 +1350,8 @@ async def test_infer_shield_blocked_skips_llm_call(
         "app.endpoints.rlsapi_v1.run_shield_moderation",
         new=mocker.AsyncMock(return_value=blocked),
     )
-    mock_retrieve = mocker.patch(
-        "app.endpoints.rlsapi_v1.retrieve_simple_response",
+    mock_call_llm = mocker.patch(
+        "app.endpoints.rlsapi_v1._call_llm",
         new=mocker.AsyncMock(),
     )
 
@@ -1398,7 +1364,7 @@ async def test_infer_shield_blocked_skips_llm_call(
         auth=MOCK_AUTH,
     )
 
-    mock_retrieve.assert_not_called()
+    mock_call_llm.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -1568,40 +1534,36 @@ def _setup_responses_mock_with_capture(
     return mock_create
 
 
+@pytest.mark.parametrize(
+    "tools",
+    [
+        pytest.param(
+            [
+                {
+                    "type": "mcp",
+                    "server_label": "test-mcp",
+                    "server_url": "http://localhost:9000/sse",
+                    "require_approval": "never",
+                }
+            ],
+            id="forwards_tools",
+        ),
+        pytest.param(None, id="defaults_to_empty"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_retrieve_simple_response_passes_tools(
-    mocker: MockerFixture, mock_configuration: AppConfig
+async def test_call_llm_forwards_tools(
+    mocker: MockerFixture,
+    mock_configuration: AppConfig,
+    tools: Optional[list[dict[str, Any]]],
 ) -> None:
-    """Test that retrieve_simple_response forwards tools to responses.create()."""
-    mock_create = _setup_responses_mock_with_capture(mocker)
-    tools = [
-        {
-            "type": "mcp",
-            "server_label": "test-mcp",
-            "server_url": "http://localhost:9000/sse",
-            "require_approval": "never",
-        }
-    ]
-
-    await retrieve_simple_response("Test question", "Instructions", tools=tools)
-
-    mock_create.assert_called_once()
-    call_kwargs = mock_create.call_args.kwargs
-    assert call_kwargs["tools"] == tools
-
-
-@pytest.mark.asyncio
-async def test_retrieve_simple_response_defaults_to_empty_tools(
-    mocker: MockerFixture, mock_configuration: AppConfig
-) -> None:
-    """Test that retrieve_simple_response passes empty list when tools is None."""
+    """Test that _call_llm forwards tools to responses.create(), defaulting to []."""
     mock_create = _setup_responses_mock_with_capture(mocker)
 
-    await retrieve_simple_response("Test question", "Instructions")
+    await _call_llm("Test question", "Instructions", tools=tools)
 
     mock_create.assert_called_once()
-    call_kwargs = mock_create.call_args.kwargs
-    assert call_kwargs["tools"] == []
+    assert mock_create.call_args.kwargs["tools"] == (tools or [])
 
 
 @pytest.mark.asyncio
