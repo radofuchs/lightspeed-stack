@@ -164,6 +164,62 @@ def test_apply_high_level_inference_merges_extra() -> None:
     assert entry["config"] == {"url": "http://x", "tls_verify": False}
 
 
+def test_apply_high_level_inference_emits_api_token_for_vllm() -> None:
+    """vLLM providers emit api_token from api_key_env, not api_key."""
+    ls_config: dict[str, Any] = {"providers": {"inference": []}}
+    inference = {
+        "providers": [
+            {"type": "vllm", "api_key_env": "VLLM_API_KEY"},
+            {"type": "vllm_rhaiis", "api_key_env": "VLLM_API_KEY"},
+        ]
+    }
+    apply_high_level_inference(ls_config, inference)
+    vllm = ls_config["providers"]["inference"][0]
+    vllm_rhaiis = ls_config["providers"]["inference"][1]
+    assert vllm["provider_id"] == "vllm"
+    assert vllm["provider_type"] == "remote::vllm"
+    assert vllm["config"]["api_token"] == "${env.VLLM_API_KEY}"
+    assert "api_key" not in vllm["config"]
+    assert vllm_rhaiis["provider_id"] == "vllm-rhaiis"
+    assert vllm_rhaiis["config"]["api_token"] == "${env.VLLM_API_KEY}"
+    assert "api_key" not in vllm_rhaiis["config"]
+
+
+def test_apply_high_level_inference_maps_ollama() -> None:
+    """ollama maps to remote::ollama with extra config merged."""
+    ls_config: dict[str, Any] = {"providers": {"inference": []}}
+    inference = {
+        "providers": [
+            {"type": "ollama", "extra": {"base_url": "http://localhost:11434"}}
+        ]
+    }
+    apply_high_level_inference(ls_config, inference)
+    entry = ls_config["providers"]["inference"][0]
+    assert entry["provider_id"] == "ollama"
+    assert entry["provider_type"] == "remote::ollama"
+    assert entry["config"]["base_url"] == "http://localhost:11434"
+
+
+def test_apply_high_level_inference_maps_vllm() -> None:
+    """vllm maps to remote::vllm with extra config merged."""
+    ls_config: dict[str, Any] = {"providers": {"inference": []}}
+    inference = {
+        "providers": [
+            {
+                "type": "vllm",
+                "api_key_env": "VLLM_API_KEY",
+                "extra": {"base_url": "${env.VLLM_URL:=}"},
+            }
+        ]
+    }
+    apply_high_level_inference(ls_config, inference)
+    entry = ls_config["providers"]["inference"][0]
+    assert entry["provider_id"] == "vllm"
+    assert entry["provider_type"] == "remote::vllm"
+    assert entry["config"]["api_token"] == "${env.VLLM_API_KEY}"
+    assert entry["config"]["base_url"] == "${env.VLLM_URL:=}"
+
+
 def test_apply_high_level_inference_empty_is_noop() -> None:
     """No providers -> the inference list is left as-is."""
     ls_config: dict[str, Any] = {"providers": {"inference": [{"provider_id": "x"}]}}
