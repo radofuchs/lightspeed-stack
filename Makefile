@@ -191,38 +191,49 @@ generate-documentation:	## Generate documentation
 doc:	## Generate documentation for developers
 	scripts/gen_doc.py
 
-docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/common.puml	## Generate documentation about models
+docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml	## Generate documentation about models
 
-docs/models/requests.puml:
+docs/models/requests.puml: ## Generate PlantUML class diagram for requests data models
 	uv run pyreverse src/models/api/requests/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/requests.puml
 
-docs/models/responses.puml:
+docs/models/responses.puml: ## Generate PlantUML class diagram for responses data models
 	uv run pyreverse src/models/api/responses/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/responses.puml
 
-docs/models/common.puml:
+docs/models/common.puml: ## Generate PlantUML class diagram for common data models
 	uv run pyreverse src/models/common/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/common.puml
 
-docs/models/requests.svg:	docs/models/requests.puml
+docs/models/database.puml: ## Generate PlantUML class diagram for database data models
+	uv run pyreverse src/models/database/ --output puml --output-directory=docs/models/
+	mv docs/models/classes.puml docs/models/database.puml
+
+docs/models/requests.svg:	docs/models/requests.puml	## Generate an SVG with requests data models
 	pushd docs/models && \
 	java -jar ${PATH_TO_PLANTUML}/plantuml.jar requests.puml -tsvg && \
 	xmllint --format classes.svg > requests.svg && \
 	rm -f classes.svg && \
 	popd
 
-docs/models/responses.svg:	docs/models/responses.puml
+docs/models/responses.svg:	docs/models/responses.puml	## Generate an SVG with responses data models
 	pushd docs/models && \
 	java -jar ${PATH_TO_PLANTUML}/plantuml.jar responses.puml -tsvg && \
 	xmllint --format classes.svg > responses.svg && \
 	rm -f classes.svg && \
 	popd
 
-docs/models/common.svg:	docs/models/common.puml
+docs/models/common.svg:	docs/models/common.puml	## Generate an SVG with common data models
 	pushd docs/models && \
 	java -jar ${PATH_TO_PLANTUML}/plantuml.jar common.puml -tsvg && \
 	xmllint --format classes.svg > common.svg && \
+	rm -f classes.svg && \
+	popd
+
+docs/models/database.svg:	docs/models/database.puml	## Generate a SVG with database data models
+	pushd docs/models && \
+	java -jar ${PATH_TO_PLANTUML}/plantuml.jar database.puml -tsvg && \
+	xmllint --format classes.svg > database.svg && \
 	rm -f classes.svg && \
 	popd
 
