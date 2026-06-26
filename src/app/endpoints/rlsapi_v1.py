@@ -112,9 +112,15 @@ def _build_instructions(systeminfo: RlsapiV1SystemInfo) -> str:
     Returns:
         The rendered instructions string for the LLM.
     """
+    prompt = (
+        configuration.customization.system_prompt
+        if configuration.customization is not None
+        and configuration.customization.system_prompt is not None
+        else constants.DEFAULT_SYSTEM_PROMPT
+    )
     date_today = datetime.now(tz=UTC).strftime("%B %d, %Y")
 
-    return _get_prompt_template().render(
+    return _compile_prompt_template(prompt).render(
         date=date_today,
         os=systeminfo.os or "",
         version=systeminfo.version or "",
@@ -122,7 +128,7 @@ def _build_instructions(systeminfo: RlsapiV1SystemInfo) -> str:
     )
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=1)
 def _compile_prompt_template(prompt: str) -> jinja2.Template:
     """Compile a Jinja2 template string inside a SandboxedEnvironment.
 
@@ -145,25 +151,6 @@ def _compile_prompt_template(prompt: str) -> jinja2.Template:
         raise TemplateRenderError(
             f"System prompt contains invalid Jinja2 syntax: {exc}"
         ) from exc
-
-
-def _get_prompt_template() -> jinja2.Template:
-    """Resolve the system prompt from configuration and return the compiled template.
-
-    Delegates to the cached ``_compile_prompt_template`` so that identical
-    prompt text is compiled only once, while configuration changes are
-    picked up automatically.
-
-    Returns:
-        The compiled Jinja2 Template ready for rendering.
-    """
-    prompt = (
-        configuration.customization.system_prompt
-        if configuration.customization is not None
-        and configuration.customization.system_prompt is not None
-        else constants.DEFAULT_SYSTEM_PROMPT
-    )
-    return _compile_prompt_template(prompt)
 
 
 async def _get_default_model_id() -> str:
@@ -305,18 +292,6 @@ async def _call_llm(
     return cast(OpenAIResponseObject, response)
 
 
-def _get_cla_version(request: Request) -> str:
-    """Extract CLA version from User-Agent header."""
-    return request.headers.get("User-Agent", "")
-
-
-def _get_configured_default_model_name() -> str:
-    """Get configured default model name for telemetry payloads."""
-    if configuration.inference is None:
-        return ""
-    return configuration.inference.default_model or ""
-
-
 def _queue_splunk_event(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     background_tasks: BackgroundTasks,
     infer_request: RlsapiV1InferRequest,
@@ -348,11 +323,15 @@ def _queue_splunk_event(  # pylint: disable=too-many-arguments,too-many-position
         question=infer_request.question,
         response=response_text,
         inference_time=inference_time,
-        model=_get_configured_default_model_name(),
+        model=(
+            (configuration.inference.default_model or "")
+            if configuration.inference is not None
+            else ""
+        ),
         org_id=org_id,
         system_id=system_id,
         request_id=request_id,
-        cla_version=_get_cla_version(request),
+        cla_version=request.headers.get("User-Agent", ""),
         system_os=systeminfo.os,
         system_version=systeminfo.version,
         system_arch=systeminfo.arch,
@@ -473,24 +452,6 @@ def _record_inference_failure(  # pylint: disable=too-many-arguments,too-many-po
         inference_time,
     )
     return inference_time
-
-
-def _is_verbose_enabled(infer_request: RlsapiV1InferRequest) -> bool:
-    """Check whether verbose metadata should be included in the response.
-
-    Verbose mode requires dual opt-in: the server configuration must allow it
-    via ``allow_verbose_infer``, and the client must request it via the
-    ``include_metadata`` field.
-
-    Args:
-        infer_request: The inference request to check.
-
-    Returns:
-        True if both server config and client request enable verbose mode.
-    """
-    return (
-        configuration.rlsapi_v1.allow_verbose_infer and infer_request.include_metadata
-    )
 
 
 def _resolve_quota_subject(request: Request, auth: AuthTuple) -> Optional[str]:
@@ -752,7 +713,9 @@ async def infer_endpoint(  # pylint: disable=R0914,R0915
     )
 
     start_time = time.monotonic()
-    verbose_enabled = _is_verbose_enabled(infer_request)
+    verbose_enabled = (
+        configuration.rlsapi_v1.allow_verbose_infer and infer_request.include_metadata
+    )
     logger.info(
         "Starting LLM call for rlsapi v1 request %s with verbose metadata enabled: %s",
         request_id,
