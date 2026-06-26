@@ -20056,6 +20056,8 @@
                         "type": "string",
                         "enum": [
                             "openai",
+                            "ollama",
+                            "vllm",
                             "sentence_transformers",
                             "azure",
                             "vertexai",

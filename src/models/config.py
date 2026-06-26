@@ -678,6 +678,8 @@ class UnifiedInferenceProvider(ConfigurationBase):
 
     type: Literal[
         "openai",
+        "ollama",
+        "vllm",
         "sentence_transformers",
         "azure",
         "vertexai",

@@ -38,12 +38,20 @@ logger = get_logger(__name__)
 # a unit test so a new Literal value cannot be added without a mapping.
 PROVIDER_TYPE_MAP: dict[str, str] = {
     "openai": "remote::openai",
+    "ollama": "remote::ollama",
+    "vllm": "remote::vllm",
     "sentence_transformers": "inline::sentence-transformers",
     "azure": "remote::azure",
     "vertexai": "remote::vertexai",
     "watsonx": "remote::watsonx",
     "vllm_rhaiis": "remote::vllm",
     "vllm_rhel_ai": "remote::vllm",
+}
+
+# Maps Llama Stack provider_type -> config field name for the auth token.
+# Providers not listed default to "api_key".
+API_KEY_FIELD_MAP: dict[str, str] = {
+    "remote::vllm": "api_token",
 }
 
 # Package-relative path to the built-in default baseline run.yaml shipped with
@@ -734,18 +742,20 @@ def apply_high_level_inference(
     for provider in providers:
         provider_type = provider["type"]
         emitted_id = provider_type.replace("_", "-")
+        ls_provider_type = PROVIDER_TYPE_MAP[provider_type]
         entry: dict[str, Any] = {
             "provider_id": emitted_id,
-            "provider_type": PROVIDER_TYPE_MAP[provider_type],
+            "provider_type": ls_provider_type,
         }
 
         provider_config: dict[str, Any] = {}
-        if provider.get("api_key_env"):
-            provider_config["api_key"] = "${env." + provider["api_key_env"] + "}"
-        if provider.get("allowed_models"):
-            provider_config["allowed_models"] = provider["allowed_models"]
         if provider.get("extra"):
             provider_config.update(provider["extra"])
+        if provider.get("api_key_env"):
+            key_field = API_KEY_FIELD_MAP.get(ls_provider_type, "api_key")
+            provider_config[key_field] = "${env." + provider["api_key_env"] + "}"
+        if provider.get("allowed_models"):
+            provider_config["allowed_models"] = provider["allowed_models"]
         if provider_config:
             entry["config"] = provider_config
 
