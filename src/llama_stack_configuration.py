@@ -749,13 +749,13 @@ def apply_high_level_inference(
         }
 
         provider_config: dict[str, Any] = {}
+        if provider.get("extra"):
+            provider_config.update(provider["extra"])
         if provider.get("api_key_env"):
             key_field = API_KEY_FIELD_MAP.get(ls_provider_type, "api_key")
             provider_config[key_field] = "${env." + provider["api_key_env"] + "}"
         if provider.get("allowed_models"):
             provider_config["allowed_models"] = provider["allowed_models"]
-        if provider.get("extra"):
-            provider_config.update(provider["extra"])
         if provider_config:
             entry["config"] = provider_config
 

@@ -220,6 +220,31 @@ def test_apply_high_level_inference_maps_vllm() -> None:
     assert entry["config"]["base_url"] == "${env.VLLM_URL:=}"
 
 
+def test_apply_high_level_inference_extra_cannot_override_api_key_env() -> None:
+    """api_key_env always wins over a conflicting key in extra."""
+    ls_config: dict[str, Any] = {"providers": {"inference": []}}
+    inference = {
+        "providers": [
+            {
+                "type": "vllm",
+                "api_key_env": "VLLM_API_KEY",
+                "extra": {"api_token": "hardcoded"},
+            }
+        ]
+    }
+    apply_high_level_inference(ls_config, inference)
+    entry = ls_config["providers"]["inference"][0]
+    assert entry["config"]["api_token"] == "${env.VLLM_API_KEY}"
+
+
+def test_unified_inference_provider_accepts_ollama_and_vllm() -> None:
+    """Pydantic model accepts the new ollama and vllm Literal values."""
+    ollama = UnifiedInferenceProvider(type="ollama")
+    assert ollama.type == "ollama"
+    vllm = UnifiedInferenceProvider(type="vllm")
+    assert vllm.type == "vllm"
+
+
 def test_apply_high_level_inference_empty_is_noop() -> None:
     """No providers -> the inference list is left as-is."""
     ls_config: dict[str, Any] = {"providers": {"inference": [{"provider_id": "x"}]}}
