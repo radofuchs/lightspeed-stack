@@ -263,6 +263,46 @@ DEFAULT_VIOLATION_MESSAGE: Final[str] = (
     "I cannot process this request due to policy restrictions."
 )
 
+# The Default model prompt and the default invalid question response for QuestionValidityConfig
+DEFAULT_MODEL_PROMPT: Final[str] = """
+Instructions:
+- You are a question classifying tool
+- You are an expert in kubernetes and openshift
+- Your job is to determine where or a user's question is related to kubernetes and/or openshift technologies and to provide a one-word response.
+- If a question appears to be related to kubernetes or openshift technologies, answer with the word ${allowed}, otherwise answer with the word ${rejected}.
+- Do not explain your answer, just provide the one-word response. Do not give any other response.
+- If the given question is an empty string, answer with the word ${rejected}
+
+
+Example Question:
+Why is the sky blue?
+Example Response:
+${rejected}
+
+Example Question:
+Why is the grass green?
+Example Response:
+${rejected}
+
+Example Question:
+Why is sand yellow?
+Example Response:
+${rejected}
+
+Example Question:
+Can you help configure my cluster to automatically scale?
+Example Response:
+${allowed}
+
+Question:
+${message}
+Response:
+"""
+DEFAULT_INVALID_QUESTION_RESPONSE: Final[str] = """
+Hi, I'm the OpenShift Lightspeed assistant, I can help you with questions about OpenShift, 
+please ask me a question related to OpenShift.
+"""
+
 # Placeholder slug used in responses when the server substituted its own
 # system prompt for the client's instructions.  Avoids leaking the actual
 # server prompt back to the client.
