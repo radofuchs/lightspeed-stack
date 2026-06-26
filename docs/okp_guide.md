@@ -70,7 +70,7 @@ podman run --rm -d -p 8081:8080 registry.redhat.io/offline-knowledge-portal/rhok
 
 > **Note:** The default OKP URL is configured via the `RH_SERVER_OKP` environment variable
 > (see Step 2). You can override this by setting a different value for
-> `RH_SERVER_OKP`, or by changing the `okp.rhokp_url` field in 
+> `RH_SERVER_OKP`, or by changing the `okp.rhokp_url` field in
 > `lightspeed-stack.yaml`.
 ---
 
@@ -137,7 +137,7 @@ If you want to filter the docs to a specific product, you can include a static q
 ```yaml
 okp:
   offline: true
-  chunk_filter_query: "product:*openshift*"
+  chunk_filter_query: "product:*openshift* AND product_version:4.21"
 ```
 
 When you launch Lightspeed stack it will augment the Llamastack run.yaml with
@@ -217,7 +217,7 @@ curl -sX POST http://localhost:8080/v1/query \
           "type": "and",
           "filters": [
             {"type": "eq", "key": "product", "value": "openshift_container_platform"},
-            {"type": "eq", "key": "version", "value": "4.21"}
+            {"type": "eq", "key": "product_version", "value": "4.21"}
           ]
         }
       }
