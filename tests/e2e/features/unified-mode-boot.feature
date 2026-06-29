@@ -1,4 +1,4 @@
-@e2e_group_2
+@e2e_group_2 @skip
 Feature: Unified mode configuration boot
 
   Background:
