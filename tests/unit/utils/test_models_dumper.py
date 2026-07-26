@@ -9536,7 +9536,7 @@ def test_dump_models_common_responses_models(tmpdir: Path) -> None:
     check_json_file_content(filename, expected_schemas)
 
 
-def test_dump_models_unknown_group(tmpdir: Path) -> None:
+def test_dump_models_unknown_group() -> None:
     """Test that exception is raised for unknown model group."""
     with pytest.raises(ValueError, match="Unknown model group provided: unknown"):
         dump_models_group("unknown")
