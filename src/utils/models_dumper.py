@@ -13,7 +13,9 @@ import models.common.responses as cr
 import models.compaction as models_compaction
 from utils.openapi_schema_dumper import dump_openapi_schema
 
-conversation_summary_models = [models_compaction.ConversationSummary]
+conversation_summary_models: list[type[BaseModel]] = [
+    models_compaction.ConversationSummary
+]
 
 requests_models: list[type[BaseModel]] = [
     r.ConversationUpdateRequest,
