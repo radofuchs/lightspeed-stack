@@ -4,7 +4,9 @@
 # General
 # =============================================================================
 language: en-US
-tone_instructions: ''
+tone_instructions: >-
+  Prefer concise responses (high information density, low fluff).
+  This is an AI-powered assistant that provides answers to product questions using backend LLM services, agents, and RAG databases.
 early_access: false
 enable_free_tier: true
 inheritance: false
@@ -46,6 +48,9 @@ reviews:
   disable_cache: false
   slop_detection:
     enabled: true
+  # ---------------------------------------------------------------------------
+  # Auto review
+  # ---------------------------------------------------------------------------
   auto_review:
     enabled: true
     description_keyword: ''
@@ -275,9 +280,13 @@ code_generation:
     path_instructions: []
   unit_tests:
     path_instructions: []
+
+# =============================================================================
+# Issue enrichment
+# =============================================================================
 issue_enrichment:
   auto_enrich:
-    enabled: false
+    enabled: true
   planning:
     enabled: true
     auto_planning:
