@@ -19,7 +19,7 @@ import urllib.request
 from collections import deque
 from collections.abc import Sequence
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger("konflux_resolve")
 
@@ -157,7 +157,7 @@ def version_satisfies(version: str, constraint: str) -> bool:
     return True
 
 
-def merge_constraints(existing: str | None, new: str) -> str:
+def merge_constraints(existing: Optional[str], new: str) -> str:
     """Merge two constraint strings by comma-joining."""
     if not existing:
         return new
@@ -228,7 +228,7 @@ class _LinkCollector(HTMLParser):
         self._in_a = False
         self.link_texts: list[str] = []
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         if tag == "a":
             for attr_name, attr_val in attrs:
                 if attr_name == "href" and attr_val is not None:
@@ -412,7 +412,7 @@ class RhoaiIndex:
 
     def _fetch_url(self, url: str) -> str:
         """Fetch *url* with retry (3 attempts, exponential backoff)."""
-        last_exc: Exception | None = None
+        last_exc: Optional[Exception] = None
         for attempt in range(3):
             try:
                 with urllib.request.urlopen(url, timeout=30) as resp:
@@ -470,7 +470,7 @@ class RhoaiIndex:
         if versions:
             self._packages[norm] = versions
 
-    def _match_arch(self, platform_tag: str, target_platforms: list[str]) -> str | None:
+    def _match_arch(self, platform_tag: str, target_platforms: list[str]) -> Optional[str]:
         """Determine which target arch a platform tag matches."""
         if platform_tag.lower() in ("any", "none"):
             return "any"
@@ -486,7 +486,7 @@ class RhoaiIndex:
         """Return whether the RHOAI index lists this package name."""
         return normalize_name(name) in self._known_packages
 
-    def find_best(self, name: str, constraint: str) -> dict[str, Any] | None:
+    def find_best(self, name: str, constraint: str) -> Optional[dict[str, Any]]:
         """Find latest version satisfying *constraint*.
 
         Returns ``{"version": str, "platforms": {arch: (filename, sha256)}}``
@@ -604,7 +604,7 @@ class PypiClient:
 
     def _fetch_url(self, url: str) -> str:
         """Fetch *url* with retry (3 attempts, exponential backoff)."""
-        last_exc: Exception | None = None
+        last_exc: Optional[Exception] = None
         for attempt in range(3):
             try:
                 with urllib.request.urlopen(url, timeout=30) as resp:
@@ -684,7 +684,7 @@ class PypiClient:
         self._requires_cache[cache_key] = result
         return result
 
-    def find_best(self, name: str, constraint: str) -> dict[str, Any] | None:
+    def find_best(self, name: str, constraint: str) -> Optional[dict[str, Any]]:
         """Find latest version on PyPI satisfying *constraint*.
 
         Returns ``{"version": str, "has_sdist": bool, "sdist_hashes": [...],
@@ -711,7 +711,7 @@ class Resolver:
         self,
         rhoai: RhoaiIndex,
         pypi: PypiClient,
-        wheel_only_packages: set[str] | None = None,
+        wheel_only_packages: Optional[set[str]] = None,
     ) -> None:
         """Initialize with RHOAI and PyPI clients and the wheel-only package set."""
         self.rhoai = rhoai
@@ -1041,7 +1041,7 @@ def uv_resolve(
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
     resolved: dict[str, dict[str, Any]] = {}
-    current_package: str | None = None
+    current_package: Optional[str] = None
 
     for line in result.stdout.splitlines():
         line = line.strip()
