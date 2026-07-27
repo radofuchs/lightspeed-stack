@@ -133,9 +133,13 @@ ENV PATH="/app-root/.venv/bin:$PATH"
 # We place them at /app-root/providers.d. YAMLs there reference lightspeed_stack_providers.*, so that package must be on PYTHONPATH.
 ENV PYTHONPATH="/app-root"
 
+# Copy entrypoint script
+COPY ${LSC_SOURCE_DIR}/scripts/entrypoint.sh /app-root/entrypoint.sh
+RUN chmod +x /app-root/entrypoint.sh
+
 # Run the application
 EXPOSE 8080
-ENTRYPOINT ["opentelemetry-instrument", "python3.12", "src/lightspeed_stack.py"]
+ENTRYPOINT ["/app-root/entrypoint.sh"]
 
 LABEL vendor="Red Hat, Inc." \
     name="lightspeed-core/lightspeed-stack-rhel9" \
