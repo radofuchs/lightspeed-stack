@@ -18,8 +18,8 @@ annotated-doc==0.0.4 \
     --hash=sha256:1ecb2803f2d35e57ba03d74245d9ece70ffce1552a51d1ab1d2b439d791e5086
 annotated-types==0.7.0 \
     --hash=sha256:d31d6f386f3ecd6cdca12274844b969c3f9c90d15ebef7774f2eb34857108758
-anthropic==0.116.0 \
-    --hash=sha256:8af9fbd8d932a213df08c5133995f02243ca6942703bae186c31f1d370dde25c
+anthropic==0.117.0 \
+    --hash=sha256:090da100887647422594995b93d51c3139ec58dcd29ac4357a382fee1bb13645
 anyio==4.14.1 \
     --hash=sha256:7b1919965ee5094a3cf8b0c371749b59b5835293055e51ab23a4a45bca1d3fab
 argcomplete==3.7.0 \
