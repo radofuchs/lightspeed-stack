@@ -78,7 +78,7 @@ def create_argument_parser() -> ArgumentParser:
         dest="dump_models_group",
         help="dump schemas for selected models group into OpenAPI-compatible file and quit",
         action="store",
-        default=False,
+        default=None,
     )
     parser.add_argument(
         "-c",
