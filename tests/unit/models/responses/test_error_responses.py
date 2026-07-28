@@ -83,11 +83,12 @@ class TestBadRequestResponse:
 
         # Verify example count matches schema examples count
         assert len(examples) == expected_count
-        assert expected_count == 2
+        assert expected_count == 3
 
         # Verify example structure
         assert "conversation_id" in examples
         assert "prompt_id" in examples
+        assert "saved_prompt_id" in examples
         conversation_example = examples["conversation_id"]
         assert "value" in conversation_example
         assert "detail" in conversation_example["value"]
@@ -97,6 +98,10 @@ class TestBadRequestResponse:
         prompt_example = examples["prompt_id"]
         assert (
             prompt_example["value"]["detail"]["response"] == "Invalid prompt ID format"
+        )
+        saved_prompt_example = examples["saved_prompt_id"]
+        assert saved_prompt_example["value"]["detail"]["response"] == (
+            "Invalid saved prompt ID format"
         )
 
     def test_openapi_response_with_explicit_examples(self) -> None:
@@ -235,6 +240,21 @@ class TestForbiddenResponse:
             "with ID conv-123"
         )
 
+    def test_factory_saved_prompt(self) -> None:
+        """Test ForbiddenResponse.saved_prompt() factory method."""
+        response = ForbiddenResponse.saved_prompt("delete", "prompt-123", "user-456")
+        assert isinstance(response, AbstractErrorResponse)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert isinstance(response.detail, DetailModel)
+        assert (
+            response.detail.response
+            == "User does not have permission to perform this action"
+        )
+        assert response.detail.cause == (
+            "User user-456 does not have permission to delete saved prompt "
+            "with ID prompt-123"
+        )
+
     def test_factory_endpoint(self) -> None:
         """Test ForbiddenResponse.endpoint() factory method."""
         response = ForbiddenResponse.endpoint("user-789")
@@ -277,11 +297,12 @@ class TestForbiddenResponse:
 
         # Verify example count matches schema examples count
         assert len(examples) == expected_count
-        assert expected_count == 8
+        assert expected_count == 9
 
         # Verify all labeled examples are present
         assert "conversation read" in examples
         assert "conversation delete" in examples
+        assert "saved prompt delete" in examples
         assert "endpoint" in examples
         assert "prompt read" in examples
         assert "prompt manage" in examples
@@ -376,12 +397,14 @@ class TestUnprocessableEntityResponse:
 
         # Verify example count matches schema examples count
         assert len(examples) == expected_count
-        assert expected_count == 3
+        assert expected_count == 5
 
         # Verify all labeled examples are present
         assert "invalid format" in examples
         assert "missing attributes" in examples
         assert "invalid value" in examples
+        assert "saved prompt invalid" in examples
+        assert "saved prompt limit" in examples
 
         # Verify example structure for one example
         invalid_format_example = examples["invalid format"]
