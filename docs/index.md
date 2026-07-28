@@ -92,6 +92,16 @@ product questions using backend LLM services, agents, and RAG databases.
 
 [Compaction](https://lightspeed-core.github.io/lightspeed-stack/models/compaction.html)
 
+#### Class diagrams
+
+[Common](https://lightspeed-core.github.io/lightspeed-stack/models/common.svg)
+
+[Database](https://lightspeed-core.github.io/lightspeed-stack/models/database.svg)
+
+[Requests](https://lightspeed-core.github.io/lightspeed-stack/models/requests.svg)
+
+[Responses](https://lightspeed-core.github.io/lightspeed-stack/models/responses.svg)
+
 ### Testing
 
 [Testing](https://lightspeed-core.github.io/lightspeed-stack/testing/testing.html)

@@ -73,6 +73,8 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 
 ### Models
 
+#### Descriptions
+
 [Common](https://lightspeed-core.github.io/lightspeed-stack/models/common.html)
 
 [Database](https://lightspeed-core.github.io/lightspeed-stack/models/database.html)
@@ -84,6 +86,16 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 [Error responses](https://lightspeed-core.github.io/lightspeed-stack/models/responses_errors.html)
 
 [Compaction](https://lightspeed-core.github.io/lightspeed-stack/models/compaction.html)
+
+#### Class diagrams
+
+[Common](https://lightspeed-core.github.io/lightspeed-stack/models/common.svg)
+
+[Database](https://lightspeed-core.github.io/lightspeed-stack/models/database.svg)
+
+[Requests](https://lightspeed-core.github.io/lightspeed-stack/models/requests.svg)
+
+[Responses](https://lightspeed-core.github.io/lightspeed-stack/models/responses.svg)
 
 ### Testing
 
