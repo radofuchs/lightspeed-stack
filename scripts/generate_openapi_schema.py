@@ -12,8 +12,8 @@ from client import AsyncLlamaStackClientHolder
 # it is needed to read proper configuration in order to start the app to generate schema
 from configuration import configuration
 
-cfg_file = "lightspeed-stack.yaml"
-configuration.load_configuration(cfg_file)
+CFG_FILE = "lightspeed-stack.yaml"
+configuration.load_configuration(CFG_FILE)
 
 # Llama Stack client needs to be loaded before REST API is fully initialized
 import asyncio  # noqa: E402
