@@ -860,7 +860,7 @@ options:
                         dump actual configuration into JSON file and quit
   -s, --dump-schema     dump configuration schema into OpenAPI-compatible file and quit
   -m, --dump-models     dump schemas for all models into OpenAPI-compatible file and quit
-  -gr, --dump-models-group DUMP_MODELS_GROUP
+  -gr, --dump-models-group {requests,successful_responses,error_responses,common,agents,common_responses}
                         dump schemas for selected models group into OpenAPI-compatible file and quit
   -c, --config CONFIG_FILE
                         path to configuration file (default: lightspeed-stack.yaml)
