@@ -23,7 +23,7 @@ asyncio.run(AsyncLlamaStackClientHolder().load(configuration.configuration.llama
 from app.main import app  # noqa: E402  pylint: disable=C0413
 
 
-def read_version_from_openapi(filename: str) -> str:
+def read_version_from_openapi(openapi_filename: str) -> str:
     """
     Extract the OpenAPI document's version from a generated OpenAPI JSON file.
 
@@ -31,7 +31,7 @@ def read_version_from_openapi(filename: str) -> str:
         str: The value of the OpenAPI document's `info.version`.
     """
     # retrieve pre-generated OpenAPI schema
-    with open(filename, encoding="utf-8") as fin:
+    with open(openapi_filename, encoding="utf-8") as fin:
         pre_generated_schema = json.load(fin)
         assert pre_generated_schema is not None
         assert "info" in pre_generated_schema, "node 'info' not found in openapi.json"
