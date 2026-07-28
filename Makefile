@@ -212,7 +212,7 @@ doc:	generate-documentation	## Generate or regenerated content of the whole /doc
 devel-doc:	## Generate documentation for developers
 	scripts/gen_doc.py
 
-docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml	## Generate documentation about models
+docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml docs/models/requests.svg docs/models/responses.svg docs/models/database.svg docs/models/common.svg	## Generate documentation about models
 	rm -f docs/models/packages.puml
 
 docs/models/requests.puml: ## Generate PlantUML class diagram for requests data models
