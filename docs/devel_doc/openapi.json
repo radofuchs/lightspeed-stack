@@ -12325,6 +12325,11 @@
                         "title": "BYOK RAG configuration",
                         "description": "BYOK RAG configuration. This configuration can be used to reconfigure Llama Stack through its run.yaml configuration file"
                     },
+                    "vector_store": {
+                        "$ref": "#/components/schemas/VectorStoreConfiguration",
+                        "title": "Vector store configuration",
+                        "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora). When providers is non-empty, default_provider is required and must match one of providers[].id. Applied in unified synthesis only."
+                    },
                     "a2a_state": {
                         "$ref": "#/components/schemas/A2AStateConfiguration",
                         "title": "A2A state configuration",
@@ -13238,6 +13243,67 @@
                 ],
                 "title": "DetailModel",
                 "description": "Nested detail model for error responses."
+            },
+            "FaissVectorStoreProvider": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "Provider ID",
+                        "description": "Llama Stack vector_io provider_id. Surrounding whitespace is stripped before validation and emission."
+                    },
+                    "embedding_model": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "Embedding model",
+                        "description": "Embedding model identification used for stores created against this provider."
+                    },
+                    "embedding_dimension": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Embedding dimension",
+                        "description": "Dimensionality of embedding vectors for this provider."
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "faiss",
+                        "title": "Provider type",
+                        "description": "Product type for this dynamic vector-store provider.",
+                        "default": "faiss"
+                    },
+                    "config": {
+                        "$ref": "#/components/schemas/FaissVectorStoreProviderConfig",
+                        "title": "Storage config",
+                        "description": "FAISS storage settings for this provider."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                    "id",
+                    "embedding_model",
+                    "embedding_dimension",
+                    "config"
+                ],
+                "title": "FaissVectorStoreProvider",
+                "description": "Dynamic FAISS vector-store provider (runtime create capacity)."
+            },
+            "FaissVectorStoreProviderConfig": {
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "DB path",
+                        "description": "On-disk FAISS/SQLite path for this provider."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                    "path"
+                ],
+                "title": "FaissVectorStoreProviderConfig",
+                "description": "Storage config for a FAISS dynamic vector-store provider."
             },
             "FeedbackCategory": {
                 "type": "string",
@@ -16687,6 +16753,120 @@
                 ],
                 "title": "PasswordOAuthFlow",
                 "description": "Defines configuration details for the OAuth 2.0 Resource Owner Password flow."
+            },
+            "PgvectorVectorStoreProvider": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "Provider ID",
+                        "description": "Llama Stack vector_io provider_id. Surrounding whitespace is stripped before validation and emission."
+                    },
+                    "embedding_model": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "Embedding model",
+                        "description": "Embedding model identification used for stores created against this provider."
+                    },
+                    "embedding_dimension": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Embedding dimension",
+                        "description": "Dimensionality of embedding vectors for this provider."
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "pgvector",
+                        "title": "Provider type",
+                        "description": "Product type for this dynamic vector-store provider.",
+                        "default": "pgvector"
+                    },
+                    "config": {
+                        "$ref": "#/components/schemas/PgvectorVectorStoreProviderConfig",
+                        "title": "Storage config",
+                        "description": "pgvector connection settings for this provider."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                    "id",
+                    "embedding_model",
+                    "embedding_dimension",
+                    "config"
+                ],
+                "title": "PgvectorVectorStoreProvider",
+                "description": "Dynamic pgvector vector-store provider (runtime create capacity)."
+            },
+            "PgvectorVectorStoreProviderConfig": {
+                "properties": {
+                    "host": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL host",
+                        "description": "PostgreSQL host. Defaults to ${env.POSTGRES_HOST}."
+                    },
+                    "port": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL port",
+                        "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}."
+                    },
+                    "db": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL database",
+                        "description": "PostgreSQL database name. Defaults to ${env.POSTGRES_DATABASE}."
+                    },
+                    "user": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL user",
+                        "description": "PostgreSQL user. Defaults to ${env.POSTGRES_USER}."
+                    },
+                    "password": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "password",
+                                "writeOnly": true
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "PostgreSQL password",
+                        "description": "PostgreSQL password. Defaults to ${env.POSTGRES_PASSWORD}."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "PgvectorVectorStoreProviderConfig",
+                "description": "Storage config for a pgvector dynamic vector-store provider."
             },
             "PostgreSQLDatabaseConfiguration": {
                 "properties": {
@@ -20579,6 +20759,48 @@
                     "type"
                 ],
                 "title": "ValidationError"
+            },
+            "VectorStoreConfiguration": {
+                "properties": {
+                    "default_provider": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Default provider",
+                        "description": "Provider id used for vector_stores.default_* in the synthesized Llama Stack config. Required when providers is non-empty; must match one of providers[].id."
+                    },
+                    "providers": {
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/components/schemas/FaissVectorStoreProvider"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/PgvectorVectorStoreProvider"
+                                }
+                            ],
+                            "discriminator": {
+                                "propertyName": "type",
+                                "mapping": {
+                                    "faiss": "#/components/schemas/FaissVectorStoreProvider",
+                                    "pgvector": "#/components/schemas/PgvectorVectorStoreProvider"
+                                }
+                            }
+                        },
+                        "type": "array",
+                        "title": "Vector store providers",
+                        "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora)."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "VectorStoreConfiguration",
+                "description": "Configuration for dynamic vector-store providers.\n\nMirrors ``InferenceConfiguration``: a providers list plus a sibling\n``default_provider`` pointer, rather than a per-entry default flag.\n\nAttributes:\n    default_provider: Provider id used for vector_stores.default_* in the\n        synthesized Llama Stack config. Required when providers is\n        non-empty; must match one of providers[].id. Must be omitted when\n        providers is empty.\n    providers: Dynamic vector-store provider capacity for runtime\n        POST /v1/vector-stores creates. Not the same as byok_rag (static\n        registered corpora)."
             },
             "VectorStoreCreateRequest": {
                 "properties": {

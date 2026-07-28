@@ -7,7 +7,7 @@ from enum import Enum
 from functools import cached_property
 from pathlib import Path
 from re import Pattern
-from typing import Any, Literal, Optional, Self
+from typing import Annotated, Any, Literal, Optional, Self
 
 import jsonpath_ng
 import yaml
@@ -2129,6 +2129,250 @@ class ByokRag(ConfigurationBase):
         return self
 
 
+class FaissVectorStoreProviderConfig(ConfigurationBase):
+    """Storage config for a FAISS dynamic vector-store provider."""
+
+    path: str = Field(
+        ...,
+        min_length=1,
+        title="DB path",
+        description="On-disk FAISS/SQLite path for this provider.",
+    )
+
+
+class PgvectorVectorStoreProviderConfig(ConfigurationBase):
+    """Storage config for a pgvector dynamic vector-store provider."""
+
+    host: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL host",
+        description="PostgreSQL host. Defaults to ${env.POSTGRES_HOST}.",
+    )
+
+    port: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL port",
+        description="PostgreSQL port. Defaults to ${env.POSTGRES_PORT}.",
+    )
+
+    db: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL database",
+        description="PostgreSQL database name. Defaults to ${env.POSTGRES_DATABASE}.",
+    )
+
+    user: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL user",
+        description="PostgreSQL user. Defaults to ${env.POSTGRES_USER}.",
+    )
+
+    password: Optional[SecretStr] = Field(
+        default=None,
+        title="PostgreSQL password",
+        description="PostgreSQL password. Defaults to ${env.POSTGRES_PASSWORD}.",
+    )
+
+    @model_validator(mode="after")
+    def apply_pgvector_env_defaults(self) -> Self:
+        """Fill unset connection fields with ${env.POSTGRES_*} references."""
+        pgvector_defaults: dict[str, str | SecretStr] = {
+            "host": "${env.POSTGRES_HOST}",
+            "port": "${env.POSTGRES_PORT}",
+            "db": "${env.POSTGRES_DATABASE}",
+            "user": "${env.POSTGRES_USER}",
+            "password": SecretStr("${env.POSTGRES_PASSWORD}"),
+        }
+        for field_name, default_value in pgvector_defaults.items():
+            if getattr(self, field_name) is None:
+                object.__setattr__(self, field_name, default_value)
+        return self
+
+
+class VectorStoreProviderBase(ConfigurationBase):
+    """Shared fields for dynamic vector-store provider capacity entries.
+
+    Attributes:
+        id: Llama Stack vector_io provider_id. Surrounding whitespace is
+            stripped before validation and emission.
+        embedding_model: Embedding model identification used for stores
+            created against this provider.
+        embedding_dimension: Dimensionality of embedding vectors for this
+            provider.
+    """
+
+    id: str = Field(
+        ...,
+        min_length=1,
+        title="Provider ID",
+        description=(
+            "Llama Stack vector_io provider_id. Surrounding whitespace is "
+            "stripped before validation and emission."
+        ),
+    )
+    embedding_model: str = Field(
+        ...,
+        min_length=1,
+        title="Embedding model",
+        description="Embedding model identification used for stores created "
+        "against this provider.",
+    )
+    embedding_dimension: PositiveInt = Field(
+        ...,
+        title="Embedding dimension",
+        description="Dimensionality of embedding vectors for this provider.",
+    )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, value: str) -> str:
+        """Validate and normalize the provider id.
+
+        Parameters:
+            value: Raw provider id from configuration.
+
+        Returns:
+            Stripped provider id.
+
+        Raises:
+            ValueError: If the id is empty, uses the reserved ``byok_`` prefix,
+                or contains characters outside ``[a-z0-9_-]``.
+        """
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("id must be non-empty after stripping whitespace")
+        if stripped.startswith("byok_"):
+            raise ValueError("id must not start with 'byok_' (reserved for BYOK RAG)")
+        if not re.fullmatch(r"[a-z0-9_-]+", stripped):
+            raise ValueError(
+                "id may contain only lowercase letters, digits, "
+                "underscores, and hyphens"
+            )
+        return stripped
+
+
+class FaissVectorStoreProvider(VectorStoreProviderBase):
+    """Dynamic FAISS vector-store provider (runtime create capacity)."""
+
+    type: Literal["faiss"] = Field(
+        "faiss",
+        title="Provider type",
+        description="Product type for this dynamic vector-store provider.",
+    )
+    config: FaissVectorStoreProviderConfig = Field(
+        ...,
+        title="Storage config",
+        description="FAISS storage settings for this provider.",
+    )
+
+
+class PgvectorVectorStoreProvider(VectorStoreProviderBase):
+    """Dynamic pgvector vector-store provider (runtime create capacity)."""
+
+    type: Literal["pgvector"] = Field(
+        "pgvector",
+        title="Provider type",
+        description="Product type for this dynamic vector-store provider.",
+    )
+    config: PgvectorVectorStoreProviderConfig = Field(
+        ...,
+        title="Storage config",
+        description="pgvector connection settings for this provider.",
+    )
+
+
+VectorStoreProvider = Annotated[
+    FaissVectorStoreProvider | PgvectorVectorStoreProvider,
+    Field(discriminator="type"),
+]
+
+
+class VectorStoreConfiguration(ConfigurationBase):
+    """Configuration for dynamic vector-store providers.
+
+    Mirrors ``InferenceConfiguration``: a providers list plus a sibling
+    ``default_provider`` pointer, rather than a per-entry default flag.
+
+    Attributes:
+        default_provider: Provider id used for vector_stores.default_* in the
+            synthesized Llama Stack config. Required when providers is
+            non-empty; must match one of providers[].id. Must be omitted when
+            providers is empty.
+        providers: Dynamic vector-store provider capacity for runtime
+            POST /v1/vector-stores creates. Not the same as byok_rag (static
+            registered corpora).
+    """
+
+    default_provider: Optional[str] = Field(
+        None,
+        title="Default provider",
+        description=(
+            "Provider id used for vector_stores.default_* in the synthesized "
+            "Llama Stack config. Required when providers is non-empty; must "
+            "match one of providers[].id."
+        ),
+    )
+
+    providers: list[VectorStoreProvider] = Field(
+        default_factory=list,
+        title="Vector store providers",
+        description=(
+            "Dynamic vector-store provider capacity for runtime "
+            "POST /v1/vector-stores creates. "
+            "Not the same as byok_rag (static registered corpora)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_providers_and_default(self) -> Self:
+        """Validate providers list and default_provider pointer.
+
+        When providers is empty, default_provider must be unset. When
+        providers is non-empty, default_provider is required and must match
+        exactly one providers[].id. Provider ids must be unique.
+
+        Returns:
+            Self: The validated configuration instance.
+
+        Raises:
+            ValueError: If ids are duplicated, default_provider is missing
+                for a non-empty list, is set for an empty list, or does not
+                match a provider id.
+        """
+        # pylint: disable=no-member
+        if not self.providers:
+            if self.default_provider is not None:
+                raise ValueError(
+                    "vector_store.default_provider must not be set when "
+                    "providers is empty"
+                )
+            return self
+
+        if self.default_provider is None:
+            raise ValueError(
+                "vector_store.default_provider is required when providers "
+                "is non-empty"
+            )
+
+        ids = [provider.id for provider in self.providers]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"vector_store.providers ids must be unique; got {ids}")
+
+        default_provider = self.default_provider.strip()
+        if not default_provider:
+            raise ValueError(
+                "vector_store.default_provider must be non-empty after "
+                "stripping whitespace"
+            )
+        if default_provider not in ids:
+            raise ValueError(
+                "vector_store.default_provider must match one of "
+                f"providers[].id; got {default_provider!r}, known ids: {ids}"
+            )
+        object.__setattr__(self, "default_provider", default_provider)
+        return self
+
+
 class QuotaLimiterConfiguration(ConfigurationBase):
     """Configuration for one quota limiter.
 
@@ -2704,6 +2948,21 @@ class Configuration(ConfigurationBase):
         "reconfigure Llama Stack through its run.yaml configuration file",
     )
 
+    vector_store: VectorStoreConfiguration = Field(
+        default_factory=lambda: VectorStoreConfiguration(
+            default_provider=None, providers=[]
+        ),
+        title="Vector store configuration",
+        description=(
+            "Dynamic vector-store provider capacity for runtime "
+            "POST /v1/vector-stores creates. "
+            "Not the same as byok_rag (static registered corpora). "
+            "When providers is non-empty, default_provider is required and "
+            "must match one of providers[].id. Applied in unified synthesis "
+            "only."
+        ),
+    )
+
     a2a_state: A2AStateConfiguration = Field(
         default_factory=A2AStateConfiguration,
         title="A2A state configuration",
@@ -2915,17 +3174,18 @@ class Configuration(ConfigurationBase):
         """Reconcile unified synthesis inputs, legacy mode, and library-mode needs.
 
         Unified-mode *synthesis inputs* span the configuration root: a non-empty
-        top-level ``inference.providers`` (Decision S5) and/or a
-        ``llama_stack.config`` block. The legacy path is
-        ``llama_stack.library_client_config_path`` pointing at an external
-        run.yaml. Both checks live here on the root model rather than on
-        ``LlamaStackConfiguration`` (which cannot see ``inference.providers``):
+        top-level ``inference.providers`` (Decision S5), a non-empty
+        ``vector_store.providers``, and/or a ``llama_stack.config`` block. The
+        legacy path is ``llama_stack.library_client_config_path`` pointing at an
+        external run.yaml. Both checks live here on the root model rather than
+        on ``LlamaStackConfiguration`` (which cannot see root-level provider
+        lists):
 
         - A synthesis input and the legacy path are mutually exclusive — a
           single file must pick one shape.
         - Library mode needs *some* run source — a synthesis input or the
-          legacy path. ``inference.providers`` alone is sufficient; no
-          ``llama_stack.config`` block is required.
+          legacy path. ``inference.providers`` or ``vector_store.providers``
+          alone is sufficient; no ``llama_stack.config`` block is required.
 
         Returns:
             Self: The validated configuration instance.
@@ -2937,14 +3197,17 @@ class Configuration(ConfigurationBase):
         """
         # pylint: disable=no-member
         synthesis_input = (
-            bool(self.inference.providers) or self.llama_stack.config is not None
+            bool(self.inference.providers)
+            or bool(self.vector_store.providers)
+            or self.llama_stack.config is not None
         )
         legacy_input = self.llama_stack.library_client_config_path is not None
         if synthesis_input and legacy_input:
             raise ValueError(
                 "Llama Stack configuration is ambiguous: unified synthesis "
-                "inputs (a non-empty inference.providers or a llama_stack.config "
-                "block) are mutually exclusive with the legacy "
+                "inputs (a non-empty inference.providers, a non-empty "
+                "vector_store.providers, or a llama_stack.config block) are "
+                "mutually exclusive with the legacy "
                 "llama_stack.library_client_config_path. Use one or the other. "
                 "To convert a legacy two-file setup to unified mode, run "
                 "`lightspeed-stack --migrate-config`."
@@ -2956,8 +3219,9 @@ class Configuration(ConfigurationBase):
         ):
             raise ValueError(
                 "Llama Stack library mode requires a run-configuration source: "
-                "set a non-empty inference.providers, a llama_stack.config "
-                "block, or library_client_config_path."
+                "set a non-empty inference.providers, a non-empty "
+                "vector_store.providers, a llama_stack.config block, or "
+                "library_client_config_path."
             )
         return self
 
