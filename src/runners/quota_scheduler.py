@@ -189,6 +189,8 @@ def quota_revocation(
 
     Parameters:
     ----------
+        connection (Any): Database connection object (Postgres or SQLite) used
+                          to apply quota updates.
         quota_limiter (QuotaLimiterConfiguration): Limiter configuration to process.
         increase_quota_statement (str): SQL statement used to increment quota values.
         reset_quota_statement (str): SQL statement used to reset quota values.
