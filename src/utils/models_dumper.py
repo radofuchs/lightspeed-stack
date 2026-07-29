@@ -182,6 +182,7 @@ def get_models_for_group(model_group: str) -> list[type[BaseModel]]:
     """Return the list of Pydantic model classes for the given model group.
 
     Supported groups:
+    - "conversation_summary"
     - "requests"
     - "successful_responses"
     - "error_responses"
@@ -202,6 +203,8 @@ def get_models_for_group(model_group: str) -> list[type[BaseModel]]:
         Exception: If model_group is not a recognized group name.
     """
     match model_group:
+        case "conversation_summary":
+            return conversation_summary_models
         case "requests":
             return requests_models
         case "successful_responses":
