@@ -7,6 +7,33 @@ from pydantic import Field
 from models.api.responses.successful.bases import AbstractSuccessfulResponse
 
 
+class SkillsResponse(AbstractSuccessfulResponse):
+    """Model representing a response to skills request."""
+
+    skills: list[dict[str, Any]] = Field(
+        description="List of loaded skills with metadata",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "skills": [
+                        {
+                            "name": "code-review",
+                            "description": "Review code for quality and security",
+                        },
+                        {
+                            "name": "openshift-troubleshooting",
+                            "description": "Troubleshoot OpenShift cluster issues",
+                        },
+                    ],
+                }
+            ]
+        }
+    }
+
+
 class ModelsResponse(AbstractSuccessfulResponse):
     """Model representing a response to models request."""
 

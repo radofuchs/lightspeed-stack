@@ -104,6 +104,26 @@ def _capability_tools_from_toolset(toolset: Any) -> list[dict[str, Any]]:
     return tool_dicts
 
 
+def get_skills_metadata(
+    skills: Optional[SkillsConfiguration],
+) -> list[dict[str, Any]]:
+    """Return metadata for all loaded skills.
+
+    Parameters:
+        skills: Agent skills configuration from LCS, or None when skills are disabled.
+
+    Returns:
+        List of dicts with ``name`` and ``description`` for each loaded skill.
+    """
+    capability = _skills_capability(skills)
+    if capability is None:
+        return []
+    return [
+        {"name": skill.name, "description": skill.description}
+        for skill in capability.toolset.skills.values()
+    ]
+
+
 def get_agent_capability_tools(
     skills: Optional[SkillsConfiguration],
 ) -> list[dict[str, Any]]:

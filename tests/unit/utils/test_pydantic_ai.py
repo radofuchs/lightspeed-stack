@@ -15,6 +15,7 @@ from utils.pydantic_ai_helpers import (
     _skills_capability,
     build_agent,
     get_agent_capability_tools,
+    get_skills_metadata,
 )
 
 
@@ -181,6 +182,25 @@ class TestBuildAgent:
             type(capability) for capability in agent._root_capability.capabilities
         }
         assert SkillsCapability not in capability_types
+
+
+class TestGetSkillsMetadata:
+    """Tests for get_skills_metadata."""
+
+    def test_returns_empty_list_when_skills_not_configured(self) -> None:
+        """Test that missing skills configuration yields no metadata."""
+        assert get_skills_metadata(None) == []
+        assert get_skills_metadata(SkillsConfiguration(paths=[])) == []
+
+    def test_returns_metadata_when_configured(
+        self, mock_skills_configuration: SkillsConfiguration
+    ) -> None:
+        """Test that configured skills return name and description."""
+        metadata = get_skills_metadata(mock_skills_configuration)
+
+        assert len(metadata) == 1
+        assert metadata[0]["name"] == "test-skill"
+        assert metadata[0]["description"] == "Test skill."
 
 
 class TestGetAgentCapabilityTools:
