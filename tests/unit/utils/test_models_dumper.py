@@ -9506,7 +9506,7 @@ def test_dump_models_group_error_responses(tmpdir: Path) -> None:
     check_json_file_content(filename, expected_schemas)
 
 
-def test_dump_models_group_common_models(tmpdir: Path) -> None:
+def test_dump_models_group_common(tmpdir: Path) -> None:
     """Test that selected models can be dump into a JSON file."""
     group = "common"
     filename = tmpdir / "foo.json"
@@ -9539,7 +9539,7 @@ def test_dump_models_group_common_models(tmpdir: Path) -> None:
     check_json_file_content(filename, expected_schemas)
 
 
-def test_dump_models_group_agent_models(tmpdir: Path) -> None:
+def test_dump_models_group_agent(tmpdir: Path) -> None:
     """Test that selected models can be dump into a JSON file."""
     group = "agents"
     filename = tmpdir / "foo.json"
@@ -9565,7 +9565,7 @@ def test_dump_models_group_agent_models(tmpdir: Path) -> None:
     check_json_file_content(filename, expected_schemas)
 
 
-def test_dump_models_common_responses_models(tmpdir: Path) -> None:
+def test_dump_models_common_responses(tmpdir: Path) -> None:
     """Test that selected models can be dump into a JSON file."""
     group = "common_responses"
     filename = tmpdir / "foo.json"
@@ -9576,6 +9576,17 @@ def test_dump_models_common_responses_models(tmpdir: Path) -> None:
         "InputToolMCP",
         "ResponsesApiParams",
     )
+    check_json_file_content(filename, expected_schemas)
+
+
+def test_dump_models_conversation_summary(tmpdir: Path) -> None:
+    """Test that selected models can be dump into a JSON file."""
+    group = "conversation_summary"
+    filename = tmpdir / "foo.json"
+    dump_models_group(group, filename)
+
+    # list of schemas expected in a dump
+    expected_schemas = ("ConversationSummary",)
     check_json_file_content(filename, expected_schemas)
 
 
