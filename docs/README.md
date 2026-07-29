@@ -35,6 +35,8 @@ See the full documentation at [`../README.md`](../README.md) or browse sub-pages
 
 [Splunk integration](https://lightspeed-core.github.io/lightspeed-stack/user_doc/splunk.html)
 
+[OpenTelemetry tracing](https://lightspeed-core.github.io/lightspeed-stack/user_doc/opentelemetry.html)
+
 ## Developer doc
 
 [Architecture](https://lightspeed-core.github.io/lightspeed-stack/devel_doc/ARCHITECTURE.html)
