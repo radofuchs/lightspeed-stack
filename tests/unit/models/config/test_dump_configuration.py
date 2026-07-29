@@ -4,9 +4,11 @@
 # pyright: reportCallIssue=false
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
+import pytest
 from pydantic import SecretStr
 
 import constants
@@ -50,6 +52,26 @@ _MCP_SERVER_DUMP_DEFAULTS: dict[str, Any] = {
     "require_approval": "never",
     "timeout": None,
 }
+
+
+@pytest.fixture(name="clear_otel_env", autouse=True)
+def clear_otel_env_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear OTEL_* environment variables to prevent ambient leakage in tests.
+
+    This fixture ensures dump configuration tests have stable expectations
+    regardless of whether they run on instrumented CI runners.
+    """
+    for key in list(os.environ.keys()):
+        if key.startswith("OTEL_"):
+            monkeypatch.delenv(key, raising=False)
+
+
+def _get_expected_observability_dump() -> dict[str, dict[str, str]]:
+    """Get expected observability dump based on current environment.
+
+    Returns empty otel dict when OTEL_* vars are cleared by fixture.
+    """
+    return {"otel": {}}
 
 
 def test_dump_configuration_minimal_cfg(tmp_path: Path) -> None:
@@ -232,6 +254,7 @@ def test_dump_configuration_minimal_cfg(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -459,6 +482,7 @@ def test_dump_configuration_valid_values(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -837,6 +861,7 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -1099,6 +1124,7 @@ def test_dump_configuration_with_quota_limiters_different_values(
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -1394,6 +1420,7 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -1616,6 +1643,7 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -1998,6 +2026,7 @@ def test_dump_configuration_allow_degraded_mode(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -2226,6 +2255,7 @@ def test_dump_configuration_max_retries_settings(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -2454,6 +2484,7 @@ def test_dump_configuration_retry_count_settings(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
@@ -2689,6 +2720,7 @@ def test_dump_configuration_specific_compaction_values(tmp_path: Path) -> None:
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
             "reranker": {
                 "enabled": False,
