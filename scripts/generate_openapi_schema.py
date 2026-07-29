@@ -16,7 +16,7 @@ CFG_FILE = "lightspeed-stack.yaml"
 configuration.load_configuration(CFG_FILE)
 
 # Llama Stack client needs to be loaded before REST API is fully initialized
-import asyncio  # noqa: E402
+import asyncio  # noqa: E402  pylint: disable=C0413
 
 asyncio.run(AsyncLlamaStackClientHolder().load(configuration.configuration.llama_stack))
 
