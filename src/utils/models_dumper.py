@@ -202,6 +202,7 @@ def get_models_for_group(model_group: str) -> list[type[BaseModel]]:
     ------
         Exception: If model_group is not a recognized group name.
     """
+    # pylint: disable=too-many-return-statements
     match model_group:
         case "conversation_summary":
             return conversation_summary_models
