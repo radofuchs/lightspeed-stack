@@ -58,13 +58,8 @@ def read_version_from_pyproject() -> str:
     return completed.stdout.decode("utf-8").strip()
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python generate_openapi_schema.py <filename>")
-        sys.exit(1)
-
-    filename = sys.argv[1]
-
+def generate_openapi_schema(schema_file_name: str) -> None:
+    """Generate OpenAPI schema into file with provided name."""
     print("Service metadata:")
     print(app.title)
     print(app.description)
@@ -89,12 +84,21 @@ if __name__ == "__main__":
     )
 
     # dump the schema into file
-    with open(filename, "w", encoding="utf-8") as fout:
+    with open(schema_file_name, "w", encoding="utf-8") as fout:
         json.dump(open_api, fout, indent=4)
 
-    openapi_version = read_version_from_openapi(filename)
+    openapi_version = read_version_from_openapi(schema_file_name)
     project_version = read_version_from_pyproject()
     assert (
         openapi_version == project_version
     ), f"OpenAPI version {openapi_version} != project version {project_version}"
-    print(f"OpenAPI schema generated into file {filename}")
+    print(f"OpenAPI schema generated into file {schema_file_name}")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python generate_openapi_schema.py <filename>")
+        sys.exit(1)
+
+    filename = sys.argv[1]
+    generate_openapi_schema(filename)
