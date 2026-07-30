@@ -1,0 +1,1710 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Lightspeed Core Stack",
+        "version": "0.3.0"
+    },
+    "components": {
+        "schemas": {
+            "Attachment": {
+                "additionalProperties": false,
+                "description": "Model representing an attachment that can be sent from the UI as part of query.\n\nA list of attachments can be an optional part of 'query' request.\n\nAttributes:\n    attachment_type: The attachment type, like \"log\", \"configuration\", \"image\" etc.\n    content_type: The content type as defined in MIME standard\n    content: The actual attachment content (text or base64-encoded image data)",
+                "examples": [
+                    {
+                        "attachment_type": "log",
+                        "content": "this is attachment",
+                        "content_type": "text/plain"
+                    },
+                    {
+                        "attachment_type": "configuration",
+                        "content": "kind: Pod\n metadata:\n name:    private-reg",
+                        "content_type": "application/yaml"
+                    },
+                    {
+                        "attachment_type": "configuration",
+                        "content": "foo: bar",
+                        "content_type": "application/yaml"
+                    },
+                    {
+                        "attachment_type": "image",
+                        "content": "<base64-encoded image data>",
+                        "content_type": "image/png"
+                    }
+                ],
+                "properties": {
+                    "attachment_type": {
+                        "description": "The attachment type, like 'log', 'configuration', 'image' etc.",
+                        "examples": [
+                            "log",
+                            "image"
+                        ],
+                        "title": "Attachment Type",
+                        "type": "string"
+                    },
+                    "content_type": {
+                        "description": "The content type as defined in MIME standard",
+                        "examples": [
+                            "text/plain",
+                            "image/jpeg",
+                            "image/png"
+                        ],
+                        "title": "Content Type",
+                        "type": "string"
+                    },
+                    "content": {
+                        "description": "The actual attachment content (text or base64-encoded image data)",
+                        "examples": [
+                            "warning: quota exceeded"
+                        ],
+                        "title": "Content",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "attachment_type",
+                    "content_type",
+                    "content"
+                ],
+                "title": "Attachment",
+                "type": "object"
+            },
+            "ConversationData": {
+                "description": "Model representing conversation data returned by cache list operations.\n\nAttributes:\n    conversation_id: The conversation ID\n    topic_summary: The topic summary for the conversation (can be None)\n    last_message_timestamp: The timestamp of the last message in the conversation",
+                "properties": {
+                    "conversation_id": {
+                        "title": "Conversation Id",
+                        "type": "string"
+                    },
+                    "topic_summary": {
+                        "type": "string",
+                        "nullable": true,
+                        "title": "Topic Summary"
+                    },
+                    "last_message_timestamp": {
+                        "title": "Last Message Timestamp",
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "conversation_id",
+                    "topic_summary",
+                    "last_message_timestamp"
+                ],
+                "title": "ConversationData",
+                "type": "object"
+            },
+            "ConversationDetails": {
+                "description": "Model representing the details of a user conversation.\n\nAttributes:\n    conversation_id: The conversation ID (UUID).\n    created_at: When the conversation was created.\n    last_message_at: When the last message was sent.\n    message_count: Number of user messages in the conversation.\n    last_used_model: The last model used for the conversation.\n    last_used_provider: The provider of the last used model.\n    topic_summary: The topic summary for the conversation.\n\nExample:\n    ```python\n    conversation = ConversationDetails(\n        conversation_id=\"123e4567-e89b-12d3-a456-426614174000\",\n        created_at=\"2024-01-01T00:00:00Z\",\n        last_message_at=\"2024-01-01T00:05:00Z\",\n        message_count=5,\n        last_used_model=\"gemini/gemini-2.0-flash\",\n        last_used_provider=\"gemini\",\n        topic_summary=\"Openshift Microservices Deployment Strategies\",\n    )\n    ```",
+                "properties": {
+                    "conversation_id": {
+                        "description": "Conversation ID (UUID)",
+                        "examples": [
+                            "c5260aec-4d82-4370-9fdf-05cf908b3f16"
+                        ],
+                        "title": "Conversation Id",
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "When the conversation was created",
+                        "examples": [
+                            "2024-01-01T01:00:00Z"
+                        ],
+                        "title": "Created At"
+                    },
+                    "last_message_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "When the last message was sent",
+                        "examples": [
+                            "2024-01-01T01:00:00Z"
+                        ],
+                        "title": "Last Message At"
+                    },
+                    "message_count": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Number of user messages in the conversation",
+                        "examples": [
+                            42
+                        ],
+                        "title": "Message Count"
+                    },
+                    "last_used_model": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Identification of the last model used for the conversation",
+                        "examples": [
+                            "gpt-4-turbo",
+                            "gpt-3.5-turbo-0125"
+                        ],
+                        "title": "Last Used Model"
+                    },
+                    "last_used_provider": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Identification of the last provider used for the conversation",
+                        "examples": [
+                            "openai",
+                            "gemini"
+                        ],
+                        "title": "Last Used Provider"
+                    },
+                    "topic_summary": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Topic summary for the conversation",
+                        "examples": [
+                            "Openshift Microservices Deployment Strategies"
+                        ],
+                        "title": "Topic Summary"
+                    }
+                },
+                "required": [
+                    "conversation_id"
+                ],
+                "title": "ConversationDetails",
+                "type": "object"
+            },
+            "ConversationTurn": {
+                "description": "Model representing a single conversation turn.\n\nAttributes:\n    messages: List of messages in this turn.\n    tool_calls: List of tool calls made in this turn.\n    tool_results: List of tool results from this turn.\n    provider: Provider identifier used for this turn.\n    model: Model identifier used for this turn.\n    started_at: ISO 8601 timestamp when the turn started.\n    completed_at: ISO 8601 timestamp when the turn completed.",
+                "properties": {
+                    "messages": {
+                        "description": "List of messages in this turn",
+                        "items": {
+                            "$ref": "`#/components/schemas/`Message"
+                        },
+                        "title": "Messages",
+                        "type": "array"
+                    },
+                    "tool_calls": {
+                        "description": "List of tool calls made in this turn",
+                        "items": {
+                            "$ref": "`#/components/schemas/`ToolCallSummary"
+                        },
+                        "title": "Tool Calls",
+                        "type": "array"
+                    },
+                    "tool_results": {
+                        "description": "List of tool results from this turn",
+                        "items": {
+                            "$ref": "`#/components/schemas/`ToolResultSummary"
+                        },
+                        "title": "Tool Results",
+                        "type": "array"
+                    },
+                    "provider": {
+                        "description": "Provider identifier used for this turn",
+                        "examples": [
+                            "openai"
+                        ],
+                        "title": "Provider",
+                        "type": "string"
+                    },
+                    "model": {
+                        "description": "Model identifier used for this turn",
+                        "examples": [
+                            "gpt-4o-mini"
+                        ],
+                        "title": "Model",
+                        "type": "string"
+                    },
+                    "started_at": {
+                        "description": "ISO 8601 timestamp when the turn started",
+                        "examples": [
+                            "2024-01-01T00:01:00Z"
+                        ],
+                        "title": "Started At",
+                        "type": "string"
+                    },
+                    "completed_at": {
+                        "description": "ISO 8601 timestamp when the turn completed",
+                        "examples": [
+                            "2024-01-01T00:01:05Z"
+                        ],
+                        "title": "Completed At",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "provider",
+                    "model",
+                    "started_at",
+                    "completed_at"
+                ],
+                "title": "ConversationTurn",
+                "type": "object"
+            },
+            "MCPListToolsSummary": {
+                "description": "Model representing MCP list tools payload serialized into tool results.",
+                "properties": {
+                    "server_label": {
+                        "description": "MCP server label associated with the tool list",
+                        "title": "Server Label",
+                        "type": "string"
+                    },
+                    "tools": {
+                        "description": "Tools exposed by the MCP server",
+                        "items": {
+                            "$ref": "`#/components/schemas/`ToolInfoSummary"
+                        },
+                        "title": "Tools",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "server_label"
+                ],
+                "title": "MCPListToolsSummary",
+                "type": "object"
+            },
+            "MCPListToolsTool": {
+                "description": "Tool definition returned by MCP list tools operation.\n\n:param input_schema: JSON schema defining the tool's input parameters\n:param name: Name of the tool\n:param description: (Optional) Description of what the tool does",
+                "properties": {
+                    "input_schema": {
+                        "additionalProperties": true,
+                        "title": "Input Schema",
+                        "type": "object"
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Description"
+                    }
+                },
+                "required": [
+                    "input_schema",
+                    "name"
+                ],
+                "title": "MCPListToolsTool",
+                "type": "object"
+            },
+            "MCPServerAuthInfo": {
+                "description": "Information about MCP server client authentication options.",
+                "properties": {
+                    "name": {
+                        "description": "MCP server name",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "client_auth_headers": {
+                        "description": "List of authentication header names for client-provided tokens",
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "Client Auth Headers",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "name",
+                    "client_auth_headers"
+                ],
+                "title": "MCPServerAuthInfo",
+                "type": "object"
+            },
+            "MCPServerInfo": {
+                "description": "Information about a registered MCP server.\n\nAttributes:\n    name: Unique name of the MCP server.\n    url: URL of the MCP server endpoint.\n    provider_id: MCP provider identification.\n    source: Whether the server was registered statically (config) or dynamically (api).",
+                "properties": {
+                    "name": {
+                        "description": "MCP server name",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "url": {
+                        "description": "MCP server URL",
+                        "title": "Url",
+                        "type": "string"
+                    },
+                    "provider_id": {
+                        "description": "MCP provider identification",
+                        "title": "Provider Id",
+                        "type": "string"
+                    },
+                    "source": {
+                        "description": "How the server was registered: 'config' (static) or 'api' (dynamic)",
+                        "examples": [
+                            "config",
+                            "api"
+                        ],
+                        "title": "Source",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "url",
+                    "provider_id",
+                    "source"
+                ],
+                "title": "MCPServerInfo",
+                "type": "object"
+            },
+            "Message": {
+                "description": "Model representing a message in a conversation turn.\n\nAttributes:\n    content: The message content.\n    type: The type of message.\n    referenced_documents: Optional list of documents referenced in an assistant response.",
+                "properties": {
+                    "content": {
+                        "description": "The message content",
+                        "examples": [
+                            "Hello, how can I help you?"
+                        ],
+                        "title": "Content",
+                        "type": "string"
+                    },
+                    "type": {
+                        "description": "The type of message",
+                        "enum": [
+                            "user",
+                            "assistant",
+                            "system",
+                            "developer"
+                        ],
+                        "examples": [
+                            "user",
+                            "assistant",
+                            "system",
+                            "developer"
+                        ],
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "referenced_documents": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "description": "List of documents referenced in the response (assistant messages only)",
+                        "title": "Referenced Documents"
+                    }
+                },
+                "required": [
+                    "content",
+                    "type"
+                ],
+                "title": "Message",
+                "type": "object"
+            },
+            "OpenAIResponseAnnotationCitation": {
+                "description": "URL citation annotation for referencing external web resources.\n\n:param type: Annotation type identifier, always \"url_citation\"\n:param end_index: End position of the citation span in the content\n:param start_index: Start position of the citation span in the content\n:param title: Title of the referenced web resource\n:param url: URL of the referenced web resource",
+                "properties": {
+                    "type": {
+                        "const": "url_citation",
+                        "default": "url_citation",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "end_index": {
+                        "title": "End Index",
+                        "type": "integer"
+                    },
+                    "start_index": {
+                        "title": "Start Index",
+                        "type": "integer"
+                    },
+                    "title": {
+                        "title": "Title",
+                        "type": "string"
+                    },
+                    "url": {
+                        "title": "Url",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "end_index",
+                    "start_index",
+                    "title",
+                    "url"
+                ],
+                "title": "OpenAIResponseAnnotationCitation",
+                "type": "object"
+            },
+            "OpenAIResponseAnnotationContainerFileCitation": {
+                "properties": {
+                    "type": {
+                        "const": "container_file_citation",
+                        "default": "container_file_citation",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "container_id": {
+                        "title": "Container Id",
+                        "type": "string"
+                    },
+                    "end_index": {
+                        "title": "End Index",
+                        "type": "integer"
+                    },
+                    "file_id": {
+                        "title": "File Id",
+                        "type": "string"
+                    },
+                    "filename": {
+                        "title": "Filename",
+                        "type": "string"
+                    },
+                    "start_index": {
+                        "title": "Start Index",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "container_id",
+                    "end_index",
+                    "file_id",
+                    "filename",
+                    "start_index"
+                ],
+                "title": "OpenAIResponseAnnotationContainerFileCitation",
+                "type": "object"
+            },
+            "OpenAIResponseAnnotationFileCitation": {
+                "description": "File citation annotation for referencing specific files in response content.\n\n:param type: Annotation type identifier, always \"file_citation\"\n:param file_id: Unique identifier of the referenced file\n:param filename: Name of the referenced file\n:param index: Position index of the citation within the content",
+                "properties": {
+                    "type": {
+                        "const": "file_citation",
+                        "default": "file_citation",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "file_id": {
+                        "title": "File Id",
+                        "type": "string"
+                    },
+                    "filename": {
+                        "title": "Filename",
+                        "type": "string"
+                    },
+                    "index": {
+                        "title": "Index",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "file_id",
+                    "filename",
+                    "index"
+                ],
+                "title": "OpenAIResponseAnnotationFileCitation",
+                "type": "object"
+            },
+            "OpenAIResponseAnnotationFilePath": {
+                "properties": {
+                    "type": {
+                        "const": "file_path",
+                        "default": "file_path",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "file_id": {
+                        "title": "File Id",
+                        "type": "string"
+                    },
+                    "index": {
+                        "title": "Index",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "file_id",
+                    "index"
+                ],
+                "title": "OpenAIResponseAnnotationFilePath",
+                "type": "object"
+            },
+            "OpenAIResponseContentPartRefusal": {
+                "description": "Refusal content within a streamed response part.\n\n:param type: Content part type identifier, always \"refusal\"\n:param refusal: Refusal text supplied by the model",
+                "properties": {
+                    "type": {
+                        "const": "refusal",
+                        "default": "refusal",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "refusal": {
+                        "title": "Refusal",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "refusal"
+                ],
+                "title": "OpenAIResponseContentPartRefusal",
+                "type": "object"
+            },
+            "OpenAIResponseInputMessageContentFile": {
+                "description": "File content for input messages in OpenAI response format.\n\n:param type: The type of the input item. Always `input_file`.\n:param file_data: The data of the file to be sent to the model.\n:param file_id: (Optional) The ID of the file to be sent to the model.\n:param file_url: The URL of the file to be sent to the model.\n:param filename: The name of the file to be sent to the model.",
+                "properties": {
+                    "type": {
+                        "const": "input_file",
+                        "default": "input_file",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "file_data": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "File Data"
+                    },
+                    "file_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "File Id"
+                    },
+                    "file_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "File Url"
+                    },
+                    "filename": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Filename"
+                    }
+                },
+                "title": "OpenAIResponseInputMessageContentFile",
+                "type": "object"
+            },
+            "OpenAIResponseInputMessageContentImage": {
+                "description": "Image content for input messages in OpenAI response format.\n\n:param detail: Level of detail for image processing, can be \"low\", \"high\", or \"auto\"\n:param type: Content type identifier, always \"input_image\"\n:param file_id: (Optional) The ID of the file to be sent to the model.\n:param image_url: (Optional) URL of the image content",
+                "properties": {
+                    "detail": {
+                        "anyOf": [
+                            {
+                                "const": "low",
+                                "type": "string"
+                            },
+                            {
+                                "const": "high",
+                                "type": "string"
+                            },
+                            {
+                                "const": "auto",
+                                "type": "string"
+                            }
+                        ],
+                        "default": "auto",
+                        "title": "Detail"
+                    },
+                    "type": {
+                        "const": "input_image",
+                        "default": "input_image",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "file_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "File Id"
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Image Url"
+                    }
+                },
+                "title": "OpenAIResponseInputMessageContentImage",
+                "type": "object"
+            },
+            "OpenAIResponseInputMessageContentText": {
+                "description": "Text content for input messages in OpenAI response format.\n\n:param text: The text content of the input message\n:param type: Content type identifier, always \"input_text\"",
+                "properties": {
+                    "text": {
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "input_text",
+                        "default": "input_text",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "text"
+                ],
+                "title": "OpenAIResponseInputMessageContentText",
+                "type": "object"
+            },
+            "OpenAIResponseMCPApprovalRequest": {
+                "description": "A request for human approval of a tool invocation.",
+                "properties": {
+                    "arguments": {
+                        "title": "Arguments",
+                        "type": "string"
+                    },
+                    "id": {
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "server_label": {
+                        "title": "Server Label",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "mcp_approval_request",
+                        "default": "mcp_approval_request",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "arguments",
+                    "id",
+                    "name",
+                    "server_label"
+                ],
+                "title": "OpenAIResponseMCPApprovalRequest",
+                "type": "object"
+            },
+            "OpenAIResponseMessage": {
+                "description": "Corresponds to the various Message types in the Responses API.\nThey are all under one type because the Responses API gives them all\nthe same \"type\" value, and there is no way to tell them apart in certain\nscenarios.",
+                "properties": {
+                    "content": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "items": {
+                                    "discriminator": {
+                                        "mapping": {
+                                            "input_file": "`#/components/schemas/`OpenAIResponseInputMessageContentFile",
+                                            "input_image": "`#/components/schemas/`OpenAIResponseInputMessageContentImage",
+                                            "input_text": "`#/components/schemas/`OpenAIResponseInputMessageContentText"
+                                        },
+                                        "propertyName": "type"
+                                    },
+                                    "oneOf": [
+                                        {
+                                            "$ref": "`#/components/schemas/`OpenAIResponseInputMessageContentText"
+                                        },
+                                        {
+                                            "$ref": "`#/components/schemas/`OpenAIResponseInputMessageContentImage"
+                                        },
+                                        {
+                                            "$ref": "`#/components/schemas/`OpenAIResponseInputMessageContentFile"
+                                        }
+                                    ]
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "items": {
+                                    "discriminator": {
+                                        "mapping": {
+                                            "output_text": "`#/components/schemas/`OpenAIResponseOutputMessageContentOutputText",
+                                            "refusal": "`#/components/schemas/`OpenAIResponseContentPartRefusal"
+                                        },
+                                        "propertyName": "type"
+                                    },
+                                    "oneOf": [
+                                        {
+                                            "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageContentOutputText"
+                                        },
+                                        {
+                                            "$ref": "`#/components/schemas/`OpenAIResponseContentPartRefusal"
+                                        }
+                                    ]
+                                },
+                                "type": "array"
+                            }
+                        ],
+                        "title": "Content"
+                    },
+                    "role": {
+                        "anyOf": [
+                            {
+                                "const": "system",
+                                "type": "string"
+                            },
+                            {
+                                "const": "developer",
+                                "type": "string"
+                            },
+                            {
+                                "const": "user",
+                                "type": "string"
+                            },
+                            {
+                                "const": "assistant",
+                                "type": "string"
+                            }
+                        ],
+                        "title": "Role"
+                    },
+                    "type": {
+                        "const": "message",
+                        "default": "message",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Id"
+                    },
+                    "status": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Status"
+                    }
+                },
+                "required": [
+                    "content",
+                    "role"
+                ],
+                "title": "OpenAIResponseMessage",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageContentOutputText": {
+                "properties": {
+                    "text": {
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "output_text",
+                        "default": "output_text",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "annotations": {
+                        "items": {
+                            "discriminator": {
+                                "mapping": {
+                                    "container_file_citation": "`#/components/schemas/`OpenAIResponseAnnotationContainerFileCitation",
+                                    "file_citation": "`#/components/schemas/`OpenAIResponseAnnotationFileCitation",
+                                    "file_path": "`#/components/schemas/`OpenAIResponseAnnotationFilePath",
+                                    "url_citation": "`#/components/schemas/`OpenAIResponseAnnotationCitation"
+                                },
+                                "propertyName": "type"
+                            },
+                            "oneOf": [
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseAnnotationFileCitation"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseAnnotationCitation"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseAnnotationContainerFileCitation"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseAnnotationFilePath"
+                                }
+                            ]
+                        },
+                        "title": "Annotations",
+                        "type": "array"
+                    },
+                    "logprobs": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Logprobs"
+                    }
+                },
+                "required": [
+                    "text"
+                ],
+                "title": "OpenAIResponseOutputMessageContentOutputText",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageFileSearchToolCall": {
+                "description": "File search tool call output message for OpenAI responses.\n\n:param id: Unique identifier for this tool call\n:param queries: List of search queries executed\n:param status: Current status of the file search operation\n:param type: Tool call type identifier, always \"file_search_call\"\n:param results: (Optional) Search results returned by the file search operation",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "queries": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "Queries",
+                        "type": "array"
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "file_search_call",
+                        "default": "file_search_call",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "results": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Results"
+                    }
+                },
+                "required": [
+                    "id",
+                    "queries",
+                    "status"
+                ],
+                "title": "OpenAIResponseOutputMessageFileSearchToolCall",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageFileSearchToolCallResults": {
+                "description": "Search results returned by the file search operation.\n\n:param attributes: (Optional) Key-value attributes associated with the file\n:param file_id: Unique identifier of the file containing the result\n:param filename: Name of the file containing the result\n:param score: Relevance score for this search result (between 0 and 1)\n:param text: Text content of the search result",
+                "properties": {
+                    "attributes": {
+                        "additionalProperties": true,
+                        "title": "Attributes",
+                        "type": "object"
+                    },
+                    "file_id": {
+                        "title": "File Id",
+                        "type": "string"
+                    },
+                    "filename": {
+                        "title": "Filename",
+                        "type": "string"
+                    },
+                    "score": {
+                        "title": "Score",
+                        "type": "number"
+                    },
+                    "text": {
+                        "title": "Text",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "attributes",
+                    "file_id",
+                    "filename",
+                    "score",
+                    "text"
+                ],
+                "title": "OpenAIResponseOutputMessageFileSearchToolCallResults",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageFunctionToolCall": {
+                "description": "Function tool call output message for OpenAI responses.\n\n:param call_id: Unique identifier for the function call\n:param name: Name of the function being called\n:param arguments: JSON string containing the function arguments\n:param type: Tool call type identifier, always \"function_call\"\n:param id: (Optional) Additional identifier for the tool call\n:param status: (Optional) Current status of the function call execution",
+                "properties": {
+                    "call_id": {
+                        "title": "Call Id",
+                        "type": "string"
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "arguments": {
+                        "title": "Arguments",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "function_call",
+                        "default": "function_call",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Id"
+                    },
+                    "status": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Status"
+                    }
+                },
+                "required": [
+                    "call_id",
+                    "name",
+                    "arguments"
+                ],
+                "title": "OpenAIResponseOutputMessageFunctionToolCall",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageMCPCall": {
+                "description": "Model Context Protocol (MCP) call output message for OpenAI responses.\n\n:param id: Unique identifier for this MCP call\n:param type: Tool call type identifier, always \"mcp_call\"\n:param arguments: JSON string containing the MCP call arguments\n:param name: Name of the MCP method being called\n:param server_label: Label identifying the MCP server handling the call\n:param error: (Optional) Error message if the MCP call failed\n:param output: (Optional) Output result from the successful MCP call",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "mcp_call",
+                        "default": "mcp_call",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "arguments": {
+                        "title": "Arguments",
+                        "type": "string"
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "server_label": {
+                        "title": "Server Label",
+                        "type": "string"
+                    },
+                    "error": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Error"
+                    },
+                    "output": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Output"
+                    }
+                },
+                "required": [
+                    "id",
+                    "arguments",
+                    "name",
+                    "server_label"
+                ],
+                "title": "OpenAIResponseOutputMessageMCPCall",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageMCPListTools": {
+                "description": "MCP list tools output message containing available tools from an MCP server.\n\n:param id: Unique identifier for this MCP list tools operation\n:param type: Tool call type identifier, always \"mcp_list_tools\"\n:param server_label: Label identifying the MCP server providing the tools\n:param tools: List of available tools provided by the MCP server",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "mcp_list_tools",
+                        "default": "mcp_list_tools",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "server_label": {
+                        "title": "Server Label",
+                        "type": "string"
+                    },
+                    "tools": {
+                        "items": {
+                            "$ref": "`#/components/schemas/`MCPListToolsTool"
+                        },
+                        "title": "Tools",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "id",
+                    "server_label",
+                    "tools"
+                ],
+                "title": "OpenAIResponseOutputMessageMCPListTools",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageWebSearchToolCall": {
+                "description": "Web search tool call output message for OpenAI responses.\n\n:param id: Unique identifier for this tool call\n:param status: Current status of the web search operation\n:param type: Tool call type identifier, always \"web_search_call\"",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "status": {
+                        "title": "Status",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "web_search_call",
+                        "default": "web_search_call",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status"
+                ],
+                "title": "OpenAIResponseOutputMessageWebSearchToolCall",
+                "type": "object"
+            },
+            "OpenAITokenLogProb": {
+                "description": "The log probability for a token from an OpenAI-compatible chat completion response.",
+                "properties": {
+                    "token": {
+                        "description": "The token.",
+                        "title": "Token",
+                        "type": "string"
+                    },
+                    "bytes": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "description": "The bytes for the token.",
+                        "title": "Bytes"
+                    },
+                    "logprob": {
+                        "description": "The log probability of the token.",
+                        "title": "Logprob",
+                        "type": "number"
+                    },
+                    "top_logprobs": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "description": "The top log probabilities for the token.",
+                        "title": "Top Logprobs"
+                    }
+                },
+                "required": [
+                    "token",
+                    "logprob"
+                ],
+                "title": "OpenAITokenLogProb",
+                "type": "object"
+            },
+            "OpenAITopLogProb": {
+                "description": "The top log probability for a token from an OpenAI-compatible chat completion response.",
+                "properties": {
+                    "token": {
+                        "description": "The token.",
+                        "title": "Token",
+                        "type": "string"
+                    },
+                    "bytes": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "description": "The bytes for the token.",
+                        "title": "Bytes"
+                    },
+                    "logprob": {
+                        "description": "The log probability of the token.",
+                        "title": "Logprob",
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "token",
+                    "logprob"
+                ],
+                "title": "OpenAITopLogProb",
+                "type": "object"
+            },
+            "ProviderHealthStatus": {
+                "description": "Model representing the health status of a provider.\n\nAttributes:\n    provider_id: The ID of the provider.\n    status: The health status ('ok', 'unhealthy', 'not_implemented').\n    message: Optional message about the health status.",
+                "properties": {
+                    "provider_id": {
+                        "description": "The ID of the provider",
+                        "title": "Provider Id",
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "The health status",
+                        "examples": [
+                            "ok",
+                            "unhealthy",
+                            "not_implemented"
+                        ],
+                        "title": "Status",
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Optional message about the health status",
+                        "examples": [
+                            "All systems operational",
+                            "Provider is unavailable"
+                        ],
+                        "title": "Message"
+                    }
+                },
+                "required": [
+                    "provider_id",
+                    "status"
+                ],
+                "title": "ProviderHealthStatus",
+                "type": "object"
+            },
+            "RAGChunk": {
+                "description": "Model representing a RAG chunk used in the response.",
+                "properties": {
+                    "content": {
+                        "description": "The content of the chunk",
+                        "title": "Content",
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Index name identifying the knowledge source from configuration",
+                        "title": "Source"
+                    },
+                    "score": {
+                        "type": "number",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Relevance score",
+                        "title": "Score"
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Document metadata from the RAG provider (e.g., url, title, author)",
+                        "title": "Attributes"
+                    }
+                },
+                "required": [
+                    "content"
+                ],
+                "title": "RAGChunk",
+                "type": "object"
+            },
+            "RAGContext": {
+                "description": "Result of building RAG context from all enabled pre-query RAG sources.\n\nAttributes:\n    context_text: Formatted RAG context string for injection into the query.\n    rag_chunks: RAG chunks from pre-query sources (BYOK + Solr).\n    referenced_documents: Referenced documents from pre-query sources.",
+                "properties": {
+                    "context_text": {
+                        "default": "",
+                        "description": "Formatted context for injection",
+                        "title": "Context Text",
+                        "type": "string"
+                    },
+                    "rag_chunks": {
+                        "description": "RAG chunks from pre-query sources",
+                        "items": {
+                            "$ref": "`#/components/schemas/`RAGChunk"
+                        },
+                        "title": "Rag Chunks",
+                        "type": "array"
+                    },
+                    "referenced_documents": {
+                        "description": "Documents from pre-query sources",
+                        "items": {
+                            "$ref": "`#/components/schemas/`ReferencedDocument"
+                        },
+                        "title": "Referenced Documents",
+                        "type": "array"
+                    }
+                },
+                "title": "RAGContext",
+                "type": "object"
+            },
+            "ReferencedDocument": {
+                "description": "Model representing a document referenced in generating a response.\n\nAttributes:\n    doc_url: Url to the referenced doc.\n    doc_title: Title of the referenced doc.\n    document_id: Document ID for preserving identity during deduplication.",
+                "properties": {
+                    "doc_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "URL of the referenced document",
+                        "title": "Doc Url"
+                    },
+                    "doc_title": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Title of the referenced document",
+                        "title": "Doc Title"
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Index name identifying the knowledge source from configuration",
+                        "title": "Source"
+                    },
+                    "document_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Document ID for preserving identity during deduplication",
+                        "title": "Document Id"
+                    }
+                },
+                "title": "ReferencedDocument",
+                "type": "object"
+            },
+            "ShieldModerationBlocked": {
+                "description": "Shield moderation blocked the content; refusal details are present.",
+                "properties": {
+                    "decision": {
+                        "const": "blocked",
+                        "default": "blocked",
+                        "title": "Decision",
+                        "type": "string"
+                    },
+                    "message": {
+                        "title": "Message",
+                        "type": "string"
+                    },
+                    "moderation_id": {
+                        "title": "Moderation Id",
+                        "type": "string"
+                    },
+                    "refusal_response": {
+                        "$ref": "`#/components/schemas/`OpenAIResponseMessage"
+                    }
+                },
+                "required": [
+                    "message",
+                    "moderation_id",
+                    "refusal_response"
+                ],
+                "title": "ShieldModerationBlocked",
+                "type": "object"
+            },
+            "ShieldModerationPassed": {
+                "description": "Shield moderation passed; no refusal.",
+                "properties": {
+                    "decision": {
+                        "const": "passed",
+                        "default": "passed",
+                        "title": "Decision",
+                        "type": "string"
+                    }
+                },
+                "title": "ShieldModerationPassed",
+                "type": "object"
+            },
+            "SolrVectorSearchRequest": {
+                "additionalProperties": false,
+                "description": "LCORE Solr inline RAG options for vector_io.query (mode and provider filters).\n\nAttributes:\n    mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.\n    filters: Solr provider filter payload passed through as params['solr'].\n\nLegacy clients may send a plain JSON object with filter keys only;\nthat object is accepted as filters with mode unset (server default applies).",
+                "properties": {
+                    "mode": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Solr vector_io search mode. When omitted, the server default ('hybrid') is used.",
+                        "examples": [
+                            "hybrid",
+                            "semantic",
+                            "lexical"
+                        ],
+                        "title": "Mode"
+                    },
+                    "filters": {
+                        "type": "object",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Solr provider filter payload passed through as params['solr']. Supports structured metadata filters (eq, ne, in, nin comparison operators). Legacy filter-only objects (e.g. fq) are still accepted.",
+                        "examples": [
+                            {
+                                "filters": {
+                                    "key": "product",
+                                    "type": "eq",
+                                    "value": "openshift_container_platform"
+                                }
+                            },
+                            {
+                                "filters": {
+                                    "filters": [
+                                        {
+                                            "key": "product",
+                                            "type": "eq",
+                                            "value": "openshift_container_platform"
+                                        },
+                                        {
+                                            "key": "version",
+                                            "type": "in",
+                                            "value": [
+                                                "4.14",
+                                                "4.15",
+                                                "4.16"
+                                            ]
+                                        }
+                                    ],
+                                    "type": "and"
+                                }
+                            },
+                            {
+                                "fq": [
+                                    "product:*openshift*"
+                                ]
+                            }
+                        ],
+                        "title": "Filters"
+                    }
+                },
+                "title": "SolrVectorSearchRequest",
+                "type": "object"
+            },
+            "TokenCounter": {
+                "description": "Model representing token counter.\n\nAttributes:\n    input_tokens: number of tokens sent to LLM\n    output_tokens: number of tokens received from LLM\n    input_tokens_counted: number of input tokens counted by the handler\n    llm_calls: number of LLM calls",
+                "properties": {
+                    "input_tokens": {
+                        "default": 0,
+                        "title": "Input Tokens",
+                        "type": "integer"
+                    },
+                    "output_tokens": {
+                        "default": 0,
+                        "title": "Output Tokens",
+                        "type": "integer"
+                    },
+                    "input_tokens_counted": {
+                        "default": 0,
+                        "title": "Input Tokens Counted",
+                        "type": "integer"
+                    },
+                    "llm_calls": {
+                        "default": 0,
+                        "title": "Llm Calls",
+                        "type": "integer"
+                    }
+                },
+                "title": "TokenCounter",
+                "type": "object"
+            },
+            "ToolCallSummary": {
+                "description": "Model representing a tool call made during response generation (for tool_calls list).",
+                "properties": {
+                    "id": {
+                        "description": "ID of the tool call",
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Name of the tool called",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "args": {
+                        "additionalProperties": true,
+                        "description": "Arguments passed to the tool",
+                        "title": "Args",
+                        "type": "object"
+                    },
+                    "type": {
+                        "default": "tool_call",
+                        "description": "Type indicator for tool call",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name"
+                ],
+                "title": "ToolCallSummary",
+                "type": "object"
+            },
+            "ToolInfoSummary": {
+                "description": "Model representing metadata for a single tool exposed by MCP list tools.",
+                "properties": {
+                    "name": {
+                        "description": "Tool name",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Human-readable tool description",
+                        "title": "Description"
+                    },
+                    "input_schema": {
+                        "type": "object",
+                        "nullable": true,
+                        "default": null,
+                        "description": "JSON schema for the tool input",
+                        "title": "Input Schema"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "ToolInfoSummary",
+                "type": "object"
+            },
+            "ToolResultSummary": {
+                "description": "Model representing a result from a tool call (for tool_results list).",
+                "properties": {
+                    "id": {
+                        "description": "ID of the tool call/result, matches the corresponding tool call 'id'",
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "Status of the tool execution (e.g., 'success')",
+                        "title": "Status",
+                        "type": "string"
+                    },
+                    "content": {
+                        "description": "Content/result returned from the tool",
+                        "title": "Content",
+                        "type": "string"
+                    },
+                    "type": {
+                        "default": "tool_result",
+                        "description": "Type indicator for tool result",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "round": {
+                        "description": "Round number or step of tool execution",
+                        "title": "Round",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status",
+                    "content",
+                    "round"
+                ],
+                "title": "ToolResultSummary",
+                "type": "object"
+            },
+            "Transcript": {
+                "description": "Model representing a transcript entry to be stored.",
+                "properties": {
+                    "metadata": {
+                        "$ref": "`#/components/schemas/`TranscriptMetadata"
+                    },
+                    "redacted_query": {
+                        "title": "Redacted Query",
+                        "type": "string"
+                    },
+                    "query_is_valid": {
+                        "title": "Query Is Valid",
+                        "type": "boolean"
+                    },
+                    "llm_response": {
+                        "title": "Llm Response",
+                        "type": "string"
+                    },
+                    "rag_chunks": {
+                        "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "title": "Rag Chunks",
+                        "type": "array"
+                    },
+                    "truncated": {
+                        "title": "Truncated",
+                        "type": "boolean"
+                    },
+                    "attachments": {
+                        "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "title": "Attachments",
+                        "type": "array"
+                    },
+                    "tool_calls": {
+                        "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "title": "Tool Calls",
+                        "type": "array"
+                    },
+                    "tool_results": {
+                        "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "title": "Tool Results",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "metadata",
+                    "redacted_query",
+                    "query_is_valid",
+                    "llm_response",
+                    "truncated"
+                ],
+                "title": "Transcript",
+                "type": "object"
+            },
+            "TranscriptMetadata": {
+                "description": "Metadata for a transcript entry.",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Provider"
+                    },
+                    "model": {
+                        "title": "Model",
+                        "type": "string"
+                    },
+                    "query_provider": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Query Provider"
+                    },
+                    "query_model": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Query Model"
+                    },
+                    "user_id": {
+                        "title": "User Id",
+                        "type": "string"
+                    },
+                    "conversation_id": {
+                        "title": "Conversation Id",
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "title": "Timestamp",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "model",
+                    "user_id",
+                    "conversation_id",
+                    "timestamp"
+                ],
+                "title": "TranscriptMetadata",
+                "type": "object"
+            },
+            "TurnSummary": {
+                "description": "Summary of a turn in llama stack.",
+                "properties": {
+                    "id": {
+                        "default": "",
+                        "description": "ID of the response",
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "llm_response": {
+                        "default": "",
+                        "title": "Llm Response",
+                        "type": "string"
+                    },
+                    "tool_calls": {
+                        "items": {
+                            "$ref": "`#/components/schemas/`ToolCallSummary"
+                        },
+                        "title": "Tool Calls",
+                        "type": "array"
+                    },
+                    "tool_results": {
+                        "items": {
+                            "$ref": "`#/components/schemas/`ToolResultSummary"
+                        },
+                        "title": "Tool Results",
+                        "type": "array"
+                    },
+                    "rag_chunks": {
+                        "items": {
+                            "$ref": "`#/components/schemas/`RAGChunk"
+                        },
+                        "title": "Rag Chunks",
+                        "type": "array"
+                    },
+                    "referenced_documents": {
+                        "items": {
+                            "$ref": "`#/components/schemas/`ReferencedDocument"
+                        },
+                        "title": "Referenced Documents",
+                        "type": "array"
+                    },
+                    "token_usage": {
+                        "$ref": "`#/components/schemas/`TokenCounter"
+                    },
+                    "output_items": {
+                        "description": "Structured response output items, captured for compacted-mode turn persistence (LCORE-1572). Empty on the non-compacted path.",
+                        "items": {
+                            "discriminator": {
+                                "mapping": {
+                                    "file_search_call": "`#/components/schemas/`OpenAIResponseOutputMessageFileSearchToolCall",
+                                    "function_call": "`#/components/schemas/`OpenAIResponseOutputMessageFunctionToolCall",
+                                    "mcp_approval_request": "`#/components/schemas/`OpenAIResponseMCPApprovalRequest",
+                                    "mcp_call": "`#/components/schemas/`OpenAIResponseOutputMessageMCPCall",
+                                    "mcp_list_tools": "`#/components/schemas/`OpenAIResponseOutputMessageMCPListTools",
+                                    "message": "`#/components/schemas/`OpenAIResponseMessage",
+                                    "web_search_call": "`#/components/schemas/`OpenAIResponseOutputMessageWebSearchToolCall"
+                                },
+                                "propertyName": "type"
+                            },
+                            "oneOf": [
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseMessage"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageWebSearchToolCall"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageFileSearchToolCall"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageFunctionToolCall"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageMCPCall"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageMCPListTools"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseMCPApprovalRequest"
+                                }
+                            ]
+                        },
+                        "title": "Output Items",
+                        "type": "array"
+                    },
+                    "partial_tokens": {
+                        "description": "Accumulated text deltas during streaming, used to reconstruct partial content on interruption.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "Partial Tokens",
+                        "type": "array"
+                    },
+                    "next_chunk_id": {
+                        "default": 0,
+                        "description": "Next monotonic SSE chunk index, kept in sync with the inner generator so the interrupt handler can emit a sequentially valid id.",
+                        "title": "Next Chunk Id",
+                        "type": "integer"
+                    }
+                },
+                "title": "TurnSummary",
+                "type": "object"
+            }
+        }
+    },
+    "paths": {}
+}
