@@ -3,6 +3,7 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.params import Depends
 
 from authentication import get_auth_dependency
@@ -62,5 +63,7 @@ async def skills_endpoint_handler(
 
     check_configuration_loaded(configuration)
 
-    skills_metadata = get_skills_metadata(configuration.configuration.skills)
+    skills_metadata = await run_in_threadpool(
+        get_skills_metadata, configuration.configuration.skills
+    )
     return SkillsResponse(skills=skills_metadata)

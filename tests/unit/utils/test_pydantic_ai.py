@@ -199,8 +199,8 @@ class TestGetSkillsMetadata:
         metadata = get_skills_metadata(mock_skills_configuration)
 
         assert len(metadata) == 1
-        assert metadata[0]["name"] == "test-skill"
-        assert metadata[0]["description"] == "Test skill."
+        assert metadata[0].name == "test-skill"
+        assert metadata[0].description == "Test skill."
 
 
 class TestGetAgentCapabilityTools:

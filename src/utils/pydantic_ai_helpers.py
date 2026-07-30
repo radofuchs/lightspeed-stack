@@ -12,6 +12,7 @@ from pydantic_ai.capabilities import AbstractCapability, AgentCapability
 from pydantic_ai_skills import SkillsCapability
 
 from models.common.responses.responses_api_params import ResponsesApiParams
+from models.common.skills import SkillMetadata
 from models.config import SkillsConfiguration
 from pydantic_ai_lightspeed.llamastack import (
     LlamaStackResponsesModel,
@@ -106,20 +107,20 @@ def _capability_tools_from_toolset(toolset: Any) -> list[dict[str, Any]]:
 
 def get_skills_metadata(
     skills: Optional[SkillsConfiguration],
-) -> list[dict[str, Any]]:
+) -> list[SkillMetadata]:
     """Return metadata for all loaded skills.
 
     Parameters:
         skills: Agent skills configuration from LCS, or None when skills are disabled.
 
     Returns:
-        List of dicts with ``name`` and ``description`` for each loaded skill.
+        List of ``SkillMetadata`` with ``name`` and ``description`` for each loaded skill.
     """
     capability = _skills_capability(skills)
     if capability is None:
         return []
     return [
-        {"name": skill.name, "description": skill.description}
+        SkillMetadata(name=skill.name, description=skill.description)
         for skill in capability.toolset.skills.values()
     ]
 

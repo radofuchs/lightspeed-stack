@@ -20946,6 +20946,27 @@
                     }
                 ]
             },
+            "SkillMetadata": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name",
+                        "description": "Unique name of the skill"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Human readable description of what the skill does"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "description"
+                ],
+                "title": "SkillMetadata",
+                "description": "Metadata describing a single loaded agent skill.\n\nAttributes:\n    name: Unique name of the skill.\n    description: Human readable description of what the skill does."
+            },
             "SkillsConfiguration": {
                 "properties": {
                     "paths": {
@@ -20967,8 +20988,7 @@
                 "properties": {
                     "skills": {
                         "items": {
-                            "additionalProperties": true,
-                            "type": "object"
+                            "$ref": "#/components/schemas/SkillMetadata"
                         },
                         "type": "array",
                         "title": "Skills",

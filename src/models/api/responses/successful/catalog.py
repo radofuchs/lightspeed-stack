@@ -5,12 +5,13 @@ from typing import Any, Optional
 from pydantic import Field
 
 from models.api.responses.successful.bases import AbstractSuccessfulResponse
+from models.common.skills import SkillMetadata
 
 
 class SkillsResponse(AbstractSuccessfulResponse):
     """Model representing a response to skills request."""
 
-    skills: list[dict[str, Any]] = Field(
+    skills: list[SkillMetadata] = Field(
         description="List of loaded skills with metadata",
     )
 

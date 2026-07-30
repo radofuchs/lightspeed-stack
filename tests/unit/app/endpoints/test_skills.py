@@ -44,11 +44,11 @@ async def test_skills_loaded(
 
     assert isinstance(response, SkillsResponse)
     assert len(response.skills) == 2
-    names = {s["name"] for s in response.skills}
+    names = {s.name for s in response.skills}
     assert names == {"code-review", "openshift-troubleshooting"}
     for skill in response.skills:
-        assert "name" in skill
-        assert "description" in skill
+        assert skill.name
+        assert skill.description
 
 
 @pytest.mark.asyncio
@@ -115,5 +115,5 @@ async def test_skills_with_references(
 
     assert isinstance(response, SkillsResponse)
     assert len(response.skills) == 1
-    assert response.skills[0]["name"] == "dynamic-plugins"
-    assert response.skills[0]["description"] == "Dynamic plugins guide"
+    assert response.skills[0].name == "dynamic-plugins"
+    assert response.skills[0].description == "Dynamic plugins guide"
