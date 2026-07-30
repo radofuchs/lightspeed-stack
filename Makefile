@@ -212,8 +212,54 @@ doc:	generate-documentation	## Generate or regenerated content of the whole /doc
 devel-doc:	## Generate documentation for developers
 	scripts/gen_doc.py
 
-docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml docs/models/requests.svg docs/models/responses.svg docs/models/database.svg docs/models/common.svg	## Generate documentation about models
+docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml docs/models/requests.svg docs/models/responses.svg docs/models/database.svg docs/models/common.svg docs/models/requests.md docs/models/successful_responses.md docs/models/error_responses.md docs/models/common.md docs/models/agents.md docs/models/conversation_summary.md docs/models/common.md	## Generate documentation about models
 	rm -f docs/models/packages.puml
+
+docs/models/requests.md:	docs/models/requests.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/conversation_summary.md:	docs/models/conversation_summary.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/common.md:	docs/models/common.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/successful_responses.md:	docs/models/successful_responses.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/error_responses.md:	docs/models/error_responses.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/agents.md:	docs/models/agents.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/requests.json:	## Generate OpenAPI specification with requests models
+	uv run src/lightspeed_stack.py --dump-models-group requests
+	mv requests.json $@
+
+docs/models/conversation_summary.json:	## Generate OpenAPI specification with conversation_summary models
+	uv run src/lightspeed_stack.py --dump-models-group conversation_summary
+	mv conversation_summary.json $@
+
+docs/models/successful_responses.json:	## Generate OpenAPI specification with successful_responses models
+	uv run src/lightspeed_stack.py --dump-models-group successful_responses
+	mv successful_responses.json $@
+
+docs/models/error_responses.json:	## Generate OpenAPI specification with error_responses models
+	uv run src/lightspeed_stack.py --dump-models-group error_responses
+	mv error_responses.json $@
+
+docs/models/common.json:	## Generate OpenAPI specification with common models
+	uv run src/lightspeed_stack.py --dump-models-group common
+	mv common.json $@
+
+docs/models/agents.json:	## Generate OpenAPI specification with agents models
+	uv run src/lightspeed_stack.py --dump-models-group agents
+	mv agents.json $@
+
+docs/models/common_responses.json:	## Generate OpenAPI specification with common_responses models
+	uv run src/lightspeed_stack.py --dump-models-group common_responses
+	mv common_responses.json $@
 
 docs/models/requests.puml: ## Generate PlantUML class diagram for requests data models
 	uv run pyreverse src/models/api/requests/ --output puml --output-directory=docs/models/
