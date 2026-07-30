@@ -94,15 +94,17 @@ async def test_skills_with_references(
     mock_authorization_resolvers(mocker)
 
     skills_root = tmp_path / "skills"
-    skill_dir = skills_root / "rhdh-dynamic-plugins"
+    skill_dir = skills_root / "dynamic-plugins"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
-        "---\nname: rhdh-dynamic-plugins\ndescription: RHDH dynamic plugins guide\n---\n\nInstructions.\n",
+        "---\nname: dynamic-plugins\ndescription: Dynamic plugins guide\n---\n\nInstructions.\n",
         encoding="utf-8",
     )
     refs_dir = skill_dir / "references"
     refs_dir.mkdir()
-    (refs_dir / "plugin-list.md").write_text("# Plugins\n- plugin-a\n", encoding="utf-8")
+    (refs_dir / "plugin-list.md").write_text(
+        "# Plugins\n- plugin-a\n", encoding="utf-8"
+    )
 
     skills_config = SkillsConfiguration(paths=[skills_root])
     mock_config = mocker.patch("app.endpoints.skills.configuration")
@@ -113,5 +115,5 @@ async def test_skills_with_references(
 
     assert isinstance(response, SkillsResponse)
     assert len(response.skills) == 1
-    assert response.skills[0]["name"] == "rhdh-dynamic-plugins"
-    assert response.skills[0]["description"] == "RHDH dynamic plugins guide"
+    assert response.skills[0]["name"] == "dynamic-plugins"
+    assert response.skills[0]["description"] == "Dynamic plugins guide"
