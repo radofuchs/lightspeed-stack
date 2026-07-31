@@ -2,6 +2,7 @@
 
 # pylint: disable=too-many-lines
 
+import os
 import re
 from enum import Enum
 from functools import cached_property
@@ -2772,6 +2773,118 @@ class RedactionConfig(ConfigurationBase):
         return list(self._compiled_patterns)
 
 
+class ObservabilityConfiguration(ConfigurationBase):
+    """OpenTelemetry observability configuration.
+
+    This configuration is automatically populated from OTEL_* environment variables
+    to provide visibility into the active tracing setup.
+
+    Attributes:
+        otel: Dictionary of OTEL_* environment variables with secrets redacted.
+    """
+
+    otel: dict[str, str] = Field(
+        default_factory=dict,
+        title="OpenTelemetry configuration",
+        description="Active OpenTelemetry configuration from OTEL_* environment variables",
+    )
+
+    @field_validator("otel", mode="before")
+    @classmethod
+    def redact_secrets(cls, value: dict[str, str]) -> dict[str, str]:
+        """Redact sensitive OTEL environment variables.
+
+        For headers (e.g., OTEL_EXPORTER_OTLP_HEADERS), redacts values while preserving
+        key names for debugging. For certificates and client keys, redacts the entire value.
+
+        Parameters:
+        ----------
+            value: Dictionary of OTEL environment variables
+
+        Returns:
+            New dictionary with sensitive values redacted
+        """
+        # Let Pydantic handle type validation for non-dict inputs
+        if not isinstance(value, dict):
+            return value
+
+        if not value:
+            return value
+
+        # Create a new dict to avoid mutating caller's data
+        redacted = {}
+
+        for key, val in value.items():
+            # Redact generic and signal-specific OTLP headers
+            # Matches: OTEL_EXPORTER_OTLP_HEADERS,
+            #          OTEL_EXPORTER_OTLP_TRACES_HEADERS,
+            #          OTEL_EXPORTER_OTLP_METRICS_HEADERS,
+            #          OTEL_EXPORTER_OTLP_LOGS_HEADERS
+            # Format: "api-key=secret,tenant-id=acme" -> "api-key=[REDACTED],tenant-id=[REDACTED]"
+            if "HEADERS" in key and "OTLP" in key:
+                redacted[key] = cls._redact_header_values(val)
+            # Redact generic and signal-specific certificates
+            # Matches: OTEL_EXPORTER_OTLP_CERTIFICATE,
+            #          OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE, etc.
+            elif "CERTIFICATE" in key and "OTLP" in key:
+                redacted[key] = "[REDACTED]"
+            # Redact generic and signal-specific client keys
+            # Matches: OTEL_EXPORTER_OTLP_CLIENT_KEY,
+            #          OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY, etc.
+            elif "CLIENT_KEY" in key and "OTLP" in key:
+                redacted[key] = "[REDACTED]"
+            else:
+                redacted[key] = val
+
+        return redacted
+
+    @staticmethod
+    def _redact_header_values(header_string: str) -> str:
+        """Redact header values while preserving key names.
+
+        OTEL headers format: "key1=value1,key2=value2"
+        Result: "key1=[REDACTED],key2=[REDACTED]"
+
+        Parameters:
+        ----------
+            header_string: Comma-separated key=value pairs
+
+        Returns:
+            Header string with values redacted but keys preserved
+        """
+        if not header_string or "=" not in header_string:
+            # No key=value pairs found, redact entire string
+            return "[REDACTED]"
+
+        redacted_pairs = []
+        for pair in header_string.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                key_part = pair.split("=", 1)[0]
+                redacted_pairs.append(f"{key_part}=[REDACTED]")
+            else:
+                # Malformed pair without =, redact entirely
+                redacted_pairs.append("[REDACTED]")
+
+        return ",".join(redacted_pairs)
+
+    @classmethod
+    def from_environment(cls) -> "ObservabilityConfiguration":
+        """Collect all OTEL_* environment variables from the environment.
+
+        Sensitive variables (headers, certificates, keys) are automatically redacted
+        by the field validator.
+
+        Returns:
+            ObservabilityConfiguration with otel dict populated from environment.
+        """
+        otel_vars = {}
+        for key, value in os.environ.items():
+            if key.startswith("OTEL_"):
+                otel_vars[key] = value
+        return cls(otel=otel_vars)
+
+
 class Configuration(ConfigurationBase):
     """Global service configuration."""
 
@@ -2931,6 +3044,13 @@ class Configuration(ConfigurationBase):
         default=None,
         title="Splunk configuration",
         description="Splunk HEC configuration for sending telemetry events.",
+    )
+
+    observability: ObservabilityConfiguration = Field(
+        default_factory=ObservabilityConfiguration.from_environment,
+        title="Observability configuration",
+        description="OpenTelemetry and observability configuration collected "
+        "from OTEL_* environment variables.",
     )
 
     deployment_environment: str = Field(
