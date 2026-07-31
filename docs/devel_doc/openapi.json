@@ -21039,7 +21039,7 @@
                     "skills"
                 ],
                 "title": "SkillsResponse",
-                "description": "Model representing a response to skills request.",
+                "description": "Model representing a response to skills request.\n\nAttributes:\n    skills: List of loaded skills with metadata (name and description).",
                 "examples": [
                     {
                         "skills": [
