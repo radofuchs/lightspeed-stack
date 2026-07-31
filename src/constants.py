@@ -235,6 +235,8 @@ BYOK_RAG_RERANK_BOOST: Final[float] = 1.2
 SOLR_VECTOR_SEARCH_DEFAULT_K: Final[int] = 5
 SOLR_VECTOR_SEARCH_DEFAULT_SCORE_THRESHOLD: Final[float] = 0.3
 SOLR_VECTOR_SEARCH_DEFAULT_MODE: Final[str] = "hybrid"
+# LCORE exposes "lexical" but Llama Stack dispatch recognizes "keyword"
+SOLR_SEARCH_MODE_MAP: Final[dict[str, str]] = {"lexical": "keyword"}
 
 # Internal Solr filter always applied to restrict results to chunk documents
 SOLR_CHUNK_FILTER_QUERY: Final[str] = "is_chunk:true"

@@ -144,13 +144,14 @@ class SolrVectorSearchRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    mode: Optional[Literal["semantic", "hybrid", "lexical"]] = Field(
+    mode: Optional[Literal["semantic", "hybrid", "lexical", "keyword"]] = Field(
         None,
         description=(
             "Solr vector_io search mode. When omitted, the server default "
-            f"({SOLR_VECTOR_SEARCH_DEFAULT_MODE!r}) is used."
+            f"({SOLR_VECTOR_SEARCH_DEFAULT_MODE!r}) is used. "
+            "'keyword' and 'lexical' both use BM25 text search."
         ),
-        examples=["hybrid", "semantic", "lexical"],
+        examples=["hybrid", "semantic", "keyword", "lexical"],
     )
     filters: Optional[dict[str, Any]] = Field(
         None,
