@@ -541,10 +541,19 @@ def test_dump_models(tmpdir: Path) -> None:
                             "title": "PostgreSQL host"
                         },
                         "port": {
-                            "type": "string",
-                            "nullable": true,
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
                             "default": null,
-                            "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+                            "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. Accepts string placeholders and integer values.",
                             "title": "PostgreSQL port"
                         },
                         "db": {

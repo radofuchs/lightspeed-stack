@@ -2085,11 +2085,12 @@ class ByokRag(ConfigurationBase):
         "Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
     )
 
-    port: Optional[str] = Field(
+    port: Optional[str | int] = Field(
         default=None,
         title="PostgreSQL port",
         description="PostgreSQL port for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+        "Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. "
+        "Accepts string placeholders and integer values.",
     )
 
     db: Optional[str] = Field(
@@ -2153,10 +2154,11 @@ class PgvectorVectorStoreProviderConfig(ConfigurationBase):
         description="PostgreSQL host. Defaults to ${env.POSTGRES_HOST}.",
     )
 
-    port: Optional[str] = Field(
+    port: Optional[str | int] = Field(
         default=None,
         title="PostgreSQL port",
-        description="PostgreSQL port. Defaults to ${env.POSTGRES_PORT}.",
+        description="PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. "
+        "Accepts string placeholders and integer values.",
     )
 
     db: Optional[str] = Field(
