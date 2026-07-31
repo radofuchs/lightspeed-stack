@@ -21,7 +21,16 @@ from models.config import SkillsConfiguration
 
 
 def _write_skill(skills_root: Path, name: str, description: str) -> None:
-    """Write a minimal SKILL.md file for the given skill name under skills_root."""
+    """Write a minimal SKILL.md file for one skill.
+
+    Parameters:
+        skills_root: Root directory that contains the skill directory.
+        name: Skill name, used as both the directory name and frontmatter value.
+        description: Skill description written into the frontmatter.
+
+    Returns:
+        None.
+    """
     skill_dir = skills_root / name
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(

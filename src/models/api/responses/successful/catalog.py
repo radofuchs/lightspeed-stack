@@ -9,7 +9,11 @@ from models.common.skills import SkillMetadata
 
 
 class SkillsResponse(AbstractSuccessfulResponse):
-    """Model representing a response to skills request."""
+    """Model representing a response to skills request.
+
+    Attributes:
+        skills: List of loaded skills with metadata (name and description).
+    """
 
     skills: list[SkillMetadata] = Field(
         description="List of loaded skills with metadata",
