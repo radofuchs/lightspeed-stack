@@ -2,10 +2,18 @@
 
 
 
+## 🌍 Base URL
+
+
+| URL | Description |
+|-----|-------------|
+
+
+# 🛠️ APIs
 
 ---
 
-# 📋 Schemas for common models
+# 📋 Components
 
 
 
@@ -17,16 +25,16 @@ Model representing an attachment that can be sent from the UI as part of query.
 A list of attachments can be an optional part of 'query' request.
 
 Attributes:
-    attachment_type: The attachment type, like "log", "configuration" etc.
+    attachment_type: The attachment type, like "log", "configuration", "image" etc.
     content_type: The content type as defined in MIME standard
-    content: The actual attachment content
+    content: The actual attachment content (text or base64-encoded image data)
 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| attachment_type | string | The attachment type, like 'log', 'configuration' etc. |
+| attachment_type | string | The attachment type, like 'log', 'configuration', 'image' etc. |
 | content_type | string | The content type as defined in MIME standard |
-| content | string | The actual attachment content |
+| content | string | The actual attachment content (text or base64-encoded image data) |
 
 
 ## ConversationData
@@ -751,3 +759,5 @@ Summary of a turn in llama stack.
 | referenced_documents | array |  |
 | token_usage |  |  |
 | output_items | array | Structured response output items, captured for compacted-mode turn persistence (LCORE-1572). Empty on the non-compacted path. |
+| partial_tokens | array | Accumulated text deltas during streaming, used to reconstruct partial content on interruption. |
+| next_chunk_id | integer | Next monotonic SSE chunk index, kept in sync with the inner generator so the interrupt handler can emit a sequentially valid id. |

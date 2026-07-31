@@ -1,9 +1,21 @@
 # Lightspeed Core Stack
 
 
+
+## 🌍 Base URL
+
+
+| URL | Description |
+|-----|-------------|
+
+
+# 🛠️ APIs
+
 ---
 
-# 📋 Schemas for requests models
+# 📋 Components
+
+
 
 ## AllowedToolsFilter
 
@@ -41,16 +53,16 @@ Model representing an attachment that can be sent from the UI as part of query.
 A list of attachments can be an optional part of 'query' request.
 
 Attributes:
-    attachment_type: The attachment type, like "log", "configuration" etc.
+    attachment_type: The attachment type, like "log", "configuration", "image" etc.
     content_type: The content type as defined in MIME standard
-    content: The actual attachment content
+    content: The actual attachment content (text or base64-encoded image data)
 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| attachment_type | string | The attachment type, like 'log', 'configuration' etc. |
+| attachment_type | string | The attachment type, like 'log', 'configuration', 'image' etc. |
 | content_type | string | The content type as defined in MIME standard |
-| content | string | The actual attachment content |
+| content | string | The actual attachment content (text or base64-encoded image data) |
 
 
 ## ConversationUpdateRequest

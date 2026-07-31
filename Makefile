@@ -25,15 +25,9 @@ CONTAINER_RUNTIME ?= $(shell command -v podman 2>/dev/null || command -v docker 
 	start-llama-stack-container \
 	wait-for-llama-stack-health \
 	clean-llama-stack \
+	doc \
 	docs/models \
-	docs/models/requests.puml \
-	docs/models/responses.puml \
-	docs/models/common.puml \
-	docs/models/database.puml \
-	docs/models/requests.svg \
-	docs/models/responses.svg \
-	docs/models/common.svg \
-	docs/models/database.svg
+	generate-documentation
 
 run-stack: ## Run lightspeed-stack directly, without building dependent service/s
 	@if [ "$${OTEL_SDK_DISABLED:-true}" = "false" ]; then \
@@ -205,29 +199,75 @@ openapi-doc:	docs/devel_doc/openapi.json scripts/fix_openapi_doc.py	## Generate 
 	python3 scripts/fix_openapi_doc.py < output.md > openapi2.md
 	rm output.md
 
-generate-documentation:	devel-doc schema	## Generate or regenerated content of the whole /docs subdirectory
+generate-documentation:	devel-doc schema docs/models	## Generate or regenerated content of the whole /docs subdirectory
 
 doc:	generate-documentation	## Generate or regenerated content of the whole /docs subdirectory
 
 devel-doc:	## Generate documentation for developers
 	scripts/gen_doc.py
 
-docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml docs/models/requests.svg docs/models/responses.svg docs/models/database.svg docs/models/common.svg	## Generate documentation about models
+docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml docs/models/requests.svg docs/models/responses.svg docs/models/database.svg docs/models/common.svg docs/models/requests.md docs/models/successful_responses.md docs/models/error_responses.md docs/models/common.md docs/models/agents.md docs/models/conversation_summary.md docs/models/common.md	## Generate documentation about models
 	rm -f docs/models/packages.puml
 
-docs/models/requests.puml: ## Generate PlantUML class diagram for requests data models
+docs/models/requests.md:	docs/models/requests.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/conversation_summary.md:	docs/models/conversation_summary.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/common.md:	docs/models/common.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/successful_responses.md:	docs/models/successful_responses.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/error_responses.md:	docs/models/error_responses.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/agents.md:	docs/models/agents.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/requests.json:	$(wildcard src/models/api/requests/*)	## Generate OpenAPI specification with requests models
+	uv run src/lightspeed_stack.py --dump-models-group requests
+	mv requests.json $@
+
+docs/models/conversation_summary.json:	src/models/compaction.py	## Generate OpenAPI specification with conversation_summary models
+	uv run src/lightspeed_stack.py --dump-models-group conversation_summary
+	mv conversation_summary.json $@
+
+docs/models/successful_responses.json:	$(wildcard src/models/api/responses/successful/*)	## Generate OpenAPI specification with successful_responses models
+	uv run src/lightspeed_stack.py --dump-models-group successful_responses
+	mv successful_responses.json $@
+
+docs/models/error_responses.json:	$(wildcard src/models/api/responses/error/*)	## Generate OpenAPI specification with error_responses models
+	uv run src/lightspeed_stack.py --dump-models-group error_responses
+	mv error_responses.json $@
+
+docs/models/common.json:	$(wildcard src/models/common/*)	## Generate OpenAPI specification with common models
+	uv run src/lightspeed_stack.py --dump-models-group common
+	mv common.json $@
+
+docs/models/agents.json:	$(wildcard src/models/common/agents/*)	## Generate OpenAPI specification with agents models
+	uv run src/lightspeed_stack.py --dump-models-group agents
+	mv agents.json $@
+
+docs/models/common_responses.json:	$(wildcard src/models/common/responses/*)	## Generate OpenAPI specification with common_responses models
+	uv run src/lightspeed_stack.py --dump-models-group common_responses
+	mv common_responses.json $@
+
+docs/models/requests.puml:	$(wildcard src/models/api/requests/*)	## Generate PlantUML class diagram for requests data models
 	uv run pyreverse src/models/api/requests/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/requests.puml
 
-docs/models/responses.puml: ## Generate PlantUML class diagram for responses data models
+docs/models/responses.puml:	$(wildcard src/models/api/responses/error/* src/models/api/responses/successful/*)	## Generate PlantUML class diagram for responses data models
 	uv run pyreverse src/models/api/responses/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/responses.puml
 
-docs/models/common.puml: ## Generate PlantUML class diagram for common data models
+docs/models/common.puml:	$(wildcard src/models/common/* src/models/common/agents/* src/models/common/responses/* )	## Generate PlantUML class diagram for common data models
 	uv run pyreverse src/models/common/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/common.puml
 
-docs/models/database.puml: ## Generate PlantUML class diagram for database data models
+docs/models/database.puml:	$(wildcard src/models/database/*)	## Generate PlantUML class diagram for database data models
 	uv run pyreverse src/models/database/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/database.puml
 

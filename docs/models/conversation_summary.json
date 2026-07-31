@@ -1,0 +1,53 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Lightspeed Core Stack",
+        "version": "0.3.0"
+    },
+    "components": {
+        "schemas": {
+            "ConversationSummary": {
+                "description": "A single compaction-produced summary chunk.\n\nAttributes:\n    summary_text: The natural-language summary produced by the\n        summarization LLM call. Used directly as context for\n        subsequent requests (alongside any later summary chunks\n        and the buffer of recent turns kept verbatim).\n    summarized_through_turn: Running total of conversation items\n        consumed by this and all preceding summaries. Used by the\n        caller to advance the partition boundary on the next\n        compaction so the new summary only covers items that\n        have not yet been summarized.\n    token_count: Number of tokens in ``summary_text``. Tracked so\n        the recursive-resummarize fallback can decide when the\n        cumulative summary size itself approaches the context\n        limit without re-tokenizing.\n    created_at: ISO 8601 timestamp recording when this summary was\n        produced. Kept as a string (not datetime) to match the\n        cache schema convention used elsewhere in the codebase.\n    model_used: Fully-qualified model identifier used for the\n        summarization LLM call (e.g., ``\"openai/gpt-4o-mini\"``).\n        Preserved for audit and for diagnostics when summary\n        quality varies between models.",
+                "properties": {
+                    "summary_text": {
+                        "description": "Natural-language summary produced by the summarization LLM call.",
+                        "title": "Summary text",
+                        "type": "string"
+                    },
+                    "summarized_through_turn": {
+                        "description": "Running total of conversation items consumed by this and all preceding summaries.",
+                        "minimum": 0,
+                        "title": "Summarized through turn",
+                        "type": "integer"
+                    },
+                    "token_count": {
+                        "description": "Number of tokens in summary_text.",
+                        "minimum": 0,
+                        "title": "Token count",
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "description": "ISO 8601 timestamp recording when this summary was produced.",
+                        "title": "Created at",
+                        "type": "string"
+                    },
+                    "model_used": {
+                        "description": "Fully-qualified model identifier used for the summarization call.",
+                        "title": "Model used",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "summary_text",
+                    "summarized_through_turn",
+                    "token_count",
+                    "created_at",
+                    "model_used"
+                ],
+                "title": "ConversationSummary",
+                "type": "object"
+            }
+        }
+    },
+    "paths": {}
+}

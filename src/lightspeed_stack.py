@@ -28,8 +28,8 @@ def create_argument_parser() -> ArgumentParser:
     - -d / --dump-configuration: dump the loaded configuration to JSON and exit
     - -s / --dump-schema: dump the configuration schema to OpenAPI JSON and exit
     - -m / --dump-models: dump schemas for all models into OpenAPI-compatible file and quit
-    - -gr / --dump-models-group {requests,successful_responses,error_responses,common,agents,
-                      common_responses}
+    - -gr / --dump-models-group {conversation_summary,requests,successful_responses,
+                      error_responses,common,agents,common_responses}
                       dump schemas for selected models group into OpenAPI-compatible file and quit
     - -c / --config: path to the configuration file (default "lightspeed-stack.yaml")
     - -g / --generate-llama-stack-configuration: generate a Llama Stack
@@ -80,6 +80,7 @@ def create_argument_parser() -> ArgumentParser:
         help="dump schemas for selected models group into OpenAPI-compatible file and quit",
         action="store",
         choices=[
+            "conversation_summary",
             "requests",
             "successful_responses",
             "error_responses",
