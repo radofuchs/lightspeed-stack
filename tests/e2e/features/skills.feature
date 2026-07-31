@@ -178,6 +178,60 @@ Feature: Agent skills tests
       }
       """
 
+  # --- GET /v1/skills endpoint ---
+
+  @SkillsConfig
+  Scenario: GET /v1/skills returns metadata for configured skills
+    Given The service uses the lightspeed-stack-skills.yaml configuration
+      And The service is restarted
+    When I access REST API endpoint "skills" using HTTP GET method
+    Then The status code of the response is 200
+      And The body of the response is the following
+      """
+      {
+        "skills": [
+          {
+            "name": "echo",
+            "description": "Echo back the user's input exactly as provided. Use when a user asks to echo, repeat, or mirror text."
+          }
+        ]
+      }
+      """
+
+  Scenario: GET /v1/skills returns an empty list when no skills are configured
+    Given The service uses the lightspeed-stack.yaml configuration
+      And The service is restarted
+    When I access REST API endpoint "skills" using HTTP GET method
+    Then The status code of the response is 200
+      And The body of the response is the following
+      """
+      {
+        "skills": []
+      }
+      """
+
+  @SkillsMultiConfig
+  Scenario: GET /v1/skills discovers all skills in a skills directory
+    Given The service uses the lightspeed-stack-skills-directory.yaml configuration
+      And The service is restarted
+    When I access REST API endpoint "skills" using HTTP GET method
+    Then The status code of the response is 200
+      And The body of the response is the following
+      """
+      {
+        "skills": [
+          {
+            "name": "echo",
+            "description": "Echo back the user's input exactly as provided. Use when a user asks to echo, repeat, or mirror text."
+          },
+          {
+            "name": "summarize",
+            "description": "Summarize text into a concise single-sentence overview. Use when a user asks to summarize, condense, or shorten text."
+          }
+        ]
+      }
+      """
+
   # --- Skill discovery ---
 
   @SkillsConfig
