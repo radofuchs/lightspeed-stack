@@ -102,6 +102,9 @@ def test_pgvector_accepts_int_port_from_env_substitution(
     Llama Stack's replace_env_vars converts digit-only env values to int via
     _convert_string_to_proper_type. LCORE loads config through that helper, so
     port must accept int as well as str / ${env.*} placeholders.
+
+    Parameters:
+        monkeypatch: Fixture that sets and restores environment variables.
     """
     monkeypatch.setenv("PGVECTOR_PORT", "5432")
     resolved = replace_env_vars({"port": "${env.PGVECTOR_PORT:=5432}"})
@@ -129,7 +132,11 @@ def test_pgvector_accepts_int_port_from_env_substitution(
 def test_pgvector_accepts_int_port_from_env_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Unset env with :=default still coerces the default to int and validates."""
+    """Unset env with :=default still coerces the default to int and validates.
+
+    Parameters:
+        monkeypatch: Fixture that removes and restores environment variables.
+    """
     monkeypatch.delenv("PGVECTOR_PORT", raising=False)
     resolved = replace_env_vars({"port": "${env.PGVECTOR_PORT:=5432}"})
     assert resolved["port"] == 5432

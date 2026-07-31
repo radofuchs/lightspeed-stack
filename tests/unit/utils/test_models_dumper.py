@@ -9164,6 +9164,12 @@ def test_dump_models(tmpdir: Path) -> None:
         schemas = components["schemas"]
         assert schemas is not None
 
+        # ByokRag.port accepts str placeholders, int values, and null.
+        port_schema = schemas["ByokRag"]["properties"]["port"]
+        assert {"type": "string"} in port_schema["anyOf"]
+        assert {"type": "integer"} in port_schema["anyOf"]
+        assert {"type": "null"} in port_schema["anyOf"]
+
         # list of schemas expected in a dump
         expected_schemas = (
             "A2AStateConfiguration",
