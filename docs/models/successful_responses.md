@@ -296,6 +296,7 @@ Global service configuration.
 | azure_entra_id |  |  |
 | rlsapi_v1 |  | Configuration for the rlsapi v1 /infer endpoint used by the RHEL Lightspeed Command Line Assistant (CLA). |
 | splunk |  | Splunk HEC configuration for sending telemetry events. |
+| observability |  | OpenTelemetry and observability configuration collected from OTEL_* environment variables. |
 | deployment_environment | string | Deployment environment name (e.g., 'development', 'staging', 'production'). Used in telemetry events. |
 | rag |  | Configuration for all RAG strategies (inline and tool-based). |
 | okp |  | OKP provider settings. Only used when 'okp' is listed in rag.inline or rag.tool. |
@@ -961,6 +962,23 @@ Model representing a response to models request.
 | Field | Type | Description |
 |-------|------|-------------|
 | models | array | List of models available |
+
+
+## ObservabilityConfiguration
+
+
+OpenTelemetry observability configuration.
+
+This configuration is automatically populated from OTEL_* environment variables
+to provide visibility into the active tracing setup.
+
+Attributes:
+    otel: Dictionary of OTEL_* environment variables with secrets redacted.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| otel | object | Active OpenTelemetry configuration from OTEL_* environment variables |
 
 
 ## OkpConfiguration

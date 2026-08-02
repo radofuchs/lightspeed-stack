@@ -694,6 +694,11 @@
                         "description": "Splunk HEC configuration for sending telemetry events.",
                         "title": "Splunk configuration"
                     },
+                    "observability": {
+                        "$ref": "`#/components/schemas/`ObservabilityConfiguration",
+                        "description": "OpenTelemetry and observability configuration collected from OTEL_* environment variables.",
+                        "title": "Observability configuration"
+                    },
                     "deployment_environment": {
                         "default": "development",
                         "description": "Deployment environment name (e.g., 'development', 'staging', 'production'). Used in telemetry events.",
@@ -787,6 +792,15 @@
                                 }
                             ],
                             "name": "lightspeed-stack",
+                            "observability": {
+                                "otel": {
+                                    "OTEL_EXPORTER_OTLP_ENDPOINT": "",
+                                    "OTEL_EXPORTER_OTLP_HEADERS": "api-key=[REDACTED]",
+                                    "OTEL_EXPORTER_OTLP_PROTOCOL": "",
+                                    "OTEL_SDK_DISABLED": "true",
+                                    "OTEL_SERVICE_NAME": ""
+                                }
+                            },
                             "quota_handlers": {
                                 "enable_token_history": false,
                                 "limiters": [],
@@ -2302,6 +2316,22 @@
                     "models"
                 ],
                 "title": "ModelsResponse",
+                "type": "object"
+            },
+            "ObservabilityConfiguration": {
+                "additionalProperties": false,
+                "description": "OpenTelemetry observability configuration.\n\nThis configuration is automatically populated from OTEL_* environment variables\nto provide visibility into the active tracing setup.\n\nAttributes:\n    otel: Dictionary of OTEL_* environment variables with secrets redacted.",
+                "properties": {
+                    "otel": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Active OpenTelemetry configuration from OTEL_* environment variables",
+                        "title": "OpenTelemetry configuration",
+                        "type": "object"
+                    }
+                },
+                "title": "ObservabilityConfiguration",
                 "type": "object"
             },
             "OkpConfiguration": {
