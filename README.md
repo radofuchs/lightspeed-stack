@@ -919,12 +919,19 @@ check-types-tests                 Check type hints in tests only
 check-types                       Checks type hints in sources and tests
 security-check                    Check the project for security issues
 format                            Format the code into unified format
-schema                            Generate OpenAPI schema file stored in docs subdirectory
+schema                            Generate OpenAPI schema file stored in docs/devel_doc subdirectory
 openapi-doc                       Generate OpenAPI documentation
 generate-documentation            Generate or regenerated content of the whole /docs subdirectory
 doc                               Generate or regenerated content of the whole /docs subdirectory
 devel-doc                         Generate documentation for developers
 docs/models                       Generate documentation about models
+docs/models/requests.json         Generate OpenAPI specification with requests models
+docs/models/conversation_summary.json Generate OpenAPI specification with conversation_summary models
+docs/models/successful_responses.json Generate OpenAPI specification with successful_responses models
+docs/models/error_responses.json  Generate OpenAPI specification with error_responses models
+docs/models/common.json           Generate OpenAPI specification with common models
+docs/models/agents.json           Generate OpenAPI specification with agents models
+docs/models/common_responses.json Generate OpenAPI specification with common_responses models
 docs/models/requests.puml         Generate PlantUML class diagram for requests data models
 docs/models/responses.puml        Generate PlantUML class diagram for responses data models
 docs/models/common.puml           Generate PlantUML class diagram for common data models
