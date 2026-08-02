@@ -300,7 +300,7 @@ docs/models/database.svg:	docs/models/database.puml	## Generate a SVG with datab
 	popd
 
 docs/config.puml:	src/models/config.py ## Generate PlantUML class diagram for configuration
-	uv run pyreverse src/models/config.py --output puml --output-directory=docs/
+	uv run pyreverse $< --output puml --output-directory=docs/
 	mv docs/classes.puml docs/config.puml
 
 # Omit --theme rose on the CLI: it fails with some plantuml.jar builds on pyreverse output.
