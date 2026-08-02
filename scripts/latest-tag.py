@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Script to retrieve latest tag defined on GitHub."""
+
 import os
 import subprocess
 from typing import Optional
