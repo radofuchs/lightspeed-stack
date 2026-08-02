@@ -30,6 +30,7 @@ def get_latest_stable() -> Optional[str]:
 
 
 def main() -> None:
+    """Entry point to this script, retrieves latest tag defined on GitHub."""
     if not (current_tag := os.environ.get("GIT_TAG")):
         reason = "GIT_TAG environment variable not set, skipping latest tag"
         apply_latest = "false"
