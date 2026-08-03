@@ -1,86 +1,33 @@
-"""Utility functions for working with Llama Stack shields."""
+"""Utility helpers for shield override validation and moderation."""
 
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import HTTPException
-from llama_stack_api import OpenAIResponseMessage
-from llama_stack_client import (
-    APIConnectionError,
-    AsyncLlamaStackClient,
-)
-from llama_stack_client import (
-    APIStatusError as LLSApiStatusError,
-)
-from llama_stack_client.types import ShieldListResponse
-from openai._exceptions import APIStatusError as OpenAIAPIStatusError
+from ogx_client import AsyncOgxClient
+from pydantic_ai.exceptions import AgentRunError
 
 from configuration import AppConfig
-from constants import DEFAULT_VIOLATION_MESSAGE
 from log import get_logger
-from metrics import recording
 from models.api.requests import QueryRequest
 from models.api.responses.error import (
-    InternalServerErrorResponse,
     NotFoundResponse,
-    ServiceUnavailableResponse,
     UnprocessableEntityResponse,
 )
 from models.common.moderation import (
-    ShieldModerationBlocked,
     ShieldModerationPassed,
     ShieldModerationResult,
 )
-from utils.query import handle_known_apistatus_errors
+from models.config import QuestionValidityConfig, RedactionConfig, ShieldConfiguration
+from pydantic_ai_lightspeed.capabilities.base import AbstractSafetyCapability
+from pydantic_ai_lightspeed.capabilities.question_validity._capability import (
+    QuestionValidity,
+)
+from pydantic_ai_lightspeed.capabilities.redaction._capability import (
+    PiiRedactionCapability,
+)
+from utils.agents.error_handler import map_agent_inference_error
 
 logger = get_logger(__name__)
-
-
-async def get_available_shields(client: AsyncLlamaStackClient) -> list[str]:
-    """
-    Discover and return available shield identifiers.
-
-    Parameters:
-    ----------
-        client: The Llama Stack client to query for available shields.
-
-    Returns:
-    -------
-        list[str]: List of available shield identifiers; empty if no shields are available.
-    """
-    available_shields = [shield.identifier for shield in await client.shields.list()]
-    if not available_shields:
-        logger.info("No available shields. Disabling safety")
-    else:
-        logger.info("Available shields: %s", available_shields)
-    return available_shields
-
-
-def detect_shield_violations(output_items: list[Any]) -> bool:
-    """
-    Check output items for shield violations and update metrics.
-
-    Iterates through output items looking for message items with refusal
-    attributes. If a refusal is found, increments the validation error
-    metric and logs a warning.
-
-    Parameters:
-    ----------
-        output_items: List of output items from the LLM response to check.
-
-    Returns:
-    -------
-        bool: True if a shield violation was detected, False otherwise.
-    """
-    for output_item in output_items:
-        item_type = getattr(output_item, "type", None)
-        if item_type == "message":
-            refusal = getattr(output_item, "refusal", None)
-            if refusal:
-                # Metric for LLM validation errors (shield violations)
-                recording.record_llm_validation_error()
-                logger.warning("Shield violation detected: %s", refusal)
-                return True
-    return False
 
 
 def validate_shield_ids_override(
@@ -119,11 +66,68 @@ def validate_shield_ids_override(
         raise HTTPException(**response.model_dump())
 
 
-async def run_shield_moderation(
-    client: AsyncLlamaStackClient,
+async def run_shield_moderation_v2(
     input_text: str,
-    endpoint_path: str,
-    shield_ids: Optional[list[str]] = None,
+    shield_configs: list[ShieldConfiguration],
+    selected_shield_ids: Optional[list[str]] = None,
+) -> ShieldModerationResult:
+    """Run v2 shield moderation on input text.
+
+    Iterates through configured shields and runs moderation checks.
+
+    Parameters:
+        input_text: The text to moderate.
+        shield_configs: List of shield configurations to evaluate.
+        selected_shield_ids: Optional list of shield names to filter by.
+
+    Returns:
+        Result indicating if content was blocked or passed.
+    """
+    selected_shield_configs = get_shields_for_request(
+        shield_configs, selected_shield_ids
+    )
+
+    for shield_config in selected_shield_configs:
+        shield = build_shield(shield_config)
+
+        try:
+            shield_result = await shield.run(input_text)
+        # APIConnectionError and APIStatusError from ogx should not be raised from model_request,
+        # because they will be caught inside AsyncOpenAI and transferred into openai's
+        # APIConnectionError. The openai's exceptions will further transferred into ModelHTTPError
+        # or ModelAPIError by _map_api_errors in OpenAIResponseModel.
+        except (AgentRunError, RuntimeError) as exc:
+            model_id = getattr(shield_config.config, "model_id", "unknown-shield-model")
+            response = map_agent_inference_error(exc, model_id)
+            raise HTTPException(**response.model_dump()) from exc
+
+        if shield_result.decision == "blocked":
+            return shield_result
+
+    return ShieldModerationPassed()
+
+
+def build_shield(shield_config: ShieldConfiguration) -> AbstractSafetyCapability:
+    """Build a safety capability instance from a shield configuration.
+
+    Parameters:
+        shield_config: The shield configuration to build from.
+
+    Returns:
+        The constructed safety capability.
+    """
+    match shield_config.config:
+        case QuestionValidityConfig():
+            return QuestionValidity(shield_config.config)
+        case RedactionConfig():
+            return PiiRedactionCapability(shield_config.config)
+
+
+async def run_shield_moderation(
+    _client: AsyncOgxClient,
+    _input_text: str,
+    _endpoint_path: str,
+    _shield_ids: Optional[list[str]] = None,
 ) -> ShieldModerationResult:
     """
     Run shield moderation on input text.
@@ -147,150 +151,43 @@ async def run_shield_moderation(
     ------
         HTTPException: If shield's provider_resource_id is not configured or model not found.
     """
-    shields_to_run = await get_shields_for_request(client, shield_ids)
-    available_models = {model.id for model in await client.models.list()}
-    for shield in shields_to_run:
-        # Lightspeed safety providers configure their model internally
-        # so provider_resource_id is not necessarily a valid model ID.
-        if shield.provider_id == "llama-guard" and (
-            not shield.provider_resource_id
-            or shield.provider_resource_id not in available_models
-        ):
-            logger.error("Shield model not found: %s", shield.provider_resource_id)
-            response = NotFoundResponse(
-                resource="Shield model", resource_id=shield.provider_resource_id or ""
-            )
-            raise HTTPException(**response.model_dump())
-
-        try:
-            moderation_result = await client.moderations.create(
-                input=input_text, model=shield.provider_resource_id
-            )
-        except APIConnectionError as e:
-            error_response = ServiceUnavailableResponse(
-                backend_name="Llama Stack",
-                cause=str(e),
-            )
-            raise HTTPException(**error_response.model_dump()) from e
-        except (LLSApiStatusError, OpenAIAPIStatusError) as e:
-            error_response = handle_known_apistatus_errors(
-                e, shield.provider_resource_id or ""
-            )
-            raise HTTPException(**error_response.model_dump()) from e
-
-        if moderation_result.results and moderation_result.results[0].flagged:
-            result = moderation_result.results[0]
-            recording.record_llm_validation_error(endpoint_path)
-            logger.warning(
-                "Shield '%s' flagged content: categories=%s",
-                shield.identifier,
-                result.categories,
-            )
-            violation_message = result.user_message or DEFAULT_VIOLATION_MESSAGE
-            return ShieldModerationBlocked(
-                message=violation_message,
-                moderation_id=moderation_result.id,
-                refusal_response=create_refusal_response(violation_message),
-            )
-
+    # Currently stubbed to always pass until LCS-owned input shields are wired.
     return ShieldModerationPassed()
 
 
-async def append_turn_to_conversation(
-    client: AsyncLlamaStackClient,
-    conversation_id: str,
-    user_message: str,
-    assistant_message: str,
-) -> None:
-    """
-    Append a user/assistant turn to a conversation after shield violation.
-
-    Used to record the conversation turn when a shield blocks the request,
-    storing both the user's original message and the violation response.
-
-    Parameters:
-    ----------
-        client: The Llama Stack client.
-        conversation_id: The Llama Stack conversation ID.
-        user_message: The user's input message.
-        assistant_message: The shield violation response message.
-    """
-    try:
-        await client.conversations.items.create(
-            conversation_id,
-            items=[
-                {"type": "message", "role": "user", "content": user_message},
-                {"type": "message", "role": "assistant", "content": assistant_message},
-            ],
-        )
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="Llama Stack",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
-    except LLSApiStatusError as e:
-        error_response = InternalServerErrorResponse.generic()
-        raise HTTPException(**error_response.model_dump()) from e
-
-
-def create_refusal_response(refusal_message: str) -> OpenAIResponseMessage:
-    """Create a refusal response message object.
-
-    Args:
-        refusal_message: The refusal message text.
-
-    Returns:
-        OpenAIResponseMessage with refusal message.
-    """
-    return OpenAIResponseMessage(
-        role="assistant",
-        content=refusal_message,
-    )
-
-
-async def get_shields_for_request(
-    client: AsyncLlamaStackClient,
+def get_shields_for_request(
+    shields: list[ShieldConfiguration],
     shield_ids: Optional[list[str]] = None,
-) -> ShieldListResponse:
-    """Resolve shields for the request: filtered by shield_ids or all configured.
+) -> list[ShieldConfiguration]:
+    """Return configured shields, optionally filtered by request shield_ids.
 
     Args:
-        client: Llama Stack client.
-        shield_ids: Optional list of shield IDs. If provided, only shields
-            with these identifiers are returned; if None, all configured
-            shields are returned.
+        shields: Configured LCS shields.
+        shield_ids: Optional list of shield names. If None, all shields are
+            returned. An empty list skips all shields. Otherwise only shields
+            whose name is in this list are returned.
 
     Returns:
-        ShieldListResponse: List of Shield objects to run for this request.
+        list[ShieldConfiguration]: Shield configurations to run for this request.
 
     Raises:
-        HTTPException: 404 if shield_ids is provided and any requested
-            shield is not configured in Llama Stack.
+        HTTPException: 404 if shield_ids is provided and any requested shield
+            name is not present in shields.
     """
+    if shield_ids is None:
+        return list(shields)
+
     if shield_ids == []:
         return []
-    try:
-        configured_shields: ShieldListResponse = await client.shields.list()
-        if shield_ids is None:
-            return configured_shields
-        requested = set(shield_ids)
-        configured_ids = {s.identifier for s in configured_shields}
-        missing = requested - configured_ids
-        if missing:
-            response = NotFoundResponse(
-                resource=f"Shield{'s' if len(missing) > 1 else ''}",
-                resource_id=", ".join(missing),
-            )
-            raise HTTPException(**response.model_dump())
 
-        return [s for s in configured_shields if s.identifier in requested]
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="Llama Stack",
-            cause=str(e),
+    requested = set(shield_ids)
+    configured_names = {shield.name for shield in shields}
+    missing = requested - configured_names
+    if missing:
+        response = NotFoundResponse(
+            resource=f"Shield{'s' if len(missing) > 1 else ''}",
+            resource_id=", ".join(sorted(missing)),
         )
-        raise HTTPException(**error_response.model_dump()) from e
-    except LLSApiStatusError as e:
-        error_response = InternalServerErrorResponse.generic()
-        raise HTTPException(**error_response.model_dump()) from e
+        raise HTTPException(**response.model_dump())
+
+    return [shield for shield in shields if shield.name in requested]

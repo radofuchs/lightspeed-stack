@@ -11,7 +11,7 @@ from functools import singledispatch
 from typing import Any, Final, Optional, TypeAlias, cast
 
 from fastapi import HTTPException
-from llama_stack_client import APIConnectionError, APIStatusError
+from ogx_client import APIConnectionError, APIStatusError
 from pydantic_ai import Agent, AgentRunError, AgentRunResultEvent, ToolReturnPart
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -46,12 +46,12 @@ from models.common.responses import ResponseInput
 from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.turn_summary import TurnSummary
+from utils.agents.error_handler import map_agent_inference_error
 from utils.agents.query import (
     AgentFinishReason,
     extract_agent_token_usage,
     get_agent_finish_reason,
     get_finish_reason_error,
-    map_agent_inference_error,
 )
 from utils.agents.tool_processor import (
     process_function_tool_call,
@@ -130,7 +130,11 @@ async def retrieve_agent_response_generator(
             )
 
         agent = build_agent(
-            context.client, responses_params, configuration.skills, no_tools=no_tools
+            context.client,
+            responses_params,
+            configuration,
+            shields=context.query_request.shield_ids,
+            no_tools=no_tools,
         )
 
         return (

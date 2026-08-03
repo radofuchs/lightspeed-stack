@@ -7,7 +7,8 @@ from typing import Any
 
 import pytest
 from fastapi import Request
-from llama_stack_client.types import VersionInfo
+from ogx_client.types import ListModelsResponse, VersionInfo
+from ogx_client.types.model import Model
 from pytest_mock import AsyncMockType, MockerFixture
 
 import constants
@@ -98,13 +99,20 @@ def _build_base_mock_client(mocker: MockerFixture) -> Any:
     mock_client = mocker.AsyncMock()
 
     # Model list
-    mock_model = mocker.MagicMock()
-    mock_model.id = "test-provider/test-model"
-    mock_model.custom_metadata = {
-        "provider_id": "test-provider",
-        "model_type": "llm",
-    }
-    mock_client.models.list.return_value = [mock_model]
+    mock_client.models.list.return_value = ListModelsResponse.model_construct(
+        data=[
+            Model.model_construct(
+                id="test-provider/test-model",
+                created=0,
+                owned_by="test",
+                object="model",
+                custom_metadata={
+                    "provider_id": "test-provider",
+                    "model_type": "llm",
+                },
+            )
+        ]
+    )
 
     # Shields (empty)
     mock_client.shields.list.return_value = []
@@ -150,7 +158,7 @@ def mock_byok_client_fixture(
         output_tokens=20,
     )
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     # BYOK vector_io returns results
@@ -177,7 +185,7 @@ def mock_byok_tool_rag_client_fixture(
     Configures vector_stores.list with a BYOK store and agent.run to return
     a file_search tool result alongside the assistant message.
     """
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     # vector_io returns empty (no inline RAG)
@@ -429,7 +437,7 @@ async def test_query_byok_inline_rag_with_request_vector_store_ids(
     test_config.configuration.byok_rag = [entry_a, entry_b]
     test_config.configuration.rag.inline = ["source-a"]
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     mock_client.vector_io.query = mocker.AsyncMock(
@@ -502,7 +510,7 @@ async def test_query_byok_request_vector_store_ids_filters_configured_stores(
     test_config.configuration.byok_rag = [entry_a, entry_b]
     test_config.configuration.rag.inline = ["source-a", "source-b"]
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     mock_client.vector_io.query = mocker.AsyncMock(
@@ -765,7 +773,7 @@ async def test_query_byok_combined_inline_and_tool_rag(  # pylint: disable=too-m
     test_config.configuration.rag.tool = ["test-knowledge"]
 
     # Mock Llama Stack client
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     # Inline RAG returns chunks via vector_io
@@ -874,7 +882,7 @@ async def test_query_byok_inline_rag_only_configured_rag_id_is_queried(
     test_config.configuration.byok_rag = [entry_a, entry_b]
     test_config.configuration.rag.inline = ["source-a"]
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     mock_client.vector_io.query = mocker.AsyncMock(
@@ -960,7 +968,7 @@ async def test_query_byok_score_multiplier_shifts_chunk_priority(  # pylint: dis
     test_config.configuration.byok_rag = [entry_a, entry_b]
     test_config.configuration.rag.inline = ["source-a", "source-b"]
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     # Source A: high base similarity
@@ -1062,7 +1070,7 @@ async def test_query_rag_content_limit_caps_retrieved_results(  # pylint: disabl
     # Disable reranker for this test since it's testing chunk capping, not reranking
     test_config.configuration.reranker.enabled = False
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     # Generate more chunks than INLINE_RAG_MAX_CHUNKS
@@ -1156,7 +1164,7 @@ async def test_query_rag_content_limit_caps_across_multiple_sources(  # pylint: 
     test_config.configuration.byok_rag = [entry_a, entry_b]
     test_config.configuration.rag.inline = ["source-a", "source-b"]
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     # Overlapping score bands so top-k must pick from both sources
@@ -1263,7 +1271,7 @@ async def test_query_rag_content_limit_caps_inline_rag(  # pylint: disable=too-m
     test_config.configuration.rag.inline = ["big-source"]
     test_config.configuration.reranker.enabled = False
 
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
     mock_client = _build_base_mock_client(mocker)
 
     num_chunks = constants.BYOK_RAG_MAX_CHUNKS

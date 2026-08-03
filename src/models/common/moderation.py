@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseMessage as ResponseMessage,
 )
 from pydantic import BaseModel, Field
@@ -20,7 +20,14 @@ class ShieldModerationBlocked(BaseModel):
     decision: Literal["blocked"] = "blocked"
     message: str
     moderation_id: str
-    refusal_response: ResponseMessage
+
+    @property
+    def refusal_response(self) -> ResponseMessage:
+        """Build a ResponseMessage carrying the shield's refusal text."""
+        return ResponseMessage(
+            role="assistant",
+            content=self.message,
+        )
 
 
 ShieldModerationResult = Annotated[

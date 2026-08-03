@@ -2143,8 +2143,7 @@ def test_dump_models(tmpdir: Path) -> None:
                         "computer_call_output.output.image_url",
                         "file_search_call.results",
                         "message.input_image.image_url",
-                        "message.output_text.logprobs",
-                        "reasoning.encrypted_content"
+                        "message.output_text.logprobs"
                     ],
                     "type": "string"
                 },
@@ -2298,7 +2297,7 @@ def test_dump_models(tmpdir: Path) -> None:
                                     "type": "string"
                                 },
                                 {
-                                    "$ref": "`#/components/schemas/`llama_stack_api__openai_responses__ApprovalFilter"
+                                    "$ref": "`#/components/schemas/`ogx_api__openai_responses__ApprovalFilter"
                                 }
                             ],
                             "default": "never",
@@ -7332,7 +7331,7 @@ def test_dump_models(tmpdir: Path) -> None:
                         {
                             "detail": {
                                 "cause": "Connection error while trying to reach backend service.",
-                                "response": "Unable to connect to Llama Stack"
+                                "response": "Unable to connect to OGX"
                             },
                             "label": "llama stack"
                         },
@@ -9085,7 +9084,7 @@ def test_dump_models(tmpdir: Path) -> None:
                     "title": "VectorStoresListResponse",
                     "type": "object"
                 },
-                "llama_stack_api__openai_responses__ApprovalFilter": {
+                "ogx_api__openai_responses__ApprovalFilter": {
                     "description": "Filter configuration for MCP tool approval requirements.\n\n:param always: (Optional) List of tool names that always require approval\n:param never: (Optional) List of tool names that never require approval",
                     "properties": {
                         "always": {
@@ -9172,6 +9171,7 @@ def test_dump_models(tmpdir: Path) -> None:
             "BadRequestResponse",
             "ByokRag",
             "CORSConfiguration",
+            "CatalogShield",
             "CompactionConfiguration",
             "Configuration",
             "ConfigurationResponse",

@@ -6,7 +6,7 @@ import yaml
 
 # We want to support environment variable replacement in the configuration
 # similarly to how it is done in llama-stack, so we use their function directly
-from llama_stack.core.stack import replace_env_vars
+from ogx.core.stack import replace_env_vars
 
 import constants
 from cache.cache import Cache
@@ -32,6 +32,7 @@ from models.config import (
     RerankerConfiguration,
     RlsapiV1Configuration,
     ServiceConfiguration,
+    ShieldConfiguration,
     SkillsConfiguration,
     SplunkConfiguration,
     UserDataCollection,
@@ -173,10 +174,10 @@ class AppConfig:  # pylint: disable=too-many-public-methods
 
     @property
     def llama_stack_configuration(self) -> LlamaStackConfiguration:
-        """Return Llama stack configuration.
+        """Return Llama Stack configuration.
 
         Returns:
-            LlamaStackConfiguration: The configured Llama stack settings.
+            LlamaStackConfiguration: The configured Llama Stack settings.
 
         Raises:
             LogicError: If the application configuration has not been loaded.
@@ -552,6 +553,13 @@ class AppConfig:  # pylint: disable=too-many-public-methods
         if self._configuration is None:
             raise LogicError("logic error: configuration is not loaded")
         return self._configuration.skills
+
+    @property
+    def shields(self) -> list[ShieldConfiguration]:
+        """Return the list of configured guardrail shields."""
+        if self._configuration is None:
+            raise LogicError("logic error: configuration is not loaded")
+        return self._configuration.shields
 
     @property
     def rag_id_mapping(self) -> dict[str, str]:

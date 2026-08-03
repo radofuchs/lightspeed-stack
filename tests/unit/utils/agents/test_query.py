@@ -6,10 +6,7 @@ from typing import Any, Optional
 
 import pytest
 from fastapi import HTTPException
-from llama_stack_api.openai_responses import (
-    OpenAIResponseMessage as ResponseMessage,
-)
-from llama_stack_client import APIConnectionError, APIStatusError
+from ogx_client import APIConnectionError, APIStatusError
 from pydantic_ai.messages import (
     FinishReason,
     ImageUrl,
@@ -112,10 +109,6 @@ def blocked_moderation_fixture() -> ShieldModerationBlocked:
     return ShieldModerationBlocked(
         message="Content blocked by shield.",
         moderation_id="modr-test-456",
-        refusal_response=ResponseMessage(
-            role="assistant",
-            content="Content blocked by shield.",
-        ),
     )
 
 
@@ -530,7 +523,7 @@ class TestRetrieveAgentResponse:
             "detail": {"response": "Quota exceeded", "cause": "quota exceeded"},
         }
         mocker.patch(
-            "utils.agents.query.handle_known_apistatus_errors",
+            "utils.agents.error_handler.handle_known_apistatus_errors",
             return_value=mock_error,
         )
 
