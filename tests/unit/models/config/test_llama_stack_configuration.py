@@ -374,8 +374,20 @@ def _unified_body(config_dict: dict[str, Any]) -> dict[str, Any]:
     return config_dict
 
 
+def _clear_synthesis_inputs(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Explicitly empty both provider lists the unified detection looks at.
+
+    The base fixture carries neither section today, but the legacy/remote
+    helpers must not silently become unified-shaped if it ever gains one.
+    """
+    config_dict["inference"] = {"providers": []}
+    config_dict["vector_store"] = {"providers": []}
+    return config_dict
+
+
 def _legacy_body(config_dict: dict[str, Any]) -> dict[str, Any]:
     """Give the base config a legacy shape (external run.yaml path)."""
+    config_dict = _clear_synthesis_inputs(config_dict)
     config_dict["llama_stack"] = {
         "use_as_library_client": True,
         "library_client_config_path": "tests/configuration/run.yaml",
@@ -385,6 +397,7 @@ def _legacy_body(config_dict: dict[str, Any]) -> dict[str, Any]:
 
 def _remote_body(config_dict: dict[str, Any]) -> dict[str, Any]:
     """Give the base config a remote shape (url only, no synthesis input)."""
+    config_dict = _clear_synthesis_inputs(config_dict)
     config_dict["llama_stack"] = {
         "use_as_library_client": False,
         "url": "http://localhost:8321",
@@ -451,4 +464,67 @@ def test_root_rejects_unknown_config_format_version_value() -> None:
     config_dict = _unified_body(_base_config_dict())
     config_dict["config_format_version"] = "v2"
     with pytest.raises(ValidationError, match="Input should be 'legacy' or 'unified'"):
+        Configuration(**config_dict)
+
+
+def test_root_accepts_unified_marker_with_vector_store_providers_body() -> None:
+    """'unified' agrees with a body whose only synthesis input is vector_store."""
+    config_dict = _base_config_dict()
+    config_dict["llama_stack"] = {"use_as_library_client": True}
+    config_dict["inference"] = {"providers": []}
+    config_dict["vector_store"] = {
+        "default_provider": "notebooks",
+        "providers": [
+            {
+                "id": "notebooks",
+                "type": "faiss",
+                "embedding_model": "/rag-content/embeddings_model",
+                "embedding_dimension": 768,
+                "config": {"path": "/var/lib/notebooks.db"},
+            }
+        ],
+    }
+    config_dict["config_format_version"] = "unified"
+    cfg = Configuration(**config_dict)
+    assert cfg.config_format_version == "unified"
+
+
+def test_root_accepts_unified_marker_with_config_block_body() -> None:
+    """'unified' agrees with a body whose only synthesis input is llama_stack.config."""
+    config_dict = _clear_synthesis_inputs(_base_config_dict())
+    config_dict["llama_stack"] = {
+        "use_as_library_client": True,
+        "config": {"baseline": "default"},
+    }
+    config_dict["config_format_version"] = "unified"
+    cfg = Configuration(**config_dict)
+    assert cfg.config_format_version == "unified"
+
+
+def test_missing_run_source_error_precedes_marker_check() -> None:
+    """Library mode without a run source fails on that, not on the marker.
+
+    A 'unified' marker on a sourceless library config is also a mismatch,
+    but the missing-run-source check runs first and its error must win.
+    """
+    config_dict = _clear_synthesis_inputs(_base_config_dict())
+    config_dict["llama_stack"] = {"use_as_library_client": True}
+    config_dict["config_format_version"] = "unified"
+    with pytest.raises(ValidationError, match="requires a run-configuration source"):
+        Configuration(**config_dict)
+
+
+def test_mutual_exclusion_error_precedes_marker_check() -> None:
+    """Ambiguous unified+legacy bodies fail on mutual exclusion, not the marker.
+
+    A 'legacy' marker on such a body is also a mismatch (the body carries a
+    synthesis input), but the mutual-exclusion check runs first and its
+    --migrate-config guidance must win.
+    """
+    config_dict = _unified_body(_base_config_dict())
+    config_dict["llama_stack"][
+        "library_client_config_path"
+    ] = "tests/configuration/run.yaml"
+    config_dict["config_format_version"] = "legacy"
+    with pytest.raises(ValidationError, match="mutually exclusive"):
         Configuration(**config_dict)
