@@ -138,16 +138,52 @@ model". Landscape details in
 
 | Option | Description |
 |--------|-------------|
-| A — IBM Granite Guardian (3.3-8B / 4.1-8B) | Apache 2.0. Jailbreak + harm categories + RAG relevance triad + custom criteria (BYOC) in one model. GuardBench leader. In production for Ask RH today. |
-| B — Meta Llama Guard 4 | Strong MLCommons-taxonomy content safety; no custom risks, no RAG checks; gated Llama community license. |
-| C — Meta Prompt Guard 2 (22M/86M) | Excellent cheap injection/jailbreak classifier; not a content-safety model; gated Llama license. |
+| A — IBM Granite Guardian (3.3-8B / 4.1-8B) | **Apache 2.0** (the only permissively-licensed option here). Content safety + the RAG-risk triad (context relevance, groundedness, answer relevance) + function-calling-hallucination + custom criteria (BYOC) in one model. In production at Ask Red Hat today. |
+| B — Meta Llama Guard 4 | Strong MLCommons-taxonomy content safety; no custom risks, no RAG checks; **gated Llama community license**. |
+| C — Meta Prompt Guard 2 (22M/86M) | Excellent cheap injection/jailbreak classifier; not a content-safety model; **gated Llama license**. |
+| — Google ShieldGemma | Content-policy classifier; **custom, use-restricted Gemma license (not OSI)**. |
 
 **Recommendation**: **A** — Granite Guardian: 4.1-8B as the forward
 recommendation, 3.3-8B as the production-validated reference (Ask RH).
-Document Prompt Guard 2 as an *optional* low-latency pre-filter for
-deployments whose license posture allows it; do not make it the default.
 
-**Confidence**: 90%
+The recommendation rests on **three independently-verifiable pillars**, not
+a single leaderboard (see [background](#guardian-model-landscape) for
+sources):
+
+1. **License** — Granite Guardian is Apache 2.0 and un-gated; every leading
+   alternative is gated under a use-restricted license (Meta community
+   licenses for Llama Guard / Prompt Guard, Google's Gemma license for
+   ShieldGemma). Under a "must be permissively licensed" bar for a Red Hat
+   product, it is the *only survivor* — this is the strongest and most
+   durable argument, and it matches the reviewer steer that Meta-licensed
+   models are out of scope.
+2. **Coverage** — it carries capabilities pure content-safety models lack:
+   the RAG-risk triad (which the Ask Red Hat output checks depend on) and
+   function-calling-hallucination detection for agentic/tool use. On the
+   live **LLM-AggreFact** grounded-factuality leaderboard, Granite Guardian
+   3.3-8B ranks **3rd** (avg 76.5), behind only Bespoke-MiniCheck-7B and
+   Claude-3.5 Sonnet.
+3. **Adoption** — already in production at Ask Red Hat for input safety
+   screening (the migration this feature unblocks).
+
+**Honest caveat**: on *pure content-safety recall* Granite Guardian is
+competitive but **not** best-in-class — an independent ICLR-2026 workshop
+benchmark ([Domyn](https://arxiv.org/html/2605.28830v1), the paper raised
+in review) places it mid-pack (~5th of 14), with recall-optimized models
+like Qwen Guard leading. We recommend it on the combined license +
+RAG-coverage + adoption basis above, not on a content-safety crown. The
+earlier "tops GuardBench" framing is **retired**: that claim traced to an
+IBM vendor blog, and the GuardBench public leaderboard is currently down
+(the GuardBench *results dataset* remains citable). Prompt Guard 2 stays a
+possible low-latency injection pre-filter only where its Meta license is
+acceptable — not a Red Hat default.
+
+**Confidence**: 85% — the recommendation is robust on license and adoption
+(near-certain) and on RAG coverage; the small reduction from the earlier
+90% reflects that Granite is *not* the content-safety recall leader, so a
+reviewer optimizing purely for harmful-content recall could reasonably
+prefer a different model. For Lightspeed's RAG + agentic profile and
+Red Hat's licensing bar, Granite Guardian remains the right call.
 
 ### Decision S4: Fate of LCORE-2710 ("AskRedHat Custom Guardrails" Epic)
 
@@ -993,17 +1029,38 @@ not by an upstream llama-stack provider.
 
 ### Guardian model landscape
 
-- **IBM Granite Guardian** (Apache 2.0): 3.x (2B/5B/8B, 3.3 adds thinking
-  mode) and 4.1-8B (April 2026, improved bring-your-own-criteria). Detects
-  harm umbrella (bias, profanity, violence, sexual content, unethical
-  behavior), jailbreak, RAG hallucination triad (context relevance,
-  groundedness, answer relevance), function-call hallucination; custom
-  criteria via BYOC. Generative classifier: risk selected via chat
-  template, constrained yes/no verdict. GuardBench leader (six of top-10
-  slots). No dedicated indirect-injection criterion.
-- **Meta Llama Guard 4** (12B, Llama community license): MLCommons S1–S14
-  content-safety taxonomy, prompts and responses; no custom risks, no RAG
-  checks.
+- **IBM Granite Guardian** (Apache 2.0, un-gated): 3.x (2B/5B/8B, 3.3 adds
+  thinking mode) and 4.1-8B (April 2026, improved bring-your-own-criteria).
+  Detects harm umbrella (bias, profanity, violence, sexual content,
+  unethical behavior), jailbreak, RAG hallucination triad (context
+  relevance, groundedness, answer relevance), function-call hallucination;
+  custom criteria via BYOC. Generative classifier: risk selected via chat
+  template, constrained yes/no verdict. No dedicated indirect-injection
+  criterion. **Standing (verified live, 2026-08):**
+  - *Grounded factuality* — ranks **3rd** on the
+    [LLM-AggreFact leaderboard](https://llm-aggrefact.github.io/)
+    (Granite Guardian 3.3-8B, avg 76.5), an independent, currently-live
+    source; reflects RAG-faithfulness coverage the content-safety-only
+    models lack.
+  - *Content-safety recall* — **mid-pack (~5th of 14)** in the independent
+    [Domyn ICLR-2026 workshop benchmark](https://arxiv.org/html/2605.28830v1);
+    recall-optimized models (Qwen Guard) lead. So Granite is competitive,
+    not the safety-recall leader.
+  - *GuardBench* — the [public leaderboard](https://huggingface.co/spaces/AmenRa/guardbench-leaderboard)
+    is **currently down** (runtime error), and the "six of top-10" figure
+    came from an [IBM vendor blog](https://research.ibm.com/blog/granite-guardian-tops-guardbench),
+    so it is retired as a primary citation. The
+    [GuardBench results dataset](https://huggingface.co/datasets/AmenRa/guardbench-results)
+    (Apache 2.0) is still citable and shows Granite Guardian 3.2-5B at
+    0.8797 F1 on English prompts.
+  - *Adoption* — Granite Guardian 3.3-8B is in production at Ask Red Hat
+    for input safety screening ([Red Hat technology attributions](https://access.redhat.com/articles/7123868)).
+- **Meta Llama Guard 4** (12B, **gated** Llama community license): MLCommons
+  S1–S14 content-safety taxonomy, prompts and responses; no custom risks,
+  no RAG checks.
+- **Google ShieldGemma** (2B/9B, **custom use-restricted Gemma license**,
+  not OSI): content-policy classifier; out of scope on licensing for a
+  Red Hat product.
 - **Meta Prompt Guard 2** (22M/86M classifiers, Llama license): dedicated
   jailbreak/injection detector for prompts and third-party content; 86M:
   97.5% recall @ 1% FPR, ~92 ms on GPU; 22M CPU-friendly (~19 ms). The
