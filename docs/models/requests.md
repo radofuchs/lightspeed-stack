@@ -232,6 +232,8 @@ URL citation annotation for referencing external web resources.
 ## OpenAIResponseAnnotationContainerFileCitation
 
 
+Container file citation annotation referencing a file within a container.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -264,6 +266,8 @@ File citation annotation for referencing specific files in response content.
 
 ## OpenAIResponseAnnotationFilePath
 
+
+File path annotation referencing a generated file in response content.
 
 
 | Field | Type | Description |
@@ -438,6 +442,8 @@ Forces the model to call a specific tool on a remote MCP server
 ## OpenAIResponseInputToolChoiceMode
 
 
+Enumeration of simple tool choice modes for response generation.
+
 
 
 
@@ -562,6 +568,8 @@ scenarios.
 ## OpenAIResponseOutputMessageContentOutputText
 
 
+Text content within an output message of an OpenAI response.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -680,6 +688,45 @@ MCP list tools output message containing available tools from an MCP server.
 | tools | array |  |
 
 
+## OpenAIResponseOutputMessageReasoningContent
+
+
+Reasoning text from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The reasoning text content from the model. |
+| type | string | The type identifier, always 'reasoning_text'. |
+
+
+## OpenAIResponseOutputMessageReasoningItem
+
+
+Reasoning output from the model, representing the model's thinking process.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique identifier for the reasoning output item. |
+| summary | array | Summary of the reasoning output. |
+| type | string | The type identifier, always 'reasoning'. |
+| content | array | The reasoning content from the model. |
+| status | string | The status of the reasoning output. |
+
+
+## OpenAIResponseOutputMessageReasoningSummary
+
+
+A summary of reasoning output from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The summary text of the reasoning output. |
+| type | string | The type identifier, always 'summary_text'. |
+
+
 ## OpenAIResponseOutputMessageWebSearchToolCall
 
 
@@ -729,6 +776,7 @@ Controls how much reasoning the model performs before generating a response.
 | Field | Type | Description |
 |-------|------|-------------|
 | effort | string |  |
+| summary | string | Summary mode for reasoning output. One of 'auto', 'concise', or 'detailed'. |
 
 
 ## OpenAIResponseText
@@ -737,11 +785,13 @@ Controls how much reasoning the model performs before generating a response.
 Text response configuration for OpenAI responses.
 
 :param format: (Optional) Text format configuration specifying output format requirements
+:param verbosity: (Optional) Controls response verbosity level
 
 
 | Field | Type | Description |
 |-------|------|-------------|
 | format |  |  |
+| verbosity | string |  |
 
 
 ## OpenAIResponseTextFormat
@@ -913,7 +963,7 @@ Attributes:
     generate_topic_summary: LCORE-specific flag indicating whether to generate a
         topic summary for new conversations. Defaults to True.
     shield_ids: LCORE-specific list of configured shield names to apply.
-            If None, all configured shields are used.
+        If None, all configured shields are used.
     solr: Optional Solr inline RAG options (mode, filters) or legacy filter-only dict.
 
 
@@ -1088,7 +1138,7 @@ Examples:
 :param ranker: (Optional) Name of the ranking algorithm to use. Supported values:
     - "weighted": Weighted combination of vector and keyword scores
     - "rrf": Reciprocal Rank Fusion algorithm
-    - "neural": Neural reranking model (requires model parameter, Part II)
+    - "neural": Neural reranking model (requires model parameter)
     Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.
 :param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0
 :param alpha: (Optional) Weight factor for weighted ranker (0-1).
@@ -1103,10 +1153,10 @@ Examples:
     Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.
 :param weights: (Optional) Dictionary of weights for combining different signal types.
     Keys can be "vector", "keyword", "neural". Values should sum to 1.0.
-    Used when combining algorithm-based reranking with neural reranking (Part II).
+    Used when combining algorithm-based reranking with neural reranking.
     Example: {"vector": 0.3, "keyword": 0.3, "neural": 0.4}
-:param model: (Optional) Model identifier for neural reranker (e.g., "vllm/Qwen3-Reranker-0.6B").
-    Required when ranker="neural" or when weights contains "neural" (Part II).
+:param model: (Optional) Model identifier for neural reranker (e.g., "transformers/Qwen/Qwen3-Reranker-0.6B").
+    Required when ranker="neural" or when weights contains "neural".
 
 
 | Field | Type | Description |

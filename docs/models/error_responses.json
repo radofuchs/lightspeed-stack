@@ -551,9 +551,9 @@
                     {
                         "detail": {
                             "cause": "Connection error while trying to reach backend service.",
-                            "response": "Unable to connect to Llama Stack"
+                            "response": "Unable to connect to OGX"
                         },
-                        "label": "llama stack"
+                        "label": "ogx"
                     },
                     {
                         "detail": {
