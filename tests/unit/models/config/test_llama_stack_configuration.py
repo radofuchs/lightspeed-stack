@@ -358,3 +358,97 @@ def test_root_accepts_remote_url_with_unified_config() -> None:
     }
     cfg = Configuration(**config_dict)
     assert cfg.llama_stack.config is not None  # pylint: disable=no-member
+
+
+# ---------------------------------------------------------------------------
+# config_format_version cross-validation (LCORE-2872, R11)
+# ---------------------------------------------------------------------------
+
+
+def _unified_body(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Give the base config a unified shape (synthesis input present)."""
+    config_dict["llama_stack"] = {"use_as_library_client": True}
+    config_dict["inference"] = {
+        "providers": [{"type": "openai", "api_key_env": "OPENAI_API_KEY"}]
+    }
+    return config_dict
+
+
+def _legacy_body(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Give the base config a legacy shape (external run.yaml path)."""
+    config_dict["llama_stack"] = {
+        "use_as_library_client": True,
+        "library_client_config_path": "tests/configuration/run.yaml",
+    }
+    return config_dict
+
+
+def _remote_body(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Give the base config a remote shape (url only, no synthesis input)."""
+    config_dict["llama_stack"] = {
+        "use_as_library_client": False,
+        "url": "http://localhost:8321",
+    }
+    return config_dict
+
+
+def test_root_config_format_version_defaults_to_none() -> None:
+    """The field is optional; an unversioned config loads with None."""
+    cfg = Configuration(**_unified_body(_base_config_dict()))
+    assert cfg.config_format_version is None
+
+
+def test_root_accepts_config_format_version_unified_with_unified_body() -> None:
+    """'unified' agrees with a body that has a synthesis input."""
+    config_dict = _unified_body(_base_config_dict())
+    config_dict["config_format_version"] = "unified"
+    cfg = Configuration(**config_dict)
+    assert cfg.config_format_version == "unified"
+
+
+def test_root_accepts_config_format_version_legacy_with_legacy_body() -> None:
+    """'legacy' agrees with a body driven by library_client_config_path."""
+    config_dict = _legacy_body(_base_config_dict())
+    config_dict["config_format_version"] = "legacy"
+    cfg = Configuration(**config_dict)
+    assert cfg.config_format_version == "legacy"
+
+
+def test_root_accepts_config_format_version_legacy_with_remote_body() -> None:
+    """'legacy' agrees with a remote-only body (no synthesis input)."""
+    config_dict = _remote_body(_base_config_dict())
+    config_dict["config_format_version"] = "legacy"
+    cfg = Configuration(**config_dict)
+    assert cfg.config_format_version == "legacy"
+
+
+def test_root_rejects_config_format_version_legacy_with_unified_body() -> None:
+    """'legacy' with a unified-shaped body fails; error names the field."""
+    config_dict = _unified_body(_base_config_dict())
+    config_dict["config_format_version"] = "legacy"
+    with pytest.raises(ValidationError, match="config_format_version"):
+        Configuration(**config_dict)
+
+
+def test_root_rejects_config_format_version_unified_with_legacy_body() -> None:
+    """'unified' with a legacy-shaped body fails; error names the field."""
+    config_dict = _legacy_body(_base_config_dict())
+    config_dict["config_format_version"] = "unified"
+    with pytest.raises(ValidationError, match="config_format_version"):
+        Configuration(**config_dict)
+
+
+def test_root_rejects_config_format_version_unified_with_remote_body() -> None:
+    """'unified' with a remote-only body (no synthesis input) fails."""
+    config_dict = _remote_body(_base_config_dict())
+    config_dict["config_format_version"] = "unified"
+    with pytest.raises(ValidationError, match="config_format_version"):
+        Configuration(**config_dict)
+
+
+def test_root_rejects_unknown_config_format_version_value() -> None:
+    """Values outside the 'legacy'/'unified' literal are rejected."""
+    config_dict = _unified_body(_base_config_dict())
+    config_dict["config_format_version"] = "v2"
+    with pytest.raises(ValidationError, match="Input should be 'legacy' or 'unified'"):
+        Configuration(**config_dict)
