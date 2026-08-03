@@ -513,6 +513,7 @@ exposure tradeoff is a product call. Ask Red Hat runs blocking today.
 
 ## Proposed JIRAs
 
+<!-- key: LCORE-3386 -->
 ### Epic: Prompt guardrails for Lightspeed Core
 
 LCS-native prompt guardrails: a lightspeed-stack-owned guardrails layer
@@ -543,8 +544,8 @@ guardrail points (LCORE-230).
   model consumes it — each observable via API behavior and metrics.
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? E2E feature files for prompt guardrails (no step implementation)
+<!-- key: LCORE-3387 -->
+#### LCORE-3387 E2E feature files for prompt guardrails (no step implementation)
 
 **User story**: As a Lightspeed Core e2e engineer, I want the behave
 feature files for prompt-guardrails scenarios written before the feature
@@ -558,7 +559,7 @@ describing guardrails behaviors: input block (OOTB risk), input block
 blocking rule, tool-content block, guardrails disabled (no interference),
 detector unreachable (fail-closed), streaming refusal semantics. Step
 definitions are explicitly **not** part of this ticket — they are covered
-by a later sibling ticket (LCORE-????).
+by a later sibling ticket (LCORE-3388).
 
 **Scope**:
 - `.feature` files covering R1..Rn from the spec doc
@@ -570,7 +571,7 @@ by a later sibling ticket (LCORE-????).
 - behave marks all new scenario steps as `undefined`
 - `uv run make test-e2e` remains green (new scenarios skipped/undefined, not failing)
 
-**Blocks**: LCORE-???? (step-definitions counterpart)
+**Blocks**: LCORE-3388 (step-definitions counterpart)
 
 **Agentic tool instruction**:
 
@@ -585,21 +586,21 @@ additions to tests/e2e/test_list.txt. Do NOT create step definitions.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Implement behave step definitions for prompt-guardrails feature files
+<!-- key: LCORE-3388 -->
+#### LCORE-3388 Implement behave step definitions for prompt-guardrails feature files
 
 **Description**: Implement Python step definitions under
 `tests/e2e/features/steps/` for the `.feature` files authored in
-LCORE-???? (kickoff). Take the Gherkin as-is; if a scenario cannot be
+LCORE-3387 (kickoff). Take the Gherkin as-is; if a scenario cannot be
 implemented faithfully, raise it against the spec doc rather than quietly
 weakening the test. Requires a guardian-model stand-in the CI environment
 can run (mock detector endpoint or a small real model — decide against the
 spec doc's test-pattern section).
 
 **Blocked by**:
-- LCORE-???? (E2E feature files kickoff)
-- LCORE-???? (guardrails config + detector framework)
-- LCORE-???? (input point), LCORE-???? (output point), LCORE-???? (tool content)
+- LCORE-3387 (E2E feature files kickoff)
+- LCORE-3389 (guardrails config + detector framework)
+- LCORE-3390 (input point), LCORE-3391 (output point), LCORE-3392 (tool content)
 
 **Agentic tool instruction**:
 
@@ -612,8 +613,8 @@ To verify: `uv run make test-e2e` runs every new scenario green.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Guardrails configuration schema and detector framework
+<!-- key: LCORE-3389 -->
+#### LCORE-3389 Guardrails configuration schema and detector framework
 
 **Description**: Add the top-level `guardrails:` config section (Pydantic
 models per Decision T1) and the `DetectorBackend` protocol with the
@@ -651,8 +652,8 @@ Key files: src/models/config.py, src/guardrails/, tests/unit/guardrails/.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Input guardrail point on all query endpoints
+<!-- key: LCORE-3390 -->
+#### LCORE-3390 Input guardrail point on all query endpoints
 
 **Description**: Run configured `input` rules on the moderation input in
 `/v1/query`, `/v1/streaming_query`, `/v1/responses`, and `/rlsapi`,
@@ -660,7 +661,7 @@ feeding the existing moderation-result seam (blocked ⇒ refusal response,
 RAG skip, blocked-turn persistence, validation-error metric), additive to
 the existing Llama Stack shields path (Decision S5).
 
-**Blocked by**: LCORE-???? (config + detector framework)
+**Blocked by**: LCORE-3389 (config + detector framework)
 
 **Acceptance criteria**:
 - Input rules run in parallel with per-rule latency logged/metered
@@ -677,15 +678,15 @@ rlsapi_v1.py, src/utils/shields.py, src/guardrails/.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Output guardrail point with streaming checkpoint semantics
+<!-- key: LCORE-3391 -->
+#### LCORE-3391 Output guardrail point with streaming checkpoint semantics
 
 **Description**: Run configured `output` rules on generated answers before
 they reach the client: non-streaming (single check) and streaming
 (buffer-and-release checkpoints per Decision T4). Advisory rules record
 metrics without blocking (relevance checks per the Ask RH pattern).
 
-**Blocked by**: LCORE-???? (config + detector framework)
+**Blocked by**: LCORE-3389 (config + detector framework)
 
 **Acceptance criteria**:
 - Non-streaming: flagged blocking rule replaces the answer with the refusal
@@ -702,15 +703,15 @@ src/utils/streaming_sse.py, src/guardrails/.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Tool-content guardrail point via agent-loop hook
+<!-- key: LCORE-3392 -->
+#### LCORE-3392 Tool-content guardrail point via agent-loop hook
 
 **Description**: Run configured `tool_content` rules on each tool/MCP
 result before it re-enters the agent context (pydantic-ai capability hook
 per Decision T5), blocking poisoned third-party content (indirect prompt
 injection, OWASP LLM01).
 
-**Blocked by**: LCORE-???? (config + detector framework)
+**Blocked by**: LCORE-3389 (config + detector framework)
 
 **Acceptance criteria**:
 - Flagged tool result never reaches the model; turn continues or refuses
@@ -728,15 +729,15 @@ src/guardrails/, dev-tools/mcp-mock-server/.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Integration tests for the guardrails layer
+<!-- key: LCORE-3393 -->
+#### LCORE-3393 Integration tests for the guardrails layer
 
 **Description**: pytest integration tests exercising the guardrails layer
 against a scripted OpenAI-compatible mock detector: multi-rule parallel
 runs, custom-risk definitions, advisory vs blocking, detector-down
 fail-closed, per-point selection.
 
-**Blocked by**: LCORE-???? (config + detector framework)
+**Blocked by**: LCORE-3389 (config + detector framework)
 
 **Acceptance criteria**:
 - Integration suite runs without any real guardian model
@@ -750,8 +751,8 @@ Key files: tests/integration/, src/guardrails/.
 ```
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Documentation, configuration example, and model recommendation
+<!-- key: LCORE-3394 -->
+#### LCORE-3394 Documentation, configuration example, and model recommendation
 
 **Description**: Deployer-facing documentation: enabling guardrails, the
 `guardrails:` config reference, a complete worked example (Granite
@@ -765,7 +766,7 @@ OpenShift questions at ~0.98 confidence, which no threshold separates
 from real jailbreaks. Shipping OOTB risk ids as the recommended default
 would make the feature unusable for a product assistant.
 
-**Blocked by**: LCORE-???? (config + detector framework), input/output/tool
+**Blocked by**: LCORE-3389 (config + detector framework), input/output/tool
 point tickets
 
 **Scope additions**:
@@ -841,7 +842,7 @@ runner executing a point's rules in parallel, and a hook in
 - **Finding A — custom risks must be safety-shaped.** A custom definition
   that is not a safety concept ("contains the word 'pineapple'") is not
   reliably evaluated — Guardian is a safety classifier, not a keyword
-  matcher. *Implication*: the docs ticket (LCORE-????) and the spec doc's
+  matcher. *Implication*: the docs ticket (LCORE-3394) and the spec doc's
   custom-risk guidance must state that BYOC definitions express
   safety-adjacent concepts (obfuscation, roleplay jailbreak, policy
   violation) — arbitrary predicates belong to the regex-redaction
@@ -849,7 +850,7 @@ runner executing a point's rules in parallel, and a hook in
 - **Finding B — output relevance risks require context pairing.** OOTB
   relevance risks (`answer_relevance`, `context_relevance`, `groundedness`)
   need the (retrieved-context, answer) pair; an answer-only check is
-  noise. *Implication*: the output guardrail-point ticket (LCORE-????)
+  noise. *Implication*: the output guardrail-point ticket (LCORE-3391)
   must thread the turn's retrieved context into relevance-rule detector
   calls — reflected in the spec doc's Detector-backends note.
   `poc-results/03-layer-findings.md`.
