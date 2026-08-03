@@ -3,6 +3,9 @@
 ## [__init__.py](__init__.py)
 Utility classes and functions for the Lightspeed Stack core service.
 
+## [builtin_tools.py](builtin_tools.py)
+Discover builtin file-search tools when that provider is configured.
+
 ## [checks.py](checks.py)
 Checks that are performed to configuration options.
 
@@ -48,6 +51,12 @@ MCP headers handling.
 ## [mcp_oauth_probe.py](mcp_oauth_probe.py)
 Probe MCP servers for OAuth and raise 401 with WWW-Authenticate when required.
 
+## [mcp_tools.py](mcp_tools.py)
+Utilities for discovering tools from remote MCP servers without Llama Stack.
+
+## [model_list.py](model_list.py)
+Helpers for normalizing OGX ``models.list()`` union responses.
+
 ## [models_dumper.py](models_dumper.py)
 Function to dump the schema of all data models into OpenAPI-compatible format.
 
@@ -79,7 +88,7 @@ Utility functions for extracting RH Identity context for telemetry.
 Validation helpers and data access for saved prompts.
 
 ## [shields.py](shields.py)
-Utility functions for working with Llama Stack shields.
+Utility helpers for shield override validation and moderation.
 
 ## [stream_interrupts.py](stream_interrupts.py)
 Stream interrupt registry and persistence utilities.

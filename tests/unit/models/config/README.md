@@ -48,6 +48,9 @@ Unit tests for LlamaStackConfiguration model.
 ## [test_model_context_protocol_server.py](test_model_context_protocol_server.py)
 Unit tests for ModelContextProtocolServer model.
 
+## [test_observability_configuration.py](test_observability_configuration.py)
+Unit tests for ObservabilityConfiguration model.
+
 ## [test_postgresql_database_configuration.py](test_postgresql_database_configuration.py)
 Unit tests for PostgreSQLDatabaseConfiguration model.
 
@@ -72,6 +75,9 @@ Unit tests for RlsapiV1Configuration and related startup validators.
 ## [test_service_configuration.py](test_service_configuration.py)
 Unit tests for ServiceConfiguration model.
 
+## [test_shields_configuration.py](test_shields_configuration.py)
+Unit tests for ShieldConfiguration model and the Configuration.shields list.
+
 ## [test_skills_configuration.py](test_skills_configuration.py)
 Unit tests for SkillsConfiguration model.
 
@@ -83,4 +89,7 @@ Unit tests for TLSConfiguration model.
 
 ## [test_user_data_collection.py](test_user_data_collection.py)
 Unit tests for UserDataCollection model.
+
+## [test_vector_store.py](test_vector_store.py)
+Unit tests for vector_store configuration models.
 
