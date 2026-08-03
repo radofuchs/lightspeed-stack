@@ -419,3 +419,6 @@ attaching the section.
 | Date | Change | Reason |
 |------|--------|--------|
 | 2026-07-20 | Initial version | LCORE-2657 spike |
+| 2026-08-03 | Added R4a (per-rule thresholds), R4b (per-rule violation messages), R4d (input execution mode), R7a (output-relevance context pairing); `ScreeningItem` detector payload; client-lifecycle and `src/runners` integration notes | Decisions T8–T10 and PoC finding B |
+| 2026-08-03 | Added R4c (recommended rule sets validated against a legitimate-question corpus) | PoC finding D — OOTB `jailbreak` false-positives on legitimate OpenShift questions at ~0.98 |
+| 2026-08-03 | PR #2182 review: `DetectorBackend` takes a structured payload; recommended-model rec split (3.3-8B benchmarked, 4.1-8B extrapolated) | @sbunciak / @tisnik review + CodeRabbit |
