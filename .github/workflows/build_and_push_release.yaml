@@ -35,7 +35,7 @@ jobs:
           fetch-tags: true
       - name: Determine if latest tag should be applied
         id: check_latest
-        run: ./scripts/latest-tag.py
+        run: ./scripts/latest_tag.py
       - name: Build image with Buildah
         id: build_image
         uses: redhat-actions/buildah-build@v2
