@@ -15,11 +15,20 @@ Health-related shared models for readiness and diagnostics.
 ## [mcp.py](mcp.py)
 MCP server metadata models shared by registration and list responses.
 
+## [models.py](models.py)
+Backend-agnostic model catalog types.
+
 ## [moderation.py](moderation.py)
 Shield moderation outcomes for the responses pipeline.
 
 ## [query.py](query.py)
 Shared query-related request primitives.
+
+## [shields.py](shields.py)
+Catalog models for the ``/shields`` endpoint.
+
+## [tools.py](tools.py)
+Backend-agnostic tool listing models.
 
 ## [transcripts.py](transcripts.py)
 Pydantic models for persisted query/response transcript entries.
