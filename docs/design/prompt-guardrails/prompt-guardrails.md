@@ -206,13 +206,31 @@ non-empty; names unique.
 
 ### Detector backends
 
-`DetectorBackend` protocol: `async check(content: str, rule: GuardrailRule)
--> DetectionResult`. Backends:
+`DetectorBackend` protocol: `async check(item: ScreeningItem, rule:
+GuardrailRule) -> DetectionResult`. The unit screened is a **structured
+payload**, not a bare string, because relevance rules need more than the
+answer text:
+
+```python
+class ScreeningItem(BaseModel):
+    text: str                        # the primary content being screened
+    context: Optional[str] = None    # retrieved RAG context (relevance rules)
+    question: Optional[str] = None    # the user question (answer-relevance)
+```
+
+Simple rules (harm, jailbreak on input) populate only `text`;
+output-relevance rules populate `text` (the answer) plus `context` and/or
+`question`. Each backend maps this canonical payload to its own wire form
+(the Guardian chat template's context/answer framing; the moderations
+`input` field; a shield's message list). Defining this one interface up
+front is what lets the input point, the output point, and the runners all
+call detection the same way (R7a depends on it). Backends:
 
 - **granite_guardian** — OpenAI chat-completions call; system slot selects
   the risk id or carries the custom definition (guardian chat template);
   verdict parsed from the constrained yes/no answer. Output-relevance risks
-  receive the context/answer pair packed per the guardian template.
+  send the `ScreeningItem`'s `context`/`question` alongside `text`, packed
+  per the guardian template.
 - **openai_moderations** — POST `/v1/moderations`; a rule maps to flagged
   categories (all, or a configured subset). Covers OGX 1.x
   `moderation_endpoint` services, TrustyAI gateways, and OpenAI itself.

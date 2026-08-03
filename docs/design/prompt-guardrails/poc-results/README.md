@@ -62,6 +62,13 @@ ship, and thresholds are not the remedy (`06`). Measured on the 2B model;
 
 ## Reproduce
 
+**These commands are historical — they do not run against `main`.** The
+`src/guardrails/` module and the `tests/unit/guardrails/` suite they depend
+on are not in the merged tree (see the note at the top). To reproduce,
+first restore the PoC code from the PR branch, e.g.
+`git checkout 9498b7d7 -- src/guardrails src/app/endpoints/query.py tests/unit/guardrails`
+(the last commit of PR #2182 that still carried the code), then run:
+
 ```sh
 # 1. Guardian model (Ollama >= 0.4 required; 0.3.x cannot load it)
 ollama pull granite3-guardian:2b

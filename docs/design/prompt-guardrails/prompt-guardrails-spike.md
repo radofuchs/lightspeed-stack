@@ -143,8 +143,16 @@ model". Landscape details in
 | C — Meta Prompt Guard 2 (22M/86M) | Excellent cheap injection/jailbreak classifier; not a content-safety model; **gated Llama license**. |
 | — Google ShieldGemma | Content-policy classifier; **custom, use-restricted Gemma license (not OSI)**. |
 
-**Recommendation**: **A** — Granite Guardian: 4.1-8B as the forward
-recommendation, 3.3-8B as the production-validated reference (Ask RH).
+**Recommendation**: **A** — Granite Guardian. **3.3-8B is the
+benchmark-validated and production reference** (all the standings below
+are measured on 3.3-8B, and it is the version in production at Ask RH).
+**4.1-8B is the suggested forward default** — same family and invocation,
+newer (April 2026) with improved bring-your-own-criteria; its choice is
+**extrapolated** from 3.3-8B evidence plus the version bump, not
+independently benchmarked here (no clean public rank for 4.1 was found —
+it appears in the NVIDIA-co-produced Artificial Analysis comparison but
+without an extractable standing). A deployment wanting only
+measured-here evidence should pin 3.3-8B.
 
 The recommendation rests on **three independently-verifiable pillars**, not
 a single leaderboard (see [background](#guardian-model-landscape) for
@@ -1055,6 +1063,14 @@ not by an upstream llama-stack provider.
     0.8797 F1 on English prompts.
   - *Adoption* — Granite Guardian 3.3-8B is in production at Ask Red Hat
     for input safety screening ([Red Hat technology attributions](https://access.redhat.com/articles/7123868)).
+
+  > **Source durability**: the leaderboard standings above are point-in-time
+  > (verified **2026-08-03**), and public leaderboards change or vanish (as
+  > GuardBench's did). Before these citations are relied on downstream, they
+  > should be pinned to immutable snapshots — a Wayback Machine capture per
+  > URL, or the exact leaderboard revision/commit — rather than the live
+  > page. The GuardBench *results dataset* is already versioned on the Hub;
+  > LLM-AggreFact and Artificial Analysis pages are not, and need archiving.
 - **Meta Llama Guard 4** (12B, **gated** Llama community license): MLCommons
   S1–S14 content-safety taxonomy, prompts and responses; no custom risks,
   no RAG checks.
