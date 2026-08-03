@@ -888,8 +888,8 @@ runner executing a point's rules in parallel, and a hook in
 ## Proposed incidental JIRAs
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-### LCORE-???? Fix lint-openapi Makefile target after openapi.json move
+<!-- key: LCORE-3395 -->
+### LCORE-3395 Fix lint-openapi Makefile target after openapi.json move
 
 **Description**: `make lint-openapi` (part of `make verify`) fails on a
 clean checkout of `main` with "No files found to lint": commit `d731ce76`
