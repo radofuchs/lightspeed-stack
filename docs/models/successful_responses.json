@@ -515,6 +515,182 @@
                 "title": "CORSConfiguration",
                 "type": "object"
             },
+            "CatalogModel": {
+                "description": "Normalized model entry used by ``/models`` and internal model resolution.\n\nUnifies OpenAI-style, Anthropic, and Google ``models.list()`` payloads into\none catalog shape.",
+                "properties": {
+                    "identifier": {
+                        "description": "Model identifier",
+                        "title": "Identifier",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "additionalProperties": true,
+                        "description": "Provider-specific metadata excluding core catalog fields",
+                        "title": "Metadata",
+                        "type": "object"
+                    },
+                    "api_model_type": {
+                        "description": "API model type (typically mirrors model_type)",
+                        "title": "Api Model Type",
+                        "type": "string"
+                    },
+                    "provider_id": {
+                        "description": "Provider identifier",
+                        "title": "Provider Id",
+                        "type": "string"
+                    },
+                    "type": {
+                        "default": "model",
+                        "description": "Object type, always 'model'",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "provider_resource_id": {
+                        "default": "",
+                        "description": "Provider-native resource identifier for the model",
+                        "title": "Provider Resource Id",
+                        "type": "string"
+                    },
+                    "model_type": {
+                        "description": "Model type such as 'llm' or 'embedding'",
+                        "title": "Model Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "identifier",
+                    "api_model_type",
+                    "provider_id",
+                    "model_type"
+                ],
+                "title": "CatalogModel",
+                "type": "object"
+            },
+            "CatalogShield": {
+                "description": "Shield entry in the ``/shields`` catalog response.\n\nAttributes:\n    name: Unique, user-facing name identifying this shield instance.\n    provider_id: Shield provider / type discriminator.\n    type: Catalog entry type; always shield.\n    config: Type-specific shield configuration.",
+                "properties": {
+                    "name": {
+                        "description": "Unique, user-facing name of the shield instance",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "provider_id": {
+                        "description": "Shield provider / type discriminator",
+                        "enum": [
+                            "question_validity",
+                            "redaction"
+                        ],
+                        "title": "Provider Id",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "shield",
+                        "default": "shield",
+                        "description": "Catalog entry type; always shield",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "config": {
+                        "additionalProperties": true,
+                        "description": "Type-specific shield configuration",
+                        "title": "Config",
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "name",
+                    "provider_id",
+                    "config"
+                ],
+                "title": "CatalogShield",
+                "type": "object"
+            },
+            "CatalogTool": {
+                "description": "Tool entry in the ``/tools`` catalog response.",
+                "properties": {
+                    "identifier": {
+                        "title": "Identifier",
+                        "type": "string"
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string"
+                    },
+                    "parameters": {
+                        "items": {
+                            "$ref": "`#/components/schemas/`CatalogToolParameter"
+                        },
+                        "title": "Parameters",
+                        "type": "array"
+                    },
+                    "provider_id": {
+                        "title": "Provider Id",
+                        "type": "string"
+                    },
+                    "toolgroup_id": {
+                        "title": "Toolgroup Id",
+                        "type": "string"
+                    },
+                    "server_source": {
+                        "title": "Server Source",
+                        "type": "string"
+                    },
+                    "type": {
+                        "default": "tool",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "identifier",
+                    "description",
+                    "parameters",
+                    "provider_id",
+                    "toolgroup_id",
+                    "server_source"
+                ],
+                "title": "CatalogTool",
+                "type": "object"
+            },
+            "CatalogToolParameter": {
+                "description": "Parameter entry for a tool in the ``/tools`` catalog response.",
+                "properties": {
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string"
+                    },
+                    "parameter_type": {
+                        "title": "Parameter Type",
+                        "type": "string"
+                    },
+                    "required": {
+                        "default": false,
+                        "title": "Required",
+                        "type": "boolean"
+                    },
+                    "default": {
+                        "anyOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "title": "Default"
+                    }
+                },
+                "required": [
+                    "name",
+                    "description",
+                    "parameter_type"
+                ],
+                "title": "CatalogToolParameter",
+                "type": "object"
+            },
             "CompactionConfiguration": {
                 "additionalProperties": false,
                 "description": "Configuration for conversation history compaction.\n\nCompaction summarizes older conversation turns when their estimated\ntoken count approaches the context window limit, keeping the\nconversation usable instead of failing with HTTP 413. The\nconfiguration here controls when compaction triggers and how much\nrecent context is preserved verbatim.\n\nAttributes:\n    enabled: Master switch. When False, compaction never triggers\n        and other fields are inert.\n    threshold_ratio: Trigger compaction when estimated input tokens\n        exceed this fraction of the model's context window\n        (clamped to 0.0..1.0).\n    token_floor: Minimum estimated token count before compaction\n        can trigger, regardless of threshold_ratio. Prevents\n        triggering on very small context windows.\n    buffer_turns: Initial number of recent turns to keep verbatim.\n        The runtime applies a degrading guard \u2014 if these turns\n        exceed the available budget, it reduces buffer_turns by\n        one repeatedly until the budget fits, down to zero.\n    buffer_max_ratio: Hard cap on the fraction of the context\n        window the buffer zone may occupy, regardless of\n        buffer_turns.",
@@ -737,6 +913,28 @@
                         "$ref": "`#/components/schemas/`SavedPromptsConfiguration",
                         "description": "Configuration for saved prompts feature limits including maximum prompts per user, display name length, and content length.",
                         "title": "Saved prompts configuration"
+                    },
+                    "shields": {
+                        "description": "List of pydantic-ai-lightspeed agent guardrail shields (question validity and PII redaction). Each entry has a unique 'name', a 'provider_id' ('question_validity' or 'redaction'), and a type-specific 'config'.",
+                        "items": {
+                            "discriminator": {
+                                "mapping": {
+                                    "question_validity": "`#/components/schemas/`QuestionValidityShieldConfiguration",
+                                    "redaction": "`#/components/schemas/`RedactionShieldConfiguration"
+                                },
+                                "propertyName": "provider_id"
+                            },
+                            "oneOf": [
+                                {
+                                    "$ref": "`#/components/schemas/`QuestionValidityShieldConfiguration"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`RedactionShieldConfiguration"
+                                }
+                            ]
+                        },
+                        "title": "Shields configuration",
+                        "type": "array"
                     }
                 },
                 "required": [
@@ -2305,8 +2503,7 @@
                     "models": {
                         "description": "List of models available",
                         "items": {
-                            "additionalProperties": true,
-                            "type": "object"
+                            "$ref": "`#/components/schemas/`CatalogModel"
                         },
                         "title": "Models",
                         "type": "array"
@@ -2398,6 +2595,7 @@
                 "type": "object"
             },
             "OpenAIResponseAnnotationContainerFileCitation": {
+                "description": "Container file citation annotation referencing a file within a container.",
                 "properties": {
                     "type": {
                         "const": "container_file_citation",
@@ -2467,6 +2665,7 @@
                 "type": "object"
             },
             "OpenAIResponseAnnotationFilePath": {
+                "description": "File path annotation referencing a generated file in response content.",
                 "properties": {
                     "type": {
                         "const": "file_path",
@@ -2744,6 +2943,7 @@
                 "type": "object"
             },
             "OpenAIResponseInputToolChoiceMode": {
+                "description": "Enumeration of simple tool choice modes for response generation.",
                 "enum": [
                     "auto",
                     "required",
@@ -3038,6 +3238,7 @@
                 "type": "object"
             },
             "OpenAIResponseOutputMessageContentOutputText": {
+                "description": "Text content within an output message of an OpenAI response.",
                 "properties": {
                     "text": {
                         "title": "Text",
@@ -3287,6 +3488,95 @@
                 "title": "OpenAIResponseOutputMessageMCPListTools",
                 "type": "object"
             },
+            "OpenAIResponseOutputMessageReasoningContent": {
+                "description": "Reasoning text from the model.",
+                "properties": {
+                    "text": {
+                        "description": "The reasoning text content from the model.",
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "reasoning_text",
+                        "default": "reasoning_text",
+                        "description": "The type identifier, always 'reasoning_text'.",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "text"
+                ],
+                "title": "OpenAIResponseOutputMessageReasoningContent",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageReasoningItem": {
+                "description": "Reasoning output from the model, representing the model's thinking process.",
+                "properties": {
+                    "id": {
+                        "description": "Unique identifier for the reasoning output item.",
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "summary": {
+                        "description": "Summary of the reasoning output.",
+                        "items": {
+                            "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningSummary"
+                        },
+                        "title": "Summary",
+                        "type": "array"
+                    },
+                    "type": {
+                        "const": "reasoning",
+                        "default": "reasoning",
+                        "description": "The type identifier, always 'reasoning'.",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "content": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "description": "The reasoning content from the model.",
+                        "title": "Content"
+                    },
+                    "status": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "The status of the reasoning output.",
+                        "title": "Status"
+                    }
+                },
+                "required": [
+                    "id",
+                    "summary"
+                ],
+                "title": "OpenAIResponseOutputMessageReasoningItem",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageReasoningSummary": {
+                "description": "A summary of reasoning output from the model.",
+                "properties": {
+                    "text": {
+                        "description": "The summary text of the reasoning output.",
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "summary_text",
+                        "default": "summary_text",
+                        "description": "The type identifier, always 'summary_text'.",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "text"
+                ],
+                "title": "OpenAIResponseOutputMessageReasoningSummary",
+                "type": "object"
+            },
             "OpenAIResponseOutputMessageWebSearchToolCall": {
                 "description": "Web search tool call output message for OpenAI responses.\n\n:param id: Unique identifier for this tool call\n:param status: Current status of the web search operation\n:param type: Tool call type identifier, always \"web_search_call\"",
                 "properties": {
@@ -3346,13 +3636,20 @@
                         "nullable": true,
                         "default": null,
                         "title": "Effort"
+                    },
+                    "summary": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Summary mode for reasoning output. One of 'auto', 'concise', or 'detailed'.",
+                        "title": "Summary"
                     }
                 },
                 "title": "OpenAIResponseReasoning",
                 "type": "object"
             },
             "OpenAIResponseText": {
-                "description": "Text response configuration for OpenAI responses.\n\n:param format: (Optional) Text format configuration specifying output format requirements",
+                "description": "Text response configuration for OpenAI responses.\n\n:param format: (Optional) Text format configuration specifying output format requirements\n:param verbosity: (Optional) Controls response verbosity level",
                 "properties": {
                     "format": {
                         "anyOf": [
@@ -3364,6 +3661,12 @@
                             }
                         ],
                         "default": null
+                    },
+                    "verbosity": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "title": "Verbosity"
                     }
                 },
                 "title": "OpenAIResponseText",
@@ -4160,6 +4463,63 @@
                 "title": "QueryResponse",
                 "type": "object"
             },
+            "QuestionValidityConfig": {
+                "additionalProperties": false,
+                "description": "Configuration for the question validity guardrail.",
+                "properties": {
+                    "model_id": {
+                        "description": "The model_id to use for the guard",
+                        "title": "Model id",
+                        "type": "string"
+                    },
+                    "model_prompt": {
+                        "default": "\nInstructions:\n- You are a question classifying tool\n- You are an expert in kubernetes and openshift\n- Your job is to determine where or a user's question is related to kubernetes and/or openshift technologies and to provide a one-word response.\n- If a question appears to be related to kubernetes or openshift technologies, answer with the word ${allowed}, otherwise answer with the word ${rejected}.\n- Do not explain your answer, just provide the one-word response. Do not give any other response.\n- If the given question is an empty string, answer with the word ${rejected}\n\n\nExample Question:\nWhy is the sky blue?\nExample Response:\n${rejected}\n\nExample Question:\nWhy is the grass green?\nExample Response:\n${rejected}\n\nExample Question:\nWhy is sand yellow?\nExample Response:\n${rejected}\n\nExample Question:\nCan you help configure my cluster to automatically scale?\nExample Response:\n${allowed}\n\nQuestion:\n${message}\nResponse:\n",
+                        "description": "The default prompt sent to the LLM used to validate the Users' question.",
+                        "title": "Model prompt",
+                        "type": "string"
+                    },
+                    "invalid_question_response": {
+                        "default": "\nHi, I'm the OpenShift Lightspeed assistant, I can help you with questions about OpenShift, \nplease ask me a question related to OpenShift.\n",
+                        "description": "The default response when the Users' question is determined to be invalid.",
+                        "title": "Invalid question response",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "model_id"
+                ],
+                "title": "QuestionValidityConfig",
+                "type": "object"
+            },
+            "QuestionValidityShieldConfiguration": {
+                "additionalProperties": false,
+                "description": "Configuration for a named question-validity guardrail shield.\n\nAttributes:\n    name: Unique, user-facing name identifying this shield instance.\n    provider_id: Discriminator identifying this as a question-validity shield.\n    config: Question-validity-specific configuration.",
+                "properties": {
+                    "name": {
+                        "description": "Unique, user-facing name identifying this shield instance.",
+                        "title": "Shield name",
+                        "type": "string"
+                    },
+                    "provider_id": {
+                        "const": "question_validity",
+                        "description": "Discriminator identifying this as a question-validity shield.",
+                        "title": "Shield provider id",
+                        "type": "string"
+                    },
+                    "config": {
+                        "$ref": "`#/components/schemas/`QuestionValidityConfig",
+                        "description": "Question-validity-specific configuration for this shield.",
+                        "title": "Shield configuration"
+                    }
+                },
+                "required": [
+                    "name",
+                    "provider_id",
+                    "config"
+                ],
+                "title": "QuestionValidityShieldConfiguration",
+                "type": "object"
+            },
             "QuotaHandlersConfiguration": {
                 "additionalProperties": false,
                 "description": "Quota limiter configuration.\n\nIt is possible to limit quota usage per user or per service or services\n(that typically run in one cluster). Each limit is configured as a separate\n_quota limiter_. It can be of type `user_limiter` or `cluster_limiter`\n(which is name that makes sense in OpenShift deployment).",
@@ -4579,6 +4939,86 @@
                 "title": "ReadinessResponse",
                 "type": "object"
             },
+            "RedactionConfig": {
+                "additionalProperties": false,
+                "description": "Configuration for PII redaction with regex-based rules.\n\nRules are validated and compiled at construction time. Invalid\nregex patterns raise a ``ValueError`` immediately.\n\nAttributes:\n    rules: Ordered list of redaction rules applied sequentially.\n    case_sensitive: When False, patterns are compiled with\n        ``re.IGNORECASE``. Defaults to False.",
+                "properties": {
+                    "rules": {
+                        "description": "Ordered list of PII redaction rules",
+                        "items": {
+                            "$ref": "`#/components/schemas/`RedactionRule"
+                        },
+                        "title": "Redaction rules",
+                        "type": "array"
+                    },
+                    "case_sensitive": {
+                        "default": false,
+                        "description": "When False, patterns are compiled with re.IGNORECASE",
+                        "title": "Case sensitive",
+                        "type": "boolean"
+                    }
+                },
+                "title": "RedactionConfig",
+                "type": "object"
+            },
+            "RedactionRule": {
+                "additionalProperties": false,
+                "description": "A single regex-based redaction rule.\n\nAttributes:\n    pattern: Raw regex pattern string to match sensitive data.\n    replacement: Text to substitute for each match.\n    case_sensitive: Per-rule override for case sensitivity.\n        When None, the global ``RedactionConfig.case_sensitive``\n        flag applies.",
+                "properties": {
+                    "pattern": {
+                        "description": "Regex pattern to match sensitive data",
+                        "title": "Pattern",
+                        "type": "string"
+                    },
+                    "replacement": {
+                        "description": "Replacement string for matched text",
+                        "title": "Replacement",
+                        "type": "string"
+                    },
+                    "case_sensitive": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Per-rule case sensitivity override. When None, the global config flag applies.",
+                        "title": "Case sensitive"
+                    }
+                },
+                "required": [
+                    "pattern",
+                    "replacement"
+                ],
+                "title": "RedactionRule",
+                "type": "object"
+            },
+            "RedactionShieldConfiguration": {
+                "additionalProperties": false,
+                "description": "Configuration for a named PII-redaction guardrail shield.\n\nAttributes:\n    name: Unique, user-facing name identifying this shield instance.\n    provider_id: Discriminator identifying this as a redaction shield.\n    config: Redaction-specific configuration.",
+                "properties": {
+                    "name": {
+                        "description": "Unique, user-facing name identifying this shield instance.",
+                        "title": "Shield name",
+                        "type": "string"
+                    },
+                    "provider_id": {
+                        "const": "redaction",
+                        "description": "Discriminator identifying this as a redaction shield.",
+                        "title": "Shield provider id",
+                        "type": "string"
+                    },
+                    "config": {
+                        "$ref": "`#/components/schemas/`RedactionConfig",
+                        "description": "Redaction-specific configuration for this shield.",
+                        "title": "Shield configuration"
+                    }
+                },
+                "required": [
+                    "name",
+                    "provider_id",
+                    "config"
+                ],
+                "title": "RedactionShieldConfiguration",
+                "type": "object"
+            },
             "ReferencedDocument": {
                 "description": "Model representing a document referenced in generating a response.\n\nAttributes:\n    doc_url: Url to the referenced doc.\n    doc_title: Title of the referenced doc.\n    document_id: Document ID for preserving identity during deduplication.",
                 "properties": {
@@ -4730,6 +5170,7 @@
                                     "mcp_call": "`#/components/schemas/`OpenAIResponseOutputMessageMCPCall",
                                     "mcp_list_tools": "`#/components/schemas/`OpenAIResponseOutputMessageMCPListTools",
                                     "message": "`#/components/schemas/`OpenAIResponseMessage",
+                                    "reasoning": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem",
                                     "web_search_call": "`#/components/schemas/`OpenAIResponseOutputMessageWebSearchToolCall"
                                 },
                                 "propertyName": "type"
@@ -4755,6 +5196,9 @@
                                 },
                                 {
                                     "$ref": "`#/components/schemas/`OpenAIResponseMCPApprovalRequest"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem"
                                 }
                             ]
                         },
@@ -5270,7 +5714,7 @@
                 "type": "object"
             },
             "SearchRankingOptions": {
-                "description": "Options for ranking and filtering search results.\n\nThis class configures how search results are ranked and filtered. You can use algorithm-based\nrerankers (weighted, RRF) or neural rerankers. Defaults from VectorStoresConfig are\nused when parameters are not provided.\n\nExamples:\n    # Weighted ranker with custom alpha\n    SearchRankingOptions(ranker=\"weighted\", alpha=0.7)\n\n    # RRF ranker with custom impact factor\n    SearchRankingOptions(ranker=\"rrf\", impact_factor=50.0)\n\n    # Use config defaults (just specify ranker type)\n    SearchRankingOptions(ranker=\"weighted\")  # Uses alpha from VectorStoresConfig\n\n    # Score threshold filtering\n    SearchRankingOptions(ranker=\"weighted\", score_threshold=0.5)\n\n:param ranker: (Optional) Name of the ranking algorithm to use. Supported values:\n    - \"weighted\": Weighted combination of vector and keyword scores\n    - \"rrf\": Reciprocal Rank Fusion algorithm\n    - \"neural\": Neural reranking model (requires model parameter, Part II)\n    Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.\n:param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0\n:param alpha: (Optional) Weight factor for weighted ranker (0-1).\n    - 0.0 = keyword only\n    - 0.5 = equal weight (default)\n    - 1.0 = vector only\n    Only used when ranker=\"weighted\" and weights is not provided.\n    Falls back to VectorStoresConfig.chunk_retrieval_params.weighted_search_alpha if not provided.\n:param impact_factor: (Optional) Impact factor (k) for RRF algorithm.\n    Lower values emphasize higher-ranked results. Default: 60.0 (optimal from research).\n    Only used when ranker=\"rrf\".\n    Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.\n:param weights: (Optional) Dictionary of weights for combining different signal types.\n    Keys can be \"vector\", \"keyword\", \"neural\". Values should sum to 1.0.\n    Used when combining algorithm-based reranking with neural reranking (Part II).\n    Example: {\"vector\": 0.3, \"keyword\": 0.3, \"neural\": 0.4}\n:param model: (Optional) Model identifier for neural reranker (e.g., \"vllm/Qwen3-Reranker-0.6B\").\n    Required when ranker=\"neural\" or when weights contains \"neural\" (Part II).",
+                "description": "Options for ranking and filtering search results.\n\nThis class configures how search results are ranked and filtered. You can use algorithm-based\nrerankers (weighted, RRF) or neural rerankers. Defaults from VectorStoresConfig are\nused when parameters are not provided.\n\nExamples:\n    # Weighted ranker with custom alpha\n    SearchRankingOptions(ranker=\"weighted\", alpha=0.7)\n\n    # RRF ranker with custom impact factor\n    SearchRankingOptions(ranker=\"rrf\", impact_factor=50.0)\n\n    # Use config defaults (just specify ranker type)\n    SearchRankingOptions(ranker=\"weighted\")  # Uses alpha from VectorStoresConfig\n\n    # Score threshold filtering\n    SearchRankingOptions(ranker=\"weighted\", score_threshold=0.5)\n\n:param ranker: (Optional) Name of the ranking algorithm to use. Supported values:\n    - \"weighted\": Weighted combination of vector and keyword scores\n    - \"rrf\": Reciprocal Rank Fusion algorithm\n    - \"neural\": Neural reranking model (requires model parameter)\n    Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.\n:param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0\n:param alpha: (Optional) Weight factor for weighted ranker (0-1).\n    - 0.0 = keyword only\n    - 0.5 = equal weight (default)\n    - 1.0 = vector only\n    Only used when ranker=\"weighted\" and weights is not provided.\n    Falls back to VectorStoresConfig.chunk_retrieval_params.weighted_search_alpha if not provided.\n:param impact_factor: (Optional) Impact factor (k) for RRF algorithm.\n    Lower values emphasize higher-ranked results. Default: 60.0 (optimal from research).\n    Only used when ranker=\"rrf\".\n    Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.\n:param weights: (Optional) Dictionary of weights for combining different signal types.\n    Keys can be \"vector\", \"keyword\", \"neural\". Values should sum to 1.0.\n    Used when combining algorithm-based reranking with neural reranking.\n    Example: {\"vector\": 0.3, \"keyword\": 0.3, \"neural\": 0.4}\n:param model: (Optional) Model identifier for neural reranker (e.g., \"transformers/Qwen/Qwen3-Reranker-0.6B\").\n    Required when ranker=\"neural\" or when weights contains \"neural\".",
                 "properties": {
                     "ranker": {
                         "type": "string",
@@ -5391,10 +5835,28 @@
                     {
                         "shields": [
                             {
-                                "identifier": "lightspeed_question_validity-shield",
-                                "params": {},
-                                "provider_id": "lightspeed_question_validity",
-                                "provider_resource_id": "lightspeed_question_validity-shield",
+                                "config": {
+                                    "invalid_question_response": "I can only answer questions about the product.",
+                                    "model_id": "openai/gpt-4o-mini",
+                                    "model_prompt": "Is this question valid?"
+                                },
+                                "name": "question-validity",
+                                "provider_id": "question_validity",
+                                "type": "shield"
+                            },
+                            {
+                                "config": {
+                                    "case_sensitive": false,
+                                    "rules": [
+                                        {
+                                            "case_sensitive": null,
+                                            "pattern": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+                                            "replacement": "[REDACTED]"
+                                        }
+                                    ]
+                                },
+                                "name": "pii-redaction",
+                                "provider_id": "redaction",
                                 "type": "shield"
                             }
                         ]
@@ -5402,10 +5864,9 @@
                 ],
                 "properties": {
                     "shields": {
-                        "description": "List of shields available",
+                        "description": "List of shields configured in Lightspeed Core Stack",
                         "items": {
-                            "additionalProperties": true,
-                            "type": "object"
+                            "$ref": "`#/components/schemas/`CatalogShield"
                         },
                         "title": "Shields",
                         "type": "array"
@@ -5708,8 +6169,7 @@
                     "tools": {
                         "description": "List of tools available from all configured MCP servers and built-in toolgroups",
                         "items": {
-                            "additionalProperties": true,
-                            "type": "object"
+                            "$ref": "`#/components/schemas/`CatalogTool"
                         },
                         "title": "Tools",
                         "type": "array"

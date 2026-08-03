@@ -230,6 +230,78 @@ Useful resources:
 | allow_headers | array | A list of HTTP request headers that should be supported for cross-origin requests. You can use ['*'] to allow all headers. The Accept, Accept-Language, Content-Language and Content-Type headers are always allowed for simple CORS requests. |
 
 
+## CatalogModel
+
+
+Normalized model entry used by ``/models`` and internal model resolution.
+
+Unifies OpenAI-style, Anthropic, and Google ``models.list()`` payloads into
+one catalog shape.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| identifier | string | Model identifier |
+| metadata | object | Provider-specific metadata excluding core catalog fields |
+| api_model_type | string | API model type (typically mirrors model_type) |
+| provider_id | string | Provider identifier |
+| type | string | Object type, always 'model' |
+| provider_resource_id | string | Provider-native resource identifier for the model |
+| model_type | string | Model type such as 'llm' or 'embedding' |
+
+
+## CatalogShield
+
+
+Shield entry in the ``/shields`` catalog response.
+
+Attributes:
+    name: Unique, user-facing name identifying this shield instance.
+    provider_id: Shield provider / type discriminator.
+    type: Catalog entry type; always shield.
+    config: Type-specific shield configuration.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique, user-facing name of the shield instance |
+| provider_id | string | Shield provider / type discriminator |
+| type | string | Catalog entry type; always shield |
+| config | object | Type-specific shield configuration |
+
+
+## CatalogTool
+
+
+Tool entry in the ``/tools`` catalog response.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| identifier | string |  |
+| description | string |  |
+| parameters | array |  |
+| provider_id | string |  |
+| toolgroup_id | string |  |
+| server_source | string |  |
+| type | string |  |
+
+
+## CatalogToolParameter
+
+
+Parameter entry for a tool in the ``/tools`` catalog response.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string |  |
+| description | string |  |
+| parameter_type | string |  |
+| required | boolean |  |
+| default |  |  |
+
+
 ## CompactionConfiguration
 
 
@@ -303,6 +375,7 @@ Global service configuration.
 | reranker |  | Configuration for neural reranking of RAG chunks using cross-encoder. |
 | skills |  | Agent skills configuration. Specifies paths to skill directories. |
 | saved_prompts |  | Configuration for saved prompts feature limits including maximum prompts per user, display name length, and content length. |
+| shields | array | List of pydantic-ai-lightspeed agent guardrail shields (question validity and PII redaction). Each entry has a unique 'name', a 'provider_id' ('question_validity' or 'redaction'), and a type-specific 'config'. |
 
 
 ## ConfigurationResponse
@@ -1021,6 +1094,8 @@ URL citation annotation for referencing external web resources.
 ## OpenAIResponseAnnotationContainerFileCitation
 
 
+Container file citation annotation referencing a file within a container.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1053,6 +1128,8 @@ File citation annotation for referencing specific files in response content.
 
 ## OpenAIResponseAnnotationFilePath
 
+
+File path annotation referencing a generated file in response content.
 
 
 | Field | Type | Description |
@@ -1227,6 +1304,8 @@ Forces the model to call a specific tool on a remote MCP server
 ## OpenAIResponseInputToolChoiceMode
 
 
+Enumeration of simple tool choice modes for response generation.
+
 
 
 
@@ -1335,6 +1414,8 @@ scenarios.
 
 ## OpenAIResponseOutputMessageContentOutputText
 
+
+Text content within an output message of an OpenAI response.
 
 
 | Field | Type | Description |
@@ -1454,6 +1535,45 @@ MCP list tools output message containing available tools from an MCP server.
 | tools | array |  |
 
 
+## OpenAIResponseOutputMessageReasoningContent
+
+
+Reasoning text from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The reasoning text content from the model. |
+| type | string | The type identifier, always 'reasoning_text'. |
+
+
+## OpenAIResponseOutputMessageReasoningItem
+
+
+Reasoning output from the model, representing the model's thinking process.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique identifier for the reasoning output item. |
+| summary | array | Summary of the reasoning output. |
+| type | string | The type identifier, always 'reasoning'. |
+| content | array | The reasoning content from the model. |
+| status | string | The status of the reasoning output. |
+
+
+## OpenAIResponseOutputMessageReasoningSummary
+
+
+A summary of reasoning output from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The summary text of the reasoning output. |
+| type | string | The type identifier, always 'summary_text'. |
+
+
 ## OpenAIResponseOutputMessageWebSearchToolCall
 
 
@@ -1503,6 +1623,7 @@ Controls how much reasoning the model performs before generating a response.
 | Field | Type | Description |
 |-------|------|-------------|
 | effort | string |  |
+| summary | string | Summary mode for reasoning output. One of 'auto', 'concise', or 'detailed'. |
 
 
 ## OpenAIResponseText
@@ -1511,11 +1632,13 @@ Controls how much reasoning the model performs before generating a response.
 Text response configuration for OpenAI responses.
 
 :param format: (Optional) Text format configuration specifying output format requirements
+:param verbosity: (Optional) Controls response verbosity level
 
 
 | Field | Type | Description |
 |-------|------|-------------|
 | format |  |  |
+| verbosity | string |  |
 
 
 ## OpenAIResponseTextFormat
@@ -1819,6 +1942,37 @@ Attributes:
 | tool_results | array | List of tool results |
 
 
+## QuestionValidityConfig
+
+
+Configuration for the question validity guardrail.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| model_id | string | The model_id to use for the guard |
+| model_prompt | string | The default prompt sent to the LLM used to validate the Users' question. |
+| invalid_question_response | string | The default response when the Users' question is determined to be invalid. |
+
+
+## QuestionValidityShieldConfiguration
+
+
+Configuration for a named question-validity guardrail shield.
+
+Attributes:
+    name: Unique, user-facing name identifying this shield instance.
+    provider_id: Discriminator identifying this as a question-validity shield.
+    config: Question-validity-specific configuration.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique, user-facing name identifying this shield instance. |
+| provider_id | string | Discriminator identifying this as a question-validity shield. |
+| config |  | Question-validity-specific configuration for this shield. |
+
+
 ## QuotaHandlersConfiguration
 
 
@@ -1980,6 +2134,64 @@ Attributes:
 | overall_status |  | Overall service health status |
 | impacts | array | List of functional impacts when service is degraded or unhealthy |
 | providers | array | List of unhealthy providers (empty when all healthy) |
+
+
+## RedactionConfig
+
+
+Configuration for PII redaction with regex-based rules.
+
+Rules are validated and compiled at construction time. Invalid
+regex patterns raise a ``ValueError`` immediately.
+
+Attributes:
+    rules: Ordered list of redaction rules applied sequentially.
+    case_sensitive: When False, patterns are compiled with
+        ``re.IGNORECASE``. Defaults to False.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| rules | array | Ordered list of PII redaction rules |
+| case_sensitive | boolean | When False, patterns are compiled with re.IGNORECASE |
+
+
+## RedactionRule
+
+
+A single regex-based redaction rule.
+
+Attributes:
+    pattern: Raw regex pattern string to match sensitive data.
+    replacement: Text to substitute for each match.
+    case_sensitive: Per-rule override for case sensitivity.
+        When None, the global ``RedactionConfig.case_sensitive``
+        flag applies.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| pattern | string | Regex pattern to match sensitive data |
+| replacement | string | Replacement string for matched text |
+| case_sensitive | boolean | Per-rule case sensitivity override. When None, the global config flag applies. |
+
+
+## RedactionShieldConfiguration
+
+
+Configuration for a named PII-redaction guardrail shield.
+
+Attributes:
+    name: Unique, user-facing name identifying this shield instance.
+    provider_id: Discriminator identifying this as a redaction shield.
+    config: Redaction-specific configuration.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique, user-facing name identifying this shield instance. |
+| provider_id | string | Discriminator identifying this as a redaction shield. |
+| config |  | Redaction-specific configuration for this shield. |
 
 
 ## ReferencedDocument
@@ -2256,7 +2468,7 @@ Examples:
 :param ranker: (Optional) Name of the ranking algorithm to use. Supported values:
     - "weighted": Weighted combination of vector and keyword scores
     - "rrf": Reciprocal Rank Fusion algorithm
-    - "neural": Neural reranking model (requires model parameter, Part II)
+    - "neural": Neural reranking model (requires model parameter)
     Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.
 :param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0
 :param alpha: (Optional) Weight factor for weighted ranker (0-1).
@@ -2271,10 +2483,10 @@ Examples:
     Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.
 :param weights: (Optional) Dictionary of weights for combining different signal types.
     Keys can be "vector", "keyword", "neural". Values should sum to 1.0.
-    Used when combining algorithm-based reranking with neural reranking (Part II).
+    Used when combining algorithm-based reranking with neural reranking.
     Example: {"vector": 0.3, "keyword": 0.3, "neural": 0.4}
-:param model: (Optional) Model identifier for neural reranker (e.g., "vllm/Qwen3-Reranker-0.6B").
-    Required when ranker="neural" or when weights contains "neural" (Part II).
+:param model: (Optional) Model identifier for neural reranker (e.g., "transformers/Qwen/Qwen3-Reranker-0.6B").
+    Required when ranker="neural" or when weights contains "neural".
 
 
 | Field | Type | Description |
@@ -2320,7 +2532,7 @@ Model representing a response to shields request.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| shields | array | List of shields available |
+| shields | array | List of shields configured in Lightspeed Core Stack |
 
 
 ## SkillsConfiguration

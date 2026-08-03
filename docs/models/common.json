@@ -431,6 +431,7 @@
                 "type": "object"
             },
             "OpenAIResponseAnnotationContainerFileCitation": {
+                "description": "Container file citation annotation referencing a file within a container.",
                 "properties": {
                     "type": {
                         "const": "container_file_citation",
@@ -500,6 +501,7 @@
                 "type": "object"
             },
             "OpenAIResponseAnnotationFilePath": {
+                "description": "File path annotation referencing a generated file in response content.",
                 "properties": {
                     "type": {
                         "const": "file_path",
@@ -781,6 +783,7 @@
                 "type": "object"
             },
             "OpenAIResponseOutputMessageContentOutputText": {
+                "description": "Text content within an output message of an OpenAI response.",
                 "properties": {
                     "text": {
                         "title": "Text",
@@ -1030,6 +1033,95 @@
                 "title": "OpenAIResponseOutputMessageMCPListTools",
                 "type": "object"
             },
+            "OpenAIResponseOutputMessageReasoningContent": {
+                "description": "Reasoning text from the model.",
+                "properties": {
+                    "text": {
+                        "description": "The reasoning text content from the model.",
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "reasoning_text",
+                        "default": "reasoning_text",
+                        "description": "The type identifier, always 'reasoning_text'.",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "text"
+                ],
+                "title": "OpenAIResponseOutputMessageReasoningContent",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageReasoningItem": {
+                "description": "Reasoning output from the model, representing the model's thinking process.",
+                "properties": {
+                    "id": {
+                        "description": "Unique identifier for the reasoning output item.",
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "summary": {
+                        "description": "Summary of the reasoning output.",
+                        "items": {
+                            "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningSummary"
+                        },
+                        "title": "Summary",
+                        "type": "array"
+                    },
+                    "type": {
+                        "const": "reasoning",
+                        "default": "reasoning",
+                        "description": "The type identifier, always 'reasoning'.",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "content": {
+                        "type": "array",
+                        "nullable": true,
+                        "default": null,
+                        "description": "The reasoning content from the model.",
+                        "title": "Content"
+                    },
+                    "status": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "The status of the reasoning output.",
+                        "title": "Status"
+                    }
+                },
+                "required": [
+                    "id",
+                    "summary"
+                ],
+                "title": "OpenAIResponseOutputMessageReasoningItem",
+                "type": "object"
+            },
+            "OpenAIResponseOutputMessageReasoningSummary": {
+                "description": "A summary of reasoning output from the model.",
+                "properties": {
+                    "text": {
+                        "description": "The summary text of the reasoning output.",
+                        "title": "Text",
+                        "type": "string"
+                    },
+                    "type": {
+                        "const": "summary_text",
+                        "default": "summary_text",
+                        "description": "The type identifier, always 'summary_text'.",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "text"
+                ],
+                "title": "OpenAIResponseOutputMessageReasoningSummary",
+                "type": "object"
+            },
             "OpenAIResponseOutputMessageWebSearchToolCall": {
                 "description": "Web search tool call output message for OpenAI responses.\n\n:param id: Unique identifier for this tool call\n:param status: Current status of the web search operation\n:param type: Tool call type identifier, always \"web_search_call\"",
                 "properties": {
@@ -1271,15 +1363,11 @@
                     "moderation_id": {
                         "title": "Moderation Id",
                         "type": "string"
-                    },
-                    "refusal_response": {
-                        "$ref": "`#/components/schemas/`OpenAIResponseMessage"
                     }
                 },
                 "required": [
                     "message",
-                    "moderation_id",
-                    "refusal_response"
+                    "moderation_id"
                 ],
                 "title": "ShieldModerationBlocked",
                 "type": "object"
@@ -1655,6 +1743,7 @@
                                     "mcp_call": "`#/components/schemas/`OpenAIResponseOutputMessageMCPCall",
                                     "mcp_list_tools": "`#/components/schemas/`OpenAIResponseOutputMessageMCPListTools",
                                     "message": "`#/components/schemas/`OpenAIResponseMessage",
+                                    "reasoning": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem",
                                     "web_search_call": "`#/components/schemas/`OpenAIResponseOutputMessageWebSearchToolCall"
                                 },
                                 "propertyName": "type"
@@ -1680,6 +1769,9 @@
                                 },
                                 {
                                     "$ref": "`#/components/schemas/`OpenAIResponseMCPApprovalRequest"
+                                },
+                                {
+                                    "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem"
                                 }
                             ]
                         },
