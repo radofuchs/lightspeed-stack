@@ -4,6 +4,17 @@ This directory validates the **LCS-native guardrails layer** (spike
 Decision S1) against a real Granite Guardian model. Read the files in
 order; each stands alone.
 
+> **Note on the code.** These results were produced by a PoC that lived in
+> `src/guardrails/` and a small hook in `src/app/endpoints/query.py`. Per
+> the reviewers' merge decision, that code is **not part of the merged
+> tree** — only this evidence and the design docs are kept. The PoC
+> sources remain in the history of PR #2182 (and the reproduction recipe
+> below is enough to rebuild them); the production implementation follows
+> in its own ticket. Consequently the scripts here
+> (`drive_layer.py`, `mcp-mock-server.py`) reference a `guardrails` module
+> that is not present in `main` — they are archived artifacts, not
+> runnable in-tree.
+
 | File | What it shows |
 |------|---------------|
 | `01-guardian-probe-results.md` | Real Guardian gives correct verdicts for OOTB and custom (BYOC) risks — the core model-behavior question (6/6). |

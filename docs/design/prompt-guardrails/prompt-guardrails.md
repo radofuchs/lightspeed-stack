@@ -245,6 +245,13 @@ so nothing leaks) and is explicitly not the production pattern.
   before it re-enters the agent loop; flagged content is replaced by a
   policy notice or aborts the turn per the rule's blocking flag.
 
+The guardrails module itself stays a thin, framework-agnostic library
+(`content + rule → verdict`). Per reviewer note, the agent runners in
+`src/runners/` are the natural place to invoke it — calling into
+`src/guardrails/` from a runner is only a few lines, and keeps the
+detection logic decoupled from any one execution path (query endpoint,
+runner, or streaming generator).
+
 ### API changes
 
 None to request models in the core epic. Response behavior on block is the
