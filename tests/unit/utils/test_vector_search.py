@@ -22,7 +22,7 @@ from utils.vector_search import (
     _extract_byok_rag_chunks,
     _extract_solr_document_metadata,
     _fetch_byok_rag,
-    _fetch_solr_rag,
+    _fetch_okp_rag,
     _format_rag_context,
     _get_okp_base_url,
     _get_solr_vector_store_ids,
@@ -581,8 +581,8 @@ class TestFetchByokRag:
     async def test_byok_no_inline_ids(self, mocker: MockerFixture) -> None:
         """Test when no inline BYOK sources are configured."""
         config_mock = mocker.Mock(spec=AppConfig)
-        config_mock.configuration.rag.inline = []
-        config_mock.configuration.byok_rag = []
+        config_mock.rag.retrieval.inline.sources = []
+        config_mock.rag.byok.stores = []
         mocker.patch("utils.vector_search.configuration", config_mock)
 
         client_mock = mocker.AsyncMock()
@@ -600,8 +600,9 @@ class TestFetchByokRag:
         byok_rag_mock = mocker.Mock()
         byok_rag_mock.rag_id = "rag_1"
         byok_rag_mock.vector_db_id = "vs_1"
-        config_mock.configuration.rag.inline = ["rag_1"]
-        config_mock.configuration.byok_rag = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.sources = ["rag_1"]
+        config_mock.rag.byok.stores = [byok_rag_mock]
+        config_mock.rag.byok.max_chunks = constants.DEFAULT_BYOK_RAG_MAX_CHUNKS
         config_mock.score_multiplier_mapping = {"vs_1": 1.5}
         config_mock.rag_id_mapping = {"vs_1": "rag_1"}
         mocker.patch("utils.vector_search.configuration", config_mock)
@@ -639,8 +640,9 @@ class TestFetchByokRag:
         byok_rag_mock = mocker.Mock()
         byok_rag_mock.rag_id = "my-kb"
         byok_rag_mock.vector_db_id = "vs-internal-001"
-        config_mock.configuration.byok_rag = [byok_rag_mock]
-        config_mock.configuration.rag.inline = ["my-kb"]
+        config_mock.rag.byok.stores = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.sources = ["my-kb"]
+        config_mock.rag.byok.max_chunks = constants.DEFAULT_BYOK_RAG_MAX_CHUNKS
         config_mock.score_multiplier_mapping = {"vs-internal-001": 1.0}
         config_mock.rag_id_mapping = {"vs-internal-001": "my-kb"}
         mocker.patch("utils.vector_search.configuration", config_mock)
@@ -664,7 +666,10 @@ class TestFetchByokRag:
         client_mock.vector_io.query.assert_called_once_with(
             vector_store_id="vs-internal-001",
             query="test query",
-            params={"max_chunks": constants.BYOK_RAG_MAX_CHUNKS, "mode": "vector"},
+            params={
+                "max_chunks": constants.DEFAULT_BYOK_RAG_MAX_CHUNKS,
+                "mode": "vector",
+            },
         )
 
     @pytest.mark.asyncio
@@ -679,8 +684,12 @@ class TestFetchByokRag:
         byok_rag_2 = mocker.Mock()
         byok_rag_2.rag_id = "kb-part2"
         byok_rag_2.vector_db_id = "vs-bbb-222"
-        config_mock.configuration.byok_rag = [byok_rag_1, byok_rag_2]
-        config_mock.configuration.rag.inline = ["kb-part1", "kb-part2"]
+        config_mock.rag.byok.stores = [byok_rag_1, byok_rag_2]
+        config_mock.rag.retrieval.inline.sources = [
+            "kb-part1",
+            "kb-part2",
+        ]
+        config_mock.rag.byok.max_chunks = constants.DEFAULT_BYOK_RAG_MAX_CHUNKS
         config_mock.score_multiplier_mapping = {"vs-aaa-111": 1.0, "vs-bbb-222": 1.0}
         config_mock.rag_id_mapping = {
             "vs-aaa-111": "kb-part1",
@@ -721,8 +730,8 @@ class TestFetchByokRag:
     ) -> None:
         """Test that BYOK inline RAG is skipped when rag.inline is empty."""
         config_mock = mocker.Mock(spec=AppConfig)
-        config_mock.configuration.rag.inline = []
-        config_mock.configuration.byok_rag = []
+        config_mock.rag.retrieval.inline.sources = []
+        config_mock.rag.byok.stores = []
         mocker.patch("utils.vector_search.configuration", config_mock)
 
         client_mock = mocker.AsyncMock()
@@ -741,8 +750,8 @@ class TestFetchByokRag:
     ) -> None:
         """Test that a request vector_store_id not registered in rag.inline is filtered out."""
         config_mock = mocker.Mock(spec=AppConfig)
-        config_mock.configuration.rag.inline = ["registered-id"]
-        config_mock.configuration.byok_rag = []
+        config_mock.rag.retrieval.inline.sources = ["registered-id"]
+        config_mock.rag.byok.stores = []
         mocker.patch("utils.vector_search.configuration", config_mock)
 
         client_mock = mocker.AsyncMock()
@@ -757,7 +766,7 @@ class TestFetchByokRag:
 
 
 class TestFetchSolrRag:
-    """Tests for _fetch_solr_rag async function."""
+    """Tests for _fetch_okp_rag async function."""
 
     @pytest.mark.asyncio
     async def test_solr_disabled(self, mocker: MockerFixture) -> None:
@@ -767,7 +776,7 @@ class TestFetchSolrRag:
         mocker.patch("utils.vector_search.configuration", config_mock)
 
         client_mock = mocker.AsyncMock()
-        rag_chunks, referenced_docs = await _fetch_solr_rag(client_mock, "test query")
+        rag_chunks, referenced_docs = await _fetch_okp_rag(client_mock, "test query")
 
         assert rag_chunks == []
         assert referenced_docs == []
@@ -781,6 +790,7 @@ class TestFetchSolrRag:
         config_mock.inline_solr_enabled = True
         config_mock.okp.offline = True
         config_mock.okp.rhokp_url = "https://okp.test"
+        config_mock.rag.okp.max_chunks = constants.DEFAULT_OKP_RAG_MAX_CHUNKS
         mocker.patch("utils.vector_search.configuration", config_mock)
 
         # Mock chunk
@@ -798,7 +808,7 @@ class TestFetchSolrRag:
         client_mock = mocker.AsyncMock()
         client_mock.vector_io.query.return_value = query_response
 
-        rag_chunks, _referenced_docs = await _fetch_solr_rag(client_mock, "test query")
+        rag_chunks, _referenced_docs = await _fetch_okp_rag(client_mock, "test query")
 
         assert len(rag_chunks) > 0
         assert rag_chunks[0].content == "Solr content"
@@ -813,6 +823,7 @@ class TestFetchSolrRag:
         config_mock.inline_solr_enabled = True
         config_mock.okp.offline = True
         config_mock.okp.rhokp_url = "https://okp.test"
+        config_mock.rag.okp.max_chunks = constants.DEFAULT_OKP_RAG_MAX_CHUNKS
         mocker.patch("utils.vector_search.configuration", config_mock)
 
         chunk_mock = mocker.Mock()
@@ -827,7 +838,7 @@ class TestFetchSolrRag:
         client_mock = mocker.AsyncMock()
         client_mock.vector_io.query.return_value = query_response
 
-        await _fetch_solr_rag(
+        await _fetch_okp_rag(
             client_mock,
             "test query",
             SolrVectorSearchRequest(mode="semantic", filters={"fq": ["x:y"]}),
@@ -846,8 +857,12 @@ class TestBuildRagContext:
     async def test_both_sources_disabled(self, mocker: MockerFixture) -> None:
         """Test when both BYOK inline and Solr inline are not configured."""
         config_mock = mocker.Mock(spec=AppConfig)
-        config_mock.configuration.rag.inline = []
-        config_mock.configuration.byok_rag = []
+        config_mock.rag.retrieval.inline.sources = []
+        config_mock.rag.byok.stores = []
+        config_mock.rag.retrieval.inline.max_chunks = (
+            constants.DEFAULT_INLINE_RAG_MAX_CHUNKS
+        )
+        config_mock.rag.byok.max_chunks = constants.DEFAULT_BYOK_RAG_MAX_CHUNKS
         config_mock.inline_solr_enabled = False
         mocker.patch("utils.vector_search.configuration", config_mock)
 
@@ -866,8 +881,12 @@ class TestBuildRagContext:
         byok_rag_mock = mocker.Mock()
         byok_rag_mock.rag_id = "rag_1"
         byok_rag_mock.vector_db_id = "vs_1"
-        config_mock.configuration.rag.inline = ["rag_1"]
-        config_mock.configuration.byok_rag = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.sources = ["rag_1"]
+        config_mock.rag.byok.stores = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.max_chunks = (
+            constants.DEFAULT_INLINE_RAG_MAX_CHUNKS
+        )
+        config_mock.rag.byok.max_chunks = constants.DEFAULT_BYOK_RAG_MAX_CHUNKS
         config_mock.inline_solr_enabled = False
         config_mock.score_multiplier_mapping = {"vs_1": 1.0}
         config_mock.rag_id_mapping = {"vs_1": "rag_1"}
@@ -903,8 +922,12 @@ class TestBuildRagContext:
         byok_rag_mock = mocker.Mock()
         byok_rag_mock.rag_id = "rag_1"
         byok_rag_mock.vector_db_id = "vs_1"
-        config_mock.configuration.rag.inline = ["rag_1"]
-        config_mock.configuration.byok_rag = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.sources = ["rag_1"]
+        config_mock.rag.byok.stores = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.max_chunks = (
+            constants.DEFAULT_INLINE_RAG_MAX_CHUNKS
+        )
+        config_mock.rag.byok.max_chunks = constants.DEFAULT_BYOK_RAG_MAX_CHUNKS
         config_mock.inline_solr_enabled = False
         config_mock.score_multiplier_mapping = {"vs_1": 1.0}
         config_mock.rag_id_mapping = {"vs_1": "rag_1"}
@@ -954,8 +977,12 @@ class TestBuildRagContext:
         byok_rag_mock = mocker.Mock()
         byok_rag_mock.rag_id = "rag_1"
         byok_rag_mock.vector_db_id = "vs_1"
-        config_mock.configuration.rag.inline = ["rag_1"]
-        config_mock.configuration.byok_rag = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.sources = ["rag_1"]
+        config_mock.rag.byok.stores = [byok_rag_mock]
+        config_mock.rag.retrieval.inline.max_chunks = (
+            constants.DEFAULT_INLINE_RAG_MAX_CHUNKS
+        )
+        config_mock.rag.byok.max_chunks = constants.DEFAULT_BYOK_RAG_MAX_CHUNKS
         config_mock.inline_solr_enabled = False
         config_mock.score_multiplier_mapping = {"vs_1": 1.0}
         config_mock.rag_id_mapping = {"vs_1": "rag_1"}
