@@ -261,6 +261,8 @@ mock Confluence.
 
 ### Epic: BYOK auto-import from Confluence
 
+<!-- key: LCORE-3374 -->
+
 Automation that builds and refreshes a BYOK vector store from Confluence,
 per `docs/design/byok-confluence-import/byok-confluence-import.md`.
 
@@ -285,8 +287,8 @@ per `docs/design/byok-confluence-import/byok-confluence-import.md`.
   answers after rollout.
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? E2E feature files for BYOK Confluence auto-import (no step implementation)
+<!-- key: LCORE-3375 -->
+#### LCORE-3375: E2E feature files for BYOK Confluence auto-import (no step implementation)
 
 **User story**: As a Lightspeed Core e2e engineer, I want the behave
 feature files for the Confluence auto-import scenarios written before the
@@ -298,7 +300,7 @@ describing: import from a (mock) Confluence produces a queryable BYOK
 store with page-URL citations; incremental re-import skips unchanged pages;
 an edited page's content is served after re-import + restart; a deleted
 page's content disappears after re-import + restart. Step definitions are
-explicitly **not** part of this ticket (covered by LCORE-????).
+explicitly **not** part of this ticket (covered by LCORE-3376).
 
 **Scope**:
 - `.feature` files covering R1..Rn from the spec doc
@@ -310,7 +312,7 @@ explicitly **not** part of this ticket (covered by LCORE-????).
 - behave marks all new scenario steps as `undefined`
 - `uv run make test-e2e` remains green (new scenarios undefined, not failing)
 
-**Blocks**: LCORE-???? (step-definitions counterpart)
+**Blocks**: LCORE-3376 (step-definitions counterpart)
 
 **Agentic tool instruction**:
 
@@ -324,8 +326,8 @@ tests/e2e/test_list.txt. Do NOT create step definitions.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Implement behave step definitions for BYOK Confluence auto-import
+<!-- key: LCORE-3376 -->
+#### LCORE-3376: Implement behave step definitions for BYOK Confluence auto-import
 
 **Description**: Implement Python step definitions under
 `tests/e2e/features/steps/` for the feature files authored in the kickoff
@@ -335,9 +337,9 @@ Gherkin as-is; if a scenario cannot be implemented faithfully, raise it
 against the spec doc rather than weakening the test.
 
 **Blocked by**:
-- LCORE-???? (E2E feature files kickoff)
-- LCORE-???? (Confluence fetch stage)
-- LCORE-???? (pipeline integration + packaging)
+- LCORE-3375 (E2E feature files kickoff)
+- LCORE-3377 (Confluence fetch stage)
+- LCORE-3378 (pipeline integration + packaging)
 
 **Agentic tool instruction**:
 
@@ -349,8 +351,8 @@ as-is. To verify: `uv run make test-e2e` runs every new scenario green.
 ```
 
 <!-- type: Story -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Implement Confluence fetch stage in rag-content
+<!-- key: LCORE-3377 -->
+#### LCORE-3377: Implement Confluence fetch stage in rag-content
 
 **User story**: As a Lightspeed admin, I want to fetch Confluence spaces as
 pipeline-ready documents with one command, so that I don't prepare BYOK
@@ -390,15 +392,15 @@ in lightspeed-core/rag-content.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? End-to-end importer command and container packaging
+<!-- key: LCORE-3378 -->
+#### LCORE-3378: End-to-end importer command and container packaging
 
 **Description**: A single `import-confluence` entrypoint that runs
 fetch → build → (optional) image packaging in one invocation, wired into
 the rag-content tool image; integration test covering
 fetch-dir → `llamastack-faiss` artifact with citation metadata.
 
-**Blocked by**: LCORE-???? (Confluence fetch stage)
+**Blocked by**: LCORE-3377 (Confluence fetch stage)
 
 **Scope**:
 - CLI orchestration (fetch stage + DocumentProcessor + optional
@@ -423,8 +425,8 @@ in lightspeed-core/rag-content.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Scheduled-refresh references (CronJob, podman/systemd) and admin automation guide
+<!-- key: LCORE-3379 -->
+#### LCORE-3379: Scheduled-refresh references (CronJob, podman/systemd) and admin automation guide
 
 **Description**: Reference automation for scheduled refresh in two
 deployment shapes, both driving the same importer container: a Kubernetes
@@ -435,7 +437,7 @@ covering credentials (Secret / podman secret; service-account
 recommendation), scheduling, staleness expectations, and the security
 warning about permission flattening.
 
-**Blocked by**: LCORE-???? (end-to-end importer command)
+**Blocked by**: LCORE-3378 (end-to-end importer command)
 
 **Acceptance criteria**:
 - Manifest applies cleanly on a stock OpenShift/k8s cluster
@@ -453,8 +455,8 @@ Key files: examples/ and docs/ in lightspeed-core/rag-content.
 ```
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-#### LCORE-???? Update lightspeed-stack BYOK documentation for Confluence auto-import
+<!-- key: LCORE-3380 -->
+#### LCORE-3380: Update lightspeed-stack BYOK documentation for Confluence auto-import
 
 **Description**: Extend `docs/byok_guide.md` with the Confluence source:
 point at the rag-content importer + CronJob guide, document the
@@ -462,7 +464,7 @@ embedding-model-match requirement, the restart-to-pick-up-changes
 behavior, and the permission-flattening warning. Per spike Decision S5, no
 lightspeed-stack config changes.
 
-**Blocked by**: LCORE-???? (CronJob reference manifest and admin guide)
+**Blocked by**: LCORE-3379 (CronJob reference manifest and admin guide)
 
 **Acceptance criteria**:
 - byok_guide has an end-to-end "from Confluence" walkthrough consistent
@@ -480,8 +482,8 @@ lightspeed-core/lightspeed-stack.
 ## Proposed incidental JIRAs
 
 <!-- type: Task -->
-<!-- key: LCORE-???? -->
-### LCORE-???? rag-content: generated llama-stack.yaml conflicts with registration persisted in faiss_store.db
+<!-- key: LCORE-3381 -->
+### LCORE-3381: rag-content: generated llama-stack.yaml conflicts with registration persisted in faiss_store.db
 
 **Description**: A freshly built `llamastack-faiss` store cannot be opened
 with its own generated `llama-stack.yaml`: the

@@ -6,11 +6,11 @@ Init of tests/unit/utils.
 ## [auth_helpers.py](auth_helpers.py)
 Helper functions for mocking authorization in tests.
 
+## [test_builtin_tools.py](test_builtin_tools.py)
+Unit tests for builtin file-search tool discovery.
+
 ## [test_checks.py](test_checks.py)
 Unit tests for functions defined in utils/checks module.
-
-## [test_common.py](test_common.py)
-Test module for utils/common.py.
 
 ## [test_compaction.py](test_compaction.py)
 Unit tests for utils/compaction — partitioning, prompt, summarization.
@@ -44,6 +44,12 @@ Unit tests for MCP authorization headers utilities.
 
 ## [test_mcp_headers.py](test_mcp_headers.py)
 Unit tests for MCP headers utility functions.
+
+## [test_mcp_tools.py](test_mcp_tools.py)
+Unit tests for MCP tool discovery utilities.
+
+## [test_model_list.py](test_model_list.py)
+Unit tests for utils/model_list.py helpers.
 
 ## [test_models_dumper.py](test_models_dumper.py)
 Unit tests for utils/models_dumper module.

@@ -1,27 +1,15 @@
 """Handler for REST API call to provide answer to query using Response API."""
 
 import datetime
-from typing import Annotated, Any, Optional, cast
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from llama_stack_api.openai_responses import OpenAIResponseObject
-from llama_stack_client import (
-    APIConnectionError,
-    AsyncLlamaStackClient,
-)
-from llama_stack_client import (
-    APIStatusError as LLSApiStatusError,
-)
-from openai._exceptions import (
-    APIStatusError as OpenAIAPIStatusError,
-)
-from typing_extensions import deprecated
+from fastapi import APIRouter, Depends, Request
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.azure_token_manager import AzureEntraIDManager
 from authorization.middleware import authorize
-from client import AsyncLlamaStackClientHolder
+from client import AsyncOgxClientHolder
 from configuration import configuration
 from constants import ENDPOINT_PATH_QUERY, IMAGE_CONTENT_TYPES
 from log import get_logger
@@ -38,18 +26,12 @@ from models.api.responses.error import (
     UnprocessableEntityResponse,
 )
 from models.api.responses.successful import QueryResponse
-from models.common.moderation import ShieldModerationResult
-from models.common.responses.responses_api_params import ResponsesApiParams
-from models.common.responses.types import ResponseInput
-from models.common.turn_summary import TurnSummary
 from models.config import Action
 from utils.agents.query import retrieve_agent_response
 from utils.conversation_compaction import (
     apply_compaction_blocking,
     configured_conversation_cache,
-    store_compacted_turn,
 )
-from utils.conversations import append_turn_items_to_conversation
 from utils.endpoints import (
     check_configuration_loaded,
     validate_and_retrieve_conversation,
@@ -58,8 +40,6 @@ from utils.mcp_headers import McpHeaders, mcp_headers_dependency
 from utils.mcp_oauth_probe import check_mcp_auth
 from utils.query import (
     consume_query_tokens,
-    handle_known_apistatus_errors,
-    is_context_length_error,
     prepare_input,
     store_query_results,
     validate_attachments_metadata,
@@ -67,9 +47,7 @@ from utils.query import (
 )
 from utils.quota_utils import check_tokens_available, get_available_quotas
 from utils.responses import (
-    build_turn_summary,
     deduplicate_referenced_documents,
-    extract_vector_store_ids_from_tools,
     maybe_get_topic_summary,
     prepare_responses_params,
 )
@@ -96,7 +74,7 @@ query_response: dict[int | str, dict[str, Any]] = {
     429: QuotaExceededResponse.openapi_response(),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -133,7 +111,7 @@ async def query_endpoint_handler(
     - 422: Unprocessable Entity - Request validation failed
     - 429: Quota limit exceeded - The token quota for model or user has been exceeded
     - 500: Internal Server Error - Configuration not loaded or other server errors
-    - 503: Service Unavailable - Unable to connect to Llama Stack backend
+    - 503: Service Unavailable - Unable to connect to OGX backend
     """
     check_configuration_loaded(configuration)
 
@@ -172,7 +150,7 @@ async def query_endpoint_handler(
             in request.state.authorized_actions,
         )
 
-    client = AsyncLlamaStackClientHolder().get_client()
+    client = AsyncOgxClientHolder().get_client()
 
     # Moderation input is the raw user content (query + attachments) without injected RAG
     # context, to avoid false positives from retrieved document content.
@@ -225,7 +203,7 @@ async def query_endpoint_handler(
         and AzureEntraIDManager().is_token_expired
         and AzureEntraIDManager().refresh_token()
     ):
-        client = await AsyncLlamaStackClientHolder().update_azure_token()
+        client = await AsyncOgxClientHolder().update_azure_token()
 
     # Extract image attachments for multimodal support
     image_attachments = [
@@ -241,6 +219,7 @@ async def query_endpoint_handler(
         moderation_result,
         endpoint_path,
         compaction.original_input if compaction.compacted else None,
+        shield_ids=query_request.shield_ids,
         no_tools=bool(query_request.no_tools),
         image_attachments=image_attachments,
     )
@@ -311,95 +290,4 @@ async def query_endpoint_handler(
         input_tokens=turn_summary.token_usage.input_tokens,
         output_tokens=turn_summary.token_usage.output_tokens,
         available_quotas=available_quotas,
-    )
-
-
-@deprecated(
-    "Deprecated in favor of utils.agents.query.retrieve_agent_response.",
-    stacklevel=2,
-)
-async def retrieve_response(
-    client: AsyncLlamaStackClient,
-    responses_params: ResponsesApiParams,
-    moderation_result: ShieldModerationResult,
-    endpoint_path: str = "",
-    original_input: Optional[ResponseInput] = None,
-) -> TurnSummary:
-    """
-    Retrieve response from LLMs and agents.
-
-    Retrieves a response from the Llama Stack LLM using the Responses API.
-    This function processes the prepared request and returns the LLM response.
-
-    Parameters:
-    ----------
-        client: The AsyncLlamaStackClient to use for the request.
-        responses_params: The Responses API parameters.
-        moderation_result: The moderation result.
-        endpoint_path: The request path, for metrics/telemetry.
-        original_input: Set only in compacted mode (LCORE-1572). It is the new
-            user query before the explicit-input rewrite. When provided, the
-            turn is appended to the conversation here, because the conversation
-            parameter is no longer passed to Llama Stack and so the turn is not
-            stored automatically.
-
-    Returns:
-    -------
-        TurnSummary: Summary of the LLM response content
-    """
-    response: Optional[OpenAIResponseObject] = None
-    # In compacted mode, the new turn must be stored against the original user
-    # query, not the explicit summaries-plus-recent input we send to inference.
-    turn_input = (
-        original_input if original_input is not None else responses_params.input
-    )
-    if moderation_result.decision == "blocked":
-        await append_turn_items_to_conversation(
-            client,
-            responses_params.conversation,
-            turn_input,
-            [moderation_result.refusal_response],
-        )
-        return TurnSummary(
-            id=moderation_result.moderation_id, llm_response=moderation_result.message
-        )
-    try:
-        response = await client.responses.create(
-            **responses_params.model_dump(exclude_none=True)
-        )
-        response = cast(OpenAIResponseObject, response)
-
-    except RuntimeError as e:  # library mode wraps 413 into runtime error
-        if is_context_length_error(str(e)):
-            error_response = PromptTooLongResponse(model=responses_params.model)
-            raise HTTPException(**error_response.model_dump()) from e
-        raise e
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="Llama Stack",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
-    except (LLSApiStatusError, OpenAIAPIStatusError) as e:
-        error_response = handle_known_apistatus_errors(e, responses_params.model)
-        raise HTTPException(**error_response.model_dump()) from e
-
-    # In compacted mode, store the completed turn ourselves (the conversation
-    # parameter was not sent, so Llama Stack did not persist it).
-    if original_input is not None:
-        await store_compacted_turn(
-            client,
-            responses_params.conversation,
-            original_input,
-            response.output,
-        )
-
-    vector_store_ids = extract_vector_store_ids_from_tools(responses_params.tools)
-    rag_id_mapping = configuration.rag_id_mapping
-    return build_turn_summary(
-        response,
-        responses_params.model,
-        endpoint_path,
-        vector_store_ids,
-        rag_id_mapping,
     )

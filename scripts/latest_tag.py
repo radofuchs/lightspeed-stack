@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Script to retrieve latest tag defined on GitHub."""
+
 import os
 import subprocess
 from typing import Optional
@@ -30,6 +32,7 @@ def get_latest_stable() -> Optional[str]:
 
 
 def main() -> None:
+    """Entry point to this script, retrieves latest tag defined on GitHub."""
     if not (current_tag := os.environ.get("GIT_TAG")):
         reason = "GIT_TAG environment variable not set, skipping latest tag"
         apply_latest = "false"
@@ -48,7 +51,7 @@ def main() -> None:
     print(reason)
 
     if github_output := os.environ.get("GITHUB_OUTPUT"):
-        with open(github_output, "a") as f:
+        with open(github_output, "a", encoding="utf-8") as f:
             f.write(f"apply_latest={apply_latest}\n")
 
 

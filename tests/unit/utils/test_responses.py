@@ -9,48 +9,50 @@ from typing import Any, Optional, cast
 
 import pytest
 from fastapi import HTTPException
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     AllowedToolsFilter,
     OpenAIResponseInputToolChoiceAllowedTools,
 )
-from llama_stack_api.openai_responses import ApprovalFilter as LlamaStackApprovalFilter
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import ApprovalFilter as OgxApprovalFilter
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolChoiceFileSearch as ToolChoiceFileSearch,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolChoiceMode as ToolChoiceMode,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolFileSearch as InputToolFileSearch,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolFunction as InputToolFunction,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolWebSearch as InputToolWebSearch,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseMCPApprovalRequest as MCPApprovalRequest,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseMCPApprovalResponse as MCPApprovalResponse,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageFileSearchToolCall as FileSearchCall,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageFunctionToolCall as FunctionCall,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageMCPCall as MCPCall,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageMCPListTools as MCPListTools,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageWebSearchToolCall as WebSearchCall,
 )
-from llama_stack_client import APIConnectionError, APIStatusError, AsyncLlamaStackClient
+from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
+from ogx_client.types import ListModelsResponse
+from ogx_client.types.model import Model
 from pydantic import AnyUrl, BaseModel
 from pytest_mock import MockerFixture
 
@@ -449,7 +451,7 @@ class TestGetMCPTools:
 
         tools = await get_mcp_tools(token=None)
         assert len(tools) == 1
-        assert isinstance(tools[0].require_approval, LlamaStackApprovalFilter)
+        assert isinstance(tools[0].require_approval, OgxApprovalFilter)
         assert tools[0].require_approval.always == ["create_issue"]
         assert tools[0].require_approval.never == ["list_repos"]
 
@@ -927,7 +929,7 @@ class TestGetTopicSummary:
     @pytest.mark.asyncio
     async def test_get_topic_summary_success(self, mocker: MockerFixture) -> None:
         """Test successful topic summary generation."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         mock_output_item = make_output_item(
             item_type="message", role="assistant", content="Topic Summary"
         )
@@ -949,7 +951,7 @@ class TestGetTopicSummary:
         self, mocker: MockerFixture
     ) -> None:
         """Test topic summary with empty response."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         mock_response = mocker.Mock()
         mock_response.output = []
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_response)
@@ -967,7 +969,7 @@ class TestGetTopicSummary:
         self, mocker: MockerFixture
     ) -> None:
         """Test topic summary raises HTTPException on connection error."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         mock_client.responses.create = mocker.AsyncMock(
             side_effect=APIConnectionError(
                 message="Connection failed", request=mocker.Mock()
@@ -986,7 +988,7 @@ class TestGetTopicSummary:
     @pytest.mark.asyncio
     async def test_get_topic_summary_api_error(self, mocker: MockerFixture) -> None:
         """Test topic summary raises HTTPException on API error."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         # Create a mock exception that will be caught by except APIStatusError
         mock_error = APIStatusError(
             message="API error", response=mocker.Mock(request=None), body=None
@@ -1851,10 +1853,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params with existing conversation ID."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         query_request = QueryRequest(
             query="test", conversation_id="123e4567-e89b-12d3-a456-426614174000"
@@ -1883,10 +1897,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params creates new conversation when ID not provided."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         mock_conversation = mocker.Mock()
         mock_conversation.id = "new_conv_id"
@@ -1936,10 +1962,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params raises HTTPException on connection error when creating conversation."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
         mock_client.conversations.create = mocker.AsyncMock(
             side_effect=APIConnectionError(
                 message="Connection failed", request=mocker.Mock()
@@ -1986,10 +2024,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test that extra_headers with x-llamastack-provider-data is set when MCP tools have headers."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         mock_conversation = mocker.Mock()
         mock_conversation.id = "new_conv_id"
@@ -2050,10 +2100,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test that extra_headers is None when no MCP tools have headers."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         mock_conversation = mocker.Mock()
         mock_conversation.id = "new_conv_id"
@@ -2083,10 +2145,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params raises HTTPException on API status error when creating conversation."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
         mock_client.conversations.create = mocker.AsyncMock(
             side_effect=APIStatusError(
                 message="API error", response=mocker.Mock(request=None), body=None

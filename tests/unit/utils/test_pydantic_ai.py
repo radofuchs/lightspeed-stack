@@ -2,21 +2,46 @@
 
 # pylint: disable=protected-access
 
+from collections.abc import Callable
+
 import httpx
-from llama_stack.core.library_client import AsyncLlamaStackAsLibraryClient
-from llama_stack_client import AsyncLlamaStackClient
+import pytest
+from fastapi import HTTPException
+from ogx.core.library_client import AsyncOGXAsLibraryClient
+from ogx_client import AsyncOgxClient
 from pydantic_ai_skills import SkillsCapability
 from pytest_mock import MockerFixture
 
+from configuration import AppConfig
 from models.common.responses.responses_api_params import ResponsesApiParams
-from models.config import SkillsConfiguration
+from models.config import (
+    QuestionValidityConfig,
+    QuestionValidityShieldConfiguration,
+    RedactionConfig,
+    RedactionShieldConfiguration,
+    SkillsConfiguration,
+)
+from pydantic_ai_lightspeed.capabilities import QuestionValidity
+from pydantic_ai_lightspeed.capabilities.redaction import PiiRedactionCapability
 from utils.pydantic_ai_helpers import (
     _agent_capabilities,
+    _shield_capability,
     _skills_capability,
     build_agent,
     get_agent_capability_tools,
     get_skills_metadata,
 )
+
+_QUESTION_VALIDITY_MODULE = (
+    "pydantic_ai_lightspeed.capabilities.question_validity._capability"
+)
+
+
+@pytest.fixture(autouse=True)
+def _mock_question_validity_model(mocker: MockerFixture) -> None:
+    """Avoid constructing a real client/model when building QuestionValidity."""
+    mocker.patch(f"{_QUESTION_VALIDITY_MODULE}.AsyncOgxClientHolder")
+    mocker.patch(f"{_QUESTION_VALIDITY_MODULE}.OgxResponsesModel.from_ogx_client")
 
 
 class TestSkillsCapability:
@@ -40,6 +65,49 @@ class TestSkillsCapability:
         assert list(capability.toolset.skills) == ["test-skill"]
 
 
+class TestShieldCapability:
+    """Tests for _shield_capability."""
+
+    def test_question_validity_shield_builds_question_validity_capability(
+        self,
+    ) -> None:
+        """Test that a question_validity shield builds a QuestionValidity capability."""
+        shield = QuestionValidityShieldConfiguration(
+            name="topic-guard",
+            provider_id="question_validity",
+            config=QuestionValidityConfig(model_id="test-model"),
+        )
+
+        capability = _shield_capability(shield)
+
+        assert isinstance(capability, QuestionValidity)
+        assert capability.config is shield.config
+
+    def test_redaction_shield_builds_pii_redaction_capability(self) -> None:
+        """Test that a redaction shield builds a PiiRedactionCapability."""
+        shield = RedactionShieldConfiguration(
+            name="pii-guard",
+            provider_id="redaction",
+            config=RedactionConfig(rules=[]),
+        )
+
+        capability = _shield_capability(shield)
+
+        assert isinstance(capability, PiiRedactionCapability)
+        assert capability.config is shield.config
+
+    def test_unsupported_config_type_raises_value_error(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that an unrecognized shield config type raises ValueError."""
+        shield = mocker.Mock(name="bad-shield")
+        shield.name = "bad-shield"
+        shield.config = object()
+
+        with pytest.raises(ValueError, match="Unsupported shield config type"):
+            _shield_capability(shield)
+
+
 class TestAgentCapabilities:
     """Tests for _agent_capabilities."""
 
@@ -47,6 +115,7 @@ class TestAgentCapabilities:
         """Test that missing configuration yields None for Agent construction."""
         assert _agent_capabilities(None) is None
         assert _agent_capabilities(SkillsConfiguration(paths=[])) is None
+        assert _agent_capabilities(None, shields=[]) is None
 
     def test_returns_skills_capability_when_configured(
         self, mock_skills_configuration: SkillsConfiguration
@@ -57,11 +126,55 @@ class TestAgentCapabilities:
         assert len(capabilities) == 1
         assert isinstance(capabilities[0], SkillsCapability)
 
+    def test_returns_shield_capabilities_when_configured(self) -> None:
+        """Test that configured shields are included in the capability list."""
+        shields = [
+            QuestionValidityShieldConfiguration(
+                name="topic-guard",
+                provider_id="question_validity",
+                config=QuestionValidityConfig(model_id="test-model"),
+            ),
+            RedactionShieldConfiguration(
+                name="pii-guard",
+                provider_id="redaction",
+                config=RedactionConfig(rules=[]),
+            ),
+        ]
+
+        capabilities = _agent_capabilities(None, shields=shields) or []
+
+        assert len(capabilities) == 2
+        assert isinstance(capabilities[0], QuestionValidity)
+        assert isinstance(capabilities[1], PiiRedactionCapability)
+
+    def test_combines_shields_and_skills(
+        self, mock_skills_configuration: SkillsConfiguration
+    ) -> None:
+        """Test that shield and skill capabilities are both included together."""
+        shields = [
+            RedactionShieldConfiguration(
+                name="pii-guard",
+                provider_id="redaction",
+                config=RedactionConfig(rules=[]),
+            ),
+        ]
+
+        capabilities = (
+            _agent_capabilities(mock_skills_configuration, shields=shields) or []
+        )
+
+        capability_types = {type(capability) for capability in capabilities}
+        assert capability_types == {PiiRedactionCapability, SkillsCapability}
+
 
 class TestBuildAgent:
     """Tests for the build_agent factory function."""
 
-    def test_returns_agent_with_correct_model(self, mocker: MockerFixture) -> None:
+    def test_returns_agent_with_correct_model(
+        self,
+        mocker: MockerFixture,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
         """Test that build_agent returns an Agent with the specified model name."""
         mock_client = mocker.Mock()
         mock_client.base_url = "http://localhost:8321"
@@ -83,11 +196,15 @@ class TestBuildAgent:
         mock_params.store = False
         mock_params.previous_response_id = None
 
-        agent = build_agent(mock_client, mock_params, None)
+        agent = build_agent(mock_client, mock_params, make_agent_config())
 
         assert agent is not None
 
-    def test_agent_has_instructions(self, mocker: MockerFixture) -> None:
+    def test_agent_has_instructions(
+        self,
+        mocker: MockerFixture,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
         """Test that build_agent passes instructions to the Agent."""
         mock_client = mocker.Mock()
         mock_client.base_url = "http://localhost:8321"
@@ -106,13 +223,17 @@ class TestBuildAgent:
         mock_params.store = False
         mock_params.previous_response_id = None
 
-        agent = build_agent(mock_client, mock_params, None)
+        agent = build_agent(mock_client, mock_params, make_agent_config())
 
         assert "You are a helpful assistant." in agent._instructions
 
-    def test_agent_with_library_client(self, mocker: MockerFixture) -> None:
+    def test_agent_with_library_client(
+        self,
+        mocker: MockerFixture,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
         """Test that build_agent works with a library client."""
-        mock_lib_client = mocker.Mock(spec=AsyncLlamaStackAsLibraryClient)
+        mock_lib_client = mocker.Mock(spec=AsyncOGXAsLibraryClient)
         mock_lib_client.provider_data = None
 
         mock_params = mocker.Mock()
@@ -129,21 +250,22 @@ class TestBuildAgent:
         mock_params.store = True
         mock_params.previous_response_id = None
 
-        agent = build_agent(mock_lib_client, mock_params, None)
+        agent = build_agent(mock_lib_client, mock_params, make_agent_config())
 
         assert agent is not None
 
     def test_agent_includes_skills_capability_when_configured(
         self,
-        mock_client: AsyncLlamaStackClient,
+        mock_client: AsyncOgxClient,
         mock_params: ResponsesApiParams,
         mock_skills_configuration: SkillsConfiguration,
+        make_agent_config: Callable[..., AppConfig],
     ) -> None:
-        """Test that build_agent attaches SkillsCapability when skills are passed."""
+        """Test that build_agent attaches SkillsCapability when skills are configured."""
         agent = build_agent(
             mock_client,
             mock_params,
-            mock_skills_configuration,
+            make_agent_config(skills=mock_skills_configuration),
         )
 
         capability_types = {
@@ -153,28 +275,75 @@ class TestBuildAgent:
 
     def test_agent_has_no_skills_capability_when_not_configured(
         self,
-        mock_client: AsyncLlamaStackClient,
+        mock_client: AsyncOgxClient,
         mock_params: ResponsesApiParams,
+        make_agent_config: Callable[..., AppConfig],
     ) -> None:
-        """Test that build_agent omits SkillsCapability when skills are not passed."""
-        agent = build_agent(mock_client, mock_params, None)
+        """Test that build_agent omits SkillsCapability when skills are not configured."""
+        agent = build_agent(mock_client, mock_params, make_agent_config())
 
         capability_types = {
             type(capability) for capability in agent._root_capability.capabilities
         }
         assert SkillsCapability not in capability_types
 
+    def test_agent_includes_shield_capabilities_when_configured(
+        self,
+        mock_client: AsyncOgxClient,
+        mock_params: ResponsesApiParams,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
+        """Test that build_agent attaches shield capabilities configured for the app."""
+        shields = [
+            QuestionValidityShieldConfiguration(
+                name="topic-guard",
+                provider_id="question_validity",
+                config=QuestionValidityConfig(model_id="test-model"),
+            ),
+            RedactionShieldConfiguration(
+                name="pii-guard",
+                provider_id="redaction",
+                config=RedactionConfig(rules=[]),
+            ),
+        ]
+
+        agent = build_agent(
+            mock_client, mock_params, make_agent_config(shields=shields)
+        )
+
+        capability_types = {
+            type(capability) for capability in agent._root_capability.capabilities
+        }
+        assert QuestionValidity in capability_types
+        assert PiiRedactionCapability in capability_types
+
+    def test_agent_has_no_shield_capabilities_when_not_configured(
+        self,
+        mock_client: AsyncOgxClient,
+        mock_params: ResponsesApiParams,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
+        """Test that build_agent omits shield capabilities when none are configured."""
+        agent = build_agent(mock_client, mock_params, make_agent_config())
+
+        capability_types = {
+            type(capability) for capability in agent._root_capability.capabilities
+        }
+        assert QuestionValidity not in capability_types
+        assert PiiRedactionCapability not in capability_types
+
     def test_agent_excludes_tool_capabilities_when_no_tools(
         self,
-        mock_client: AsyncLlamaStackClient,
+        mock_client: AsyncOgxClient,
         mock_params: ResponsesApiParams,
         mock_skills_configuration: SkillsConfiguration,
+        make_agent_config: Callable[..., AppConfig],
     ) -> None:
         """Test that build_agent omits tool-bearing capabilities when no_tools=True."""
         agent = build_agent(
             mock_client,
             mock_params,
-            mock_skills_configuration,
+            make_agent_config(skills=mock_skills_configuration),
             no_tools=True,
         )
 
@@ -182,6 +351,76 @@ class TestBuildAgent:
             type(capability) for capability in agent._root_capability.capabilities
         }
         assert SkillsCapability not in capability_types
+
+    def test_agent_filters_shields_by_name(
+        self,
+        mock_client: AsyncOgxClient,
+        mock_params: ResponsesApiParams,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
+        """Test that the shields param filters configured shields by name.
+
+        Mirrors ``QueryRequest.shield_ids``: only shields whose ``name`` is in
+        the requested list should be attached to the agent.
+        """
+        shields = [
+            QuestionValidityShieldConfiguration(
+                name="topic-guard",
+                provider_id="question_validity",
+                config=QuestionValidityConfig(model_id="test-model"),
+            ),
+            RedactionShieldConfiguration(
+                name="pii-guard",
+                provider_id="redaction",
+                config=RedactionConfig(rules=[]),
+            ),
+        ]
+        config = make_agent_config(shields=shields)
+
+        agent = build_agent(mock_client, mock_params, config, shields=["pii-guard"])
+
+        capability_types = {
+            type(capability) for capability in agent._root_capability.capabilities
+        }
+        assert PiiRedactionCapability in capability_types
+        assert QuestionValidity not in capability_types
+
+    def test_agent_disables_all_shields_with_empty_list(
+        self,
+        mock_client: AsyncOgxClient,
+        mock_params: ResponsesApiParams,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
+        """Test that an empty shields list disables all configured shields."""
+        shields = [
+            RedactionShieldConfiguration(
+                name="pii-guard",
+                provider_id="redaction",
+                config=RedactionConfig(rules=[]),
+            ),
+        ]
+        config = make_agent_config(shields=shields)
+
+        agent = build_agent(mock_client, mock_params, config, shields=[])
+
+        capability_types = {
+            type(capability) for capability in agent._root_capability.capabilities
+        }
+        assert PiiRedactionCapability not in capability_types
+
+    def test_agent_raises_not_found_for_unknown_shield_name(
+        self,
+        mock_client: AsyncOgxClient,
+        mock_params: ResponsesApiParams,
+        make_agent_config: Callable[..., AppConfig],
+    ) -> None:
+        """Test that requesting an unconfigured shield name raises HTTPException."""
+        config = make_agent_config(shields=[])
+
+        with pytest.raises(HTTPException) as exc_info:
+            build_agent(mock_client, mock_params, config, shields=["missing-shield"])
+
+        assert exc_info.value.status_code == 404
 
 
 class TestGetSkillsMetadata:
@@ -217,22 +456,22 @@ class TestGetAgentCapabilityTools:
         """Test that configured skills expose pydantic-ai skill tools."""
         tools = get_agent_capability_tools(mock_skills_configuration)
 
-        assert [tool["identifier"] for tool in tools] == [
+        assert [tool.identifier for tool in tools] == [
             "list_skills",
             "load_skill",
             "read_skill_resource",
             "run_skill_script",
         ]
         assert all(
-            tool["provider_id"] == "agent-skills"
-            and tool["toolgroup_id"] == "builtin::agent-skills"
-            and tool["server_source"] == "builtin"
-            and tool["type"] == "tool"
+            tool.provider_id == "agent-skills"
+            and tool.toolgroup_id == "builtin::agent-skills"
+            and tool.server_source == "builtin"
+            and tool.type == "tool"
             for tool in tools
         )
 
-        load_skill = next(tool for tool in tools if tool["identifier"] == "load_skill")
-        assert load_skill["parameters"] == [
+        load_skill = next(tool for tool in tools if tool.identifier == "load_skill")
+        assert [parameter.model_dump() for parameter in load_skill.parameters] == [
             {
                 "name": "skill_name",
                 "description": (

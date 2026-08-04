@@ -223,6 +223,8 @@ URL citation annotation for referencing external web resources.
 ## OpenAIResponseAnnotationContainerFileCitation
 
 
+Container file citation annotation referencing a file within a container.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -255,6 +257,8 @@ File citation annotation for referencing specific files in response content.
 
 ## OpenAIResponseAnnotationFilePath
 
+
+File path annotation referencing a generated file in response content.
 
 
 | Field | Type | Description |
@@ -369,6 +373,8 @@ scenarios.
 
 ## OpenAIResponseOutputMessageContentOutputText
 
+
+Text content within an output message of an OpenAI response.
 
 
 | Field | Type | Description |
@@ -486,6 +492,45 @@ MCP list tools output message containing available tools from an MCP server.
 | type | string |  |
 | server_label | string |  |
 | tools | array |  |
+
+
+## OpenAIResponseOutputMessageReasoningContent
+
+
+Reasoning text from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The reasoning text content from the model. |
+| type | string | The type identifier, always 'reasoning_text'. |
+
+
+## OpenAIResponseOutputMessageReasoningItem
+
+
+Reasoning output from the model, representing the model's thinking process.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique identifier for the reasoning output item. |
+| summary | array | Summary of the reasoning output. |
+| type | string | The type identifier, always 'reasoning'. |
+| content | array | The reasoning content from the model. |
+| status | string | The status of the reasoning output. |
+
+
+## OpenAIResponseOutputMessageReasoningSummary
+
+
+A summary of reasoning output from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The summary text of the reasoning output. |
+| type | string | The type identifier, always 'summary_text'. |
 
 
 ## OpenAIResponseOutputMessageWebSearchToolCall
@@ -612,7 +657,6 @@ Shield moderation blocked the content; refusal details are present.
 | decision | string |  |
 | message | string |  |
 | moderation_id | string |  |
-| refusal_response |  |  |
 
 
 ## ShieldModerationPassed
