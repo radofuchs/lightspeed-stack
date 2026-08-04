@@ -212,12 +212,12 @@ See [examples/skills/](../examples/skills/) for complete working examples.
 
 `GET /v1/skills` returns the name and description of every skill loaded
 from the configured `skills.paths`, without going through an LLM/agent
-turn. If authentication is enabled, include the appropriate credentials
-(e.g. `-H "Authorization: Bearer <token>"`); otherwise the request
-returns `401`/`403`:
+turn. If authentication is enabled, include the appropriate credentials;
+otherwise the request returns `401`/`403`:
 
 ```bash
-curl http://localhost:8080/v1/skills
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8080/v1/skills
 ```
 
 ```json

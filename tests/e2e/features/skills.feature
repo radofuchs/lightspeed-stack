@@ -178,61 +178,16 @@ Feature: Agent skills tests
       }
       """
 
-  # --- GET /v1/skills endpoint ---
-
-  @SkillsConfig
-  Scenario: GET /v1/skills returns metadata for configured skills
-    Given The service uses the lightspeed-stack-skills.yaml configuration
-      And The service is restarted
-    When I access REST API endpoint "skills" using HTTP GET method
-    Then The status code of the response is 200
-      And The body of the response is the following
-      """
-      {
-        "skills": [
-          {
-            "name": "echo",
-            "description": "Echo back the user's input exactly as provided. Use when a user asks to echo, repeat, or mirror text."
-          }
-        ]
-      }
-      """
-
-  Scenario: GET /v1/skills returns an empty list when no skills are configured
-    Given The service uses the lightspeed-stack.yaml configuration
-      And The service is restarted
-    When I access REST API endpoint "skills" using HTTP GET method
-    Then The status code of the response is 200
-      And The body of the response is the following
-      """
-      {
-        "skills": []
-      }
-      """
-
-  @SkillsMultiConfig
-  Scenario: GET /v1/skills discovers all skills in a skills directory
-    Given The service uses the lightspeed-stack-skills-directory.yaml configuration
-      And The service is restarted
-    When I access REST API endpoint "skills" using HTTP GET method
-    Then The status code of the response is 200
-      And The body of the response is the following
-      """
-      {
-        "skills": [
-          {
-            "name": "echo",
-            "description": "Echo back the user's input exactly as provided. Use when a user asks to echo, repeat, or mirror text."
-          },
-          {
-            "name": "summarize",
-            "description": "Summarize text into a concise single-sentence overview. Use when a user asks to summarize, condense, or shorten text."
-          }
-        ]
-      }
-      """
-
   # --- Skill discovery ---
+  #
+  # Note: plain GET /v1/skills happy-path coverage (configured skills, empty
+  # list, and multi-skill directory discovery) lives in
+  # tests/integration/endpoints/test_skills_integration.py instead of here.
+  # That endpoint only reads local skill directories and returns a typed
+  # response with no LLM/agent turn involved, so it doesn't need the full e2e
+  # stack. See tests/e2e/features/http_401_unauthorized.feature and
+  # tests/e2e/features/rbac.feature for the /v1/skills auth-failure (401/403)
+  # coverage.
 
   @SkillsConfig
   Scenario: LLM can discover skills via list_skills tool using query endpoint

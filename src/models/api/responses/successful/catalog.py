@@ -5,9 +5,10 @@ from typing import Any, Optional
 from pydantic import Field
 
 from models.api.responses.successful.bases import AbstractSuccessfulResponse
-from models.common.skills import SkillMetadata
 from models.common import CatalogModel, CatalogShield
+from models.common.skills import SkillMetadata
 from models.common.tools import CatalogTool
+
 
 class SkillsResponse(AbstractSuccessfulResponse):
     """Model representing a response to skills request.

@@ -3,16 +3,36 @@
 from pathlib import Path
 
 import pytest
-from fastapi import Request
+from fastapi import HTTPException, Request, status
 from pytest_mock import MockerFixture
 
 from app.endpoints.skills import skills_endpoint_handler
 from authentication.interface import AuthTuple
+from configuration import AppConfig
 from models.api.responses.successful import SkillsResponse
 from models.config import SkillsConfiguration
 from tests.unit.utils.auth_helpers import mock_authorization_resolvers
 
 MOCK_AUTH: AuthTuple = ("mock_user_id", "mock_username", True, "mock_token")
+
+
+@pytest.mark.asyncio
+async def test_skills_endpoint_handler_configuration_not_loaded(
+    mocker: MockerFixture,
+) -> None:
+    """Test that the skills endpoint returns 500 when configuration is not loaded."""
+    mock_authorization_resolvers(mocker)
+
+    mock_config = AppConfig()
+    mock_config._configuration = None  # pylint: disable=protected-access
+    mocker.patch("app.endpoints.skills.configuration", mock_config)
+
+    request = Request(scope={"type": "http"})
+
+    with pytest.raises(HTTPException) as exc_info:
+        await skills_endpoint_handler(request=request, auth=MOCK_AUTH)
+    assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert exc_info.value.detail["response"] == "Configuration is not loaded"  # type: ignore
 
 
 @pytest.mark.asyncio

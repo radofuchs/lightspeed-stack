@@ -14,10 +14,6 @@ from pydantic_ai_skills import SkillsCapability
 from configuration import AppConfig
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.skills import SkillMetadata
-from models.config import SkillsConfiguration
-from pydantic_ai_lightspeed.llamastack import (
-    LlamaStackResponsesModel,
-)
 from models.common.tools import CatalogTool, CatalogToolParameter
 from models.config import (
     QuestionValidityConfig,
@@ -27,9 +23,7 @@ from models.config import (
 )
 from pydantic_ai_lightspeed.capabilities import QuestionValidity
 from pydantic_ai_lightspeed.capabilities.redaction import PiiRedactionCapability
-from pydantic_ai_lightspeed.llamastack import (
-    OgxResponsesModel,
-)
+from pydantic_ai_lightspeed.llamastack import OgxResponsesModel
 from utils.shields import get_shields_for_request
 
 _AGENT_SKILLS_PROVIDER_ID: Final[str] = "agent-skills"

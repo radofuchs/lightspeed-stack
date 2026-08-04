@@ -1280,11 +1280,11 @@ This is distinct from the `list_skills` tool that the agent itself may
 invoke during a `/v1/query` or `/v1/streaming_query` turn.
 
 If [authentication](#authentication) is enabled, include the appropriate
-credentials (e.g. `-H "Authorization: Bearer <token>"`); otherwise the
-request returns `401`/`403`.
+credentials; otherwise the request returns `401`/`403`.
 
 ```bash
-curl http://localhost:8080/v1/skills
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8080/v1/skills
 ```
 
 **Response Body:**

@@ -19,8 +19,8 @@ from models.common.moderation import (
     ShieldModerationResult,
 )
 from models.common.query import Attachment, SolrVectorSearchRequest
-from models.common.skills import SkillMetadata
 from models.common.shields import CatalogShield
+from models.common.skills import SkillMetadata
 from models.common.transcripts import Transcript, TranscriptMetadata
 from models.common.turn_summary import (
     MCPListToolsSummary,
