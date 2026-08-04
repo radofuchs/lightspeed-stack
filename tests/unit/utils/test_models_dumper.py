@@ -9155,7 +9155,7 @@ def test_dump_models(tmpdir: Path) -> None:
         assert schemas is not None
 
         # list of schemas expected in a dump
-        expected_schemas = (
+        expected_schemas = [
             "A2AStateConfiguration",
             "APIKeyTokenConfiguration",
             "AbstractErrorResponse",
@@ -9368,12 +9368,12 @@ def test_dump_models(tmpdir: Path) -> None:
             "VectorStoreResponse",
             "VectorStoreUpdateRequest",
             "VectorStoresListResponse",
-        )
+        ]
         for expected_schema in expected_schemas:
             assert expected_schema in schemas
 
 
-def check_json_file_content(filename: str, expected_schemas: list[str]) -> None:
+def check_json_file_content(filename: Path, expected_schemas: list[str]) -> None:
     """Check the content of provided JSON file with OpenAPI-compatible schema."""
     with open(filename, "r", encoding="utf-8") as fin:
         # schema should be stored in JSON format
@@ -9405,7 +9405,7 @@ def test_dump_models_group_requests(tmpdir: Path) -> None:
     dump_models_group(group, filename)
 
     # list of schemas expected in a dump
-    expected_schemas = (
+    expected_schemas = [
         "ConversationUpdateRequest",
         "FeedbackRequest",
         "FeedbackStatusUpdateRequest",
@@ -9425,7 +9425,7 @@ def test_dump_models_group_requests(tmpdir: Path) -> None:
         "VectorStoreCreateRequest",
         "VectorStoreFileCreateRequest",
         "VectorStoreUpdateRequest",
-    )
+    ]
     check_json_file_content(filename, expected_schemas)
 
 
@@ -9436,7 +9436,7 @@ def test_dump_models_group_successful_responses(tmpdir: Path) -> None:
     dump_models_group(group, filename)
 
     # list of schemas expected in a dump
-    expected_schemas = (
+    expected_schemas = [
         "AuthorizedResponse",
         "ConfigurationResponse",
         "ConversationDeleteResponse",
@@ -9477,7 +9477,7 @@ def test_dump_models_group_successful_responses(tmpdir: Path) -> None:
         "VectorStoreFilesListResponse",
         "VectorStoreResponse",
         "VectorStoresListResponse",
-    )
+    ]
     check_json_file_content(filename, expected_schemas)
 
 
@@ -9488,7 +9488,7 @@ def test_dump_models_group_error_responses(tmpdir: Path) -> None:
     dump_models_group(group, filename)
 
     # list of schemas expected in a dump
-    expected_schemas = (
+    expected_schemas = [
         "AbstractErrorResponse",
         "BadRequestResponse",
         "ConflictResponse",
@@ -9502,7 +9502,7 @@ def test_dump_models_group_error_responses(tmpdir: Path) -> None:
         "ServiceUnavailableResponse",
         "UnauthorizedResponse",
         "UnprocessableEntityResponse",
-    )
+    ]
     check_json_file_content(filename, expected_schemas)
 
 
@@ -9513,7 +9513,7 @@ def test_dump_models_group_common(tmpdir: Path) -> None:
     dump_models_group(group, filename)
 
     # list of schemas expected in a dump
-    expected_schemas = (
+    expected_schemas = [
         "Attachment",
         "ConversationData",
         "ConversationDetails",
@@ -9535,7 +9535,7 @@ def test_dump_models_group_common(tmpdir: Path) -> None:
         "Transcript",
         "TranscriptMetadata",
         "TurnSummary",
-    )
+    ]
     check_json_file_content(filename, expected_schemas)
 
 
@@ -9546,7 +9546,7 @@ def test_dump_models_group_agent(tmpdir: Path) -> None:
     dump_models_group(group, filename)
 
     # list of schemas expected in a dump
-    expected_schemas = (
+    expected_schemas = [
         "EndEventData",
         "EndStreamPayload",
         "ErrorEventData",
@@ -9561,7 +9561,7 @@ def test_dump_models_group_agent(tmpdir: Path) -> None:
         "ToolCallStreamPayload",
         "ToolResultStreamPayload",
         "TurnCompleteStreamPayload",
-    )
+    ]
     check_json_file_content(filename, expected_schemas)
 
 
@@ -9572,10 +9572,10 @@ def test_dump_models_common_responses(tmpdir: Path) -> None:
     dump_models_group(group, filename)
 
     # list of schemas expected in a dump
-    expected_schemas = (
+    expected_schemas = [
         "InputToolMCP",
         "ResponsesApiParams",
-    )
+    ]
     check_json_file_content(filename, expected_schemas)
 
 
@@ -9586,7 +9586,7 @@ def test_dump_models_conversation_summary(tmpdir: Path) -> None:
     dump_models_group(group, filename)
 
     # list of schemas expected in a dump
-    expected_schemas = ("ConversationSummary",)
+    expected_schemas = ["ConversationSummary"]
     check_json_file_content(filename, expected_schemas)
 
 
