@@ -50,7 +50,6 @@ from typing import Any, Optional, cast
 from fastapi import HTTPException
 from ogx_api.openai_responses import OpenAIResponseMessage
 from ogx_client import AsyncOgxClient
-from ogx_client.types.conversations.item_create_params import Item
 
 from cache.cache import Cache
 from cache.cache_error import CacheError
@@ -372,7 +371,7 @@ async def _write_summary_marker(
     }
     await client.conversations.items.create(
         conversation_id,
-        items=cast(list[Item], [marker_item]),
+        items=[marker_item],
     )
 
 

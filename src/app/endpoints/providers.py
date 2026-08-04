@@ -5,8 +5,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.params import Depends
 from ogx_client import APIConnectionError, BadRequestError
-from ogx_client.types import ProviderListResponse
 from opentelemetry import trace
+from ogx_client.models.list_providers_response import ListProvidersResponse
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
@@ -104,7 +104,7 @@ async def providers_endpoint_handler(
         return ProvidersListResponse(providers=group_providers(providers))
 
 
-def group_providers(providers: ProviderListResponse) -> dict[str, list[dict[str, Any]]]:
+def group_providers(providers: ListProvidersResponse) -> dict[str, list[dict[str, Any]]]:
     """Group a list of ProviderInfo objects by their API type.
 
     Args:

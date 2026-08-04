@@ -51,11 +51,11 @@ from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageWebSearchToolCall as WebSearchCall,
 )
 from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
-from ogx_client.types import ListModelsResponse
-from ogx_client.types.model import Model
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
+from ogx_client.models.list_models_response import ListModelsResponse
+from ogx_client.models.model import Model
 from pydantic import AnyUrl, BaseModel
 from pytest_mock import MockerFixture
 

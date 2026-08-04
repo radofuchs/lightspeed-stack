@@ -5,11 +5,11 @@ from typing import Any
 import pytest
 from fastapi import HTTPException, Request, status
 from ogx_client import APIConnectionError, BadRequestError
-from ogx_client.types import ProviderInfo
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import StatusCode
+from ogx_client.models.provider_info import ProviderInfo
 from pytest_mock import MockerFixture
 
 from app.endpoints.providers import (

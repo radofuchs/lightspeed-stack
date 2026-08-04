@@ -5,12 +5,12 @@ from typing import Any
 import pytest
 from fastapi import HTTPException, Request, status
 from ogx_client import APIConnectionError
-from ogx_client.types import ListModelsResponse
-from ogx_client.types.model import Model
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import StatusCode
+from ogx_client.models.list_models_response import ListModelsResponse
+from ogx_client.models.model import Model
 from pytest_mock import MockerFixture
 from pytest_subtests import SubTests
 
