@@ -103,6 +103,12 @@ def before_all(context: Context) -> None:
             - default_model (str): Detected model id or fallback model.
             - default_provider (str): Detected provider id or fallback provider.
     """
+    # Set OTEL anonymization secret for E2E tests if not already configured
+    if not os.environ.get("OTEL_ANONYMIZATION_SECRET"):
+        os.environ["OTEL_ANONYMIZATION_SECRET"] = (
+            "e2e-test-secret-do-not-use-in-production"
+        )
+
     # Detect deployment mode from environment variable
     context.deployment_mode = os.getenv("E2E_DEPLOYMENT_MODE", "server").lower()
     context.is_library_mode = context.deployment_mode == "library"

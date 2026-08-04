@@ -447,6 +447,27 @@ def set_streaming_query_agent_run(
 
 
 @pytest.fixture(autouse=True)
+def otel_anonymization_secret() -> Generator[None, None, None]:
+    """Set OTEL_ANONYMIZATION_SECRET for all integration tests.
+
+    This fixture ensures that the OTEL anonymization secret is available
+    for any code that uses OpenTelemetry tracing during integration tests.
+    """
+    original_value = os.environ.get("OTEL_ANONYMIZATION_SECRET")
+    os.environ["OTEL_ANONYMIZATION_SECRET"] = (
+        "integration-test-secret-do-not-use-in-production"
+    )
+
+    yield
+
+    # Restore original value or remove if it wasn't set
+    if original_value is None:
+        os.environ.pop("OTEL_ANONYMIZATION_SECRET", None)
+    else:
+        os.environ["OTEL_ANONYMIZATION_SECRET"] = original_value
+
+
+@pytest.fixture(autouse=True)
 def reset_configuration_state() -> Generator:
     """Reset configuration state before each integration test.
 
