@@ -83,7 +83,10 @@ detail that LCORE owns, not an operator-facing artifact.
 - **R5:** When `llama_stack.config.native_override` overlaps a key set
   by the high-level section or by the baseline, deep-merge semantics
   apply with list replacement (maps merge recursively; lists are
-  replaced wholesale; scalars are replaced).
+  replaced wholesale; scalars are replaced). The override wins over the
+  baseline and the high-level expansion; enrichment (R7) applies after
+  the merge, exactly as in legacy mode, where enrichment always
+  post-processes the operator's final run.yaml (LCORE-3370).
 - **R6:** Secrets that LCORE itself emits are never resolved on disk:
   `apply_high_level_inference` writes `${env.<VAR>}` references
   verbatim, and LCORE does not eagerly resolve env refs in the
@@ -557,6 +560,7 @@ reference.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-04-23 | Initial version | Spike completion |
+| 2026-08-04 | R5: enrichment applies after the `native_override` merge | LCORE-3370 — migrated configs (run.yaml lifted into the override) replaced list-shaped enrichment artifacts wholesale, silently dropping BYOK/Solr providers, registered embedding models, and Azure `model_validation`; ordering now matches legacy, where the operator's run.yaml never beats enrichment |
 | 2026-08-20 | Default baseline openai provider is conditional on `OPENAI_API_KEY` | LCORE-3607: `baseline: default` must load when the key is unset |
 | 2026-08-21 | Add `baseline: byo-llm` (default_run.yaml minus the OpenAI row) | LCORE-3654: opt-in openai-free baseline |
 | 2026-08-25 | `baseline: default`'s built-in OpenAI provider deprecated in 0.7, removed in 0.8 | LCORE-3696: `default` shipped in 0.6.0 GA, so the ESA one-minor deprecation phase applies (confirmed by @sbunciak) |
