@@ -161,6 +161,7 @@ async def test_create_saved_prompt_returns_422_when_limit_exceeded(
     test_config: AppConfig,
     test_request: Request,
     test_auth: AuthTuple,
+    other_auth: AuthTuple,
     patch_db_session: Session,
 ) -> None:
     """Create returns 422 after the configured per-user maximum is reached."""
@@ -173,6 +174,14 @@ async def test_create_saved_prompt_returns_422_when_limit_exceeded(
         name="one",
         content="body one",
     )
+
+    other_created = await create_prompt_via_handler(
+        request=test_request,
+        auth=other_auth,
+        name="other-user-one",
+        content="other user body",
+    )
+    assert other_created.id
 
     with pytest.raises(HTTPException) as exc_info:
         await create_prompt_via_handler(
@@ -266,3 +275,9 @@ async def test_delete_other_users_saved_prompt_returns_403(
         )
 
     assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+
+    remaining = await list_saved_prompts_handler(
+        auth=other_auth,
+        request=test_request,
+    )
+    assert any(prompt.id == other_prompt.id for prompt in remaining.prompts)
