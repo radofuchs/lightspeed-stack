@@ -4,7 +4,7 @@
 
 import asyncio
 import io
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 from fastapi import HTTPException, Request, status
@@ -64,6 +64,14 @@ class VectorStoresList:
         """Initialize vector stores list mock."""
         self.data = stores
 
+    def __iter__(self) -> Iterator[VectorStore]:
+        """Iterate over vector stores."""
+        return iter(self.data)
+
+    def __len__(self) -> int:
+        """Return number of vector stores."""
+        return len(self.data)
+
 
 # pylint: disable=R0903
 class File:
@@ -103,6 +111,14 @@ class VectorStoreFilesList:
     def __init__(self, files: list[VectorStoreFile]) -> None:
         """Initialize vector store files list mock."""
         self.data = files
+
+    def __iter__(self) -> Iterator[VectorStoreFile]:
+        """Iterate over vector store files."""
+        return iter(self.data)
+
+    def __len__(self) -> int:
+        """Return number of files."""
+        return len(self.data)
 
 
 def get_test_config() -> dict[str, Any]:

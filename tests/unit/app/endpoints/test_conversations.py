@@ -690,7 +690,7 @@ class TestGetConversationEndpoint:
         mock_item2.role = "assistant"
         mock_item2.content = "Hi there!"
         mock_items_response.data = [mock_item1, mock_item2]
-        mock_items_response.has_next_page.return_value = False
+        mock_items_response.has_more = False
         mock_client.conversations.items.list = mocker.AsyncMock(
             return_value=mock_items_response
         )
@@ -746,7 +746,7 @@ class TestGetConversationEndpoint:
                 type="message", role="assistant", content="I'm doing well, thanks!"
             ),
         ]
-        mock_items.has_next_page.return_value = False
+        mock_items.has_more = False
         mock_client.conversations.items.list = mocker.AsyncMock(return_value=mock_items)
 
         mock_client_holder = mocker.patch(
@@ -822,7 +822,7 @@ class TestGetConversationEndpoint:
         mock_client = mocker.AsyncMock()
         mock_items_response = mocker.Mock()
         mock_items_response.data = []
-        mock_items_response.has_next_page.return_value = False
+        mock_items_response.has_more = False
         mock_client.conversations.items.list = mocker.AsyncMock(
             return_value=mock_items_response
         )
@@ -973,6 +973,7 @@ class TestGetConversationEndpoint:
             mocker.Mock(type="message", role="user", content="Hello"),
             mocker.Mock(type="message", role="assistant", content="Hi!"),
         ]
+        mock_items_response.has_more = False
         mock_client.conversations.items.list.return_value = mock_items_response
         mock_client_holder = mocker.patch(
             "app.endpoints.conversations_v1.AsyncOgxClientHolder"
