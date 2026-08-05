@@ -577,6 +577,38 @@ def test_byok_vector_store_uses_registered_embedding_id_not_load_path() -> None:
     assert models[0]["provider_model_id"] == "/rag-content/embeddings_model"
 
 
+def test_construct_models_section_registers_alias_per_rag_id_for_shared_path() -> None:
+    """Two BYOK entries sharing a load path each get a byok_<rag_id>_embedding alias."""
+    ls_config: dict[str, Any] = {}
+    byok_rag = [
+        {
+            "rag_id": "docs-a",
+            "vector_db_id": "vs_a",
+            "embedding_model": "/rag-content/embeddings_model",
+            "embedding_dimension": 768,
+        },
+        {
+            "rag_id": "docs-b",
+            "vector_db_id": "vs_b",
+            "embedding_model": "/rag-content/embeddings_model",
+            "embedding_dimension": 768,
+        },
+    ]
+    models = construct_models_section(ls_config, byok_rag)
+    stores = construct_vector_stores_section(ls_config, byok_rag)
+    assert {m["model_id"] for m in models} == {
+        "byok_docs-a_embedding",
+        "byok_docs-b_embedding",
+    }
+    assert all(
+        m["provider_model_id"] == "/rag-content/embeddings_model" for m in models
+    )
+    assert {s["embedding_model"] for s in stores} == {
+        "sentence-transformers/byok_docs-a_embedding",
+        "sentence-transformers/byok_docs-b_embedding",
+    }
+
+
 def test_construct_storage_backends_section_raises_on_missing_rag_id() -> None:
     """Test raises ValueError when rag_id is missing from a BYOK RAG entry."""
     ls_config: dict[str, Any] = {}
@@ -1201,6 +1233,51 @@ def test_enrich_vector_store_dedupes_same_vsprov_model_id() -> None:
         ls_config["registered_resources"]["models"][0]["model_id"]
         == "vsprov_notebooks_embedding"
     )
+
+
+def test_enrich_vector_store_updates_vsprov_alias_on_path_change() -> None:
+    """Re-enrichment with a new embedding path refreshes the vsprov_* model row."""
+    ls_config: dict[str, Any] = {
+        "providers": {},
+        "storage": {"backends": {}},
+        "registered_resources": {"models": [], "vector_stores": []},
+        "vector_stores": {},
+    }
+    enrich_vector_store(
+        ls_config,
+        {
+            "default_provider": "notebooks",
+            "providers": [
+                {
+                    "id": "notebooks",
+                    "type": "faiss",
+                    "embedding_model": "/old/embeddings_model",
+                    "embedding_dimension": 768,
+                    "config": {"path": "/tmp/n.db"},
+                }
+            ],
+        },
+    )
+    enrich_vector_store(
+        ls_config,
+        {
+            "default_provider": "notebooks",
+            "providers": [
+                {
+                    "id": "notebooks",
+                    "type": "faiss",
+                    "embedding_model": "/new/embeddings_model",
+                    "embedding_dimension": 384,
+                    "config": {"path": "/tmp/n.db"},
+                }
+            ],
+        },
+    )
+    models = ls_config["registered_resources"]["models"]
+    assert len(models) == 1
+    assert models[0]["model_id"] == "vsprov_notebooks_embedding"
+    assert models[0]["provider_model_id"] == "/new/embeddings_model"
+    assert models[0]["metadata"]["embedding_dimension"] == 384
 
 
 def test_enrich_vector_store_skips_embedding_without_dimension() -> None:

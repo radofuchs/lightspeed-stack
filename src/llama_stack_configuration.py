@@ -338,14 +338,16 @@ def construct_models_section(
         provider_model_id = embedding_model
         provider_model_id = provider_model_id.removeprefix("sentence-transformers/")
 
-        # Skip if embedding model already registered
-        existing_model_ids = [m.get("provider_model_id") for m in output]
-        if provider_model_id in existing_model_ids:
+        # Dedupe by generated model_id (not load path). Vector stores look up
+        # sentence-transformers/byok_<rag_id>_embedding; shared paths still need
+        # one alias per rag_id.
+        model_id = f"byok_{rag_id}_embedding"
+        if any(model.get("model_id") == model_id for model in output):
             continue
 
         output.append(
             {
-                "model_id": f"byok_{rag_id}_embedding",
+                "model_id": model_id,
                 "model_type": "embedding",
                 "provider_id": "sentence-transformers",
                 "provider_model_id": provider_model_id,
@@ -546,12 +548,12 @@ def _upsert_vsprov_embedding_model(
     embedding_model: str,
     embedding_dimension: int,
 ) -> None:
-    """Register a vsprov embedding model alias if that model_id is not present.
+    """Register or refresh a vsprov embedding model alias by model_id.
 
-    Dedupes by ``model_id`` (``vsprov_<provider_id>_embedding``), not by load
-    path. BYOK and ``vector_store`` often share the same
-    ``provider_model_id``; both aliases must be registered so
-    ``default_embedding_model`` can resolve.
+    Uses ``model_id`` ``vsprov_<provider_id>_embedding`` (not load path) so
+    BYOK and ``vector_store`` can share a ``provider_model_id`` and both
+    resolve. Re-enrichment updates path and metadata when the same
+    ``model_id`` already exists.
 
     Parameters:
         ls_config: Llama Stack configuration modified in place.
@@ -562,18 +564,19 @@ def _upsert_vsprov_embedding_model(
     """
     models = ls_config.setdefault("registered_resources", {}).setdefault("models", [])
     model_id = f"vsprov_{provider_id}_embedding"
-    if any(model.get("model_id") == model_id for model in models):
-        return
     provider_model_id = embedding_model.removeprefix("sentence-transformers/")
-    models.append(
-        {
-            "model_id": model_id,
-            "model_type": "embedding",
-            "provider_id": "sentence-transformers",
-            "provider_model_id": provider_model_id,
-            "metadata": {"embedding_dimension": embedding_dimension},
-        }
-    )
+    entry = {
+        "model_id": model_id,
+        "model_type": "embedding",
+        "provider_id": "sentence-transformers",
+        "provider_model_id": provider_model_id,
+        "metadata": {"embedding_dimension": embedding_dimension},
+    }
+    for index, model in enumerate(models):
+        if model.get("model_id") == model_id:
+            models[index] = entry
+            return
+    models.append(entry)
 
 
 def _vsprov_fields_and_backend(
