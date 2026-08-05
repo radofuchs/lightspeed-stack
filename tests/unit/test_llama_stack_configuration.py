@@ -808,7 +808,7 @@ def test_enrich_solr_adds_embedding_model() -> None:
     enrich_solr(ls_config, _OKP_RAG_CONFIG, {})
 
     model_ids = [m["model_id"] for m in ls_config["registered_resources"]["models"]]
-    assert "solr_embedding" in model_ids
+    assert "sentence-transformers/solr_embedding" in model_ids
 
 
 def test_enrich_solr_skips_duplicate_provider() -> None:
