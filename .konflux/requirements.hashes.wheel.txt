@@ -62,6 +62,8 @@ cryptography==49.0.0 \
     --hash=sha256:44e7dda87cce4e64a4eada2469ade616471772ee8203d7331967ef7ba2fee2bd
 datasets==5.0.0 \
     --hash=sha256:0fbc08ef020b03a22d91ad38b3b22091a1e18c1335f2963d357ea540bfb032e7
+defusedxml==0.7.1 \
+    --hash=sha256:884a1483dffbab373933eb9604e1ebb2a6d5e794b1c467e83ddd453a9d48b1c6
 dill==0.4.1 \
     --hash=sha256:8aa45e639751fc9610ff6aa53229cd95c66142cb2372fa4b530985c0d6a445ce
 distro==1.9.0 \
