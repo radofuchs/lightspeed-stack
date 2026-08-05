@@ -31,9 +31,9 @@ CONTAINER_RUNTIME ?= $(shell command -v podman 2>/dev/null || command -v docker 
 
 run-stack: ## Run lightspeed-stack directly, without building dependent service/s
 	@if [ "$${OTEL_SDK_DISABLED:-true}" = "false" ]; then \
-		uv run opentelemetry-instrument python3.12 src/lightspeed_stack.py -c $(CONFIG); \
+		uv run opentelemetry-instrument python src/lightspeed_stack.py -c $(CONFIG); \
 	else \
-		uv run python3.12 src/lightspeed_stack.py -c $(CONFIG); \
+		uv run python src/lightspeed_stack.py -c $(CONFIG); \
 	fi
 
 run: start-llama-stack-container ## Run the service locally with dependent services
