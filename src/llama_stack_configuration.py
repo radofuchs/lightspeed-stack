@@ -516,8 +516,8 @@ def enrich_byok_rag(ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]) -
 
 
 def _vector_store_provider_by_id(
-    providers: list[dict[str, Any]], provider_id: str | None
-) -> dict[str, Any] | None:
+    providers: list[dict[str, Any]], provider_id: Optional[str]
+) -> Optional[dict[str, Any]]:
     """Return the provider entry matching ``provider_id``.
 
     Parameters:
