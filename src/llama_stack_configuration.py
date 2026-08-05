@@ -878,16 +878,11 @@ def enrich_solr(  # pylint: disable=too-many-locals
         for vs in ls_config["registered_resources"]["vector_stores"]
     ]
     if constants.SOLR_DEFAULT_VECTOR_STORE_ID not in existing_stores:
-        # Build environment variable expression
-        embedding_model_env = (
-            f"${{env.SOLR_EMBEDDING_MODEL:={constants.SOLR_DEFAULT_EMBEDDING_MODEL}}}"
-        )
-
         ls_config["registered_resources"]["vector_stores"].append(
             {
                 "vector_store_id": constants.SOLR_DEFAULT_VECTOR_STORE_ID,
                 "provider_id": constants.SOLR_PROVIDER_ID,
-                "embedding_model": embedding_model_env,
+                "embedding_model": constants.SOLR_EMBEDDING_MODEL_ID,
                 "embedding_dimension": constants.SOLR_DEFAULT_EMBEDDING_DIMENSION,
             }
         )
@@ -913,7 +908,7 @@ def enrich_solr(  # pylint: disable=too-many-locals
 
         ls_config["registered_resources"]["models"].append(
             {
-                "model_id": "solr_embedding",
+                "model_id": constants.SOLR_EMBEDDING_MODEL_ID,
                 "model_type": "embedding",
                 "provider_id": "sentence-transformers",
                 "provider_model_id": provider_model_env,

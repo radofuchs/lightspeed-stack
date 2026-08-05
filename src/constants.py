@@ -254,6 +254,7 @@ SOLR_DEFAULT_EMBEDDING_MODEL: Final[str] = (
     "sentence-transformers/ibm-granite/granite-embedding-30m-english"
 )
 SOLR_DEFAULT_EMBEDDING_DIMENSION: Final[int] = 384
+SOLR_EMBEDDING_MODEL_ID: Final[str] = "sentence-transformers/solr_embedding"
 
 # Default score multiplier for BYOK RAG vector stores
 DEFAULT_SCORE_MULTIPLIER: Final[float] = 1.0
