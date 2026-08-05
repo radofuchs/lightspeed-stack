@@ -1,5 +1,18 @@
 # Lightspeed Core Stack Development Guide
 
+## Workflow Rules
+
+### CI/Quality Checks Before Completion
+After making code changes, proactively run the full CI/linting pipeline before presenting changes as complete. Do not wait for the user to report CI failures.
+
+**Required checks:**
+- `uv run make format` - Black formatting
+- `uv run make verify` - All linters (pylint, pyright, ruff, docstyle)
+- `uv run make test-unit` - Unit tests
+- OpenAPI schema regeneration if models changed
+
+Only report work as complete after all checks pass.
+
 ## Project Overview
 Lightspeed Core Stack (LCS) is an AI-powered assistant built on FastAPI that provides answers using LLM services, agents, and RAG databases. It integrates with Llama Stack for AI operations.
 
@@ -9,6 +22,22 @@ Lightspeed Core Stack (LCS) is an AI-powered assistant built on FastAPI that pro
 - **Required Commands**:
   - `uv run make format` - Format code (black + ruff)
   - `uv run make verify` - Run all linters (black, pylint, pyright, ruff, docstyle, check-types)
+
+## Environment & Dependencies
+
+This project uses Python with uv for dependency management. When debugging dependency/import issues, check:
+
+1. **Which Python binary is being invoked** (system vs venv)
+   - Run `which python` to verify the active Python
+   - Check if `.venv/bin/python` is being used
+   - System Python vs venv Python can cause ModuleNotFoundError
+
+2. **Whether `uv sync` was run in the correct environment**
+   - Run `uv sync --group dev` to install all dependencies
+   - Verify packages are installed in `.venv/lib/python*/site-packages/`
+   - Ensure the command was run in the project root directory
+
+Do not suggest generic venv activation without checking these first.
 
 ## Code Architecture & Patterns
 
