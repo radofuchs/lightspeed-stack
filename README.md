@@ -19,6 +19,8 @@ The service includes comprehensive user data collection capabilities for various
 * [Architecture](#architecture)
 * [Prerequisites](#prerequisites)
 * [Installation](#installation)
+    * [Clone the Repository](#clone-the-repository)
+    * [System-Specific Installation](#system-specific-installation)
 * [Run LCS locally](#run-lcs-locally)
     * [Container Runtime Requirements](#container-runtime-requirements)
 * [Configuration](#configuration)
@@ -960,9 +962,9 @@ lint-openapi                      Lint docs/openapi.json (Spectral OAS ruleset; 
 verify                            Run all linters
 distribution-archives             Generate distribution archives to be uploaded into Python registry
 upload-distribution-archives      Upload distribution archives into Python registry
-konflux-requirements              Generate hermetic requirements.*.txt file for konflux build
-konflux-rpm-lock                  Generate rpm.lock.yaml file for konflux build
-konflux-artifacts-lock            Regenerate artifacts.lock.yaml file for konflux build
+konflux-requirements              Generate hermetic requirements.*.txt file for Konflux build
+konflux-rpm-lock                  Generate rpm.lock.yaml file for Konflux build
+konflux-artifacts-lock            Regenerate artifacts.lock.yaml file for Konflux build
 help                              Show this help screen
 ```
 
@@ -1451,9 +1453,9 @@ make konflux-requirements
 This compiles Python dependencies from `pyproject.toml` using `uv`, splits packages by their source index (PyPI vs Red Hat's internal registry), and generates hermetic requirements files with pinned versions and hashes for Konflux builds.
 
 **Files produced:**
-- `requirements.hashes.source.txt` – PyPI packages with hashes
-- `requirements.hashes.wheel.txt` – Red Hat registry packages with hashes
-- `requirements-build.txt` – Build-time dependencies for source packages
+- `.konflux/requirements.hashes.source.txt` – PyPI packages with hashes
+- `.konflux/requirements.hashes.wheel.txt` – Red Hat registry packages with hashes
+- `.konflux/requirements-build.txt` – Build-time dependencies for source packages
 
 The script also updates the Tekton pipeline configurations (`.tekton/lightspeed-stack-*.yaml`) with the list of pre-built wheel packages.
 
