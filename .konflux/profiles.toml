@@ -1,7 +1,13 @@
 [common]
 python_version = "3.12"
 platforms = ["x86_64", "aarch64"]
-bootstrap_packages = ["maturin"]
+# Toolchains/bootstrap tools that are not resolved from pyproject.toml, but
+# still need to be listed in the Tekton "binary.packages" so Hermeto
+# prefetches them as prebuilt wheels instead of building from sdist.
+# uv and pip come from .konflux/requirements.hermetic.txt; uv in particular
+# must stay wheel-only because its PyPI sdist ships a Rust Cargo.lock that
+# Hermeto rejects as out of sync with Cargo.toml.
+bootstrap_packages = ["maturin", "uv", "pip"]
 
 [profiles.cpu]
 rhoai_index_url = "https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.5/cpu-ubi9/simple/"
