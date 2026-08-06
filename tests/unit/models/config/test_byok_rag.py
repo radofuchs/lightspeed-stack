@@ -247,6 +247,21 @@ def test_byok_rag_pgvector_custom_connection_fields() -> None:
     assert store.password.get_secret_value() == "secret"  # pylint: disable=no-member
 
 
+def test_byok_rag_pgvector_accepts_int_port() -> None:
+    """Int port (from replace_env_vars coercion) must validate for pgvector."""
+    store = ByokRag(
+        rag_id="pg_store",
+        rag_type="remote::pgvector",
+        vector_db_id="vs_pg",
+        host="db.example.com",
+        port=5432,
+        db="my_knowledge",
+        user="admin",
+        password="secret",
+    )
+    assert store.port == 5432
+
+
 def test_byok_rag_pgvector_partial_overrides() -> None:
     """Test pgvector fills only missing connection fields with defaults."""
     store = ByokRag(

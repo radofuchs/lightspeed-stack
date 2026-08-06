@@ -541,10 +541,19 @@ def test_dump_models(tmpdir: Path) -> None:
                             "title": "PostgreSQL host"
                         },
                         "port": {
-                            "type": "string",
-                            "nullable": true,
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
                             "default": null,
-                            "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+                            "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. Accepts string placeholders and integer values.",
                             "title": "PostgreSQL port"
                         },
                         "db": {
@@ -9153,6 +9162,12 @@ def test_dump_models(tmpdir: Path) -> None:
         assert "schemas" in components
         schemas = components["schemas"]
         assert schemas is not None
+
+        # ByokRag.port accepts str placeholders, int values, and null.
+        port_schema = schemas["ByokRag"]["properties"]["port"]
+        assert {"type": "string"} in port_schema["anyOf"]
+        assert {"type": "integer"} in port_schema["anyOf"]
+        assert {"type": "null"} in port_schema["anyOf"]
 
         # list of schemas expected in a dump
         expected_schemas = [

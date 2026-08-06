@@ -12631,11 +12631,14 @@
                                 "type": "string"
                             },
                             {
+                                "type": "integer"
+                            },
+                            {
                                 "type": "null"
                             }
                         ],
                         "title": "PostgreSQL port",
-                        "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector."
+                        "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. Accepts string placeholders and integer values."
                     },
                     "db": {
                         "anyOf": [
@@ -17772,11 +17775,14 @@
                                 "type": "string"
                             },
                             {
+                                "type": "integer"
+                            },
+                            {
                                 "type": "null"
                             }
                         ],
                         "title": "PostgreSQL port",
-                        "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}."
+                        "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. Accepts string placeholders and integer values."
                     },
                     "db": {
                         "anyOf": [
