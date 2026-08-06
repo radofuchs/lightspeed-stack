@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 import yaml
-from llama_stack.core.stack import replace_env_vars
+from ogx.core.stack import replace_env_vars
 from pydantic import SecretStr, TypeAdapter, ValidationError
 
 from models.config import Configuration, VectorStoreProvider
