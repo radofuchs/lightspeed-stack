@@ -15,18 +15,18 @@ jobs:
         mode: ["server", "library"]
         environment: ["azure", "vertexai", "watsonx", "bedrock"]
         # Expected default LLM for Behave (matches tests/e2e/configs/run-<env>.yaml).
-        # | environment | model_id                            | provider_id   |
-        # |-------------|-------------------------------------|---------------|
-        # | azure       | gpt-4o-mini                         | azure         |
-        # | vertexai    | google/gemini-2.5-flash             | google-vertex |
-        # | watsonx     | meta-llama/llama-3-3-70b-instruct   | watsonx       |
-        # | bedrock     | deepseek.v3-v1:0                    | aws-bedrock   |
+        # | environment | model_id                                   | provider_id   |
+        # |-------------|--------------------------------------------| --------------|
+        # | azure       | gpt-4o-mini                                | azure         |
+        # | vertexai    | publishers/google/models/gemini-2.5-flash  | google-vertex |
+        # | watsonx     | meta-llama/llama-3-3-70b-instruct          | watsonx       |
+        # | bedrock     | deepseek.v3-v1:0                           | aws-bedrock   |
         include:
           - environment: azure
             e2e_default_model: gpt-4o-mini
             e2e_default_provider: azure
           - environment: vertexai
-            e2e_default_model: google/gemini-2.5-flash
+            e2e_default_model: publishers/google/models/gemini-2.5-flash
             e2e_default_provider: google-vertex
           - environment: watsonx
             e2e_default_model: meta-llama/llama-3-3-70b-instruct
