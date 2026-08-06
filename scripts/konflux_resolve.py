@@ -67,8 +67,7 @@ def parse_version(
     version_str = version_str.strip()
     if "+" in version_str:
         version_str = version_str.split("+", 1)[0]
-    if version_str.endswith(".*"):
-        version_str = version_str[:-2]
+    version_str = version_str.removesuffix(".*")
     m = _VERSION_RE.match(version_str)
     if m is None:
         raise ValueError(f"Cannot parse version: {version_str!r}")
