@@ -767,7 +767,7 @@ def enrich_vector_store(
 # =============================================================================
 
 
-def enrich_solr(  # pylint: disable=too-many-locals
+def enrich_solr(  # pylint: disable=too-many-locals,too-many-statements
     ls_config: dict[str, Any],
     rag_config: dict[str, Any],
     okp_config: dict[str, Any],
@@ -918,6 +918,27 @@ def enrich_solr(  # pylint: disable=too-many-locals
             }
         )
         logger.info("Added OKP embedding model to registered_resources.models")
+
+    # Propagate search_mode to OGX's top-level vector_stores config so that
+    # rag.tool (file_search) uses keyword/hybrid instead of defaulting to
+    # vector similarity — critical for air-gap environments without an
+    # embedding model.
+    okp_search_mode = okp_config.get("search_mode")
+    if okp_search_mode:
+        ogx_mode = constants.SOLR_SEARCH_MODE_MAP.get(okp_search_mode, okp_search_mode)
+        # LCORE uses "semantic"; OGX uses "vector"
+        if ogx_mode == "semantic":
+            ogx_mode = "vector"
+        if "vector_stores" not in ls_config:
+            ls_config["vector_stores"] = {}
+        chunk_params = ls_config["vector_stores"].setdefault(
+            "chunk_retrieval_params", {}
+        )
+        chunk_params["default_search_mode"] = ogx_mode
+        logger.info(
+            "Set vector_stores.chunk_retrieval_params.default_search_mode=%s",
+            ogx_mode,
+        )
 
 
 # =============================================================================
