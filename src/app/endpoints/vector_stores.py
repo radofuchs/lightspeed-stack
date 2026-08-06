@@ -647,14 +647,12 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
         async with vector_store_attach_semaphore:
             for attempt in range(max_retries):
                 try:
-                    vs_file = await client.vector_stores.files.create(
+                    vs_file = await client.vector_stores_files.create(
                         vector_store_id=vector_store_id,
                         **body.model_dump(exclude_none=True),
                     )
                     break  # Success, exit retry loop
-                except (
-                    Exception  # pylint: disable=broad-exception-caught
-                ) as retry_error:
+                except Exception as retry_error:  # pylint: disable=broad-exception-caught
                     error_msg = str(retry_error).lower()
                     is_lock_error = (
                         "database is locked" in error_msg or "locked" in error_msg
@@ -777,7 +775,7 @@ async def list_vector_store_files(
 
     try:
         client = AsyncOgxClientHolder().get_client()
-        files = await client.vector_stores.files.list(vector_store_id=vector_store_id)
+        files = await client.vector_stores_files.list(vector_store_id=vector_store_id)
 
         data = [
             VectorStoreFileResponse(
@@ -848,7 +846,7 @@ async def get_vector_store_file(
 
     try:
         client = AsyncOgxClientHolder().get_client()
-        vs_file = await client.vector_stores.files.retrieve(
+        vs_file = await client.vector_stores_files.retrieve(
             vector_store_id=vector_store_id,
             file_id=file_id,
         )
@@ -915,7 +913,7 @@ async def delete_vector_store_file(
 
     try:
         client = AsyncOgxClientHolder().get_client()
-        await client.vector_stores.files.delete(
+        await client.vector_stores_files.delete(
             vector_store_id=vector_store_id,
             file_id=file_id,
         )
