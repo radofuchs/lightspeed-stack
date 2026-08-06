@@ -774,7 +774,7 @@ def enrich_solr(  # pylint: disable=too-many-locals,too-many-statements
 ) -> None:
     """Enrich Llama Stack config with Solr settings.
 
-    Args:
+    Parameters:
         ls_config: Llama Stack configuration dict (modified in place)
         rag_config: RAG configuration dict. Used keys:
             - inline (list[str]): inline RAG IDs

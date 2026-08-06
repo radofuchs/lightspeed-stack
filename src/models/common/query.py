@@ -135,7 +135,7 @@ class SolrVectorSearchRequest(BaseModel):
     """LCORE Solr inline RAG options for vector_io.query (mode and provider filters).
 
     Attributes:
-        mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.
+        mode: Solr vector_io search mode. When omitted, the configured OKP default is used.
         filters: Solr provider filter payload passed through as params['solr'].
 
     Legacy clients may send a plain JSON object with filter keys only;
