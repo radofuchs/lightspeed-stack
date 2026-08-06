@@ -296,7 +296,7 @@ def build_referenced_document(
 
     # OKP/Solr chunks need URL construction with the OKP base URL
     if resolved_source == constants.OKP_RAG_ID:
-        doc_url = _build_okp_doc_url(attributes)
+        doc_url = _build_okp_doc_url(attributes) or doc_url
 
     if not (doc_title or doc_url):
         return None

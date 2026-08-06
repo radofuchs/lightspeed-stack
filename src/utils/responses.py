@@ -858,7 +858,7 @@ def _build_okp_doc_url(attributes: dict[str, Any]) -> Optional[str]:
     ``source_path`` (disconnected clusters) and ``reference_url`` (online).
     The chosen relative path is joined with the OKP base URL.
 
-    Args:
+    Parameters:
         attributes: Metadata dict from a file_search result chunk.
 
     Returns:

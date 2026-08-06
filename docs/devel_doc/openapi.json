@@ -21303,7 +21303,7 @@
                             }
                         ],
                         "title": "Mode",
-                        "description": "Solr vector_io search mode. When omitted, the server default ('hybrid') is used. 'keyword' and 'lexical' both use BM25 text search.",
+                        "description": "Solr vector_io search mode. When omitted, the configured OKP default is used; otherwise 'hybrid' applies. 'keyword' and 'lexical' both use BM25 text search.",
                         "examples": [
                             "hybrid",
                             "semantic",
