@@ -573,7 +573,7 @@ def _upsert_vsprov_embedding_model(
 
 def _vsprov_fields_and_backend(
     product_type: str, provider_id: str, cfg: dict[str, Any]
-) -> tuple[dict[str, Any], str, dict[str, Any] | None]:
+) -> tuple[dict[str, Any], str, Optional[dict[str, Any]]]:
     """Build template extra fields and optional faiss storage backend.
 
     Parameters:
@@ -712,7 +712,7 @@ def _enrich_one_vector_store_provider(
 
 def enrich_vector_store(
     ls_config: dict[str, Any],
-    vector_store: dict[str, Any] | None = None,
+    vector_store: Optional[dict[str, Any]] = None,
 ) -> None:
     """Enrich LS config with dynamic vector-store provider capacity.
 
