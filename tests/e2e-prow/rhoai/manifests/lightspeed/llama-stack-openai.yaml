@@ -88,6 +88,13 @@ spec:
           fi
           cp -f /opt/app-root/.e2e-rag-seed/kv_store.db /opt/app-root/src/.llama/storage/rag/kv_store.db
           cp /opt/app-root/src/llama_stack_configuration.py /opt/app-root/llama_stack_configuration.py
+          # Mirror GH Actions e2e: pre-download the FAISS embedding model into the PVC so
+          # query-time retrieval can run with HF_HUB_OFFLINE=1 (no HuggingFace egress).
+          export HF_HOME=/opt/app-root/src/.cache/huggingface
+          mkdir -p "$HF_HOME"
+          echo "Pre-downloading sentence-transformers/all-mpnet-base-v2 into $HF_HOME ..."
+          /opt/app-root/.venv/bin/python -c \
+            "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-mpnet-base-v2')"
           chmod -R 775 /opt/app-root && chown -R 1001:0 /opt/app-root
       volumeMounts:
         - name: app-root
@@ -132,6 +139,11 @@ spec:
           value: "/opt/app-root/src"
         - name: HOME
           value: "/opt/app-root/src"
+        # Match docker-compose / GH Actions: use the PVC-cached embedding model offline.
+        - name: HF_HOME
+          value: "/opt/app-root/src/.cache/huggingface"
+        - name: HF_HUB_OFFLINE
+          value: "1"
         - name: KV_STORE_PATH
           value: "/opt/app-root/src/.llama/storage/kv_store.db"
         - name: KV_RAG_PATH
