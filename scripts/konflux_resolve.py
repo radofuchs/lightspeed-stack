@@ -1289,6 +1289,7 @@ def main() -> None:
         # Strip build deps that duplicate RHOAI wheel packages to avoid
         # hermeto fetching them as binary from PyPI (EC policy violation).
         rhoai_names = set(buckets["rhoai_wheel"].keys())
+        rhoai_names.update(normalize_name(p) for p in bootstrap_packages)
         _strip_rhoai_duplicates_from_build_deps(build_output, rhoai_names)
     else:
         with open(build_output, "w") as f:
