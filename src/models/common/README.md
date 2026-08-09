@@ -36,6 +36,10 @@ Shared query-related request primitives.
 
 Catalog models for the ``/shields`` endpoint.
 
+## [skills.py](skills.py)
+
+Metadata models for agent skills shared across the skills endpoint and helpers.
+
 ## [tools.py](tools.py)
 
 Backend-agnostic tool listing models.

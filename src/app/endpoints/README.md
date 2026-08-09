@@ -96,6 +96,10 @@ Handler for REST API calls to manage saved prompts.
 
 Handler for REST API call to list available shields.
 
+## [skills.py](skills.py)
+
+Handler for REST API call to list loaded agent skills.
+
 ## [stream_interrupt.py](stream_interrupt.py)
 
 Endpoint for interrupting in-progress streaming query requests.

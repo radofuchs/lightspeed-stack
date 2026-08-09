@@ -60,6 +60,10 @@ Integration tests for the /root endpoint.
 
 Integration tests for the /v1/saved-prompts REST API endpoints.
 
+## [test_skills_integration.py](test_skills_integration.py)
+
+Integration tests for the /v1/skills endpoint.
+
 ## [test_stream_interrupt_integration.py](test_stream_interrupt_integration.py)
 
 Integration tests for the streaming query interrupt lifecycle.
