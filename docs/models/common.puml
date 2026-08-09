@@ -234,6 +234,10 @@ class "ShieldModerationBlocked" as src.models.common.moderation.ShieldModeration
 class "ShieldModerationPassed" as src.models.common.moderation.ShieldModerationPassed {
   decision : Literal['passed']
 }
+class "SkillMetadata" as src.models.common.skills.SkillMetadata {
+  description : str
+  name : str
+}
 class "SolrVectorSearchRequest" as src.models.common.query.SolrVectorSearchRequest {
   filters : Optional[dict[str, Any]]
   mode : Optional[Literal['semantic', 'hybrid', 'lexical']]

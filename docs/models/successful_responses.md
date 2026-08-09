@@ -2576,6 +2576,9 @@ Paths are validated at startup to ensure they exist and contain valid SKILL.md f
 
 Model representing a response to skills request.
 
+Attributes:
+    skills: List of loaded skills with metadata (name and description).
+
 
 | Field | Type | Description |
 |-------|------|-------------|
