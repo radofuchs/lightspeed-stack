@@ -670,6 +670,22 @@ Shield moderation passed; no refusal.
 | decision | string |  |
 
 
+## SkillMetadata
+
+
+Metadata describing a single loaded agent skill.
+
+Attributes:
+    name: Unique name of the skill.
+    description: Human readable description of what the skill does.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique name of the skill |
+| description | string | Human readable description of what the skill does |
+
+
 ## SolrVectorSearchRequest
 
 

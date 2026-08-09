@@ -104,6 +104,7 @@
                     "feedback",
                     "get_models",
                     "get_tools",
+                    "get_skills",
                     "get_shields",
                     "list_providers",
                     "get_provider",
@@ -5896,6 +5897,27 @@
                 "title": "ShieldsResponse",
                 "type": "object"
             },
+            "SkillMetadata": {
+                "description": "Metadata describing a single loaded agent skill.\n\nAttributes:\n    name: Unique name of the skill.\n    description: Human readable description of what the skill does.",
+                "properties": {
+                    "name": {
+                        "description": "Unique name of the skill",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "description": {
+                        "description": "Human readable description of what the skill does",
+                        "title": "Description",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "description"
+                ],
+                "title": "SkillMetadata",
+                "type": "object"
+            },
             "SkillsConfiguration": {
                 "additionalProperties": false,
                 "description": "Agent skills configuration.\n\nSpecifies paths to skill directories. Skill metadata (name, description)\nis read from SKILL.md frontmatter at startup.\n\nEach path can point to either:\n- A directory containing a SKILL.md file (single skill)\n- A directory containing subdirectories with SKILL.md files (multiple skills)\n\nPaths are validated at startup to ensure they exist and contain valid SKILL.md files.",
@@ -5911,6 +5933,38 @@
                     }
                 },
                 "title": "SkillsConfiguration",
+                "type": "object"
+            },
+            "SkillsResponse": {
+                "description": "Model representing a response to skills request.\n\nAttributes:\n    skills: List of loaded skills with metadata (name and description).",
+                "examples": [
+                    {
+                        "skills": [
+                            {
+                                "description": "Review code for quality and security",
+                                "name": "code-review"
+                            },
+                            {
+                                "description": "Troubleshoot OpenShift cluster issues",
+                                "name": "openshift-troubleshooting"
+                            }
+                        ]
+                    }
+                ],
+                "properties": {
+                    "skills": {
+                        "description": "List of loaded skills with metadata",
+                        "items": {
+                            "$ref": "`#/components/schemas/`SkillMetadata"
+                        },
+                        "title": "Skills",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "skills"
+                ],
+                "title": "SkillsResponse",
                 "type": "object"
             },
             "SplunkConfiguration": {

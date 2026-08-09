@@ -96,6 +96,10 @@ Unit tests for the /saved-prompts REST API endpoints.
 
 Unit tests for the /shields REST API endpoint.
 
+## [test_skills.py](test_skills.py)
+
+Unit tests for skills endpoint.
+
 ## [test_stream_interrupt.py](test_stream_interrupt.py)
 
 Unit tests for streaming query interrupt endpoint.

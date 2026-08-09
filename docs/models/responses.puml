@@ -27,7 +27,7 @@ class "BadRequestResponse" as src.models.api.responses.error.bad_request.BadRequ
 }
 class "ConfigurationResponse" as src.models.api.responses.successful.configuration.ConfigurationResponse {
   configuration
-  model_config : ConfigDict
+  model_config
 }
 class "ConflictResponse" as src.models.api.responses.error.conflict.ConflictResponse {
   description : ClassVar[str]
@@ -297,6 +297,10 @@ class "ServiceUnavailableResponse" as src.models.api.responses.error.service_una
 class "ShieldsResponse" as src.models.api.responses.successful.catalog.ShieldsResponse {
   model_config : dict
   shields : list[CatalogShield]
+}
+class "SkillsResponse" as src.models.api.responses.successful.catalog.SkillsResponse {
+  model_config : dict
+  skills : list[SkillMetadata]
 }
 class "StatusResponse" as src.models.api.responses.successful.probes.StatusResponse {
   functionality : str
