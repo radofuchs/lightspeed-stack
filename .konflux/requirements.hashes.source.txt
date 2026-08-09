@@ -102,8 +102,6 @@ google-cloud-resource-manager==1.18.0 \
 oci==2.182.1 \
     --hash=sha256:0c616a6bc3bc458464bc3456469d8da63a1a2d2277e9314b41a1c4e76d5df523 \
     --hash=sha256:9862de221f2abe9cf8319393eec58ea59c014fd9b61afaf0a3cca163e2a508b0
-pydantic-ai-skills==1.3.0 \
-    --hash=sha256:4a8e001054b8c458d9b9b1d7688f0a30602246473ed8dfbe235dc4557b458dff
 pythainlp==5.3.4 \
     --hash=sha256:76744e51e27c895630bafd74f53a1f0aa8782cef2f7f02eebd6427fe8ce8d84d \
     --hash=sha256:e66fd76fb5931834fd4e32ed54337ec62350d7654f187850e4dd4f915e9f624f

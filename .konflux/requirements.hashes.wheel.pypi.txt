@@ -3,6 +3,8 @@
 # Wheel-only hashes — hermetic builds cannot install sdist build backends.
 pydantic-ai==2.26.0 \
     --hash=sha256:1d2324407ed6c206b4c21436059c651051b836fa443b14165236ea9e53379c10
+pydantic-ai-skills==1.3.0 \
+    --hash=sha256:4a8e001054b8c458d9b9b1d7688f0a30602246473ed8dfbe235dc4557b458dff
 pydantic-ai-slim==2.26.0 \
     --hash=sha256:855a23f120328e7a12e8f4371db597d74f65925e20ce335d3a6db81203238f58
 pydantic-evals==2.26.0 \
