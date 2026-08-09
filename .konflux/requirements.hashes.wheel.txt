@@ -304,17 +304,9 @@ pycparser==3.0 \
     --hash=sha256:c2e6198bf8dc97ba19b5f42d9d0e08d5842ffb775e0e208b150080dcf423396e
 pydantic==2.13.4 \
     --hash=sha256:1a3d4d45204182df30dbd68890bdf1becec13f689075099866dd4bdf06b04371
-pydantic-ai==2.5.0 \
-    --hash=sha256:e2278856e6f3d653601e39ce626a90c99faa139b03c742532da58d64d9f8cab0
-pydantic-ai-slim==2.5.0 \
-    --hash=sha256:8436abb3db39526cbc903de3d78c150a28fcc55463db3dfb5a82ee1b5cb27c50
 pydantic-core==2.46.4 \
     --hash=sha256:38235509e8f37596cc39453972c1a9b200287d92a98eb2a7c92d9708a98eec49 \
     --hash=sha256:bbc9884932978a8f52c59aac4a0a273c8e514d303fd040c38b0436b37e57ed33
-pydantic-evals==2.5.0 \
-    --hash=sha256:b7d38de7f719dd71f5b91302e7555198d0e19c5d62a7c19908ad5aadfb5e275a
-pydantic-graph==2.5.0 \
-    --hash=sha256:61ad8c88d52760b864e186e4342da3d5de5e2d8a232f66ac562c69b108889a62
 pydantic-settings==2.14.2 \
     --hash=sha256:0398c90f6e52de6fc403d1aa3dfd53c7be8e011759e7fcd7b317fffb0649f726
 pygments==2.20.0 \

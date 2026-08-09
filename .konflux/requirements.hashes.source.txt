@@ -102,9 +102,22 @@ google-cloud-resource-manager==1.18.0 \
 oci==2.182.1 \
     --hash=sha256:0c616a6bc3bc458464bc3456469d8da63a1a2d2277e9314b41a1c4e76d5df523 \
     --hash=sha256:9862de221f2abe9cf8319393eec58ea59c014fd9b61afaf0a3cca163e2a508b0
-pydantic-ai-skills==1.2.0 \
-    --hash=sha256:7ff4eb4b307deb6ef3bf31a6d9493c1e3a8e9b866a13b866a9ea4606bd914206 \
-    --hash=sha256:e52f7e8243343dfa94206aae11cd142120edb8990fc392b1d8af32f99b6d351e
+# Aligned with uv.lock / pyproject (>=2.23); PyPI only — RHOAI index tops out at 2.9.x.
+pydantic-ai==2.26.0 \
+    --hash=sha256:1d2324407ed6c206b4c21436059c651051b836fa443b14165236ea9e53379c10 \
+    --hash=sha256:f04585e1b16047e17bfeda8ce5d5f5b549fa3567a000ee2e1f012ac5cc893ccf
+pydantic-ai-skills==1.3.0 \
+    --hash=sha256:4a8e001054b8c458d9b9b1d7688f0a30602246473ed8dfbe235dc4557b458dff \
+    --hash=sha256:9940240170fa315640b76ec94be430bea1df55ac6d625a285725b4994f07f86d
+pydantic-ai-slim==2.26.0 \
+    --hash=sha256:855a23f120328e7a12e8f4371db597d74f65925e20ce335d3a6db81203238f58 \
+    --hash=sha256:d41a40a976885d5f9c6848552fcd6732d5daa8294faf4d3e0138fb28118b6734
+pydantic-evals==2.26.0 \
+    --hash=sha256:41f92eee7270dbb85e6639082256ff14877c1f0bba0d7dda30e683efb6555e0d \
+    --hash=sha256:b5bcac364042d18a028b9e747c1f930f171706c23cab50473c769e053b43a4c0
+pydantic-graph==2.26.0 \
+    --hash=sha256:4599a980747588faf17ac56cfa9c10b2a79723a5a20c3c7ee479e8366653097c \
+    --hash=sha256:12d9da6c5a0e2634d89f2795ca15783ee37250fdc295b33b5c14232576dafdac
 pythainlp==5.3.4 \
     --hash=sha256:76744e51e27c895630bafd74f53a1f0aa8782cef2f7f02eebd6427fe8ce8d84d \
     --hash=sha256:e66fd76fb5931834fd4e32ed54337ec62350d7654f187850e4dd4f915e9f624f
