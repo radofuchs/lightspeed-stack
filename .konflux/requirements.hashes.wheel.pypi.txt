@@ -1,1 +1,11 @@
 --index-url https://pypi.org/simple
+# Aligned with uv.lock / pyproject (>=2.23). Pure PyPI wheels (RHOAI tops out at 2.9.x).
+# Wheel-only hashes — hermetic builds cannot install sdist build backends.
+pydantic-ai==2.26.0 \
+    --hash=sha256:1d2324407ed6c206b4c21436059c651051b836fa443b14165236ea9e53379c10
+pydantic-ai-slim==2.26.0 \
+    --hash=sha256:855a23f120328e7a12e8f4371db597d74f65925e20ce335d3a6db81203238f58
+pydantic-evals==2.26.0 \
+    --hash=sha256:41f92eee7270dbb85e6639082256ff14877c1f0bba0d7dda30e683efb6555e0d
+pydantic-graph==2.26.0 \
+    --hash=sha256:4599a980747588faf17ac56cfa9c10b2a79723a5a20c3c7ee479e8366653097c
