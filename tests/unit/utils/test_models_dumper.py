@@ -161,7 +161,8 @@ def test_dump_models(tmpdir: Path) -> None:
                         "read_vector_stores",
                         "manage_files",
                         "manage_prompts",
-                        "read_prompts"
+                        "read_prompts",
+                        "manage_saved_prompts"
                     ],
                     "title": "Action",
                     "type": "string"
@@ -203,7 +204,7 @@ def test_dump_models(tmpdir: Path) -> None:
                 },
                 "Attachment": {
                     "additionalProperties": false,
-                    "description": "Model representing an attachment that can be sent from the UI as part of query.\n\nA list of attachments can be an optional part of 'query' request.\n\nAttributes:\n    attachment_type: The attachment type, like \"log\", \"configuration\" etc.\n    content_type: The content type as defined in MIME standard\n    content: The actual attachment content",
+                    "description": "Model representing an attachment that can be sent from the UI as part of query.\n\nA list of attachments can be an optional part of 'query' request.\n\nAttributes:\n    attachment_type: The attachment type, like \"log\", \"configuration\", \"image\" etc.\n    content_type: The content type as defined in MIME standard\n    content: The actual attachment content (text or base64-encoded image data)",
                     "examples": [
                         {
                             "attachment_type": "log",
@@ -219,13 +220,19 @@ def test_dump_models(tmpdir: Path) -> None:
                             "attachment_type": "configuration",
                             "content": "foo: bar",
                             "content_type": "application/yaml"
+                        },
+                        {
+                            "attachment_type": "image",
+                            "content": "<base64-encoded image data>",
+                            "content_type": "image/png"
                         }
                     ],
                     "properties": {
                         "attachment_type": {
-                            "description": "The attachment type, like 'log', 'configuration' etc.",
+                            "description": "The attachment type, like 'log', 'configuration', 'image' etc.",
                             "examples": [
-                                "log"
+                                "log",
+                                "image"
                             ],
                             "title": "Attachment Type",
                             "type": "string"
@@ -233,13 +240,15 @@ def test_dump_models(tmpdir: Path) -> None:
                         "content_type": {
                             "description": "The content type as defined in MIME standard",
                             "examples": [
-                                "text/plain"
+                                "text/plain",
+                                "image/jpeg",
+                                "image/png"
                             ],
                             "title": "Content Type",
                             "type": "string"
                         },
                         "content": {
-                            "description": "The actual attachment content",
+                            "description": "The actual attachment content (text or base64-encoded image data)",
                             "examples": [
                                 "warning: quota exceeded"
                             ],
@@ -632,6 +641,182 @@ def test_dump_models(tmpdir: Path) -> None:
                     "title": "CORSConfiguration",
                     "type": "object"
                 },
+                "CatalogModel": {
+                    "description": "Normalized model entry used by ``/models`` and internal model resolution.\n\nUnifies OpenAI-style, Anthropic, and Google ``models.list()`` payloads into\none catalog shape.",
+                    "properties": {
+                        "identifier": {
+                            "description": "Model identifier",
+                            "title": "Identifier",
+                            "type": "string"
+                        },
+                        "metadata": {
+                            "additionalProperties": true,
+                            "description": "Provider-specific metadata excluding core catalog fields",
+                            "title": "Metadata",
+                            "type": "object"
+                        },
+                        "api_model_type": {
+                            "description": "API model type (typically mirrors model_type)",
+                            "title": "Api Model Type",
+                            "type": "string"
+                        },
+                        "provider_id": {
+                            "description": "Provider identifier",
+                            "title": "Provider Id",
+                            "type": "string"
+                        },
+                        "type": {
+                            "default": "model",
+                            "description": "Object type, always 'model'",
+                            "title": "Type",
+                            "type": "string"
+                        },
+                        "provider_resource_id": {
+                            "default": "",
+                            "description": "Provider-native resource identifier for the model",
+                            "title": "Provider Resource Id",
+                            "type": "string"
+                        },
+                        "model_type": {
+                            "description": "Model type such as 'llm' or 'embedding'",
+                            "title": "Model Type",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "identifier",
+                        "api_model_type",
+                        "provider_id",
+                        "model_type"
+                    ],
+                    "title": "CatalogModel",
+                    "type": "object"
+                },
+                "CatalogShield": {
+                    "description": "Shield entry in the ``/shields`` catalog response.\n\nAttributes:\n    name: Unique, user-facing name identifying this shield instance.\n    provider_id: Shield provider / type discriminator.\n    type: Catalog entry type; always shield.\n    config: Type-specific shield configuration.",
+                    "properties": {
+                        "name": {
+                            "description": "Unique, user-facing name of the shield instance",
+                            "title": "Name",
+                            "type": "string"
+                        },
+                        "provider_id": {
+                            "description": "Shield provider / type discriminator",
+                            "enum": [
+                                "question_validity",
+                                "redaction"
+                            ],
+                            "title": "Provider Id",
+                            "type": "string"
+                        },
+                        "type": {
+                            "const": "shield",
+                            "default": "shield",
+                            "description": "Catalog entry type; always shield",
+                            "title": "Type",
+                            "type": "string"
+                        },
+                        "config": {
+                            "additionalProperties": true,
+                            "description": "Type-specific shield configuration",
+                            "title": "Config",
+                            "type": "object"
+                        }
+                    },
+                    "required": [
+                        "name",
+                        "provider_id",
+                        "config"
+                    ],
+                    "title": "CatalogShield",
+                    "type": "object"
+                },
+                "CatalogTool": {
+                    "description": "Tool entry in the ``/tools`` catalog response.",
+                    "properties": {
+                        "identifier": {
+                            "title": "Identifier",
+                            "type": "string"
+                        },
+                        "description": {
+                            "title": "Description",
+                            "type": "string"
+                        },
+                        "parameters": {
+                            "items": {
+                                "$ref": "`#/components/schemas/`CatalogToolParameter"
+                            },
+                            "title": "Parameters",
+                            "type": "array"
+                        },
+                        "provider_id": {
+                            "title": "Provider Id",
+                            "type": "string"
+                        },
+                        "toolgroup_id": {
+                            "title": "Toolgroup Id",
+                            "type": "string"
+                        },
+                        "server_source": {
+                            "title": "Server Source",
+                            "type": "string"
+                        },
+                        "type": {
+                            "default": "tool",
+                            "title": "Type",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "identifier",
+                        "description",
+                        "parameters",
+                        "provider_id",
+                        "toolgroup_id",
+                        "server_source"
+                    ],
+                    "title": "CatalogTool",
+                    "type": "object"
+                },
+                "CatalogToolParameter": {
+                    "description": "Parameter entry for a tool in the ``/tools`` catalog response.",
+                    "properties": {
+                        "name": {
+                            "title": "Name",
+                            "type": "string"
+                        },
+                        "description": {
+                            "title": "Description",
+                            "type": "string"
+                        },
+                        "parameter_type": {
+                            "title": "Parameter Type",
+                            "type": "string"
+                        },
+                        "required": {
+                            "default": false,
+                            "title": "Required",
+                            "type": "boolean"
+                        },
+                        "default": {
+                            "anyOf": [
+                                {},
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "default": null,
+                            "title": "Default"
+                        }
+                    },
+                    "required": [
+                        "name",
+                        "description",
+                        "parameter_type"
+                    ],
+                    "title": "CatalogToolParameter",
+                    "type": "object"
+                },
                 "CompactionConfiguration": {
                     "additionalProperties": false,
                     "description": "Configuration for conversation history compaction.\n\nCompaction summarizes older conversation turns when their estimated\ntoken count approaches the context window limit, keeping the\nconversation usable instead of failing with HTTP 413. The\nconfiguration here controls when compaction triggers and how much\nrecent context is preserved verbatim.\n\nAttributes:\n    enabled: Master switch. When False, compaction never triggers\n        and other fields are inert.\n    threshold_ratio: Trigger compaction when estimated input tokens\n        exceed this fraction of the model's context window\n        (clamped to 0.0..1.0).\n    token_floor: Minimum estimated token count before compaction\n        can trigger, regardless of threshold_ratio. Prevents\n        triggering on very small context windows.\n    buffer_turns: Initial number of recent turns to keep verbatim.\n        The runtime applies a degrading guard \u2014 if these turns\n        exceed the available budget, it reduces buffer_turns by\n        one repeatedly until the budget fits, down to zero.\n    buffer_max_ratio: Hard cap on the fraction of the context\n        window the buffer zone may occupy, regardless of\n        buffer_turns.",
@@ -767,6 +952,11 @@ def test_dump_models(tmpdir: Path) -> None:
                             "title": "BYOK RAG configuration",
                             "type": "array"
                         },
+                        "vector_store": {
+                            "$ref": "`#/components/schemas/`VectorStoreConfiguration",
+                            "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora). When providers is non-empty, default_provider is required and must match one of providers[].id. Applied in unified synthesis only.",
+                            "title": "Vector store configuration"
+                        },
                         "a2a_state": {
                             "$ref": "`#/components/schemas/`A2AStateConfiguration",
                             "description": "Configuration for A2A protocol persistent state storage.",
@@ -806,6 +996,11 @@ def test_dump_models(tmpdir: Path) -> None:
                             "description": "Splunk HEC configuration for sending telemetry events.",
                             "title": "Splunk configuration"
                         },
+                        "observability": {
+                            "$ref": "`#/components/schemas/`ObservabilityConfiguration",
+                            "description": "OpenTelemetry and observability configuration collected from OTEL_* environment variables.",
+                            "title": "Observability configuration"
+                        },
                         "deployment_environment": {
                             "default": "development",
                             "description": "Deployment environment name (e.g., 'development', 'staging', 'production'). Used in telemetry events.",
@@ -844,6 +1039,28 @@ def test_dump_models(tmpdir: Path) -> None:
                             "$ref": "`#/components/schemas/`SavedPromptsConfiguration",
                             "description": "Configuration for saved prompts feature limits including maximum prompts per user, display name length, and content length.",
                             "title": "Saved prompts configuration"
+                        },
+                        "shields": {
+                            "description": "List of pydantic-ai-lightspeed agent guardrail shields (question validity and PII redaction). Each entry has a unique 'name', a 'provider_id' ('question_validity' or 'redaction'), and a type-specific 'config'.",
+                            "items": {
+                                "discriminator": {
+                                    "mapping": {
+                                        "question_validity": "`#/components/schemas/`QuestionValidityShieldConfiguration",
+                                        "redaction": "`#/components/schemas/`RedactionShieldConfiguration"
+                                    },
+                                    "propertyName": "provider_id"
+                                },
+                                "oneOf": [
+                                    {
+                                        "$ref": "`#/components/schemas/`QuestionValidityShieldConfiguration"
+                                    },
+                                    {
+                                        "$ref": "`#/components/schemas/`RedactionShieldConfiguration"
+                                    }
+                                ]
+                            },
+                            "title": "Shields configuration",
+                            "type": "array"
                         }
                     },
                     "required": [
@@ -899,6 +1116,15 @@ def test_dump_models(tmpdir: Path) -> None:
                                     }
                                 ],
                                 "name": "lightspeed-stack",
+                                "observability": {
+                                    "otel": {
+                                        "OTEL_EXPORTER_OTLP_ENDPOINT": "",
+                                        "OTEL_EXPORTER_OTLP_HEADERS": "api-key=[REDACTED]",
+                                        "OTEL_EXPORTER_OTLP_PROTOCOL": "",
+                                        "OTEL_SDK_DISABLED": "true",
+                                        "OTEL_SERVICE_NAME": ""
+                                    }
+                                },
                                 "quota_handlers": {
                                     "enable_token_history": false,
                                     "limiters": [],
@@ -1765,6 +1991,67 @@ def test_dump_models(tmpdir: Path) -> None:
                     "title": "ErrorStreamPayload",
                     "type": "object"
                 },
+                "FaissVectorStoreProvider": {
+                    "additionalProperties": false,
+                    "description": "Dynamic FAISS vector-store provider (runtime create capacity).",
+                    "properties": {
+                        "id": {
+                            "description": "Llama Stack vector_io provider_id. Surrounding whitespace is stripped before validation and emission.",
+                            "minLength": 1,
+                            "title": "Provider ID",
+                            "type": "string"
+                        },
+                        "embedding_model": {
+                            "description": "Embedding model identification used for stores created against this provider.",
+                            "minLength": 1,
+                            "title": "Embedding model",
+                            "type": "string"
+                        },
+                        "embedding_dimension": {
+                            "description": "Dimensionality of embedding vectors for this provider.",
+                            "minimum": 0,
+                            "title": "Embedding dimension",
+                            "type": "integer"
+                        },
+                        "type": {
+                            "const": "faiss",
+                            "default": "faiss",
+                            "description": "Product type for this dynamic vector-store provider.",
+                            "title": "Provider type",
+                            "type": "string"
+                        },
+                        "config": {
+                            "$ref": "`#/components/schemas/`FaissVectorStoreProviderConfig",
+                            "description": "FAISS storage settings for this provider.",
+                            "title": "Storage config"
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "embedding_model",
+                        "embedding_dimension",
+                        "config"
+                    ],
+                    "title": "FaissVectorStoreProvider",
+                    "type": "object"
+                },
+                "FaissVectorStoreProviderConfig": {
+                    "additionalProperties": false,
+                    "description": "Storage config for a FAISS dynamic vector-store provider.",
+                    "properties": {
+                        "path": {
+                            "description": "On-disk FAISS/SQLite path for this provider.",
+                            "minLength": 1,
+                            "title": "DB path",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "path"
+                    ],
+                    "title": "FaissVectorStoreProviderConfig",
+                    "type": "object"
+                },
                 "FeedbackCategory": {
                     "description": "Enum representing predefined feedback categories for AI responses.\n\nThese categories help provide structured feedback about AI inference quality\nwhen users provide negative feedback (thumbs down). Multiple categories can\nbe selected to provide comprehensive feedback about response issues.",
                     "enum": [
@@ -2052,6 +2339,13 @@ def test_dump_models(tmpdir: Path) -> None:
                                 "response": "User does not have permission to perform this action"
                             },
                             "label": "conversation delete"
+                        },
+                        {
+                            "detail": {
+                                "cause": "User 6789 does not have permission to delete saved prompt with ID abc123",
+                                "response": "User does not have permission to perform this action"
+                            },
+                            "label": "saved prompt delete"
                         },
                         {
                             "detail": {
@@ -3194,8 +3488,7 @@ def test_dump_models(tmpdir: Path) -> None:
                         "models": {
                             "description": "List of models available",
                             "items": {
-                                "additionalProperties": true,
-                                "type": "object"
+                                "$ref": "`#/components/schemas/`CatalogModel"
                             },
                             "title": "Models",
                             "type": "array"
@@ -3272,13 +3565,6 @@ def test_dump_models(tmpdir: Path) -> None:
                                 "response": "Prompt not found"
                             },
                             "label": "prompt"
-                        },
-                        {
-                            "detail": {
-                                "cause": "Saved Prompt with ID 123e4567-e89b-12d3-a456-426614174000 does not exist",
-                                "response": "Saved Prompt not found"
-                            },
-                            "label": "saved prompt"
                         }
                     ],
                     "properties": {
@@ -3297,6 +3583,22 @@ def test_dump_models(tmpdir: Path) -> None:
                         "detail"
                     ],
                     "title": "NotFoundResponse",
+                    "type": "object"
+                },
+                "ObservabilityConfiguration": {
+                    "additionalProperties": false,
+                    "description": "OpenTelemetry observability configuration.\n\nThis configuration is automatically populated from OTEL_* environment variables\nto provide visibility into the active tracing setup.\n\nAttributes:\n    otel: Dictionary of OTEL_* environment variables with secrets redacted.",
+                    "properties": {
+                        "otel": {
+                            "additionalProperties": {
+                                "type": "string"
+                            },
+                            "description": "Active OpenTelemetry configuration from OTEL_* environment variables",
+                            "title": "OpenTelemetry configuration",
+                            "type": "object"
+                        }
+                    },
+                    "title": "ObservabilityConfiguration",
                     "type": "object"
                 },
                 "OkpConfiguration": {
@@ -3363,6 +3665,7 @@ def test_dump_models(tmpdir: Path) -> None:
                     "type": "object"
                 },
                 "OpenAIResponseAnnotationContainerFileCitation": {
+                    "description": "Container file citation annotation referencing a file within a container.",
                     "properties": {
                         "type": {
                             "const": "container_file_citation",
@@ -3432,6 +3735,7 @@ def test_dump_models(tmpdir: Path) -> None:
                     "type": "object"
                 },
                 "OpenAIResponseAnnotationFilePath": {
+                    "description": "File path annotation referencing a generated file in response content.",
                     "properties": {
                         "type": {
                             "const": "file_path",
@@ -3774,6 +4078,7 @@ def test_dump_models(tmpdir: Path) -> None:
                     "type": "object"
                 },
                 "OpenAIResponseInputToolChoiceMode": {
+                    "description": "Enumeration of simple tool choice modes for response generation.",
                     "enum": [
                         "auto",
                         "required",
@@ -4105,6 +4410,7 @@ def test_dump_models(tmpdir: Path) -> None:
                     "type": "object"
                 },
                 "OpenAIResponseOutputMessageContentOutputText": {
+                    "description": "Text content within an output message of an OpenAI response.",
                     "properties": {
                         "text": {
                             "title": "Text",
@@ -4354,6 +4660,95 @@ def test_dump_models(tmpdir: Path) -> None:
                     "title": "OpenAIResponseOutputMessageMCPListTools",
                     "type": "object"
                 },
+                "OpenAIResponseOutputMessageReasoningContent": {
+                    "description": "Reasoning text from the model.",
+                    "properties": {
+                        "text": {
+                            "description": "The reasoning text content from the model.",
+                            "title": "Text",
+                            "type": "string"
+                        },
+                        "type": {
+                            "const": "reasoning_text",
+                            "default": "reasoning_text",
+                            "description": "The type identifier, always 'reasoning_text'.",
+                            "title": "Type",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "text"
+                    ],
+                    "title": "OpenAIResponseOutputMessageReasoningContent",
+                    "type": "object"
+                },
+                "OpenAIResponseOutputMessageReasoningItem": {
+                    "description": "Reasoning output from the model, representing the model's thinking process.",
+                    "properties": {
+                        "id": {
+                            "description": "Unique identifier for the reasoning output item.",
+                            "title": "Id",
+                            "type": "string"
+                        },
+                        "summary": {
+                            "description": "Summary of the reasoning output.",
+                            "items": {
+                                "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningSummary"
+                            },
+                            "title": "Summary",
+                            "type": "array"
+                        },
+                        "type": {
+                            "const": "reasoning",
+                            "default": "reasoning",
+                            "description": "The type identifier, always 'reasoning'.",
+                            "title": "Type",
+                            "type": "string"
+                        },
+                        "content": {
+                            "type": "array",
+                            "nullable": true,
+                            "default": null,
+                            "description": "The reasoning content from the model.",
+                            "title": "Content"
+                        },
+                        "status": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "description": "The status of the reasoning output.",
+                            "title": "Status"
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "summary"
+                    ],
+                    "title": "OpenAIResponseOutputMessageReasoningItem",
+                    "type": "object"
+                },
+                "OpenAIResponseOutputMessageReasoningSummary": {
+                    "description": "A summary of reasoning output from the model.",
+                    "properties": {
+                        "text": {
+                            "description": "The summary text of the reasoning output.",
+                            "title": "Text",
+                            "type": "string"
+                        },
+                        "type": {
+                            "const": "summary_text",
+                            "default": "summary_text",
+                            "description": "The type identifier, always 'summary_text'.",
+                            "title": "Type",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "text"
+                    ],
+                    "title": "OpenAIResponseOutputMessageReasoningSummary",
+                    "type": "object"
+                },
                 "OpenAIResponseOutputMessageWebSearchToolCall": {
                     "description": "Web search tool call output message for OpenAI responses.\n\n:param id: Unique identifier for this tool call\n:param status: Current status of the web search operation\n:param type: Tool call type identifier, always \"web_search_call\"",
                     "properties": {
@@ -4413,13 +4808,20 @@ def test_dump_models(tmpdir: Path) -> None:
                             "nullable": true,
                             "default": null,
                             "title": "Effort"
+                        },
+                        "summary": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "description": "Summary mode for reasoning output. One of 'auto', 'concise', or 'detailed'.",
+                            "title": "Summary"
                         }
                     },
                     "title": "OpenAIResponseReasoning",
                     "type": "object"
                 },
                 "OpenAIResponseText": {
-                    "description": "Text response configuration for OpenAI responses.\n\n:param format: (Optional) Text format configuration specifying output format requirements",
+                    "description": "Text response configuration for OpenAI responses.\n\n:param format: (Optional) Text format configuration specifying output format requirements\n:param verbosity: (Optional) Controls response verbosity level",
                     "properties": {
                         "format": {
                             "anyOf": [
@@ -4431,6 +4833,12 @@ def test_dump_models(tmpdir: Path) -> None:
                                 }
                             ],
                             "default": null
+                        },
+                        "verbosity": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "title": "Verbosity"
                         }
                     },
                     "title": "OpenAIResponseText",
@@ -4639,6 +5047,102 @@ def test_dump_models(tmpdir: Path) -> None:
                         "logprob"
                     ],
                     "title": "OpenAITopLogProb",
+                    "type": "object"
+                },
+                "PgvectorVectorStoreProvider": {
+                    "additionalProperties": false,
+                    "description": "Dynamic pgvector vector-store provider (runtime create capacity).",
+                    "properties": {
+                        "id": {
+                            "description": "Llama Stack vector_io provider_id. Surrounding whitespace is stripped before validation and emission.",
+                            "minLength": 1,
+                            "title": "Provider ID",
+                            "type": "string"
+                        },
+                        "embedding_model": {
+                            "description": "Embedding model identification used for stores created against this provider.",
+                            "minLength": 1,
+                            "title": "Embedding model",
+                            "type": "string"
+                        },
+                        "embedding_dimension": {
+                            "description": "Dimensionality of embedding vectors for this provider.",
+                            "minimum": 0,
+                            "title": "Embedding dimension",
+                            "type": "integer"
+                        },
+                        "type": {
+                            "const": "pgvector",
+                            "default": "pgvector",
+                            "description": "Product type for this dynamic vector-store provider.",
+                            "title": "Provider type",
+                            "type": "string"
+                        },
+                        "config": {
+                            "$ref": "`#/components/schemas/`PgvectorVectorStoreProviderConfig",
+                            "description": "pgvector connection settings for this provider.",
+                            "title": "Storage config"
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "embedding_model",
+                        "embedding_dimension",
+                        "config"
+                    ],
+                    "title": "PgvectorVectorStoreProvider",
+                    "type": "object"
+                },
+                "PgvectorVectorStoreProviderConfig": {
+                    "additionalProperties": false,
+                    "description": "Storage config for a pgvector dynamic vector-store provider.",
+                    "properties": {
+                        "host": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "description": "PostgreSQL host. Defaults to ${env.POSTGRES_HOST}.",
+                            "title": "PostgreSQL host"
+                        },
+                        "port": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "default": null,
+                            "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. Accepts string placeholders and integer values.",
+                            "title": "PostgreSQL port"
+                        },
+                        "db": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "description": "PostgreSQL database name. Defaults to ${env.POSTGRES_DATABASE}.",
+                            "title": "PostgreSQL database"
+                        },
+                        "user": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "description": "PostgreSQL user. Defaults to ${env.POSTGRES_USER}.",
+                            "title": "PostgreSQL user"
+                        },
+                        "password": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "description": "PostgreSQL password. Defaults to ${env.POSTGRES_PASSWORD}.",
+                            "title": "PostgreSQL password"
+                        }
+                    },
+                    "title": "PgvectorVectorStoreProviderConfig",
                     "type": "object"
                 },
                 "PostgreSQLDatabaseConfiguration": {
@@ -5130,7 +5634,7 @@ def test_dump_models(tmpdir: Path) -> None:
                 },
                 "QueryRequest": {
                     "additionalProperties": false,
-                    "description": "Model representing a request for the LLM (Language Model).\n\nAttributes:\n    query: The query string.\n    conversation_id: The optional conversation ID (UUID).\n    provider: The optional provider.\n    model: The optional model.\n    system_prompt: The optional system prompt.\n    attachments: The optional attachments.\n    no_tools: Whether to bypass all tools and MCP servers (default: False).\n    generate_topic_summary: Whether to generate topic summary for new conversations.\n    media_type: The optional media type for response format (application/json or text/plain).\n    vector_store_ids: The optional list of specific vector store IDs to query for RAG.\n    shield_ids: The optional list of safety shield IDs to apply.\n    solr: Optional Solr inline RAG options (mode, filters) or legacy filter-only dict.",
+                    "description": "Model representing a request for the LLM (Language Model).\n\nAttributes:\n    query: The query string.\n    conversation_id: The optional conversation ID (UUID).\n    provider: The optional provider.\n    model: The optional model.\n    system_prompt: The optional system prompt.\n    attachments: The optional attachments.\n    no_tools: Whether to bypass all tools and MCP servers (default: False).\n    generate_topic_summary: Whether to generate topic summary for new conversations.\n    media_type: The optional media type for response format (application/json or text/plain).\n    vector_store_ids: The optional list of specific vector store IDs to query for RAG.\n    shield_ids: The optional list of configured shield names to apply.\n    solr: Optional Solr inline RAG options (mode, filters) or legacy filter-only dict.",
                     "examples": [
                         {
                             "attachments": [
@@ -5287,10 +5791,10 @@ def test_dump_models(tmpdir: Path) -> None:
                             "type": "array",
                             "nullable": true,
                             "default": null,
-                            "description": "Optional list of safety shield IDs to apply. If None, all configured shields are used. ",
+                            "description": "Optional list of configured shield names to apply. If None, all configured shields are used.",
                             "examples": [
-                                "llama-guard",
-                                "custom-shield"
+                                "topic-guard",
+                                "pii-redaction"
                             ],
                             "title": "Shield Ids"
                         },
@@ -5479,6 +5983,63 @@ def test_dump_models(tmpdir: Path) -> None:
                         "response"
                     ],
                     "title": "QueryResponse",
+                    "type": "object"
+                },
+                "QuestionValidityConfig": {
+                    "additionalProperties": false,
+                    "description": "Configuration for the question validity guardrail.",
+                    "properties": {
+                        "model_id": {
+                            "description": "The model_id to use for the guard",
+                            "title": "Model id",
+                            "type": "string"
+                        },
+                        "model_prompt": {
+                            "default": "\nInstructions:\n- You are a question classifying tool\n- You are an expert in kubernetes and openshift\n- Your job is to determine where or a user's question is related to kubernetes and/or openshift technologies and to provide a one-word response.\n- If a question appears to be related to kubernetes or openshift technologies, answer with the word ${allowed}, otherwise answer with the word ${rejected}.\n- Do not explain your answer, just provide the one-word response. Do not give any other response.\n- If the given question is an empty string, answer with the word ${rejected}\n\n\nExample Question:\nWhy is the sky blue?\nExample Response:\n${rejected}\n\nExample Question:\nWhy is the grass green?\nExample Response:\n${rejected}\n\nExample Question:\nWhy is sand yellow?\nExample Response:\n${rejected}\n\nExample Question:\nCan you help configure my cluster to automatically scale?\nExample Response:\n${allowed}\n\nQuestion:\n${message}\nResponse:\n",
+                            "description": "The default prompt sent to the LLM used to validate the Users' question.",
+                            "title": "Model prompt",
+                            "type": "string"
+                        },
+                        "invalid_question_response": {
+                            "default": "\nHi, I'm the OpenShift Lightspeed assistant, I can help you with questions about OpenShift, \nplease ask me a question related to OpenShift.\n",
+                            "description": "The default response when the Users' question is determined to be invalid.",
+                            "title": "Invalid question response",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "model_id"
+                    ],
+                    "title": "QuestionValidityConfig",
+                    "type": "object"
+                },
+                "QuestionValidityShieldConfiguration": {
+                    "additionalProperties": false,
+                    "description": "Configuration for a named question-validity guardrail shield.\n\nAttributes:\n    name: Unique, user-facing name identifying this shield instance.\n    provider_id: Discriminator identifying this as a question-validity shield.\n    config: Question-validity-specific configuration.",
+                    "properties": {
+                        "name": {
+                            "description": "Unique, user-facing name identifying this shield instance.",
+                            "title": "Shield name",
+                            "type": "string"
+                        },
+                        "provider_id": {
+                            "const": "question_validity",
+                            "description": "Discriminator identifying this as a question-validity shield.",
+                            "title": "Shield provider id",
+                            "type": "string"
+                        },
+                        "config": {
+                            "$ref": "`#/components/schemas/`QuestionValidityConfig",
+                            "description": "Question-validity-specific configuration for this shield.",
+                            "title": "Shield configuration"
+                        }
+                    },
+                    "required": [
+                        "name",
+                        "provider_id",
+                        "config"
+                    ],
+                    "title": "QuestionValidityShieldConfiguration",
                     "type": "object"
                 },
                 "QuotaExceededResponse": {
@@ -5896,7 +6457,7 @@ def test_dump_models(tmpdir: Path) -> None:
                 },
                 "RagConfiguration": {
                     "additionalProperties": false,
-                    "description": "RAG strategy configuration.\n\nControls which RAG sources are used for inline and tool-based retrieval.\n\nEach strategy lists RAG IDs to include. The special ID ``\"okp\"`` defined in constants,\nactivates the OKP provider; all other IDs refer to entries in ``byok_rag``.\n\nBackward compatibility:\n    - ``inline`` defaults to ``[]`` (no inline RAG).\n    - ``tool`` defaults to ``[]`` (no tool RAG).\n\nIf no RAG strategy is defined (inline and tool are empty),\nthe RAG tool will register all stores available to llama-stack.",
+                    "description": "RAG strategy configuration.\n\nControls which RAG sources are used for inline and tool-based retrieval.\n\nEach strategy lists RAG IDs to include. The special ID ``\"okp\"`` defined in constants,\nactivates the OKP provider; all other IDs refer to entries in ``byok_rag``.\n\nBoth ``inline`` and ``tool`` default to ``[]`` (disabled).\nEach must be explicitly configured to activate its respective RAG strategy.",
                     "properties": {
                         "inline": {
                             "description": "RAG IDs whose sources are injected as context before the LLM call. Use 'okp' to enable OKP inline RAG. Empty by default (no inline RAG).",
@@ -5907,7 +6468,7 @@ def test_dump_models(tmpdir: Path) -> None:
                             "type": "array"
                         },
                         "tool": {
-                            "description": "RAG IDs made available to the LLM as a file_search tool. Use 'okp' to include the OKP vector store. When omitted, all registered BYOK vector stores are used (backward compatibility).",
+                            "description": "RAG IDs made available to the LLM as a file_search tool. Use 'okp' to include the OKP vector store. When omitted, tool RAG is disabled.",
                             "items": {
                                 "type": "string"
                             },
@@ -5998,6 +6559,86 @@ def test_dump_models(tmpdir: Path) -> None:
                         "providers"
                     ],
                     "title": "ReadinessResponse",
+                    "type": "object"
+                },
+                "RedactionConfig": {
+                    "additionalProperties": false,
+                    "description": "Configuration for PII redaction with regex-based rules.\n\nRules are validated and compiled at construction time. Invalid\nregex patterns raise a ``ValueError`` immediately.\n\nAttributes:\n    rules: Ordered list of redaction rules applied sequentially.\n    case_sensitive: When False, patterns are compiled with\n        ``re.IGNORECASE``. Defaults to False.",
+                    "properties": {
+                        "rules": {
+                            "description": "Ordered list of PII redaction rules",
+                            "items": {
+                                "$ref": "`#/components/schemas/`RedactionRule"
+                            },
+                            "title": "Redaction rules",
+                            "type": "array"
+                        },
+                        "case_sensitive": {
+                            "default": false,
+                            "description": "When False, patterns are compiled with re.IGNORECASE",
+                            "title": "Case sensitive",
+                            "type": "boolean"
+                        }
+                    },
+                    "title": "RedactionConfig",
+                    "type": "object"
+                },
+                "RedactionRule": {
+                    "additionalProperties": false,
+                    "description": "A single regex-based redaction rule.\n\nAttributes:\n    pattern: Raw regex pattern string to match sensitive data.\n    replacement: Text to substitute for each match.\n    case_sensitive: Per-rule override for case sensitivity.\n        When None, the global ``RedactionConfig.case_sensitive``\n        flag applies.",
+                    "properties": {
+                        "pattern": {
+                            "description": "Regex pattern to match sensitive data",
+                            "title": "Pattern",
+                            "type": "string"
+                        },
+                        "replacement": {
+                            "description": "Replacement string for matched text",
+                            "title": "Replacement",
+                            "type": "string"
+                        },
+                        "case_sensitive": {
+                            "type": "boolean",
+                            "nullable": true,
+                            "default": null,
+                            "description": "Per-rule case sensitivity override. When None, the global config flag applies.",
+                            "title": "Case sensitive"
+                        }
+                    },
+                    "required": [
+                        "pattern",
+                        "replacement"
+                    ],
+                    "title": "RedactionRule",
+                    "type": "object"
+                },
+                "RedactionShieldConfiguration": {
+                    "additionalProperties": false,
+                    "description": "Configuration for a named PII-redaction guardrail shield.\n\nAttributes:\n    name: Unique, user-facing name identifying this shield instance.\n    provider_id: Discriminator identifying this as a redaction shield.\n    config: Redaction-specific configuration.",
+                    "properties": {
+                        "name": {
+                            "description": "Unique, user-facing name identifying this shield instance.",
+                            "title": "Shield name",
+                            "type": "string"
+                        },
+                        "provider_id": {
+                            "const": "redaction",
+                            "description": "Discriminator identifying this as a redaction shield.",
+                            "title": "Shield provider id",
+                            "type": "string"
+                        },
+                        "config": {
+                            "$ref": "`#/components/schemas/`RedactionConfig",
+                            "description": "Redaction-specific configuration for this shield.",
+                            "title": "Shield configuration"
+                        }
+                    },
+                    "required": [
+                        "name",
+                        "provider_id",
+                        "config"
+                    ],
+                    "title": "RedactionShieldConfiguration",
                     "type": "object"
                 },
                 "ReferencedDocument": {
@@ -6096,6 +6737,9 @@ def test_dump_models(tmpdir: Path) -> None:
                         },
                         {
                             "$ref": "`#/components/schemas/`OpenAIResponseMCPApprovalResponse"
+                        },
+                        {
+                            "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem"
                         }
                     ]
                 },
@@ -6314,7 +6958,7 @@ def test_dump_models(tmpdir: Path) -> None:
                 },
                 "ResponsesRequest": {
                     "additionalProperties": false,
-                    "description": "Model representing a request for the Responses API following LCORE specification.\n\nAttributes:\n    input: Input text or structured input items containing the query.\n    model: Model identifier in format \"provider/model\". Auto-selected if not provided.\n    conversation: Conversation ID linking to an existing conversation. Accepts both\n        OpenAI and LCORE formats. Mutually exclusive with previous_response_id.\n    include: Explicitly specify output item types that are excluded by default but\n        should be included in the response.\n    instructions: System instructions or guidelines provided to the model (acts as\n        the system prompt).\n    max_infer_iters: Maximum number of inference iterations the model can perform.\n    max_output_tokens: Maximum number of tokens allowed in the response.\n    max_tool_calls: Maximum number of tool calls allowed in a single response.\n    metadata: Custom metadata dictionary with key-value pairs for tracking or logging.\n    parallel_tool_calls: Whether the model can make multiple tool calls in parallel.\n    previous_response_id: Identifier of the previous response in a multi-turn\n        conversation. Mutually exclusive with conversation.\n    prompt: Prompt object containing a template with variables for dynamic\n        substitution.\n    reasoning: Reasoning configuration for the response.\n    safety_identifier: Safety identifier for the response.\n    store: Whether to store the response in conversation history. Defaults to True.\n    stream: Whether to stream the response as it is generated. Defaults to False.\n    temperature: Sampling temperature controlling randomness (typically 0.0\u20132.0).\n    text: Text response configuration specifying output format constraints (JSON\n        schema, JSON object, or plain text).\n    tool_choice: Tool selection strategy (\"auto\", \"required\", \"none\", or specific\n        tool configuration).\n    tools: List of tools available to the model (file search, web search, function\n        calls, MCP tools). Defaults to all tools available to the model.\n    generate_topic_summary: LCORE-specific flag indicating whether to generate a\n        topic summary for new conversations. Defaults to True.\n    shield_ids: LCORE-specific list of safety shield IDs to apply. If None, all\n        configured shields are used.\n    solr: Optional Solr inline RAG options (mode, filters) or legacy filter-only dict.",
+                    "description": "Model representing a request for the Responses API following LCORE specification.\n\nAttributes:\n    input: Input text or structured input items containing the query.\n    model: Model identifier in format \"provider/model\". Auto-selected if not provided.\n    conversation: Conversation ID linking to an existing conversation. Accepts both\n        OpenAI and LCORE formats. Mutually exclusive with previous_response_id.\n    include: Explicitly specify output item types that are excluded by default but\n        should be included in the response.\n    instructions: System instructions or guidelines provided to the model (acts as\n        the system prompt).\n    max_infer_iters: Maximum number of inference iterations the model can perform.\n    max_output_tokens: Maximum number of tokens allowed in the response.\n    max_tool_calls: Maximum number of tool calls allowed in a single response.\n    metadata: Custom metadata dictionary with key-value pairs for tracking or logging.\n    parallel_tool_calls: Whether the model can make multiple tool calls in parallel.\n    previous_response_id: Identifier of the previous response in a multi-turn\n        conversation. Mutually exclusive with conversation.\n    prompt: Prompt object containing a template with variables for dynamic\n        substitution.\n    reasoning: Reasoning configuration for the response.\n    safety_identifier: Safety identifier for the response.\n    store: Whether to store the response in conversation history. Defaults to True.\n    stream: Whether to stream the response as it is generated. Defaults to False.\n    temperature: Sampling temperature controlling randomness (typically 0.0\u20132.0).\n    text: Text response configuration specifying output format constraints (JSON\n        schema, JSON object, or plain text).\n    tool_choice: Tool selection strategy (\"auto\", \"required\", \"none\", or specific\n        tool configuration).\n    tools: List of tools available to the model (file search, web search, function\n        calls, MCP tools). Defaults to all tools available to the model.\n    generate_topic_summary: LCORE-specific flag indicating whether to generate a\n        topic summary for new conversations. Defaults to True.\n    shield_ids: LCORE-specific list of configured shield names to apply.\n        If None, all configured shields are used.\n    solr: Optional Solr inline RAG options (mode, filters) or legacy filter-only dict.",
                     "examples": [
                         {
                             "generate_topic_summary": true,
@@ -6624,6 +7268,7 @@ def test_dump_models(tmpdir: Path) -> None:
                                         "mcp_call": "`#/components/schemas/`OpenAIResponseOutputMessageMCPCall",
                                         "mcp_list_tools": "`#/components/schemas/`OpenAIResponseOutputMessageMCPListTools",
                                         "message": "`#/components/schemas/`OpenAIResponseMessage",
+                                        "reasoning": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem",
                                         "web_search_call": "`#/components/schemas/`OpenAIResponseOutputMessageWebSearchToolCall"
                                     },
                                     "propertyName": "type"
@@ -6649,6 +7294,9 @@ def test_dump_models(tmpdir: Path) -> None:
                                     },
                                     {
                                         "$ref": "`#/components/schemas/`OpenAIResponseMCPApprovalRequest"
+                                    },
+                                    {
+                                        "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem"
                                     }
                                 ]
                             },
@@ -7189,37 +7837,221 @@ def test_dump_models(tmpdir: Path) -> None:
                     "title": "SQLiteDatabaseConfiguration",
                     "type": "object"
                 },
+                "SavedPromptCreateRequest": {
+                    "additionalProperties": false,
+                    "description": "Request body to create a user-scoped saved prompt.\n\nLength and emptiness limits are enforced by the endpoint using configured\nsaved-prompts limits, not by static field constraints here.\n\nAttributes:\n    name: Display name of the saved prompt.\n    content: Prompt body text.",
+                    "examples": [
+                        {
+                            "content": "Help me write a deployment checklist\u2026",
+                            "name": "Deploy to staging"
+                        }
+                    ],
+                    "properties": {
+                        "name": {
+                            "description": "Display name of the saved prompt",
+                            "examples": [
+                                "Deploy to staging"
+                            ],
+                            "title": "Name",
+                            "type": "string"
+                        },
+                        "content": {
+                            "description": "Prompt body text",
+                            "examples": [
+                                "Help me write a deployment checklist\u2026"
+                            ],
+                            "title": "Content",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "name",
+                        "content"
+                    ],
+                    "title": "SavedPromptCreateRequest",
+                    "type": "object"
+                },
+                "SavedPromptDeleteResponse": {
+                    "description": "Result of deleting a saved prompt (always HTTP 200).\n\nAttributes:\n    prompt_id: Saved prompt identifier that was passed to delete.\n    deleted: Whether the prompt was deleted successfully.\n    response: Human-readable outcome of the delete operation.",
+                    "examples": [
+                        {
+                            "label": "deleted",
+                            "value": {
+                                "deleted": true,
+                                "prompt_id": "abc123",
+                                "response": "Saved prompt deleted successfully"
+                            }
+                        },
+                        {
+                            "label": "not found",
+                            "value": {
+                                "deleted": false,
+                                "prompt_id": "abc123",
+                                "response": "Saved prompt not found"
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "deleted": {
+                            "description": "Whether the deletion was successful.",
+                            "examples": [
+                                true,
+                                false
+                            ],
+                            "title": "Deleted",
+                            "type": "boolean"
+                        },
+                        "prompt_id": {
+                            "description": "Saved prompt identifier that was passed to delete.",
+                            "examples": [
+                                "abc123"
+                            ],
+                            "title": "Prompt Id",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "deleted",
+                        "prompt_id"
+                    ],
+                    "title": "SavedPromptDeleteResponse",
+                    "type": "object"
+                },
+                "SavedPromptResponse": {
+                    "additionalProperties": false,
+                    "description": "Single saved prompt returned to an authenticated user.\n\nAttributes:\n    id: Unique identifier of the saved prompt.\n    name: Display name of the saved prompt.\n    content: Prompt body text.\n    created_at: When the prompt was created.\n    updated_at: When the prompt was last updated.",
+                    "examples": [
+                        {
+                            "content": "Help me write a deployment checklist\u2026",
+                            "created_at": "2026-07-22T16:00:00+00:00",
+                            "id": "abc123",
+                            "name": "Deploy to staging",
+                            "updated_at": "2026-07-22T16:00:00+00:00"
+                        }
+                    ],
+                    "properties": {
+                        "id": {
+                            "description": "Unique identifier of the saved prompt",
+                            "examples": [
+                                "abc123"
+                            ],
+                            "title": "Id",
+                            "type": "string"
+                        },
+                        "name": {
+                            "description": "Display name of the saved prompt",
+                            "examples": [
+                                "Deploy to staging"
+                            ],
+                            "title": "Name",
+                            "type": "string"
+                        },
+                        "content": {
+                            "description": "Prompt body text",
+                            "examples": [
+                                "Help me write a deployment checklist\u2026"
+                            ],
+                            "title": "Content",
+                            "type": "string"
+                        },
+                        "created_at": {
+                            "description": "When the prompt was created",
+                            "examples": [
+                                "2026-07-22T16:00:00+00:00"
+                            ],
+                            "format": "date-time",
+                            "title": "Created At",
+                            "type": "string"
+                        },
+                        "updated_at": {
+                            "description": "When the prompt was last updated",
+                            "examples": [
+                                "2026-07-22T16:00:00+00:00"
+                            ],
+                            "format": "date-time",
+                            "title": "Updated At",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "name",
+                        "content",
+                        "created_at",
+                        "updated_at"
+                    ],
+                    "title": "SavedPromptResponse",
+                    "type": "object"
+                },
                 "SavedPromptsConfiguration": {
                     "additionalProperties": false,
-                    "description": "Configuration for saved prompts feature limits.\n\nControls the maximum number of prompts a user can save, the maximum\ndisplay name (title) length, and the maximum prompt content length.\nAll fields are optional and default to values defined in constants.\n\nAttributes:\n    max_prompts_per_user: Maximum number of saved prompts allowed per user.\n    max_display_name_length: Maximum character length for the prompt display name.\n    max_content_length: Maximum character length for the prompt content body.",
+                    "description": "Configuration for saved prompts feature limits.\n\nControls the maximum number of prompts a user can save, the maximum\ndisplay name (title) length, and the maximum prompt content length.\nOmitted fields use the defaults defined in constants.\n\nAttributes:\n    max_prompts_per_user: Maximum number of saved prompts allowed per user.\n    max_display_name_length: Maximum character length for the prompt display name.\n    max_content_length: Maximum character length for the prompt content body.",
                     "properties": {
                         "max_prompts_per_user": {
-                            "type": "integer",
-                            "nullable": true,
-                            "default": null,
+                            "default": 50,
                             "description": "Maximum number of saved prompts a user can create. Defaults to 50. Cannot exceed 200.",
-                            "title": "Max prompts per user"
+                            "minimum": 0,
+                            "maximum": 200,
+                            "title": "Max prompts per user",
+                            "type": "integer"
                         },
                         "max_display_name_length": {
-                            "type": "integer",
-                            "nullable": true,
-                            "default": null,
+                            "default": 255,
                             "description": "Maximum character length for prompt display name (title). Defaults to 255. Cannot exceed 255.",
-                            "title": "Max display name length"
+                            "minimum": 0,
+                            "maximum": 255,
+                            "title": "Max display name length",
+                            "type": "integer"
                         },
                         "max_content_length": {
-                            "type": "integer",
-                            "nullable": true,
-                            "default": null,
+                            "default": 10000,
                             "description": "Maximum character length for the prompt content body. Defaults to 10000. Cannot exceed 30000.",
-                            "title": "Max content length"
+                            "minimum": 0,
+                            "maximum": 30000,
+                            "title": "Max content length",
+                            "type": "integer"
                         }
                     },
                     "title": "SavedPromptsConfiguration",
                     "type": "object"
                 },
+                "SavedPromptsListResponse": {
+                    "additionalProperties": false,
+                    "description": "List of saved prompts belonging to the authenticated user.\n\nAttributes:\n    prompts: Saved prompts ordered by created_at descending (newest first).",
+                    "examples": [
+                        {
+                            "prompts": [
+                                {
+                                    "content": "Help me write a deployment checklist\u2026",
+                                    "created_at": "2026-07-22T16:00:00+00:00",
+                                    "id": "abc123",
+                                    "name": "Deploy to staging",
+                                    "updated_at": "2026-07-22T16:00:00+00:00"
+                                }
+                            ]
+                        },
+                        {
+                            "prompts": []
+                        }
+                    ],
+                    "properties": {
+                        "prompts": {
+                            "description": "Saved prompts for the authenticated user",
+                            "items": {
+                                "$ref": "`#/components/schemas/`SavedPromptResponse"
+                            },
+                            "title": "Prompts",
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "prompts"
+                    ],
+                    "title": "SavedPromptsListResponse",
+                    "type": "object"
+                },
                 "SearchRankingOptions": {
-                    "description": "Options for ranking and filtering search results.\n\nThis class configures how search results are ranked and filtered. You can use algorithm-based\nrerankers (weighted, RRF) or neural rerankers. Defaults from VectorStoresConfig are\nused when parameters are not provided.\n\nExamples:\n    # Weighted ranker with custom alpha\n    SearchRankingOptions(ranker=\"weighted\", alpha=0.7)\n\n    # RRF ranker with custom impact factor\n    SearchRankingOptions(ranker=\"rrf\", impact_factor=50.0)\n\n    # Use config defaults (just specify ranker type)\n    SearchRankingOptions(ranker=\"weighted\")  # Uses alpha from VectorStoresConfig\n\n    # Score threshold filtering\n    SearchRankingOptions(ranker=\"weighted\", score_threshold=0.5)\n\n:param ranker: (Optional) Name of the ranking algorithm to use. Supported values:\n    - \"weighted\": Weighted combination of vector and keyword scores\n    - \"rrf\": Reciprocal Rank Fusion algorithm\n    - \"neural\": Neural reranking model (requires model parameter, Part II)\n    Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.\n:param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0\n:param alpha: (Optional) Weight factor for weighted ranker (0-1).\n    - 0.0 = keyword only\n    - 0.5 = equal weight (default)\n    - 1.0 = vector only\n    Only used when ranker=\"weighted\" and weights is not provided.\n    Falls back to VectorStoresConfig.chunk_retrieval_params.weighted_search_alpha if not provided.\n:param impact_factor: (Optional) Impact factor (k) for RRF algorithm.\n    Lower values emphasize higher-ranked results. Default: 60.0 (optimal from research).\n    Only used when ranker=\"rrf\".\n    Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.\n:param weights: (Optional) Dictionary of weights for combining different signal types.\n    Keys can be \"vector\", \"keyword\", \"neural\". Values should sum to 1.0.\n    Used when combining algorithm-based reranking with neural reranking (Part II).\n    Example: {\"vector\": 0.3, \"keyword\": 0.3, \"neural\": 0.4}\n:param model: (Optional) Model identifier for neural reranker (e.g., \"vllm/Qwen3-Reranker-0.6B\").\n    Required when ranker=\"neural\" or when weights contains \"neural\" (Part II).",
+                    "description": "Options for ranking and filtering search results.\n\nThis class configures how search results are ranked and filtered. You can use algorithm-based\nrerankers (weighted, RRF) or neural rerankers. Defaults from VectorStoresConfig are\nused when parameters are not provided.\n\nExamples:\n    # Weighted ranker with custom alpha\n    SearchRankingOptions(ranker=\"weighted\", alpha=0.7)\n\n    # RRF ranker with custom impact factor\n    SearchRankingOptions(ranker=\"rrf\", impact_factor=50.0)\n\n    # Use config defaults (just specify ranker type)\n    SearchRankingOptions(ranker=\"weighted\")  # Uses alpha from VectorStoresConfig\n\n    # Score threshold filtering\n    SearchRankingOptions(ranker=\"weighted\", score_threshold=0.5)\n\n:param ranker: (Optional) Name of the ranking algorithm to use. Supported values:\n    - \"weighted\": Weighted combination of vector and keyword scores\n    - \"rrf\": Reciprocal Rank Fusion algorithm\n    - \"neural\": Neural reranking model (requires model parameter)\n    Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.\n:param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0\n:param alpha: (Optional) Weight factor for weighted ranker (0-1).\n    - 0.0 = keyword only\n    - 0.5 = equal weight (default)\n    - 1.0 = vector only\n    Only used when ranker=\"weighted\" and weights is not provided.\n    Falls back to VectorStoresConfig.chunk_retrieval_params.weighted_search_alpha if not provided.\n:param impact_factor: (Optional) Impact factor (k) for RRF algorithm.\n    Lower values emphasize higher-ranked results. Default: 60.0 (optimal from research).\n    Only used when ranker=\"rrf\".\n    Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.\n:param weights: (Optional) Dictionary of weights for combining different signal types.\n    Keys can be \"vector\", \"keyword\", \"neural\". Values should sum to 1.0.\n    Used when combining algorithm-based reranking with neural reranking.\n    Example: {\"vector\": 0.3, \"keyword\": 0.3, \"neural\": 0.4}\n:param model: (Optional) Model identifier for neural reranker (e.g., \"transformers/Qwen/Qwen3-Reranker-0.6B\").\n    Required when ranker=\"neural\" or when weights contains \"neural\".",
                     "properties": {
                         "ranker": {
                             "type": "string",
@@ -7342,7 +8174,7 @@ def test_dump_models(tmpdir: Path) -> None:
                                 "cause": "Connection error while trying to reach backend service.",
                                 "response": "Unable to connect to OGX"
                             },
-                            "label": "llama stack"
+                            "label": "ogx"
                         },
                         {
                             "detail": {
@@ -7386,15 +8218,11 @@ def test_dump_models(tmpdir: Path) -> None:
                         "moderation_id": {
                             "title": "Moderation Id",
                             "type": "string"
-                        },
-                        "refusal_response": {
-                            "$ref": "`#/components/schemas/`OpenAIResponseMessage"
                         }
                     },
                     "required": [
                         "message",
-                        "moderation_id",
-                        "refusal_response"
+                        "moderation_id"
                     ],
                     "title": "ShieldModerationBlocked",
                     "type": "object"
@@ -7418,10 +8246,28 @@ def test_dump_models(tmpdir: Path) -> None:
                         {
                             "shields": [
                                 {
-                                    "identifier": "lightspeed_question_validity-shield",
-                                    "params": {},
-                                    "provider_id": "lightspeed_question_validity",
-                                    "provider_resource_id": "lightspeed_question_validity-shield",
+                                    "config": {
+                                        "invalid_question_response": "I can only answer questions about the product.",
+                                        "model_id": "openai/gpt-4o-mini",
+                                        "model_prompt": "Is this question valid?"
+                                    },
+                                    "name": "question-validity",
+                                    "provider_id": "question_validity",
+                                    "type": "shield"
+                                },
+                                {
+                                    "config": {
+                                        "case_sensitive": false,
+                                        "rules": [
+                                            {
+                                                "case_sensitive": null,
+                                                "pattern": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+                                                "replacement": "[REDACTED]"
+                                            }
+                                        ]
+                                    },
+                                    "name": "pii-redaction",
+                                    "provider_id": "redaction",
                                     "type": "shield"
                                 }
                             ]
@@ -7429,10 +8275,9 @@ def test_dump_models(tmpdir: Path) -> None:
                     ],
                     "properties": {
                         "shields": {
-                            "description": "List of shields available",
+                            "description": "List of shields configured in Lightspeed Core Stack",
                             "items": {
-                                "additionalProperties": true,
-                                "type": "object"
+                                "$ref": "`#/components/schemas/`CatalogShield"
                             },
                             "title": "Shields",
                             "type": "array"
@@ -8002,8 +8847,7 @@ def test_dump_models(tmpdir: Path) -> None:
                         "tools": {
                             "description": "List of tools available from all configured MCP servers and built-in toolgroups",
                             "items": {
-                                "additionalProperties": true,
-                                "type": "object"
+                                "$ref": "`#/components/schemas/`CatalogTool"
                             },
                             "title": "Tools",
                             "type": "array"
@@ -8246,6 +9090,7 @@ def test_dump_models(tmpdir: Path) -> None:
                                         "mcp_call": "`#/components/schemas/`OpenAIResponseOutputMessageMCPCall",
                                         "mcp_list_tools": "`#/components/schemas/`OpenAIResponseOutputMessageMCPListTools",
                                         "message": "`#/components/schemas/`OpenAIResponseMessage",
+                                        "reasoning": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem",
                                         "web_search_call": "`#/components/schemas/`OpenAIResponseOutputMessageWebSearchToolCall"
                                     },
                                     "propertyName": "type"
@@ -8271,6 +9116,9 @@ def test_dump_models(tmpdir: Path) -> None:
                                     },
                                     {
                                         "$ref": "`#/components/schemas/`OpenAIResponseMCPApprovalRequest"
+                                    },
+                                    {
+                                        "$ref": "`#/components/schemas/`OpenAIResponseOutputMessageReasoningItem"
                                     }
                                 ]
                             },
@@ -8554,6 +9402,43 @@ def test_dump_models(tmpdir: Path) -> None:
                         }
                     },
                     "title": "UserDataCollection",
+                    "type": "object"
+                },
+                "VectorStoreConfiguration": {
+                    "additionalProperties": false,
+                    "description": "Configuration for dynamic vector-store providers.\n\nMirrors ``InferenceConfiguration``: a providers list plus a sibling\n``default_provider`` pointer, rather than a per-entry default flag.\n\nAttributes:\n    default_provider: Provider id used for vector_stores.default_* in the\n        synthesized Llama Stack config. Required when providers is\n        non-empty; must match one of providers[].id. Must be omitted when\n        providers is empty.\n    providers: Dynamic vector-store provider capacity for runtime\n        POST /v1/vector-stores creates. Not the same as byok_rag (static\n        registered corpora).",
+                    "properties": {
+                        "default_provider": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "description": "Provider id used for vector_stores.default_* in the synthesized Llama Stack config. Required when providers is non-empty; must match one of providers[].id.",
+                            "title": "Default provider"
+                        },
+                        "providers": {
+                            "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora).",
+                            "items": {
+                                "discriminator": {
+                                    "mapping": {
+                                        "faiss": "`#/components/schemas/`FaissVectorStoreProvider",
+                                        "pgvector": "`#/components/schemas/`PgvectorVectorStoreProvider"
+                                    },
+                                    "propertyName": "type"
+                                },
+                                "oneOf": [
+                                    {
+                                        "$ref": "`#/components/schemas/`FaissVectorStoreProvider"
+                                    },
+                                    {
+                                        "$ref": "`#/components/schemas/`PgvectorVectorStoreProvider"
+                                    }
+                                ]
+                            },
+                            "title": "Vector store providers",
+                            "type": "array"
+                        }
+                    },
+                    "title": "VectorStoreConfiguration",
                     "type": "object"
                 },
                 "VectorStoreCreateRequest": {
@@ -9093,25 +9978,6 @@ def test_dump_models(tmpdir: Path) -> None:
                     "title": "VectorStoresListResponse",
                     "type": "object"
                 },
-                "ogx_api__openai_responses__ApprovalFilter": {
-                    "description": "Filter configuration for MCP tool approval requirements.\n\n:param always: (Optional) List of tool names that always require approval\n:param never: (Optional) List of tool names that never require approval",
-                    "properties": {
-                        "always": {
-                            "type": "array",
-                            "nullable": true,
-                            "default": null,
-                            "title": "Always"
-                        },
-                        "never": {
-                            "type": "array",
-                            "nullable": true,
-                            "default": null,
-                            "title": "Never"
-                        }
-                    },
-                    "title": "ApprovalFilter",
-                    "type": "object"
-                },
                 "models__config__ApprovalFilter": {
                     "additionalProperties": false,
                     "description": "Granular approval control for specific MCP tools.\n\nAttributes:\n    always: Tool names that always require human approval before execution.\n    never: Tool names that never require approval (pre-approved).",
@@ -9131,6 +9997,25 @@ def test_dump_models(tmpdir: Path) -> None:
                             },
                             "title": "Never require approval",
                             "type": "array"
+                        }
+                    },
+                    "title": "ApprovalFilter",
+                    "type": "object"
+                },
+                "ogx_api__openai_responses__ApprovalFilter": {
+                    "description": "Filter configuration for MCP tool approval requirements.\n\n:param always: (Optional) List of tool names that always require approval\n:param never: (Optional) List of tool names that never require approval",
+                    "properties": {
+                        "always": {
+                            "type": "array",
+                            "nullable": true,
+                            "default": null,
+                            "title": "Always"
+                        },
+                        "never": {
+                            "type": "array",
+                            "nullable": true,
+                            "default": null,
+                            "title": "Never"
                         }
                     },
                     "title": "ApprovalFilter",
@@ -9436,6 +10321,7 @@ def test_dump_models_group_requests(tmpdir: Path) -> None:
         "RlsapiV1InferRequest",
         "RlsapiV1SystemInfo",
         "RlsapiV1Terminal",
+        "SavedPromptCreateRequest",
         "StreamingInterruptRequest",
         "VectorStoreCreateRequest",
         "VectorStoreFileCreateRequest",
