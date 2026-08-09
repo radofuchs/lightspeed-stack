@@ -103,8 +103,6 @@ frozenlist==1.8.0 \
     --hash=sha256:824190e162bc775e7f6ded9bde5897738987c51548677c213d1ff728b10efe5b
 fsspec==2026.4.0 \
     --hash=sha256:ef0c6ca507776eab560612d5785f243e2e3f6cfe42468aacdce3609353366b5b
-genai-prices==0.0.69 \
-    --hash=sha256:f01ccb80e2ac9be9b7d978e4cc97a79023ddd1fc796f50eabd379c23687bb901
 google-api-core==2.31.0 \
     --hash=sha256:2975c76ecb910406ff6f71c62ed09848d0db421b27986413c448cb8766fc827e
 google-auth==2.55.1 \
