@@ -61,6 +61,31 @@
                 "title": "APIKeyTokenConfiguration",
                 "type": "object"
             },
+            "AbstractDeleteResponse": {
+                "description": "Base model for successful delete responses.",
+                "properties": {
+                    "deleted": {
+                        "description": "Whether the deletion was successful.",
+                        "examples": [
+                            true,
+                            false
+                        ],
+                        "title": "Deleted",
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "deleted"
+                ],
+                "title": "AbstractDeleteResponse",
+                "type": "object"
+            },
+            "AbstractSuccessfulResponse": {
+                "description": "Base class for all successful response models.",
+                "properties": {},
+                "title": "AbstractSuccessfulResponse",
+                "type": "object"
+            },
             "AccessRule": {
                 "additionalProperties": false,
                 "description": "Rule defining what actions a role can perform.",
@@ -5663,6 +5688,50 @@
                     "updated_at"
                 ],
                 "title": "SavedPromptResponse",
+                "type": "object"
+            },
+            "SavedPromptsConfigResponse": {
+                "additionalProperties": false,
+                "description": "Saved prompts configuration limits returned to consuming services.\n\nAttributes:\n    max_prompts_per_user: Maximum number of saved prompts allowed per user.\n    max_display_name_length: Maximum character length for prompt display name.\n    max_content_length: Maximum character length for prompt content body.",
+                "examples": [
+                    {
+                        "max_content_length": 10000,
+                        "max_display_name_length": 255,
+                        "max_prompts_per_user": 50
+                    }
+                ],
+                "properties": {
+                    "max_prompts_per_user": {
+                        "description": "Maximum number of saved prompts allowed per user",
+                        "examples": [
+                            50
+                        ],
+                        "title": "Max Prompts Per User",
+                        "type": "integer"
+                    },
+                    "max_display_name_length": {
+                        "description": "Maximum character length for prompt display name",
+                        "examples": [
+                            255
+                        ],
+                        "title": "Max Display Name Length",
+                        "type": "integer"
+                    },
+                    "max_content_length": {
+                        "description": "Maximum character length for prompt content body",
+                        "examples": [
+                            10000
+                        ],
+                        "title": "Max Content Length",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "max_prompts_per_user",
+                    "max_display_name_length",
+                    "max_content_length"
+                ],
+                "title": "SavedPromptsConfigResponse",
                 "type": "object"
             },
             "SavedPromptsConfiguration": {

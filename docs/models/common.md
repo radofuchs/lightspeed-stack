@@ -37,6 +37,78 @@ Attributes:
 | content | string | The actual attachment content (text or base64-encoded image data) |
 
 
+## CatalogModel
+
+
+Normalized model entry used by ``/models`` and internal model resolution.
+
+Unifies OpenAI-style, Anthropic, and Google ``models.list()`` payloads into
+one catalog shape.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| identifier | string | Model identifier |
+| metadata | object | Provider-specific metadata excluding core catalog fields |
+| api_model_type | string | API model type (typically mirrors model_type) |
+| provider_id | string | Provider identifier |
+| type | string | Object type, always 'model' |
+| provider_resource_id | string | Provider-native resource identifier for the model |
+| model_type | string | Model type such as 'llm' or 'embedding' |
+
+
+## CatalogShield
+
+
+Shield entry in the ``/shields`` catalog response.
+
+Attributes:
+    name: Unique, user-facing name identifying this shield instance.
+    provider_id: Shield provider / type discriminator.
+    type: Catalog entry type; always shield.
+    config: Type-specific shield configuration.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique, user-facing name of the shield instance |
+| provider_id | string | Shield provider / type discriminator |
+| type | string | Catalog entry type; always shield |
+| config | object | Type-specific shield configuration |
+
+
+## CatalogTool
+
+
+Tool entry in the ``/tools`` catalog response.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| identifier | string |  |
+| description | string |  |
+| parameters | array |  |
+| provider_id | string |  |
+| toolgroup_id | string |  |
+| server_source | string |  |
+| type | string |  |
+
+
+## CatalogToolParameter
+
+
+Parameter entry for a tool in the ``/tools`` catalog response.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string |  |
+| description | string |  |
+| parameter_type | string |  |
+| required | boolean |  |
+| default |  |  |
+
+
 ## ConversationData
 
 
@@ -118,6 +190,19 @@ Attributes:
 | model | string | Model identifier used for this turn |
 | started_at | string | ISO 8601 timestamp when the turn started |
 | completed_at | string | ISO 8601 timestamp when the turn completed |
+
+
+## ListedMcpTool
+
+
+Tool metadata returned from an MCP ``tools/list`` call.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string |  |
+| description | string |  |
+| input_schema | object |  |
 
 
 ## MCPListToolsSummary

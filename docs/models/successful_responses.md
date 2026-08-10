@@ -52,6 +52,25 @@ API Key Token configuration.
 | api_key | string |  |
 
 
+## AbstractDeleteResponse
+
+
+Base model for successful delete responses.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| deleted | boolean | Whether the deletion was successful. |
+
+
+## AbstractSuccessfulResponse
+
+
+Base class for all successful response models.
+
+
+
+
 ## AccessRule
 
 
@@ -2405,6 +2424,24 @@ Attributes:
 | content | string | Prompt body text |
 | created_at | string | When the prompt was created |
 | updated_at | string | When the prompt was last updated |
+
+
+## SavedPromptsConfigResponse
+
+
+Saved prompts configuration limits returned to consuming services.
+
+Attributes:
+    max_prompts_per_user: Maximum number of saved prompts allowed per user.
+    max_display_name_length: Maximum character length for prompt display name.
+    max_content_length: Maximum character length for prompt content body.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| max_prompts_per_user | integer | Maximum number of saved prompts allowed per user |
+| max_display_name_length | integer | Maximum character length for prompt display name |
+| max_content_length | integer | Maximum character length for prompt content body |
 
 
 ## SavedPromptsConfiguration
