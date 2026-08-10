@@ -138,8 +138,6 @@ hf-xet==1.5.1 \
     --hash=sha256:e0b14eda87d8109be4ca52aa5daef4897ed046ff2e558f363be65008c048149e
 httpcore==1.0.9 \
     --hash=sha256:fc0ea63671089523efc6fe94ec49d0b10c9660460cbca6172fc972c1c5f9c0ac
-httpcore2==2.5.0 \
-    --hash=sha256:1e8550e99da4297cb64d0cd5dd797c11a736a11f6fcbd8ffec350a9a85b39a27
 httpx==0.28.1 \
     --hash=sha256:40b3fef8650d88ced417b05b236427596a6da9117b0f64ef5b0a5d548d20addb
 httpx-sse==0.4.3 \

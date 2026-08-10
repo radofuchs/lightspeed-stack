@@ -3,6 +3,8 @@
 # Wheel-only hashes — hermetic builds cannot install sdist build backends.
 genai-prices==0.1.1 \
     --hash=sha256:de2e3d8ea3ca1d0d292025995c598da447a74e94f22cd3342df46941aeb5416b
+httpcore2==2.9.1 \
+    --hash=sha256:6182472379e855fe4221246a2bb7ecede403bc61c6798062ae1787d051ccde26
 httpx2==2.9.1 \
     --hash=sha256:1820fe14a9ab1107bfeff39259987429450b070ec0ff38cc87eb0d8c97fdc71a
 openai==2.53.0 \
