@@ -4,7 +4,6 @@
 
 from collections.abc import Callable
 
-import httpx
 import pytest
 from fastapi import HTTPException
 from ogx.core.library_client import AsyncOGXAsLibraryClient
@@ -31,6 +30,7 @@ from utils.pydantic_ai_helpers import (
     get_agent_capability_tools,
     get_skills_metadata,
 )
+from tests.unit.conftest import attach_mock_api_client
 
 _QUESTION_VALIDITY_MODULE = (
     "pydantic_ai_lightspeed.capabilities.question_validity._capability"
@@ -179,8 +179,7 @@ class TestBuildAgent:
         mock_client = mocker.Mock()
         mock_client.base_url = "http://localhost:8321"
         mock_client.api_key = "test-key"
-        mock_client._client = mocker.Mock(spec=httpx.AsyncClient)
-        mock_client.default_headers = {}
+        attach_mock_api_client(mocker, mock_client)
 
         mock_params = mocker.Mock()
         mock_params.model = "provider/my-model"
@@ -209,8 +208,7 @@ class TestBuildAgent:
         mock_client = mocker.Mock()
         mock_client.base_url = "http://localhost:8321"
         mock_client.api_key = "test-key"
-        mock_client._client = mocker.Mock(spec=httpx.AsyncClient)
-        mock_client.default_headers = {}
+        attach_mock_api_client(mocker, mock_client)
 
         mock_params = mocker.Mock()
         mock_params.model = "provider/my-model"
