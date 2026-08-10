@@ -67,8 +67,10 @@ oc get ns "$NAMESPACE" >/dev/null 2>&1 || oc create namespace "$NAMESPACE"
 
 create_secret() {
     local name=$1; shift
-    log "Creating secret $name..."
-    oc create secret generic "$name" "$@" -n "$NAMESPACE" 2>/dev/null || log "Secret $name exists"
+    log "Creating/updating secret $name..."
+    # Upsert: a stale FAISS_VECTOR_STORE_ID from a prior run in this namespace
+    # would otherwise leave registration/search pointing at the wrong store.
+    oc create secret generic "$name" "$@" -n "$NAMESPACE" --dry-run=client -o yaml | oc apply -f -
 }
 
 create_secret openai-api-key-secret --from-literal=key="$OPENAI_API_KEY"
@@ -215,7 +217,9 @@ conn.close()
     fi
 
     gzip -c "$RAG_DB_PATH" > /tmp/kv_store.db.gz
-    oc create configmap rag-data -n "$NAMESPACE" --from-file=kv_store.db.gz=/tmp/kv_store.db.gz
+    oc create configmap rag-data -n "$NAMESPACE" \
+      --from-file=kv_store.db.gz=/tmp/kv_store.db.gz \
+      --dry-run=client -o yaml | oc apply -f -
     rm /tmp/kv_store.db.gz
     log "✅ RAG data ConfigMap created from $RAG_DB_PATH"
 else
@@ -408,7 +412,47 @@ log "LCS accessible at: http://$E2E_LSC_HOSTNAME:8080"
 log "Mock JWKS accessible at: http://$E2E_JWKS_HOSTNAME:8000"
 log "Llama Stack (e2e client hooks) at: http://$E2E_LLAMA_HOSTNAME:$E2E_LLAMA_PORT"
 
-
+# Fail fast if FAISS is registered but returns zero chunks (matches prior Konflux RAG mode).
+if [[ -n "${FAISS_VECTOR_STORE_ID:-}" ]]; then
+  progress "Smoke-testing FAISS vector_io.query for $FAISS_VECTOR_STORE_ID"
+  RAG_SMOKE_OUT="$(mktemp)"
+  if ! curl -sf -X POST "http://localhost:8321/v1/vector-io/query" \
+      -H "Content-Type: application/json" \
+      -d "{\"vector_store_id\":\"${FAISS_VECTOR_STORE_ID}\",\"query\":\"What is the title of the article from Paul?\",\"params\":{\"max_chunks\":5,\"mode\":\"vector\"}}" \
+      >"$RAG_SMOKE_OUT"; then
+    echo "❌ FAISS smoke query HTTP failed" | tee /dev/stderr
+    e2e_echo_pod_logs 250
+    rm -f "$RAG_SMOKE_OUT"
+    exit 1
+  fi
+  RAG_SMOKE_CHUNKS="$(python3 -c "
+import json,sys
+try:
+    data=json.load(open(sys.argv[1], encoding='utf-8'))
+except Exception as e:
+    print(f'parse-error:{e}')
+    sys.exit(0)
+chunks=data.get('chunks') or data.get('data') or []
+if isinstance(data, dict) and not chunks:
+    # QueryChunksResponse shapes vary; count any list-like payload values.
+    for v in data.values():
+        if isinstance(v, list):
+            chunks=v
+            break
+print(len(chunks) if isinstance(chunks, list) else 0)
+" "$RAG_SMOKE_OUT" 2>/dev/null || echo 0)"
+  log "[e2e-rag] smoke query chunks=${RAG_SMOKE_CHUNKS} body=$(head -c 400 "$RAG_SMOKE_OUT" | tr '\n' ' ')"
+  if [[ "${RAG_SMOKE_CHUNKS}" =~ ^[0-9]+$ ]] && [[ "${RAG_SMOKE_CHUNKS}" -lt 1 ]]; then
+    echo "❌ FAISS smoke query returned 0 chunks — RAG e2e would fail" | tee /dev/stderr
+    e2e_echo_pod_logs 250
+    rm -f "$RAG_SMOKE_OUT"
+    exit 1
+  fi
+  rm -f "$RAG_SMOKE_OUT"
+  log "✅ FAISS smoke query returned ${RAG_SMOKE_CHUNKS} chunk(s)"
+else
+  log "⚠️  FAISS_VECTOR_STORE_ID unset — skipping RAG smoke query"
+fi
 
 #========================================
 # 7. RUN TESTS

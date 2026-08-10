@@ -19,6 +19,23 @@ if [ -f "$LIGHTSPEED_CONFIG" ]; then
 
     if [ -f "$ENRICHED_CONFIG" ] && [ "$ENRICHMENT_FAILED" -eq 0 ]; then
         echo "Using enriched config: $ENRICHED_CONFIG"
+        # Evidence for Konflux RAG failures: which SQLite backends BYOK will open.
+        /opt/app-root/.venv/bin/python3 - <<'PY' || true
+import os, yaml
+path = "/tmp/enriched-run.yaml"
+with open(path, encoding="utf-8") as fh:
+    cfg = yaml.safe_load(fh) or {}
+backends = (cfg.get("storage") or {}).get("backends") or {}
+print("[e2e-rag] KV_RAG_PATH=", os.environ.get("KV_RAG_PATH"))
+print("[e2e-rag] KV_STORE_PATH=", os.environ.get("KV_STORE_PATH"))
+print("[e2e-rag] FAISS_VECTOR_STORE_ID=", os.environ.get("FAISS_VECTOR_STORE_ID"))
+for name, backend in backends.items():
+    if "rag" in name or "byok" in name or name.startswith("kv_"):
+        print(f"[e2e-rag] storage.backends[{name}]={backend}")
+stores = ((cfg.get("registered_resources") or {}).get("vector_stores")) or []
+for store in stores:
+    print(f"[e2e-rag] registered vector_store={store}")
+PY
         exec ogx stack run "$ENRICHED_CONFIG"
     fi
 fi
