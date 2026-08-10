@@ -217,9 +217,12 @@ conn.close()
     fi
 
     gzip -c "$RAG_DB_PATH" > /tmp/kv_store.db.gz
+    # Do not use `oc apply` here: client-side apply stores the full object in
+    # metadata.annotations.kubectl.kubernetes.io/last-applied-configuration
+    # (256KiB limit). The gzipped FAISS fixture (~800KiB+) overflows that.
+    oc delete configmap rag-data -n "$NAMESPACE" --ignore-not-found
     oc create configmap rag-data -n "$NAMESPACE" \
-      --from-file=kv_store.db.gz=/tmp/kv_store.db.gz \
-      --dry-run=client -o yaml | oc apply -f -
+      --from-file=kv_store.db.gz=/tmp/kv_store.db.gz
     rm /tmp/kv_store.db.gz
     log "✅ RAG data ConfigMap created from $RAG_DB_PATH"
 else
