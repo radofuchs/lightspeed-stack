@@ -144,8 +144,6 @@ httpx==0.28.1 \
     --hash=sha256:40b3fef8650d88ced417b05b236427596a6da9117b0f64ef5b0a5d548d20addb
 httpx-sse==0.4.3 \
     --hash=sha256:e163972748a0d3dcc718803a47bfad40fa1fa5a554d192f60ba685163ab2162a
-httpx2==2.5.0 \
-    --hash=sha256:78cf66523b7294f6cd2f18e8a04f0b46b2fec6bdb294c464ba111ddd44953129
 huggingface-hub==1.22.0 \
     --hash=sha256:54ae3efe94beb5a7c9eea3e911ca578945f178e1f211644a0d4f92a1b1648dde
 idna==3.18 \
@@ -220,8 +218,6 @@ numpy==2.3.5 \
     --hash=sha256:a08c6c26c26d7530d09ac93bc177593958c2e3ce4a9b5750c14a80329cca157c
 oauthlib==3.3.1 \
     --hash=sha256:c6fbab4f1a77a539f01175e2ea74b9552806bd0a849c70e744fda4ab801031c0
-openai==2.44.0 \
-    --hash=sha256:87429e9a4d15b2918a03b040b6330fa03fc175bbf0bc6eaff7ae61c93cd42c53
 ogx==1.0.2+rhaiv.0 \
     --hash=sha256:52c891af9dfb22f884d2dae150e5e94d04e492f452ec811bbc61ba84257de000
 ogx-api==1.0.2+rhaiv.0 \
