@@ -21,6 +21,11 @@ from models.common.moderation import (
 from models.common.query import Attachment, SolrVectorSearchRequest
 from models.common.shields import CatalogShield
 from models.common.skills import SkillMetadata
+from models.common.tools import (
+    CatalogTool,
+    CatalogToolParameter,
+    ListedMcpTool,
+)
 from models.common.transcripts import Transcript, TranscriptMetadata
 from models.common.turn_summary import (
     MCPListToolsSummary,
@@ -37,11 +42,14 @@ __all__ = [
     "Attachment",
     "CatalogModel",
     "CatalogShield",
+    "CatalogTool",
+    "CatalogToolParameter",
     "ConversationData",
     "ConversationDetails",
     "ConversationTurn",
     "FeedbackCategory",
     "HealthStatus",
+    "ListedMcpTool",
     "MCPListToolsSummary",
     "MCPServerAuthInfo",
     "MCPServerInfo",

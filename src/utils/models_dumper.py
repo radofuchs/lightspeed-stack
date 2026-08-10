@@ -108,6 +108,8 @@ error_responses_models: list[type[BaseModel]] = [
 
 common_models: list[type[BaseModel]] = [
     c.Attachment,
+    c.CatalogModel,
+    c.CatalogShield,
     c.ConversationData,
     c.ConversationDetails,
     c.ConversationTurn,
@@ -129,6 +131,9 @@ common_models: list[type[BaseModel]] = [
     c.Transcript,
     c.TranscriptMetadata,
     c.TurnSummary,
+    c.CatalogTool,
+    c.CatalogToolParameter,
+    c.ListedMcpTool,
 ]
 
 agents_models: list[type[BaseModel]] = [

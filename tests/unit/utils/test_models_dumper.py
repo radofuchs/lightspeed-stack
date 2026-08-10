@@ -10439,6 +10439,9 @@ def test_dump_models_group_common(tmpdir: Path) -> None:
         "Transcript",
         "TranscriptMetadata",
         "TurnSummary",
+        "CatalogTool",
+        "CatalogToolParameter",
+        "ListedMcpTool",
     ]
     check_json_file_content(filename, expected_schemas)
 
