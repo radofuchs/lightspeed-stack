@@ -42,8 +42,12 @@ RUN mkdir -p /opt/app-root/src/.llama/storage \
 # Copy enrichment scripts for runtime config enrichment
 COPY src/llama_stack_configuration.py /opt/app-root/llama_stack_configuration.py
 COPY scripts/llama-stack-entrypoint.sh /opt/app-root/enrich-entrypoint.sh
+COPY scripts/e2e_verify_enriched_rag_config.py /opt/app-root/scripts/e2e_verify_enriched_rag_config.py
+COPY scripts/e2e_verify_rag_fixture.py /opt/app-root/scripts/e2e_verify_rag_fixture.py
 RUN chmod +x /opt/app-root/enrich-entrypoint.sh && \
-    chown 1001:0 /opt/app-root/enrich-entrypoint.sh /opt/app-root/llama_stack_configuration.py
+    chown -R 1001:0 /opt/app-root/enrich-entrypoint.sh \
+      /opt/app-root/llama_stack_configuration.py \
+      /opt/app-root/scripts
 
 # Switch back to the original user
 USER 1001

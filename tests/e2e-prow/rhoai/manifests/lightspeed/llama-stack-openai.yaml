@@ -4,7 +4,8 @@
 # optional llama-stack-source for repo_url / repo_revision.
 #
 # RAG: seeded in setup-from-source from rag-data ConfigMap (gzip); main re-inflates, verifies the
-# FAISS index key, then lets the shared entrypoint copy the fixture into writable KV_STORE_PATH.
+# OGX 1.0 namespaced FAISS index at KV_RAG_PATH, then enrich-entrypoint checks BYOK backends
+# (persistence.namespace + resolved db_path / vector_store_id) before `ogx stack run`.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -140,7 +141,7 @@ spec:
         - name: HOME
           value: "/opt/app-root/src"
         # Match GitHub Actions docker-compose + llama-stack-entrypoint.sh:
-        # registry/SQL under /tmp (writable); FAISS (run-ci kv_rag) reads the restored fixture.
+        # registry/SQL under /tmp (writable); FAISS BYOK / kv_rag reads the restored fixture.
         - name: KV_STORE_PATH
           value: "/tmp/llama/kv_store.db"
         - name: KV_RAG_PATH

@@ -278,6 +278,30 @@ if ! oc wait pod/lightspeed-stack-service pod/llama-stack-service \
 fi
 log "✅ Both service pods are ready"
 
+# OGX 1.0 / BYOK evidence: fail before port-forward if fixture or enriched config is wrong.
+progress "Verifying live RAG fixture + enriched FAISS config in llama-stack pod"
+echo "[e2e] ========== llama-stack [e2e-rag] startup lines =========="
+oc logs llama-stack-service -n "$NAMESPACE" 2>&1 | grep '\[e2e-rag\]' \
+  | while IFS= read -r line || [[ -n "$line" ]]; do echo "[e2e] $line"; done || true
+if ! oc exec llama-stack-service -n "$NAMESPACE" -- /bin/bash -c '
+  set -e
+  export RAG_WORK="${KV_RAG_PATH:-/opt/app-root/src/.llama/storage/rag/kv_store.db}"
+  echo "[e2e-rag] live KV_RAG_PATH=${KV_RAG_PATH:-}"
+  echo "[e2e-rag] live FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}"
+  python3 /opt/app-root/scripts/e2e_verify_rag_fixture.py
+  if [[ -f /tmp/enriched-run.yaml ]]; then
+    python3 /opt/app-root/scripts/e2e_verify_enriched_rag_config.py /tmp/enriched-run.yaml
+  else
+    echo "FATAL: /tmp/enriched-run.yaml missing after llama-stack start" >&2
+    exit 1
+  fi
+'; then
+  echo "❌ Live RAG / enriched config verification failed" | tee /dev/stderr
+  e2e_echo_pod_logs 250
+  exit 1
+fi
+log "✅ Live RAG fixture + enriched FAISS/BYOK config OK"
+
 if [ "$QUIET" = "1" ]; then
   e2e_echo_pod_logs 80
 else

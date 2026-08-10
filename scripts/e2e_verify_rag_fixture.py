@@ -61,12 +61,26 @@ def main() -> int:
     ).fetchall()
     conn.close()
 
+    namespaced_index = [
+        (key, val_len, blob)
+        for key, val_len, blob in rows
+        if key.startswith("vector_io::faiss:faiss_index:")
+    ]
+    namespaced_vs = [
+        key for (key,) in vs_keys if key.startswith("vector_io::faiss:vector_stores:")
+    ]
+
     print(f"[e2e-rag] fixture={path} size={size}")
     print(f"[e2e-rag] FAISS_VECTOR_STORE_ID={expected!r}")
     print(f"[e2e-rag] vector_stores keys={vs_keys}")
     print(
         f"[e2e-rag] faiss_index keys="
         f"{[(key, val_len) for key, val_len, _ in rows]}"
+    )
+    print(f"[e2e-rag] namespaced vector_stores={namespaced_vs}")
+    print(
+        f"[e2e-rag] namespaced faiss_index="
+        f"{[(key, val_len) for key, val_len, _ in namespaced_index]}"
     )
 
     if size < 1_048_576:
@@ -75,14 +89,36 @@ def main() -> int:
     if not rows:
         print("FATAL: no faiss_index key in RAG fixture", file=sys.stderr)
         return 1
-
-    key, val_len, index_blob = rows[0]
-    if expected and expected not in key:
+    if not namespaced_index:
         print(
-            f"FATAL: FAISS_VECTOR_STORE_ID {expected!r} not in index key {key!r}",
+            "FATAL: no OGX 1.0 namespaced faiss_index key "
+            "(expected prefix vector_io::faiss:faiss_index:)",
             file=sys.stderr,
         )
         return 1
+    if not namespaced_vs:
+        print(
+            "FATAL: no OGX 1.0 namespaced vector_stores key "
+            "(expected prefix vector_io::faiss:vector_stores:)",
+            file=sys.stderr,
+        )
+        return 1
+
+    key, val_len, index_blob = namespaced_index[0]
+    if expected:
+        matched = [
+            (k, length, blob)
+            for k, length, blob in namespaced_index
+            if expected in k
+        ]
+        if not matched:
+            print(
+                f"FATAL: FAISS_VECTOR_STORE_ID {expected!r} not in any "
+                f"namespaced index key {[k for k, _, _ in namespaced_index]!r}",
+                file=sys.stderr,
+            )
+            return 1
+        key, val_len, index_blob = matched[0]
     if val_len < 100_000:
         print(f"FATAL: faiss_index value too small: {val_len}", file=sys.stderr)
         return 1
