@@ -10338,6 +10338,9 @@ def test_dump_models_group_successful_responses(tmpdir: Path) -> None:
 
     # list of schemas expected in a dump
     expected_schemas = [
+        "AbstractDeleteResponse",
+        "AbstractSuccessfulResponse",
+        "SavedPromptsConfigResponse",
         "AuthorizedResponse",
         "ConfigurationResponse",
         "ConversationDeleteResponse",
