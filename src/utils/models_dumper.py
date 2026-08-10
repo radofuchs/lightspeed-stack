@@ -41,6 +41,9 @@ requests_models: list[type[BaseModel]] = [
 ]
 
 successful_responses_models: list[type[BaseModel]] = [
+    s.AbstractDeleteResponse,
+    s.AbstractSuccessfulResponse,
+    s.SavedPromptsConfigResponse,
     s.AuthorizedResponse,
     s.ConfigurationResponse,
     s.ConversationDeleteResponse,
