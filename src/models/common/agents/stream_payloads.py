@@ -1,7 +1,7 @@
 """Typed JSON bodies for SSE streaming events."""
 
 import json
-from typing import Annotated, Literal, Optional, Self, TypeAlias
+from typing import Annotated, Literal, Optional, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -257,7 +257,7 @@ class ToolResultStreamPayload(StreamPayloadBase):
         return "[Tool Result]\n"
 
 
-StreamEventPayload: TypeAlias = Annotated[
+type StreamEventPayload = Annotated[
     TokenStreamPayload
     | TurnCompleteStreamPayload
     | ToolCallStreamPayload
