@@ -76,7 +76,7 @@ skills:
 > [!TIP]
 > Option A is recommended for most deployments. Use Option B when you need to selectively include specific skills from a larger collection.
 
-See [examples/lightspeed-stack-skills.yaml](../examples/lightspeed-stack-skills.yaml) for a complete configuration example.
+See [examples/lightspeed-stack-skills.yaml](https://github.com/lightspeed-core/lightspeed-stack/blob/main/examples/lightspeed-stack-skills.yaml) for a complete configuration example.
 
 # Skill Directory Structure
 
@@ -281,6 +281,6 @@ The system prompt contains behavioral instructions telling the LLM how to use th
 
 - [Agent Skills Specification](https://agentskills.io/specification) — the open standard for skill format
 - [Agent Skills Implementation Guide](https://agentskills.io/client-implementation/adding-skills-support) — client implementation guidance
-- [Feature Design Document](design/agent-skills/agent-skills.md) — internal design spec for the Lightspeed Core implementation
-- [Example Skills](../examples/skills/) — working example skills
-- [Example Configuration](../examples/lightspeed-stack-skills.yaml) — example `lightspeed-stack.yaml` with skills configured
+- [Feature Design Document](../design/agent-skills/agent-skills.md) — internal design spec for the Lightspeed Core implementation
+- [Example Skills](https://github.com/lightspeed-core/lightspeed-stack/tree/main/examples/skills) — working example skills
+- [Example Configuration](https://github.com/lightspeed-core/lightspeed-stack/blob/main/examples/lightspeed-stack-skills.yaml) — example `lightspeed-stack.yaml` with skills configured
