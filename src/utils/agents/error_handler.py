@@ -1,7 +1,5 @@
 """Error mapping for agent inference failures to structured API error responses."""
 
-from typing import TypeAlias
-
 from ogx_client import APIConnectionError, APIStatusError
 from pydantic_ai.exceptions import (
     AgentRunError,
@@ -26,7 +24,7 @@ from utils.query import (
     is_context_length_error,
 )
 
-AgentInferenceError: TypeAlias = (
+type AgentInferenceError = (
     AgentRunError | APIStatusError | APIConnectionError | RuntimeError
 )
 
