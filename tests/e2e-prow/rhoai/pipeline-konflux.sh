@@ -285,9 +285,11 @@ oc logs llama-stack-service -n "$NAMESPACE" 2>&1 | grep '\[e2e-rag\]' \
   | while IFS= read -r line || [[ -n "$line" ]]; do echo "[e2e] $line"; done || true
 if ! oc exec llama-stack-service -n "$NAMESPACE" -- /bin/bash -c '
   set -e
-  export RAG_WORK="${KV_RAG_PATH:-/opt/app-root/src/.llama/storage/rag/kv_store.db}"
+  export RAG_WORK="${KV_RAG_PATH:-/opt/app-root/.e2e-rag-work/kv_store.db}"
   echo "[e2e-rag] live KV_RAG_PATH=${KV_RAG_PATH:-}"
+  echo "[e2e-rag] live OGX_CONFIG_DIR=${OGX_CONFIG_DIR:-}"
   echo "[e2e-rag] live FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}"
+  # Fixture must still be at KV_RAG_PATH after ogx start (not moved by ~/.llama migration).
   python3 /opt/app-root/scripts/e2e_verify_rag_fixture.py
   if [[ -f /tmp/enriched-run.yaml ]]; then
     python3 /opt/app-root/scripts/e2e_verify_enriched_rag_config.py /tmp/enriched-run.yaml
