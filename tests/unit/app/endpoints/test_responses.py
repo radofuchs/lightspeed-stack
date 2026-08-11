@@ -849,7 +849,7 @@ class TestHandleNonStreamingResponse:
         mock_api_response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        mock_api_response.model_dump.return_value = {
+        serialized_response = {
             "id": "resp_1",
             "object": "response",
             "created_at": 0,
@@ -865,6 +865,7 @@ class TestHandleNonStreamingResponse:
             },
         }
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_api_response)
+        mocker.patch(f"{MODULE}.dump_ogx_model", return_value=serialized_response)
 
         _patch_handle_non_streaming_common(mocker, minimal_config)
         mocker.patch(
@@ -930,7 +931,7 @@ class TestHandleNonStreamingResponse:
         mock_api_response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        mock_api_response.model_dump.return_value = {
+        serialized_response = {
             "id": "resp_1",
             "object": "response",
             "created_at": 0,
@@ -946,6 +947,7 @@ class TestHandleNonStreamingResponse:
             },
         }
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_api_response)
+        mocker.patch(f"{MODULE}.dump_ogx_model", return_value=serialized_response)
 
         _patch_handle_non_streaming_common(mocker, minimal_config)
         mocker.patch(
@@ -1249,7 +1251,7 @@ class TestHandleStreamingResponse:
         mock_chunk.response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        mock_chunk.model_dump.return_value = {
+        serialized_chunk = {
             "type": "response.completed",
             "response": {"id": "r1", "usage": {"input_tokens": 1}},
         }
@@ -1258,6 +1260,7 @@ class TestHandleStreamingResponse:
             yield mock_chunk
 
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_stream())
+        mocker.patch(f"{MODULE}.dump_ogx_model", return_value=serialized_chunk)
 
         mocker.patch(f"{MODULE}.configuration", minimal_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -1322,10 +1325,6 @@ class TestHandleStreamingResponse:
 
         in_progress_chunk = mocker.Mock()
         in_progress_chunk.type = "response.in_progress"
-        in_progress_chunk.model_dump.return_value = {
-            "type": "response.in_progress",
-            "response": {"id": "r0"},
-        }
 
         completed_chunk = mocker.Mock()
         completed_chunk.type = "response.completed"
@@ -1335,7 +1334,11 @@ class TestHandleStreamingResponse:
         completed_chunk.response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        completed_chunk.model_dump.return_value = {
+        serialized_in_progress_chunk = {
+            "type": "response.in_progress",
+            "response": {"id": "r0"},
+        }
+        serialized_completed_chunk = {
             "type": "response.completed",
             "response": {"id": "r1", "usage": {"input_tokens": 1}},
         }
@@ -1345,6 +1348,10 @@ class TestHandleStreamingResponse:
             yield completed_chunk
 
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_stream())
+        mocker.patch(
+            f"{MODULE}.dump_ogx_model",
+            side_effect=[serialized_in_progress_chunk, serialized_completed_chunk],
+        )
 
         mocker.patch(f"{MODULE}.configuration", minimal_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -1416,7 +1423,7 @@ class TestHandleStreamingResponse:
         completed_chunk.response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        completed_chunk.model_dump.return_value = {
+        serialized_completed_chunk = {
             "type": "response.completed",
             "response": {"id": "r1", "usage": {"input_tokens": 1}},
         }
@@ -1425,6 +1432,9 @@ class TestHandleStreamingResponse:
             yield completed_chunk
 
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_stream())
+        mocker.patch(
+            f"{MODULE}.dump_ogx_model", return_value=serialized_completed_chunk
+        )
 
         mocker.patch(f"{MODULE}.configuration", minimal_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -1505,7 +1515,7 @@ class TestHandleStreamingResponse:
         completed_chunk.response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        completed_chunk.model_dump.return_value = {
+        serialized_completed_chunk = {
             "type": "response.completed",
             "response": {"id": "r1", "usage": {"input_tokens": 1}},
         }
@@ -1514,6 +1524,9 @@ class TestHandleStreamingResponse:
             yield completed_chunk
 
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_stream())
+        mocker.patch(
+            f"{MODULE}.dump_ogx_model", return_value=serialized_completed_chunk
+        )
 
         mocker.patch(f"{MODULE}.configuration", minimal_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -2306,7 +2319,7 @@ class TestSanitizesOutputAndModel:
         mock_api_response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        mock_api_response.model_dump.return_value = {
+        serialized_response = {
             "id": "resp_1",
             "object": "response",
             "created_at": 0,
@@ -2334,6 +2347,7 @@ class TestSanitizesOutputAndModel:
             },
         }
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_api_response)
+        mocker.patch(f"{MODULE}.dump_ogx_model", return_value=serialized_response)
 
         mocker.patch(f"{MODULE}.configuration", mock_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -2400,7 +2414,7 @@ class TestSanitizesOutputAndModel:
         completed_chunk.response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        completed_chunk.model_dump.return_value = {
+        completed_chunk.serialized = {
             "type": "response.completed",
             "response": {
                 "id": "r1",
@@ -2459,6 +2473,10 @@ class TestSanitizesOutputAndModel:
             yield completed_chunk
 
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_stream())
+        mocker.patch(
+            f"{MODULE}.dump_ogx_model",
+            return_value=completed_chunk.serialized,
+        )
 
         mocker.patch(f"{MODULE}.configuration", mock_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -2562,9 +2580,9 @@ class TestMcpEventsFilteredUnconditionally:
         mcp_added_chunk.type = "response.output_item.added"
         mcp_added_chunk.item = mcp_item
         mcp_added_chunk.output_index = 0
-        mcp_added_chunk.model_dump.return_value = {
-            "type": "response.output_item.added",
-            "output_index": 0,
+        serialized_completed_chunk = {
+            "type": "response.completed",
+            "response": {"id": "r1"},
         }
 
         completed_chunk = mocker.Mock()
@@ -2575,16 +2593,16 @@ class TestMcpEventsFilteredUnconditionally:
         completed_chunk.response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        completed_chunk.model_dump.return_value = {
-            "type": "response.completed",
-            "response": {"id": "r1"},
-        }
 
         async def mock_stream() -> Any:
             yield mcp_added_chunk
             yield completed_chunk
 
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_stream())
+        mocker.patch(
+            f"{MODULE}.dump_ogx_model",
+            return_value=serialized_completed_chunk,
+        )
 
         mocker.patch(f"{MODULE}.configuration", mock_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -2658,9 +2676,13 @@ class TestMcpEventsFilteredUnconditionally:
         text_added_chunk.type = "response.output_item.added"
         text_added_chunk.item = text_item
         text_added_chunk.output_index = 0
-        text_added_chunk.model_dump.return_value = {
+        serialized_text_added_chunk = {
             "type": "response.output_item.added",
             "output_index": 0,
+        }
+        serialized_completed_chunk = {
+            "type": "response.completed",
+            "response": {"id": "r1"},
         }
 
         completed_chunk = mocker.Mock()
@@ -2671,16 +2693,16 @@ class TestMcpEventsFilteredUnconditionally:
         completed_chunk.response.usage = mocker.Mock(
             input_tokens=1, output_tokens=2, total_tokens=3
         )
-        completed_chunk.model_dump.return_value = {
-            "type": "response.completed",
-            "response": {"id": "r1"},
-        }
 
         async def mock_stream() -> Any:
             yield text_added_chunk
             yield completed_chunk
 
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_stream())
+        mocker.patch(
+            f"{MODULE}.dump_ogx_model",
+            side_effect=[serialized_text_added_chunk, serialized_completed_chunk],
+        )
 
         mocker.patch(f"{MODULE}.configuration", minimal_config)
         mocker.patch(f"{MODULE}.get_available_quotas", return_value={})
@@ -2747,7 +2769,10 @@ async def test_response_generator_records_failure_when_stream_iteration_raises(
 
     ok_chunk = mocker.Mock()
     ok_chunk.type = "response.output_item.added"
-    ok_chunk.model_dump.return_value = {"type": "response.output_item.added"}
+    mocker.patch(
+        f"{MODULE}.dump_ogx_model",
+        return_value={"type": "response.output_item.added"},
+    )
 
     async def failing_stream() -> AsyncIterator[Any]:
         """Async generator that optionally yields a chunk then raises."""

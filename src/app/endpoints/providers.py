@@ -28,6 +28,7 @@ from models.api.responses.successful import (
 )
 from models.config import Action
 from utils.endpoints import check_configuration_loaded
+from utils.ogx_serialization import dump_ogx_model
 
 logger = get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -170,7 +171,7 @@ async def get_provider_endpoint_handler(
             client = AsyncOgxClientHolder().get_client()
             provider = await client.providers.retrieve(provider_id)
             span.set_attribute("providers.found", True)
-            return ProviderResponse(**provider.model_dump())
+            return ProviderResponse(**dump_ogx_model(provider))
 
         except (BadRequestError, ValueError) as e:
             # Server mode raises BadRequestError; library mode raises ValueError.
