@@ -4,8 +4,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.params import Depends
-from ogx_client import APIConnectionError, BadRequestError
 from opentelemetry import trace
+from ogx_client import ApiException, BadRequestError
 from ogx_client.models.list_providers_response import ListProvidersResponse
 
 from authentication import get_auth_dependency
@@ -94,17 +94,19 @@ async def providers_endpoint_handler(
 
         try:
             client = AsyncOgxClientHolder().get_client()
-            providers: ProviderListResponse = await client.providers.list()
-        except APIConnectionError as e:
+            providers: ListProvidersResponse = await client.providers.list()
+        except ApiException as e:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         span.set_attribute("providers.count", len(providers))
         return ProvidersListResponse(providers=group_providers(providers))
 
 
-def group_providers(providers: ListProvidersResponse) -> dict[str, list[dict[str, Any]]]:
+def group_providers(
+    providers: ListProvidersResponse,
+) -> dict[str, list[dict[str, Any]]]:
     """Group a list of ProviderInfo objects by their API type.
 
     Args:
@@ -170,11 +172,15 @@ async def get_provider_endpoint_handler(
             span.set_attribute("providers.found", True)
             return ProviderResponse(**provider.model_dump())
 
-        except APIConnectionError as e:
-            logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+        except (BadRequestError, ValueError) as e:
+            # Server mode raises BadRequestError; library mode raises ValueError.
+            logger.error("Provider not found: %s", e)
+            response = NotFoundResponse(resource="provider", resource_id=provider_id)
             raise HTTPException(**response.model_dump()) from e
 
-        except BadRequestError as e:
-            response = NotFoundResponse(resource="provider", resource_id=provider_id)
+        except ApiException as e:
+            if e.status:
+                raise
+            logger.error("Unable to connect to OGX: %s", e)
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e

@@ -30,7 +30,7 @@ if [ -f "$LIGHTSPEED_CONFIG" ]; then
 
     if [ -f "$GENERATED_CONFIG" ] && [ "$GENERATION_FAILED" -eq 0 ]; then
         echo "Using generated config: $GENERATED_CONFIG"
-        exec ogx stack run "$GENERATED_CONFIG"
+        exec ogx stack run --insecure "$GENERATED_CONFIG"
     fi
 fi
 
@@ -43,4 +43,4 @@ if [ ! -f "$INPUT_CONFIG" ]; then
 fi
 
 echo "Using original config: $INPUT_CONFIG"
-exec ogx stack run "$INPUT_CONFIG"
+exec ogx stack run --insecure "$INPUT_CONFIG"

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, TypeAlias
 
 from fastapi import HTTPException
-from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
+from ogx_client import ApiException, AsyncOgxClient
 from opentelemetry import trace
 from pydantic_ai.exceptions import (
     AgentRunError,
@@ -58,9 +58,7 @@ from utils.token_counter import TokenCounter
 logger = get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
-type AgentInferenceError = (
-    AgentRunError | APIStatusError | APIConnectionError | RuntimeError
-)
+AgentInferenceError: TypeAlias = AgentRunError | ApiException | RuntimeError
 
 
 class AgentFinishReason(str, Enum):
@@ -315,12 +313,7 @@ async def retrieve_agent_response(
             else:
                 prompt = agent_prompt_text(responses_params)
             run_result = await agent.run(prompt)
-        except (
-            AgentRunError,
-            APIStatusError,
-            APIConnectionError,
-            RuntimeError,
-        ) as exc:
+        except (AgentRunError, ApiException, RuntimeError) as exc:
             response = map_agent_inference_error(exc, responses_params.model)
             raise HTTPException(**response.model_dump()) from exc
 

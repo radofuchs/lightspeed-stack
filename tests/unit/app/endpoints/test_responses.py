@@ -16,7 +16,7 @@ from ogx_api.openai_responses import (
 from ogx_api.openai_responses import (
     OpenAIResponseMessage,
 )
-from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
+from ogx_client import ApiException, AsyncOgxClient
 from opentelemetry import trace
 from pytest_mock import MockerFixture
 
@@ -46,6 +46,7 @@ from models.common.responses.types import InputToolMCP
 from models.common.turn_summary import RAGContext, ToolCallSummary, TurnSummary
 from models.config import Action, ModelContextProtocolServer
 from models.database.conversations import UserConversation
+from tests.unit.conftest import mock_async_ogx_client
 
 MOCK_AUTH = (
     "00000001-0001-0001-0001-000000000001",
@@ -157,7 +158,7 @@ def _patch_base(mocker: MockerFixture, config: AppConfig) -> None:
 
 def _patch_client(mocker: MockerFixture) -> Any:
     """Patch AsyncOgxClientHolder; return (mock_client, mock_holder)."""
-    mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+    mock_client = mock_async_ogx_client(mocker, "responses", "items")
     mock_vector_stores = mocker.Mock()
     mock_vector_stores.list = mocker.AsyncMock(return_value=[])
     mock_client.vector_stores = mock_vector_stores
@@ -517,7 +518,7 @@ class TestResponsesEndpointHandler:
         mock_azure.is_token_expired = True
         mock_azure.refresh_token.return_value = True
         mocker.patch(f"{MODULE}.AzureEntraIDManager", return_value=mock_azure)
-        updated_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        updated_client = mock_async_ogx_client(mocker)
         mock_holder.update_azure_token = mocker.AsyncMock(return_value=updated_client)
         _patch_rag(mocker)
         _patch_moderation(mocker, decision="passed")
@@ -773,7 +774,7 @@ class TestHandleNonStreamingResponse:
     ) -> None:
         """Test that blocked moderation returns response with refusal message."""
         request = _request_with_model_and_conv("Bad input")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "blocked"
         mock_moderation.message = "Content blocked"
@@ -784,6 +785,10 @@ class TestHandleNonStreamingResponse:
         mock_moderation.refusal_response = mock_refusal
 
         _patch_handle_non_streaming_common(mocker, minimal_config)
+        mocker.patch(
+            f"{MODULE}.append_turn_items_to_conversation",
+            new=mocker.AsyncMock(),
+        )
         mock_client.items.create = mocker.AsyncMock()
         mock_api_response = mocker.Mock()
         mock_api_response.output = [mock_refusal]
@@ -835,7 +840,7 @@ class TestHandleNonStreamingResponse:
     ) -> None:
         """Test successful handle_non_streaming_response returns ResponsesResponse."""
         request = _request_with_model_and_conv("Hello")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -915,7 +920,7 @@ class TestHandleNonStreamingResponse:
     ) -> None:
         """Test append_turn_items_to_conversation triggers with store and previous_response_id."""
         request = _request_with_previous_response_id("Hi", previous_response_id="r1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -997,7 +1002,7 @@ class TestHandleNonStreamingResponse:
     ) -> None:
         """Test that RuntimeError with context_length raises 413."""
         request = _request_with_model_and_conv("Long input")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_client.responses.create = mocker.AsyncMock(
             side_effect=RuntimeError("context_length exceeded")
         )
@@ -1034,14 +1039,11 @@ class TestHandleNonStreamingResponse:
         minimal_config: AppConfig,
         mocker: MockerFixture,
     ) -> None:
-        """Test that APIConnectionError raises 503."""
+        """Test that ApiException raises 503."""
         request = _request_with_model_and_conv("Hi")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_client.responses.create = mocker.AsyncMock(
-            side_effect=APIConnectionError(
-                message="Connection failed",
-                request=mocker.Mock(),
-            )
+            side_effect=ApiException(status=None, reason="Connection failed")
         )
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
@@ -1080,15 +1082,11 @@ class TestHandleNonStreamingResponse:
         minimal_config: AppConfig,
         mocker: MockerFixture,
     ) -> None:
-        """Test that APIStatusError is handled and re-raised as HTTPException."""
+        """Test that ApiException is handled and re-raised as HTTPException."""
         request = _request_with_model_and_conv("Hi")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_client.responses.create = mocker.AsyncMock(
-            side_effect=APIStatusError(
-                message="API error",
-                response=mocker.Mock(request=None),
-                body=None,
-            )
+            side_effect=ApiException(status=500, reason="API error")
         )
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
@@ -1134,7 +1132,7 @@ class TestHandleNonStreamingResponse:
     ) -> None:
         """Test that RuntimeError without context_length is re-raised."""
         request = _request_with_model_and_conv("Hi")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_client.responses.create = mocker.AsyncMock(
             side_effect=RuntimeError("Some other error")
         )
@@ -1175,7 +1173,7 @@ class TestHandleStreamingResponse:
     ) -> None:
         """Test streaming with blocked moderation yields SSE from shield_violation_generator."""
         request = _request_with_model_and_conv("Bad", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "blocked"
         mock_moderation.message = "Blocked"
@@ -1239,7 +1237,7 @@ class TestHandleStreamingResponse:
     ) -> None:
         """Test streaming with passed moderation yields SSE from response_generator."""
         request = _request_with_model_and_conv("Hi", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -1318,7 +1316,7 @@ class TestHandleStreamingResponse:
     ) -> None:
         """Test in_progress chunk includes available_quotas and output_text."""
         request = _request_with_model_and_conv("Hi", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -1405,7 +1403,7 @@ class TestHandleStreamingResponse:
     ) -> None:
         """Test that response output items are passed to build_tool_call_summary."""
         request = _request_with_model_and_conv("Hi", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -1495,7 +1493,7 @@ class TestHandleStreamingResponse:
         request = _request_with_previous_response_id(
             "Hi", previous_response_id="r_prev"
         )
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -1578,7 +1576,7 @@ class TestHandleStreamingResponse:
     ) -> None:
         """Test streaming raises 413 when create raises RuntimeError context_length."""
         request = _request_with_model_and_conv("Long", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_client.responses.create = mocker.AsyncMock(
             side_effect=RuntimeError("context_length exceeded")
         )
@@ -1613,14 +1611,11 @@ class TestHandleStreamingResponse:
         minimal_config: AppConfig,
         mocker: MockerFixture,
     ) -> None:
-        """Test streaming raises 503 when create raises APIConnectionError."""
+        """Test streaming raises 503 when create raises ApiException."""
         request = _request_with_model_and_conv("Hi", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_client.responses.create = mocker.AsyncMock(
-            side_effect=APIConnectionError(
-                message="Connection failed",
-                request=mocker.Mock(),
-            )
+            side_effect=ApiException(status=None, reason="Connection failed")
         )
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
@@ -2302,7 +2297,7 @@ class TestSanitizesOutputAndModel:
             conversation=VALID_CONV_ID_NORMALIZED,
         )
 
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -2428,7 +2423,7 @@ class TestSanitizesOutputAndModel:
         return completed_chunk
 
     @pytest.mark.asyncio
-    async def test_streaming_sanitizes_mcp_output_model_and_instructions(
+    async def test_streaming_sanitizes_mcp_output_model_and_instructions(  # pylint: disable=too-many-statements
         self,
         minimal_config: AppConfig,
         mocker: MockerFixture,
@@ -2454,7 +2449,7 @@ class TestSanitizesOutputAndModel:
             instructions=SERVER_INSTRUCTIONS,
             conversation=VALID_CONV_ID_NORMALIZED,
         )
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -2538,7 +2533,7 @@ class TestMcpEventsFilteredUnconditionally:
     """Integration test: MCP events are filtered regardless of X-LCS-Merge-Server-Tools."""
 
     @pytest.mark.asyncio
-    async def test_mcp_events_filtered_without_merge_server_tools_header(
+    async def test_mcp_events_filtered_without_merge_server_tools_header(  # pylint: disable=too-many-statements
         self,
         minimal_config: AppConfig,
         mocker: MockerFixture,
@@ -2555,7 +2550,7 @@ class TestMcpEventsFilteredUnconditionally:
         mock_config.rag_id_mapping = {}
 
         request = _request_with_model_and_conv("Hi", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -2652,7 +2647,7 @@ class TestMcpEventsFilteredUnconditionally:
         are filtered.
         """
         request = _request_with_model_and_conv("Hi", model="provider/model1")
-        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+        mock_client = mock_async_ogx_client(mocker)
         mock_moderation = mocker.Mock()
         mock_moderation.decision = "passed"
 
@@ -2746,7 +2741,7 @@ async def test_response_generator_records_failure_when_stream_iteration_raises(
 ) -> None:
     """Test that response_generator records a failure metric when the stream raises."""
     request = _request_with_model_and_conv("Hi", model="provider/model1")
-    mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
+    mock_client = mock_async_ogx_client(mocker, "responses", "items")
     mock_moderation = mocker.Mock()
     mock_moderation.decision = "passed"
 

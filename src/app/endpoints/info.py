@@ -3,8 +3,8 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from ogx_client import APIConnectionError
 from opentelemetry import trace
+from ogx_client import ApiException
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
@@ -94,7 +94,7 @@ async def info_endpoint_handler(
                 ogx_version=ogx_version,
             )
         # connection to OGX server
-        except APIConnectionError as e:
+        except ApiException as e:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e

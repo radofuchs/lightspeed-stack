@@ -4,8 +4,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.params import Depends
-from ogx_client import APIConnectionError
 from opentelemetry import trace
+from ogx_client import ApiException
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
@@ -93,7 +93,7 @@ async def models_endpoint_handler(
         logger.info("OGX config: %s", ogx_configuration)
 
         try:
-            # try to get Llama Stack client
+            # try to get OGX client
             client = AsyncOgxClientHolder().get_client()
             # retrieve and normalize models across OpenAI/Anthropic/Google list shapes
             parsed_models = parse_model_list_response(await client.openai.list())
@@ -110,7 +110,7 @@ async def models_endpoint_handler(
             return ModelsResponse(models=parsed_models)
 
         # Connection to OGX server failed
-        except APIConnectionError as e:
+        except ApiException as e:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e

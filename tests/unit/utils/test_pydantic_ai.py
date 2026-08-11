@@ -22,6 +22,7 @@ from models.config import (
 )
 from pydantic_ai_lightspeed.capabilities import QuestionValidity
 from pydantic_ai_lightspeed.capabilities.redaction import PiiRedactionCapability
+from tests.unit.conftest import attach_mock_api_client
 from utils.pydantic_ai_helpers import (
     _agent_capabilities,
     _shield_capability,
@@ -30,7 +31,6 @@ from utils.pydantic_ai_helpers import (
     get_agent_capability_tools,
     get_skills_metadata,
 )
-from tests.unit.conftest import attach_mock_api_client
 
 _QUESTION_VALIDITY_MODULE = (
     "pydantic_ai_lightspeed.capabilities.question_validity._capability"

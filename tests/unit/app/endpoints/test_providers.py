@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException, Request, status
-from ogx_client import APIConnectionError, BadRequestError
+from ogx_client import ApiException, BadRequestError
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
@@ -50,7 +50,7 @@ async def test_providers_endpoint_connection_error(
 
     mocker.patch(
         "app.endpoints.providers.AsyncOgxClientHolder"
-    ).return_value.get_client.side_effect = APIConnectionError(request=mocker.Mock())
+    ).return_value.get_client.side_effect = ApiException(status=None)
 
     request = Request(scope={"type": "http"})
 
@@ -123,11 +123,7 @@ async def test_get_provider_not_found(
     mock_client_holder = mocker.patch("app.endpoints.providers.AsyncOgxClientHolder")
     mock_client = mocker.AsyncMock()
     mock_client.providers.retrieve = mocker.AsyncMock(
-        side_effect=BadRequestError(
-            message="Provider not found",
-            response=mocker.Mock(request=None),
-            body=None,
-        )
+        side_effect=BadRequestError(status=400, reason="Provider not found")
     )  # type: ignore
     mock_client_holder.return_value.get_client.return_value = mock_client
 
@@ -189,7 +185,7 @@ async def test_get_provider_connection_error(
 
     mocker.patch(
         "app.endpoints.providers.AsyncOgxClientHolder"
-    ).return_value.get_client.side_effect = APIConnectionError(request=mocker.Mock())
+    ).return_value.get_client.side_effect = ApiException(status=None)
 
     request = Request(scope={"type": "http"})
 
@@ -262,9 +258,7 @@ class TestProvidersEndpointOtel:
 
         mocker.patch(
             "app.endpoints.providers.AsyncOgxClientHolder"
-        ).return_value.get_client.side_effect = APIConnectionError(
-            request=mocker.Mock()
-        )
+        ).return_value.get_client.side_effect = ApiException(status=None)
 
         request = Request(scope={"type": "http"})
         auth: AuthTuple = ("uid", "uname", True, "tok")

@@ -21,16 +21,12 @@ from ogx_api import (
 from ogx_api import (
     OpenAIResponseObjectStreamResponseOutputItemDone as OutputItemDoneChunk,
 )
-from ogx_client import (
-    APIConnectionError,
-)
-from ogx_client import (
-    APIStatusError as LLSApiStatusError,
-)
 from openai._exceptions import (
     APIStatusError as OpenAIAPIStatusError,
 )
 from opentelemetry import trace
+from ogx_client import ApiException
+from openai._exceptions import APIStatusError as OpenAIAPIStatusError
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
@@ -311,12 +307,11 @@ def _error_response_for_response_api_error(
         if not is_context_length_error(str(error)):
             return None
         return PromptTooLongResponse(model=api_params.model)
-    if isinstance(error, APIConnectionError):
+    if isinstance(error, ApiException) and not error.status:
         return ServiceUnavailableResponse(
             backend_name="OGX",
-            cause=str(error),
         )
-    if isinstance(error, (LLSApiStatusError, OpenAIAPIStatusError)):
+    if isinstance(error, (ApiException, OpenAIAPIStatusError)):
         return handle_known_apistatus_errors(error, api_params.model)
     return None
 
@@ -830,8 +825,7 @@ async def handle_streaming_response(
             )
         except (
             RuntimeError,
-            APIConnectionError,
-            LLSApiStatusError,
+            ApiException,
             OpenAIAPIStatusError,
         ) as e:
             _record_response_inference_result(
@@ -1390,8 +1384,7 @@ async def handle_non_streaming_response(
 
         except (
             RuntimeError,
-            APIConnectionError,
-            LLSApiStatusError,
+            ApiException,
             OpenAIAPIStatusError,
         ) as e:
             if not inference_metric_recorded:

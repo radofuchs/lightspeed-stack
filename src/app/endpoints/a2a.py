@@ -33,8 +33,8 @@ from a2a.types import (
 )
 from a2a.utils import new_agent_text_message, new_task
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from ogx_client import APIConnectionError, APIStatusError
 from opentelemetry import trace
+from ogx_client import ApiException
 from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.exceptions import AgentRunError
 from pydantic_ai.messages import (
@@ -449,8 +449,7 @@ class A2AAgentExecutor(AgentExecutor):
                 )
             except (
                 AgentRunError,
-                APIStatusError,
-                APIConnectionError,
+                ApiException,
                 RuntimeError,
             ) as e:
                 error_response = map_agent_inference_error(e, query_request.model or "")
@@ -514,8 +513,7 @@ class A2AAgentExecutor(AgentExecutor):
                     await event_queue.enqueue_event(a2a_event)
             except (
                 AgentRunError,
-                APIStatusError,
-                APIConnectionError,
+                ApiException,
                 RuntimeError,
             ) as e:
                 error_response = map_agent_inference_error(e, responses_params.model)
