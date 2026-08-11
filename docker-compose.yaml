@@ -136,7 +136,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s
       timeout: 3s
-      retries: 9
+      retries: 5
       start_period: 2s
 
   mock-mcp:
@@ -152,7 +152,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/health')"]
       interval: 5s
       timeout: 3s
-      retries: 9
+      retries: 5
       start_period: 2s
 
   # Mock TLS inference server for TLS E2E tests
@@ -169,7 +169,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request,ssl;c=ssl.create_default_context();c.check_hostname=False;c.verify_mode=ssl.CERT_NONE;urllib.request.urlopen('https://localhost:8443/health',context=c)"]
       interval: 5s
       timeout: 3s
-      retries: 9
+      retries: 5
       start_period: 5s
 
 
