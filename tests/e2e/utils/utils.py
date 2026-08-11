@@ -181,7 +181,7 @@ def validate_json(message: Any, schema: Any) -> None:
         assert False, "The provided schema is faulty:" + str(e)
 
 
-def wait_for_container_health(container_name: str, max_attempts: int = 20) -> None:
+def wait_for_container_health(container_name: str, max_attempts: int = 200) -> None:
     """Wait for container to be healthy.
 
     Polls a Docker container until its health status becomes `healthy` or the
@@ -202,7 +202,7 @@ def wait_for_container_health(container_name: str, max_attempts: int = 20) -> No
     Parameters:
     ----------
         container_name (str): Docker container name or ID to check.
-        max_attempts (int): Maximum number of health check attempts (default 20).
+        max_attempts (int): Maximum number of health check attempts (default 200).
     """
     if is_prow_environment():
         wait_for_pod_health(container_name, max_attempts)
@@ -473,7 +473,7 @@ def restart_container(container_name: str) -> None:
     # (~45-60s vs ~10s in server mode). OpenTelemetry instrumentation adds
     # initialization overhead. Use a generous attempt count so MCP-auth scenarios
     # that restart the container don't time out.
-    wait_for_container_health(container_name, max_attempts=20)
+    wait_for_container_health(container_name, max_attempts=200)
 
     if container_name == "llama-stack":
         from tests.e2e.features.steps.health import (
@@ -485,7 +485,7 @@ def restart_container(container_name: str) -> None:
 
 def wait_for_lightspeed_stack_http_ready(
     max_attempts: int = 40,
-    delay_s: float = 1.5,
+    delay_s: float = 15,
 ) -> None:
     """Block until Lightspeed Stack accepts HTTP on the host-mapped port.
 

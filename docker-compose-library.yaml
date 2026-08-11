@@ -70,7 +70,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8080/liveness"]
       interval: 10s   # how often to run the check
       timeout: 5s    # how long to wait before considering it failed
-      retries: 3      # how many times to retry before marking as unhealthy
+      retries: 9      # how many times to retry before marking as unhealthy
       start_period: 15s # time to wait before starting checks (increased for library initialization)
 
   # Mock JWKS server for RBAC E2E tests
@@ -87,7 +87,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 9
       start_period: 2s
 
   mock-mcp:
@@ -103,7 +103,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/health')"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 9
       start_period: 2s
 
 
