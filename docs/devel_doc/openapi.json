@@ -1584,6 +1584,156 @@
                 }
             }
         },
+        "/v1/skills": {
+            "get": {
+                "tags": [
+                    "skills"
+                ],
+                "summary": "Skills Endpoint Handler",
+                "description": "Handle requests to the /skills endpoint.\n\nProcess GET requests to the /skills endpoint, returning a list of loaded\nagent skills with their metadata (name, description).\n\n### Parameters:\n- request: The incoming HTTP request (used by middleware).\n- auth: Authentication tuple from the auth dependency (used by middleware).\n\n### Raises:\n- HTTPException: with status 401 for unauthorized access.\n- HTTPException: with status 403 if permission is denied.\n- HTTPException: with status 500 and a detail object containing `response`\n  and `cause` when service configuration is wrong or incomplete.\n\n### Returns:\n- SkillsResponse: An object containing the list of loaded skills.",
+                "operationId": "skills_endpoint_handler_v1_skills_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SkillsResponse"
+                                },
+                                "example": {
+                                    "skills": [
+                                        {
+                                            "description": "Review code for quality and security",
+                                            "name": "code-review"
+                                        },
+                                        {
+                                            "description": "Troubleshoot OpenShift cluster issues",
+                                            "name": "openshift-troubleshooting"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponse"
+                                },
+                                "examples": {
+                                    "missing header": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "No Authorization header found",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    },
+                                    "missing token": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "No token found in Authorization header",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    },
+                                    "expired token": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "Token has expired",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    },
+                                    "invalid signature": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "Invalid token signature",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    },
+                                    "invalid key": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "Token signed by unknown key",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    },
+                                    "missing claim": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "Token missing claim: user_id",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    },
+                                    "invalid k8s token": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "Invalid or expired Kubernetes token",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    },
+                                    "invalid jwk token": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "Authentication key server returned invalid data",
+                                                "response": "Missing or invalid credentials provided by client"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Permission denied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenResponse"
+                                },
+                                "examples": {
+                                    "endpoint": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "User 6789 is not authorized to access this endpoint.",
+                                                "response": "User does not have permission to access this endpoint"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponse"
+                                },
+                                "examples": {
+                                    "configuration": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "Lightspeed Stack configuration has not been initialized.",
+                                                "response": "Configuration is not loaded"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/providers": {
             "get": {
                 "tags": [
@@ -11591,6 +11741,7 @@
                     "feedback",
                     "get_models",
                     "get_tools",
+                    "get_skills",
                     "get_shields",
                     "list_providers",
                     "get_provider",
@@ -12906,6 +13057,22 @@
                         "type": "string",
                         "title": "Service name",
                         "description": "Name of the service. That value will be used in REST API endpoints."
+                    },
+                    "config_format_version": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "legacy",
+                                    "unified"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Configuration format version",
+                        "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or a llama_stack.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11)."
                     },
                     "service": {
                         "$ref": "#/components/schemas/ServiceConfiguration",
@@ -15876,6 +16043,23 @@
                         "title": "OKP chunk filter query",
                         "description": "Additional OKP filter query applied to every OKP search request. Use Solr boolean syntax, e.g. 'product:ansible AND product:*openshift*'."
                     },
+                    "search_mode": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "semantic",
+                                    "hybrid",
+                                    "keyword"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "OKP search mode",
+                        "description": "Default Solr search mode for OKP queries. 'keyword' uses BM25 text search (no embedding model needed). 'hybrid' combines vector + keyword search. 'semantic' uses pure vector search. When unset, falls back to the global default ('hybrid')."
+                    },
                     "max_chunks": {
                         "type": "integer",
                         "exclusiveMinimum": 0.0,
@@ -17704,11 +17888,14 @@
                                 "type": "string"
                             },
                             {
+                                "type": "integer"
+                            },
+                            {
                                 "type": "null"
                             }
                         ],
                         "title": "PostgreSQL port",
-                        "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}."
+                        "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. Accepts string placeholders and integer values."
                     },
                     "db": {
                         "anyOf": [
@@ -19292,6 +19479,9 @@
                         "anyOf": [
                             {
                                 "type": "string"
+                            },
+                            {
+                                "type": "integer"
                             },
                             {
                                 "type": "null"
@@ -21361,6 +21551,27 @@
                     }
                 ]
             },
+            "SkillMetadata": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name",
+                        "description": "Unique name of the skill"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Human readable description of what the skill does"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "description"
+                ],
+                "title": "SkillMetadata",
+                "description": "Metadata describing a single loaded agent skill.\n\nAttributes:\n    name: Unique name of the skill.\n    description: Human readable description of what the skill does."
+            },
             "SkillsConfiguration": {
                 "properties": {
                     "paths": {
@@ -21378,6 +21589,38 @@
                 "title": "SkillsConfiguration",
                 "description": "Agent skills configuration.\n\nSpecifies paths to skill directories. Skill metadata (name, description)\nis read from SKILL.md frontmatter at startup.\n\nEach path can point to either:\n- A directory containing a SKILL.md file (single skill)\n- A directory containing subdirectories with SKILL.md files (multiple skills)\n\nPaths are validated at startup to ensure they exist and contain valid SKILL.md files."
             },
+            "SkillsResponse": {
+                "properties": {
+                    "skills": {
+                        "items": {
+                            "$ref": "#/components/schemas/SkillMetadata"
+                        },
+                        "type": "array",
+                        "title": "Skills",
+                        "description": "List of loaded skills with metadata"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "skills"
+                ],
+                "title": "SkillsResponse",
+                "description": "Model representing a response to skills request.\n\nAttributes:\n    skills: List of loaded skills with metadata (name and description).",
+                "examples": [
+                    {
+                        "skills": [
+                            {
+                                "description": "Review code for quality and security",
+                                "name": "code-review"
+                            },
+                            {
+                                "description": "Troubleshoot OpenShift cluster issues",
+                                "name": "openshift-troubleshooting"
+                            }
+                        ]
+                    }
+                ]
+            },
             "SolrVectorSearchRequest": {
                 "properties": {
                     "mode": {
@@ -21387,7 +21630,8 @@
                                 "enum": [
                                     "semantic",
                                     "hybrid",
-                                    "lexical"
+                                    "lexical",
+                                    "keyword"
                                 ]
                             },
                             {
@@ -21395,10 +21639,11 @@
                             }
                         ],
                         "title": "Mode",
-                        "description": "Solr vector_io search mode. When omitted, the server default ('hybrid') is used.",
+                        "description": "Solr vector_io search mode. When omitted, the configured OKP default is used; otherwise 'hybrid' applies. 'keyword' and 'lexical' both use BM25 text search.",
                         "examples": [
                             "hybrid",
                             "semantic",
+                            "keyword",
                             "lexical"
                         ]
                     },
@@ -21454,7 +21699,7 @@
                 "additionalProperties": false,
                 "type": "object",
                 "title": "SolrVectorSearchRequest",
-                "description": "LCORE Solr inline RAG options for vector_io.query (mode and provider filters).\n\nAttributes:\n    mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.\n    filters: Solr provider filter payload passed through as params['solr'].\n\nLegacy clients may send a plain JSON object with filter keys only;\nthat object is accepted as filters with mode unset (server default applies)."
+                "description": "LCORE Solr inline RAG options for vector_io.query (mode and provider filters).\n\nAttributes:\n    mode: Solr vector_io search mode. When omitted, the configured OKP default is used.\n    filters: Solr provider filter payload passed through as params['solr'].\n\nLegacy clients may send a plain JSON object with filter keys only;\nthat object is accepted as filters with mode unset (server default applies)."
             },
             "SplunkConfiguration": {
                 "properties": {
@@ -22956,6 +23201,10 @@
         {
             "name": "shields",
             "description": "Safety shields."
+        },
+        {
+            "name": "skills",
+            "description": "Agent skills."
         },
         {
             "name": "streaming_query",

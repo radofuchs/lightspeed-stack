@@ -262,9 +262,9 @@ def test_byok_rag_pgvector_custom_connection_fields() -> None:
 
 def test_byok_rag_pgvector_accepts_int_port() -> None:
     """Int port (from replace_env_vars coercion) must validate for pgvector."""
-    store = ByokRag(
+    store = RagStore(
         rag_id="pg_store",
-        rag_type="remote::pgvector",
+        backend="pgvector",
         vector_db_id="vs_pg",
         host="db.example.com",
         port=5432,

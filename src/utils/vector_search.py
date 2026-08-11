@@ -673,8 +673,8 @@ async def build_rag_context(  # pylint: disable=too-many-locals,too-many-branche
         byok_chunks_task = _fetch_byok_rag(client, query, vector_store_ids)
         solr_chunks_task = _fetch_okp_rag(client, query, solr)
 
-        (byok_chunks, byok_documents), (solr_chunks, solr_documents) = await asyncio.gather(
-            byok_chunks_task, solr_chunks_task
+        (byok_chunks, byok_documents), (solr_chunks, solr_documents) = (
+            await asyncio.gather(byok_chunks_task, solr_chunks_task)
         )
 
         # Merge chunks

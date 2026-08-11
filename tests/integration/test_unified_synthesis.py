@@ -107,22 +107,30 @@ _OPERATOR_RUN_YAML: dict[str, Any] = {
 # lightspeed config passed to legacy generate_configuration and the extra
 # root-level content of the unified lightspeed-stack.yaml.
 _BYOK_INPUTS: dict[str, Any] = {
-    "byok_rag": [
-        {
-            "rag_id": "kb1",
-            "vector_db_id": "kb1",
-            "db_path": "/var/lib/kb1/faiss_store.db",
-            "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
-            "embedding_dimension": 768,
-        }
-    ]
+    "rag": {
+        "byok": {
+            "stores": [
+                {
+                    "rag_id": "kb1",
+                    "vector_db_id": "kb1",
+                    "db_path": "/var/lib/kb1/faiss_store.db",
+                    "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
+                    "embedding_dimension": 768,
+                }
+            ],
+        },
+    },
 }
 
 _SOLR_INPUTS: dict[str, Any] = {
-    "rag": {"inline": ["okp"]},
-    "okp": {
-        "rhokp_url": "https://okp.example.com",
-        "chunk_filter_query": "product:openshift",
+    "rag": {
+        "okp": {
+            "rhokp_url": "https://okp.example.com",
+            "chunk_filter_query": "product:openshift",
+        },
+        "retrieval": {
+            "inline": {"sources": ["okp"]},
+        },
     },
 }
 
@@ -132,6 +140,14 @@ _AZURE_INPUTS: dict[str, Any] = {
         "client_id": "test-client",
         "client_secret_path": "/run/secrets/azure",
     }
+}
+
+_ALL_INPUTS: dict[str, Any] = {
+    "rag": {
+        **_BYOK_INPUTS["rag"],
+        **_SOLR_INPUTS["rag"],
+    },
+    **_AZURE_INPUTS,
 }
 
 
@@ -186,9 +202,7 @@ def _load_and_synthesize(
         pytest.param(_BYOK_INPUTS, id="byok-rag"),
         pytest.param(_SOLR_INPUTS, id="solr-okp"),
         pytest.param(_AZURE_INPUTS, id="azure-entra-id"),
-        pytest.param(
-            {**_BYOK_INPUTS, **_SOLR_INPUTS, **_AZURE_INPUTS}, id="all-combined"
-        ),
+        pytest.param(_ALL_INPUTS, id="all-combined"),
     ],
 )
 def test_synthesis_parity_with_legacy_enrichment(
@@ -421,7 +435,7 @@ def test_migrate_then_synthesize_preserves_enrichment_parity(
     synthesizing the migrated config must yield the same result the legacy
     path produced for the original pair.
     """
-    enrichment = {**_BYOK_INPUTS, **_SOLR_INPUTS, **_AZURE_INPUTS}
+    enrichment = _ALL_INPUTS
     legacy, synthesized = _migrate_then_synthesize(
         tmp_path, _OPERATOR_RUN_YAML, enrichment
     )
