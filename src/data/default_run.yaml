@@ -8,11 +8,13 @@
 #
 # It is intentionally thinner than the repo-root run.yaml: it carries only the
 # APIs and providers needed to boot a minimal, queryable stack (inference,
-# vector_io, responses, tool_runtime, files) plus the storage backends
-# those providers reference. tool_runtime includes file-search (file_search /
-# RAG) and model-context-protocol (MCP) so those capabilities work when
-# operators enable them. Operators extend it via high-level sections or
-# `native_override`.
+# vector_io, responses, tool_runtime, files, file_processors) plus the storage
+# backends those providers reference. tool_runtime includes file-search
+# (file_search / RAG) and model-context-protocol (MCP) so those capabilities
+# work when operators enable them. file_processors (inline::pypdf) is required
+# for vector-store file attach / Notebook indexing after OGX removed the
+# legacy PyPDF fallback. Operators extend it via high-level sections or
+# `native_override` (e.g. swap pypdf for inline::docling).
 #
 # NOTE: `external_providers_dir` carries a default (`:=~/.llama/providers.d`)
 # so the baseline resolves even when EXTERNAL_PROVIDERS_DIR is unset — see the
@@ -23,6 +25,7 @@ apis:
 - responses
 - conversations
 - files
+- file_processors
 - inference
 - tool_runtime
 - vector_io
@@ -47,6 +50,13 @@ providers:
       storage_dir: ${env.SQLITE_STORE_DIR:=~/.llama/storage/files}
     provider_id: meta-reference-files
     provider_type: inline::localfs
+  # required for /v1/vector-stores to work with files properly
+  file_processors:
+  - provider_id: pypdf
+    provider_type: inline::pypdf
+    config:
+      default_chunk_size_tokens: 800
+      default_chunk_overlap_tokens: 400
   tool_runtime:
   - config: {}
     provider_id: model-context-protocol

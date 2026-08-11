@@ -123,6 +123,17 @@ def test_load_default_baseline_includes_mcp_tool_runtime() -> None:
     assert "model-context-protocol" in ids
 
 
+def test_load_default_baseline_includes_file_processors() -> None:
+    """Default stack ships file_processors so vector-store file attach works."""
+    baseline = load_default_baseline()
+    assert "file_processors" in baseline["apis"]
+    processors = baseline["providers"]["file_processors"]
+    assert any(
+        p.get("provider_id") == "pypdf" and p.get("provider_type") == "inline::pypdf"
+        for p in processors
+    )
+
+
 # ---------------------------------------------------------------------------
 # deep_merge_list_replace
 # ---------------------------------------------------------------------------
