@@ -19,6 +19,7 @@ Feature: Unified mode configuration validation
      Then the validation error contains --migrate-config
 
 
+
   Scenario: config_format_version legacy with unified-shaped body fails at load
     Given The service uses the lightspeed-stack-invalid-version-legacy-unified-body.yaml configuration
      When configuration validation is attempted for the active configuration

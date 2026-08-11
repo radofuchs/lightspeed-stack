@@ -54,8 +54,9 @@ spec:
               name: faiss-vector-store-secret
               key: id
               optional: true
+        # Unused for server-mode FAISS (llama pod owns the fixture); keep out of ~/.llama.
         - name: KV_RAG_PATH
-          value: "/app-root/src/.llama/storage/rag/kv_store.db"
+          value: "/app-root/.e2e-rag-work/kv_store.db"
         - name: VLLM_MODEL
           valueFrom:
             secretKeyRef:

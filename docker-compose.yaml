@@ -57,6 +57,8 @@ services:
       - OGX_LOGGING=${OGX_LOGGING:-}
       # FAISS test
       - FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}
+      # Disable OGX ~/.llama → ~/.ogx migration (bind-mount under ~/.llama/storage/rag).
+      - OGX_CONFIG_DIR=/opt/app-root/src/.ogx
       # Prevent HuggingFace Hub update checks (HTTP 429 rate-limiting in CI from parallel jobs).
       - HF_HUB_OFFLINE=1
       # OKP/Solr RAG

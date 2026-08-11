@@ -30,13 +30,15 @@ spec:
         - -c
         - |
           set -e
-          mkdir -p /data/src/.llama/storage/rag /data/src/.llama/storage/files /data/.e2e-rag-seed
+          mkdir -p /data/src/.llama/storage/rag /data/src/.llama/storage/files /data/src/.ogx /data/.e2e-rag-seed
           if [ ! -f /rag-data/kv_store.db.gz ]; then
             echo "FATAL: missing /rag-data/kv_store.db.gz"
             ls -la /rag-data || true
             exit 1
           fi
           gunzip -c /rag-data/kv_store.db.gz > /data/.e2e-rag-seed/kv_store.db
+          # Fixture stays on the emptyDir (mounted at .llama/storage in the main container).
+          # OGX_CONFIG_DIR must be set so migrate_legacy_config_dir() does not move ~/.llama.
           cp -f /data/.e2e-rag-seed/kv_store.db /data/src/.llama/storage/rag/kv_store.db
           chmod -R 777 /data/src /data/.e2e-rag-seed
           echo "RAG data extracted successfully"
@@ -85,6 +87,9 @@ spec:
           value: "/opt/app-root/src"
         - name: HOME
           value: "/opt/app-root/src"
+        # Prevent OGX from shutil.move(~/.llama → ~/.ogx) which would steal the fixture.
+        - name: OGX_CONFIG_DIR
+          value: "/opt/app-root/src/.ogx"
         - name: KV_STORE_PATH
           value: "/opt/app-root/src/.llama/storage/kv_store.db"
         - name: KV_RAG_PATH
@@ -134,6 +139,8 @@ spec:
           RAG_SEED="/opt/app-root/src/.llama/storage/.e2e-rag-seed/kv_store.db"
           RAG_CM_GZ="/opt/app-root/rag-data-cm/kv_store.db.gz"
           RAG_WORK="${KV_RAG_PATH:-/opt/app-root/src/.llama/storage/rag/kv_store.db}"
+          export OGX_CONFIG_DIR="${OGX_CONFIG_DIR:-/opt/app-root/src/.ogx}"
+          mkdir -p "$OGX_CONFIG_DIR" "$(dirname "$RAG_WORK")"
           restore_rag_seed() {
             mkdir -p "$(dirname "$RAG_WORK")"
             if [[ -f "$RAG_CM_GZ" ]]; then
