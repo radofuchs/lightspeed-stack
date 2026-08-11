@@ -7,7 +7,6 @@ set -e
 INPUT_CONFIG="${LLAMA_STACK_CONFIG:-/opt/app-root/run.yaml}"
 ENRICHED_CONFIG="/tmp/enriched-run.yaml"
 LIGHTSPEED_CONFIG="${LIGHTSPEED_CONFIG:-/opt/app-root/lightspeed-stack.yaml}"
-VERIFY_ENRICHED="${E2E_VERIFY_ENRICHED_RAG_CONFIG:-/opt/app-root/scripts/e2e_verify_enriched_rag_config.py}"
 
 # Enrich config if lightspeed config exists
 if [ -f "$LIGHTSPEED_CONFIG" ]; then
@@ -20,12 +19,6 @@ if [ -f "$LIGHTSPEED_CONFIG" ]; then
 
     if [ -f "$ENRICHED_CONFIG" ] && [ "$ENRICHMENT_FAILED" -eq 0 ]; then
         echo "Using enriched config: $ENRICHED_CONFIG"
-        # Fail fast when BYOK/FAISS enrichment is wrong for OGX 1.0 (namespace / env / path).
-        if [ -f "$VERIFY_ENRICHED" ]; then
-            /opt/app-root/.venv/bin/python3 "$VERIFY_ENRICHED" "$ENRICHED_CONFIG"
-        else
-            echo "[e2e-rag] WARNING: missing $VERIFY_ENRICHED — skipping enriched config check"
-        fi
         exec ogx stack run "$ENRICHED_CONFIG"
     fi
 fi

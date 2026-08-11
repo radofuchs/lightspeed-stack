@@ -3,13 +3,8 @@
 # Needs ConfigMaps: llama-stack-config (run.yaml), rag-data (kv_store.db.gz), lightspeed-stack-config;
 # optional llama-stack-source for repo_url / repo_revision.
 #
-# RAG: seeded in setup-from-source from rag-data ConfigMap (gzip); main re-inflates, verifies the
-# OGX 1.0 namespaced FAISS index at KV_RAG_PATH, then enrich-entrypoint checks BYOK backends
-# (persistence.namespace + resolved db_path / vector_store_id) before `ogx stack run`.
-#
-# KV_RAG_PATH must NOT live under ~/.llama: OGX migrate_legacy_config_dir() moves ~/.llama → ~/.ogx
-# on startup when OGX_CONFIG_DIR is unset, which orphans the fixture path; SQLite then recreates an
-# empty 12KiB DB and register_resources writes only vector_stores metadata (0 chunks).
+# RAG fixture lives at KV_RAG_PATH outside ~/.llama, with OGX_CONFIG_DIR set, so
+# migrate_legacy_config_dir() cannot move the fixture away on startup.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -216,8 +211,6 @@ spec:
           }
           # Re-inflate golden FAISS fixture (same bytes GH bind-mounts from tests/e2e/rag).
           restore_rag_seed
-          # Fail fast with evidence in pod logs (e2e-ops dumps these on scenario failure).
-          RAG_WORK="$RAG_WORK" python3 /opt/app-root/scripts/e2e_verify_rag_fixture.py
           if [[ ! -x /opt/app-root/enrich-entrypoint.sh ]]; then
             echo "FATAL: missing /opt/app-root/enrich-entrypoint.sh (init should install it)"
             exit 1

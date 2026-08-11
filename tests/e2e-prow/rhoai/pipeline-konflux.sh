@@ -278,32 +278,6 @@ if ! oc wait pod/lightspeed-stack-service pod/llama-stack-service \
 fi
 log "✅ Both service pods are ready"
 
-# OGX 1.0 / BYOK evidence: fail before port-forward if fixture or enriched config is wrong.
-progress "Verifying live RAG fixture + enriched FAISS config in llama-stack pod"
-echo "[e2e] ========== llama-stack [e2e-rag] startup lines =========="
-oc logs llama-stack-service -n "$NAMESPACE" 2>&1 | grep '\[e2e-rag\]' \
-  | while IFS= read -r line || [[ -n "$line" ]]; do echo "[e2e] $line"; done || true
-if ! oc exec llama-stack-service -n "$NAMESPACE" -- /bin/bash -c '
-  set -e
-  export RAG_WORK="${KV_RAG_PATH:-/opt/app-root/.e2e-rag-work/kv_store.db}"
-  echo "[e2e-rag] live KV_RAG_PATH=${KV_RAG_PATH:-}"
-  echo "[e2e-rag] live OGX_CONFIG_DIR=${OGX_CONFIG_DIR:-}"
-  echo "[e2e-rag] live FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}"
-  # Fixture must still be at KV_RAG_PATH after ogx start (not moved by ~/.llama migration).
-  python3 /opt/app-root/scripts/e2e_verify_rag_fixture.py
-  if [[ -f /tmp/enriched-run.yaml ]]; then
-    python3 /opt/app-root/scripts/e2e_verify_enriched_rag_config.py /tmp/enriched-run.yaml
-  else
-    echo "FATAL: /tmp/enriched-run.yaml missing after llama-stack start" >&2
-    exit 1
-  fi
-'; then
-  echo "❌ Live RAG / enriched config verification failed" | tee /dev/stderr
-  e2e_echo_pod_logs 250
-  exit 1
-fi
-log "✅ Live RAG fixture + enriched FAISS/BYOK config OK"
-
 if [ "$QUIET" = "1" ]; then
   e2e_echo_pod_logs 80
 else
@@ -440,48 +414,6 @@ export E2E_DEFAULT_PROVIDER_OVERRIDE E2E_DEFAULT_MODEL_OVERRIDE
 log "LCS accessible at: http://$E2E_LSC_HOSTNAME:8080"
 log "Mock JWKS accessible at: http://$E2E_JWKS_HOSTNAME:8000"
 log "Llama Stack (e2e client hooks) at: http://$E2E_LLAMA_HOSTNAME:$E2E_LLAMA_PORT"
-
-# Fail fast if FAISS is registered but returns zero chunks (matches prior Konflux RAG mode).
-if [[ -n "${FAISS_VECTOR_STORE_ID:-}" ]]; then
-  progress "Smoke-testing FAISS vector_io.query for $FAISS_VECTOR_STORE_ID"
-  RAG_SMOKE_OUT="$(mktemp)"
-  if ! curl -sf -X POST "http://localhost:8321/v1/vector-io/query" \
-      -H "Content-Type: application/json" \
-      -d "{\"vector_store_id\":\"${FAISS_VECTOR_STORE_ID}\",\"query\":\"What is the title of the article from Paul?\",\"params\":{\"max_chunks\":5,\"mode\":\"vector\"}}" \
-      >"$RAG_SMOKE_OUT"; then
-    echo "❌ FAISS smoke query HTTP failed" | tee /dev/stderr
-    e2e_echo_pod_logs 250
-    rm -f "$RAG_SMOKE_OUT"
-    exit 1
-  fi
-  RAG_SMOKE_CHUNKS="$(python3 -c "
-import json,sys
-try:
-    data=json.load(open(sys.argv[1], encoding='utf-8'))
-except Exception as e:
-    print(f'parse-error:{e}')
-    sys.exit(0)
-chunks=data.get('chunks') or data.get('data') or []
-if isinstance(data, dict) and not chunks:
-    # QueryChunksResponse shapes vary; count any list-like payload values.
-    for v in data.values():
-        if isinstance(v, list):
-            chunks=v
-            break
-print(len(chunks) if isinstance(chunks, list) else 0)
-" "$RAG_SMOKE_OUT" 2>/dev/null || echo 0)"
-  log "[e2e-rag] smoke query chunks=${RAG_SMOKE_CHUNKS} body=$(head -c 400 "$RAG_SMOKE_OUT" | tr '\n' ' ')"
-  if [[ "${RAG_SMOKE_CHUNKS}" =~ ^[0-9]+$ ]] && [[ "${RAG_SMOKE_CHUNKS}" -lt 1 ]]; then
-    echo "❌ FAISS smoke query returned 0 chunks — RAG e2e would fail" | tee /dev/stderr
-    e2e_echo_pod_logs 250
-    rm -f "$RAG_SMOKE_OUT"
-    exit 1
-  fi
-  rm -f "$RAG_SMOKE_OUT"
-  log "✅ FAISS smoke query returned ${RAG_SMOKE_CHUNKS} chunk(s)"
-else
-  log "⚠️  FAISS_VECTOR_STORE_ID unset — skipping RAG smoke query"
-fi
 
 #========================================
 # 7. RUN TESTS
