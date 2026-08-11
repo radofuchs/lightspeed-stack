@@ -206,7 +206,7 @@ skills:
 
 Skills are loaded at startup. Restart Lightspeed Core Stack to pick up new or modified skills.
 
-See [examples/skills/](../examples/skills/) for complete working examples.
+See [examples/skills/](https://github.com/lightspeed-core/lightspeed-stack/tree/main/examples/skills) for complete working examples.
 
 # Inspecting Loaded Skills via REST API
 
