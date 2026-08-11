@@ -8,7 +8,7 @@ import asyncio
 import datetime
 from collections.abc import AsyncIterator
 from functools import singledispatch
-from typing import Any, Final, Optional, TypeAlias, cast
+from typing import Any, Final, Optional, cast
 
 from fastapi import HTTPException
 from ogx_client import APIConnectionError, APIStatusError
@@ -79,7 +79,7 @@ from utils.stream_interrupts import (
 )
 from utils.streaming_sse import shield_violation_generator
 
-AgentDispatchEvent: TypeAlias = AgentStreamEvent | AgentRunResultEvent
+type AgentDispatchEvent = AgentStreamEvent | AgentRunResultEvent
 
 logger = get_logger(__name__)
 
