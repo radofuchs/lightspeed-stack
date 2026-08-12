@@ -468,17 +468,14 @@ def restart_container(container_name: str) -> None:
         print(f"Failed to restart container {container_name}: {e}")
         raise
 
-    # Wait for container to be healthy.
-    # Library mode embeds llama-stack, so the container takes longer to start
-    # (~45-60s vs ~10s in server mode). OpenTelemetry instrumentation adds
-    # initialization overhead. Use a generous attempt count so MCP-auth scenarios
-    # that restart the container don't time out.
-    # Lightspeed compose healthcheck probes /readiness (providers + default model).
-    wait_for_container_health(container_name, max_attempts=20)
+    # Wait for container health. Lightspeed compose probes /readiness with a long
+    # start_period (providers/models); allow enough poll time to cover that window
+    # (server ~60s+retries, library ~120s+retries) rather than giving up early.
+    health_attempts = 90 if container_name == "lightspeed-stack" else 20
+    wait_for_container_health(container_name, max_attempts=health_attempts)
 
     if container_name == "lightspeed-stack":
-        # Docker Health can flip healthy before the published host port accepts
-        # connections; also re-check /readiness from the Behave host.
+        # Published host port can lag Docker's in-container healthy; confirm from Behave.
         wait_for_lightspeed_stack_http_ready()
 
     if container_name == "llama-stack":
