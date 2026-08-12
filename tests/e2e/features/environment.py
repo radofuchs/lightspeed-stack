@@ -348,7 +348,7 @@ def _print_llama_stack_diagnostics() -> None:
     ]:
         try:
             r = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=10, check=False
+                cmd, capture_output=True, text=True, timeout=5, check=False
             )
             print(f"  {label}: {r.stdout.strip() if r.stdout else r.stderr or 'N/A'}")
         except subprocess.TimeoutExpired:
@@ -358,7 +358,7 @@ def _print_llama_stack_diagnostics() -> None:
             ["docker", "logs", "--tail", "40", "llama-stack"],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=10,
             check=False,
         )
         out = (r.stdout or "") + (r.stderr or "")
@@ -426,7 +426,7 @@ def _restore_llama_stack() -> None:
                         f"http://{get_llama_stack_hostname()}:{get_llama_stack_port()}/v1/health",
                     ],
                     capture_output=True,
-                    timeout=10,
+                    timeout=5,
                     check=False,
                 )
                 if result.returncode == 0:
@@ -514,7 +514,7 @@ def after_feature(context: Context, feature: Feature) -> None:
         for conversation_id in getattr(context, "feedback_conversations", []):
             url = f"http://{context.hostname}:{context.port}/v1/conversations/{conversation_id}"
             headers = {"Authorization": f"Bearer {token}"}
-            response = requests.delete(url, headers=headers, timeout=15)
+            response = requests.delete(url, headers=headers, timeout=10)
             assert response.status_code == 200, f"{url} returned {response.status_code}"
 
     # Restore Lightspeed Stack config if the generic configure_service step switched it.

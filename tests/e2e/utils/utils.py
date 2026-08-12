@@ -181,7 +181,7 @@ def validate_json(message: Any, schema: Any) -> None:
         assert False, "The provided schema is faulty:" + str(e)
 
 
-def wait_for_container_health(container_name: str, max_attempts: int = 30) -> None:
+def wait_for_container_health(container_name: str, max_attempts: int = 20) -> None:
     """Wait for container to be healthy.
 
     Polls a Docker container until its health status becomes `healthy` or the
@@ -193,7 +193,7 @@ def wait_for_container_health(container_name: str, max_attempts: int = 30) -> No
     after the container is observed healthy or after all attempts complete.
 
     OpenTelemetry instrumentation adds initialization overhead, so the default
-    has been set to 30 attempts (60 seconds) to prevent timeouts.
+    has been set to 20 attempts (40 seconds) to prevent timeouts.
 
     Returns:
     -------
@@ -202,7 +202,7 @@ def wait_for_container_health(container_name: str, max_attempts: int = 30) -> No
     Parameters:
     ----------
         container_name (str): Docker container name or ID to check.
-        max_attempts (int): Maximum number of health check attempts (default 30).
+        max_attempts (int): Maximum number of health check attempts (default 20).
     """
     if is_prow_environment():
         wait_for_pod_health(container_name, max_attempts)
@@ -473,7 +473,13 @@ def restart_container(container_name: str) -> None:
     # (~45-60s vs ~10s in server mode). OpenTelemetry instrumentation adds
     # initialization overhead. Use a generous attempt count so MCP-auth scenarios
     # that restart the container don't time out.
-    wait_for_container_health(container_name, max_attempts=30)
+    # Lightspeed compose healthcheck probes /readiness (providers + default model).
+    wait_for_container_health(container_name, max_attempts=20)
+
+    if container_name == "lightspeed-stack":
+        # Docker Health can flip healthy before the published host port accepts
+        # connections; also re-check /readiness from the Behave host.
+        wait_for_lightspeed_stack_http_ready()
 
     if container_name == "llama-stack":
         from tests.e2e.features.steps.health import (
@@ -485,14 +491,14 @@ def restart_container(container_name: str) -> None:
 
 def wait_for_lightspeed_stack_http_ready(
     max_attempts: int = 40,
-    delay_s: float = 2.0,
+    delay_s: float = 1.5,
 ) -> None:
-    """Block until Lightspeed Stack accepts HTTP on the host-mapped port.
+    """Block until Lightspeed Stack is ready on the host-mapped port.
 
     Used from proxy e2e steps only: ``docker inspect`` health can report
     ``healthy`` before the published port accepts connections (Podman/Docker
-    timing). Polls ``/liveness`` using the same host/port as Behave
-    (``E2E_LSC_*``).
+    timing). Polls ``/readiness`` (providers + default model) using the same
+    host/port as Behave (``E2E_LSC_*``).
 
     Parameters:
     ----------
@@ -500,13 +506,13 @@ def wait_for_lightspeed_stack_http_ready(
         delay_s: Sleep between attempts.
     Raises:
     ------
-        AssertionError: If ``/liveness`` does not return HTTP 200 in time.
+        AssertionError: If ``/readiness`` does not return HTTP 200 in time.
     """
     if is_prow_environment():
         return
     host = os.getenv("E2E_LSC_HOSTNAME", "localhost")
     port = os.getenv("E2E_LSC_PORT", "8080")
-    url = f"http://{host}:{port}/liveness"
+    url = f"http://{host}:{port}/readiness"
     for attempt in range(max_attempts):
         try:
             response = requests.get(url, timeout=5)
@@ -518,7 +524,7 @@ def wait_for_lightspeed_stack_http_ready(
             print(f"⏱ HTTP wait LSC {attempt + 1}/{max_attempts} ({url})...")
             time.sleep(delay_s)
     raise AssertionError(
-        f"Lightspeed Stack did not become reachable at {url!r} "
+        f"Lightspeed Stack did not become ready at {url!r} "
         f"after {max_attempts} attempts (~{max_attempts * delay_s:.0f}s)"
     )
 

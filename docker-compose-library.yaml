@@ -67,10 +67,10 @@ services:
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-}
       - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-true}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/liveness"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readiness"]
       interval: 10s   # how often to run the check
       timeout: 5s    # how long to wait before considering it failed
-      retries: 5      # how many times to retry before marking as unhealthy
+      retries: 3      # how many times to retry before marking as unhealthy
       start_period: 15s # time to wait before starting checks (increased for library initialization)
 
   # Mock JWKS server for RBAC E2E tests
@@ -87,7 +87,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 3
       start_period: 2s
 
   mock-mcp:
@@ -103,7 +103,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/health')"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 3
       start_period: 2s
 
 
