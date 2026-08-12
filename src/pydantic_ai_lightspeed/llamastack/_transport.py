@@ -319,7 +319,7 @@ class OgxLibraryTransport(httpx.AsyncBaseTransport):
             else:
                 async for chunk in result:
                     data = json.dumps(convert_pydantic_to_json_value(chunk))
-                    yield f"data: {data}\n\n".encode("utf-8")
+                    yield f"data: {data}\n\n".encode()
 
         wrapped_gen = preserve_contexts_async_generator(gen(), [PROVIDER_DATA_VAR])
 
