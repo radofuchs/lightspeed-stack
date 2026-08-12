@@ -117,7 +117,7 @@ class TunnelProxy:
                     asyncio.open_connection(target_host, target_port),
                     timeout=10,
                 )
-            except (asyncio.TimeoutError, OSError, ConnectionRefusedError) as e:
+            except (TimeoutError, OSError, ConnectionRefusedError) as e:
                 logger.warning("Failed to connect to %s: %s", target, e)
                 writer.write(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
                 await writer.drain()
