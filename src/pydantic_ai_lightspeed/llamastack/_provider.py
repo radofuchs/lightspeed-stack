@@ -2,7 +2,7 @@
 
 from __future__ import annotations as _annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import httpx
 from ogx.core.library_client import AsyncOGXAsLibraryClient
@@ -18,11 +18,6 @@ from pydantic_ai_lightspeed.llamastack._transport import (
     OgxLibraryTransport,
     wrap_http_client_with_provider_data,
 )
-
-if TYPE_CHECKING:
-    from ogx.core.library_client import (  # pylint: disable=reimported
-        AsyncOGXAsLibraryClient,
-    )
 
 DEFAULT_BASE_URL = "http://localhost:8321/v1"
 
