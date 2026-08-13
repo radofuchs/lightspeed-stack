@@ -321,6 +321,20 @@ async def generate_agent_response(  # pylint: disable=too-many-statements
     # Set final OTEL span attributes
     if root_span is not None:
         add_span_event(root_span, SpanEvents.TURN_PERSISTED)
+        if turn_summary.tool_calls:
+            tool_names = [tc.name for tc in turn_summary.tool_calls]
+            set_span_attributes(
+                root_span,
+                {
+                    SpanAttributes.TOOL_CALLS_COUNT: len(tool_names),
+                    SpanAttributes.TOOL_CALLS_NAMES: tool_names,
+                },
+            )
+            add_span_event(
+                root_span,
+                SpanEvents.TOOL_EXECUTION_COMPLETED,
+                {"tool.calls": ", ".join(tool_names)},
+            )
         set_span_attributes(
             root_span,
             {

@@ -55,7 +55,7 @@ from models.common.moderation import ShieldModerationBlocked, ShieldModerationPa
 from models.common.query import Attachment as QueryAttachment
 from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
-from models.common.turn_summary import RAGContext, TurnSummary
+from models.common.turn_summary import RAGContext, ToolCallSummary, TurnSummary
 from utils.agents.query import AgentFinishReason
 from utils.agents.streaming import (
     DEFAULT_REFUSAL_RESPONSE,
@@ -883,6 +883,80 @@ class TestGenerateAgentResponseOtel:
         event_names = [e.name for e in span.events]
         assert SpanEvents.TURN_PERSISTED in event_names
         assert SpanEvents.LLM_RESPONSE_COMPLETED in event_names
+
+    @pytest.mark.asyncio
+    async def test_sets_tool_call_span_attributes(
+        self,
+        mocker: MockerFixture,
+        make_generator_context: Callable[..., ResponseGeneratorContext],
+        responses_params: ResponsesApiParams,
+        otel: tuple[Any, InMemorySpanExporter],
+    ) -> None:
+        """Test that tool call OTEL attributes are emitted on the root span."""
+        tracer, exporter = otel
+        context = make_generator_context()
+        turn_summary = TurnSummary()
+        turn_summary.token_usage = TokenCounter(input_tokens=10, output_tokens=5)
+        turn_summary.llm_response = "Result"
+        turn_summary.tool_calls = [
+            ToolCallSummary(id="tc-1", name="web_search", type="web_search_call"),
+            ToolCallSummary(id="tc-2", name="file_search", type="file_search_call"),
+        ]
+        background_tasks: list[asyncio.Task[None]] = []
+        root_span = tracer.start_span("streaming_query.handle_request")
+
+        async def inner() -> AsyncIterator[str]:
+            yield serialize_event(
+                TokenStreamPayload.create(chunk_id=0, token="Hi"),
+                MEDIA_TYPE_JSON,
+            )
+
+        mocker.patch("utils.agents.streaming.consume_query_tokens")
+        mocker.patch(
+            "utils.agents.streaming.get_available_quotas",
+            return_value={"daily": 100},
+        )
+        mocker.patch(
+            "utils.agents.streaming.maybe_get_topic_summary",
+            new=mocker.AsyncMock(return_value=None),
+        )
+        mocker.patch("utils.agents.streaming.store_query_results")
+        mock_config = mocker.Mock()
+        mock_config.quota_limiters = []
+        mocker.patch("utils.agents.streaming.configuration", mock_config)
+        mocker.patch(
+            "utils.agents.streaming.anonymize_value",
+            side_effect=lambda v: f"[anon:{v}]",
+        )
+
+        [
+            event
+            async for event in generate_agent_response(
+                inner(),
+                context,
+                responses_params,
+                turn_summary,
+                background_tasks,
+                root_span=root_span,
+            )
+        ]
+
+        spans = exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.attributes is not None
+        assert span.attributes[SpanAttributes.TOOL_CALLS_COUNT] == 2
+        assert span.attributes[SpanAttributes.TOOL_CALLS_NAMES] == (
+            "web_search",
+            "file_search",
+        )
+        event_names = [e.name for e in span.events]
+        assert SpanEvents.TOOL_EXECUTION_COMPLETED in event_names
+        tool_event = next(
+            e for e in span.events if e.name == SpanEvents.TOOL_EXECUTION_COMPLETED
+        )
+        assert tool_event.attributes is not None
+        assert tool_event.attributes["tool.calls"] == "web_search, file_search"
 
     @pytest.mark.asyncio
     async def test_span_ended_on_stream_error(
