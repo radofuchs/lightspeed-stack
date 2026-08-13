@@ -9,9 +9,8 @@ import sentry_sdk  # pyright: ignore[reportMissingImports]
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from ogx_client import APIConnectionError, AsyncOgxClient
 from fastapi.routing import iter_route_contexts
-
+from ogx_client import APIConnectionError, AsyncOgxClient
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import version
@@ -293,9 +292,10 @@ logger.info("Including routers")
 routers.include_routers(app)
 
 app_routes_paths = [
-    rc.original_route.path
+    rc.original_route.path  # pyright: ignore[reportAttributeAccessIssue]
     for rc in iter_route_contexts(app.routes)
-    if hasattr(rc.original_route, "path") and rc.original_route.path
+    if hasattr(rc.original_route, "path")
+    and rc.original_route.path  # pyright: ignore[reportAttributeAccessIssue]
 ]
 
 # Register pure ASGI middlewares.  Middleware execution order is the reverse of
