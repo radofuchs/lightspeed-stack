@@ -1,0 +1,65 @@
+# Separate job: GitHub sends job-level secrets to the runner as soon as that job starts.
+name: Authorize E2E secrets access
+
+on:
+  workflow_call:
+    outputs:
+      authorized:
+        description: true if e2e may run with repository secrets
+        value: ${{ jobs.authorize.outputs.authorized }}
+
+jobs:
+  authorize:
+    name: Check owner or developer access
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    # Adding some other label must not start e2e.
+    if: github.event.action != 'labeled' || github.event.label.name == 'ok-to-test'
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      authorized: ${{ steps.check.outputs.authorized }}
+    steps:
+      - name: Verify executor is owner or developer
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          USER: ${{ github.event.pull_request.user.login || github.actor }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          allow() { echo "$1"; echo "authorized=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          deny()  { echo "::warning::$1"; echo "authorized=false" >> "$GITHUB_OUTPUT"; exit 0; }
+
+          perm() {
+            local encoded
+            encoded=$(jq -nr --arg u "$1" '$u|@uri')
+            gh api "repos/${REPOSITORY}/collaborators/${encoded}/permission" --jq .permission 2>/dev/null || echo none
+          }
+
+          [ "$EVENT_NAME" = "schedule" ] && allow "Scheduled run."
+
+          USER_PERM=$(perm "$USER")
+          echo "executor=$USER permission=$USER_PERM"
+          if [ "$USER_PERM" = "admin" ] || [ "$USER_PERM" = "write" ]; then
+            allow "$USER is an owner or developer."
+          fi
+
+          [ -n "${PR_NUMBER:-}" ] || deny "$USER is not an owner or developer."
+
+          gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name' \
+            | grep -Fxq ok-to-test || deny "No ok-to-test label."
+
+          LABELER=$(gh api --paginate "repos/${REPOSITORY}/issues/${PR_NUMBER}/events?per_page=100" \
+            --jq '.[] | select(.event=="labeled" and .label.name=="ok-to-test") | .actor.login' \
+            | tail -n1)
+          LABELER_PERM=$(perm "$LABELER")
+          echo "ok-to-test labeler=$LABELER permission=$LABELER_PERM"
+          [ "$LABELER_PERM" = "admin" ] && allow "Owner $LABELER added ok-to-test."
+
+          deny "ok-to-test was not added by an owner."

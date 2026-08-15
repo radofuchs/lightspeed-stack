@@ -1,10 +1,23 @@
 # .github/workflows/e2e_tests.yml
 name: E2E Tests
 
-on: [push, pull_request_target]
+on:
+  push:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
+  # Own job so repository secrets are never sent to a runner unless this passes.
+  authorize:
+    uses: ./.github/workflows/e2e_authorize.yaml
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+
   e2e_tests:
+    needs: authorize
+    if: needs.authorize.outputs.authorized == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
