@@ -7,7 +7,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Own job so repository secrets are never sent to a runner unless this passes.
+  authorize:
+    uses: ./.github/workflows/e2e_authorize.yaml
+    permissions:
+      contents: read
+
   e2e_tests:
+    needs: authorize
+    if: needs.authorize.outputs.authorized == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
