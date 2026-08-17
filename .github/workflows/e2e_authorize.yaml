@@ -1,4 +1,5 @@
-# Separate job: GitHub sends job-level secrets to the runner as soon as that job starts.
+# Gate before e2e jobs that use repository secrets.
+# Must be a separate job: secrets are sent to the runner when that job starts.
 name: Authorize E2E secrets access
 
 on:
@@ -10,7 +11,7 @@ on:
 
 jobs:
   authorize:
-    name: Check repository access
+    name: Check repository owner or member
     runs-on: ubuntu-latest
     timeout-minutes: 2
     if: github.event.action != 'labeled' || github.event.label.name == 'ok-to-test'
@@ -19,7 +20,7 @@ jobs:
     outputs:
       authorized: ${{ steps.check.outputs.authorized }}
     steps:
-      - name: Allow repo members, or ok-to-test from an owner
+      - name: Allow repo owners and members, or ok-to-test from an owner
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
@@ -27,7 +28,6 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
           USER: ${{ github.event.pull_request.user.login || github.actor }}
           ACTOR: ${{ github.actor }}
-          ASSOCIATION: ${{ github.event.pull_request.author_association }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -38,25 +38,37 @@ jobs:
           encode() { jq -nr --arg u "$1" '$u|@uri'; }
 
           repo_permission() {
-            gh api "repos/${REPOSITORY}/collaborators/$(encode "$1")/permission" --jq .permission 2>/dev/null || echo none
+            gh api "repos/${REPOSITORY}/collaborators/$(encode "$1")/permission" \
+              --jq .permission 2>/dev/null || echo none
+          }
+
+          # Any non-none permission means the user is on this repository.
+          is_repo_owner_or_member() {
+            case "$(repo_permission "$1")" in
+              admin|maintain|write|triage|read) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          is_repo_owner() {
+            [ "$(repo_permission "$1")" = "admin" ]
           }
 
           [ "$EVENT_NAME" = "schedule" ] && allow "Scheduled run."
 
           USER_PERM=$(repo_permission "$USER")
-          echo "executor=$USER permission=$USER_PERM association=${ASSOCIATION:-none}"
-
-          if [ "$USER_PERM" = "admin" ] || [ "$USER_PERM" = "maintain" ] || [ "$USER_PERM" = "write" ] || [ "$USER_PERM" = "triage" ]; then
-            allow "$USER has ${USER_PERM} on ${REPOSITORY}."
-          fi
-          if [ "$ASSOCIATION" = "OWNER" ] || [ "$ASSOCIATION" = "MEMBER" ] || [ "$ASSOCIATION" = "COLLABORATOR" ]; then
-            allow "$USER is a repository ${ASSOCIATION}."
+          echo "executor=$USER permission=$USER_PERM"
+          if is_repo_owner_or_member "$USER"; then
+            allow "$USER is an owner or member of ${REPOSITORY}."
           fi
 
-          [ "$EVENT_ACTION" = "labeled" ] || deny "$USER is not a user or member of ${REPOSITORY}."
+          # Outsiders: only when an owner adds ok-to-test on this event.
+          [ "$EVENT_ACTION" = "labeled" ] || deny "$USER is not an owner or member of ${REPOSITORY}."
 
           LABELER_PERM=$(repo_permission "$ACTOR")
           echo "ok-to-test labeler=$ACTOR permission=$LABELER_PERM"
-          [ "$LABELER_PERM" = "admin" ] && allow "Owner $ACTOR added ok-to-test."
+          if is_repo_owner "$ACTOR"; then
+            allow "Owner $ACTOR added ok-to-test."
+          fi
 
           deny "ok-to-test must be added by a repository owner."
