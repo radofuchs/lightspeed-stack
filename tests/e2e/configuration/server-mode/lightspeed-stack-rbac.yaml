@@ -96,3 +96,18 @@ authorization:
       actions:
         - "info"
 
+# Same e2e FAISS BYOK as default/authorized. Required so llama enrichment after
+# llama_stack_disrupted (which ends on this config) still registers e2e-test-docs.
+byok_rag:
+  - rag_id: e2e-test-docs
+    rag_type: inline::faiss
+    embedding_model: sentence-transformers/all-mpnet-base-v2
+    embedding_dimension: 768
+    vector_db_id: ${env.FAISS_VECTOR_STORE_ID}
+    db_path: ${env.KV_RAG_PATH:=~/.llama/storage/rag/kv_store.db}
+    score_multiplier: 1.0
+
+rag:
+  tool:
+    - e2e-test-docs
+
