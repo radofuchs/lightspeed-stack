@@ -114,7 +114,7 @@ class MockFastAPI(FastAPI):
         ------
             IndexError: If the router is not registered in the mock app.
         """
-        return list(filter(lambda r: r[0] == router, self.routers))[0][1]
+        return next(filter(lambda r: r[0] == router, self.routers))[1]
 
 
 def test_include_routers() -> None:

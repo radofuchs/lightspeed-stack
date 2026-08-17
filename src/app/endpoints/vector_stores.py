@@ -539,7 +539,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
             response = FileTooLargeResponse.from_backend_rejection(message=str(e))
         else:
             response = InternalServerErrorResponse.query_failed(
-                cause=f"File upload rejected by Llama Stack: {str(e)}"
+                cause=f"File upload rejected by Llama Stack: {e!s}"
             )
             # Override to use 400 status code since it's a client error
             response.status_code = status.HTTP_400_BAD_REQUEST
