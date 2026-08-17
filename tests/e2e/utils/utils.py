@@ -189,7 +189,7 @@ def validate_json(message: Any, schema: Any) -> None:
 def wait_for_container_health(
     container_name: str,
     max_attempts: Optional[int] = None,
-) -> None:
+) -> bool:
     """Wait for container to be healthy.
 
     Polls a Docker container until its health status becomes `healthy` or the
@@ -205,7 +205,8 @@ def wait_for_container_health(
 
     Returns:
     -------
-        None
+        True if the container reported healthy; False if attempts were exhausted
+        (soft-fail — callers may warn and continue).
 
     Parameters:
     ----------
@@ -217,7 +218,7 @@ def wait_for_container_health(
 
     if is_prow_environment():
         wait_for_pod_health(container_name, max_attempts)
-        return
+        return True
 
     for attempt in range(max_attempts):
         try:
@@ -234,7 +235,7 @@ def wait_for_container_health(
                 timeout=5,
             )
             if result.stdout.strip() == "healthy":
-                return
+                return True
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             pass
 
@@ -248,6 +249,26 @@ def wait_for_container_health(
         f"Could not confirm Docker health=healthy for {container_name} "
         f"after {max_attempts} attempts (~{max_attempts * 2}s)"
     )
+    return False
+
+
+def wait_for_llama_stack_ready(
+    max_attempts: Optional[int] = None,
+) -> bool:
+    """Wait until the llama-stack container HEALTHCHECK reports healthy.
+
+    Same soft-fail semantics as ``wait_for_container_health``. Prefer this over
+    hand-rolled ``curl /v1/health`` loops (compose already probes that path).
+
+    Parameters:
+    ----------
+        max_attempts: Optional override; defaults to ``E2E_CONTAINER_HEALTH_MAX_ATTEMPTS``.
+
+    Returns:
+    -------
+        True if healthy; False if the wait soft-failed.
+    """
+    return wait_for_container_health("llama-stack", max_attempts=max_attempts)
 
 
 def validate_json_partially(actual: Any, expected: Any) -> None:
@@ -494,16 +515,45 @@ def restart_container(container_name: str) -> None:
         reset_llama_stack_disrupt_once_tracking()
 
 
+def restart_lightspeed_stack_service(
+    *, wait_http: bool = True, skip_llama_restore: bool = False
+) -> None:
+    """Restart the lightspeed-stack container used by Behave steps.
+
+    Wraps ``restart_container("lightspeed-stack")`` and optionally polls the
+    host-mapped port so step modules share one LCS restart path.
+
+    Parameters:
+    ----------
+        wait_http: When True (default), also call
+            ``wait_for_lightspeed_stack_http_ready`` after Docker health.
+        skip_llama_restore: When True on Prow/Konflux, tell e2e-ops not to
+            bring llama back before recreating LCS (degraded-mode startup).
+    """
+    previous = os.environ.get("E2E_SKIP_LLAMA_RESTORE_ON_LCS_RESTART")
+    if skip_llama_restore:
+        os.environ["E2E_SKIP_LLAMA_RESTORE_ON_LCS_RESTART"] = "1"
+    try:
+        restart_container("lightspeed-stack")
+        if wait_http:
+            wait_for_lightspeed_stack_http_ready()
+    finally:
+        if skip_llama_restore:
+            if previous is None:
+                os.environ.pop("E2E_SKIP_LLAMA_RESTORE_ON_LCS_RESTART", None)
+            else:
+                os.environ["E2E_SKIP_LLAMA_RESTORE_ON_LCS_RESTART"] = previous
+
+
 def wait_for_lightspeed_stack_http_ready(
     max_attempts: int = 80,
     delay_s: float = 1.5,
 ) -> None:
     """Block until Lightspeed Stack accepts HTTP on the host-mapped port.
 
-    Used from proxy e2e steps only: ``docker inspect`` health can report
-    ``healthy`` before the published port accepts connections (Podman/Docker
-    timing). Polls ``/liveness`` using the same host/port as Behave
-    (``E2E_LSC_*``).
+    ``docker inspect`` health can report ``healthy`` before the published port
+    accepts connections (Podman/Docker timing). Polls ``/liveness`` using the
+    same host/port as Behave (``E2E_LSC_*``).
 
     Parameters:
     ----------
@@ -523,10 +573,17 @@ def wait_for_lightspeed_stack_http_ready(
             response = requests.get(url, timeout=5)
             if response.status_code == 200:
                 return
-        except requests.RequestException:
-            pass
+            detail = response.text[:200].replace("\n", " ")
+            print(
+                f"⏱ HTTP wait LSC {attempt + 1}/{max_attempts} "
+                f"({url} -> {response.status_code}: {detail})..."
+            )
+        except requests.RequestException as exc:
+            print(
+                f"⏱ HTTP wait LSC {attempt + 1}/{max_attempts} "
+                f"({url} -> {exc.__class__.__name__}: {exc})..."
+            )
         if attempt < max_attempts - 1:
-            print(f"⏱ HTTP wait LSC {attempt + 1}/{max_attempts} ({url})...")
             time.sleep(delay_s)
     raise AssertionError(
         f"Lightspeed Stack did not become reachable at {url!r} "
