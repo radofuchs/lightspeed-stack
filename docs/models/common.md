@@ -777,7 +777,7 @@ Attributes:
 LCORE Solr inline RAG options for vector_io.query (mode and provider filters).
 
 Attributes:
-    mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.
+    mode: Solr vector_io search mode. When omitted, the configured OKP default is used.
     filters: Solr provider filter payload passed through as params['solr'].
 
 Legacy clients may send a plain JSON object with filter keys only;
@@ -786,7 +786,7 @@ that object is accepted as filters with mode unset (server default applies).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| mode | string | Solr vector_io search mode. When omitted, the server default ('hybrid') is used. |
+| mode | string | Solr vector_io search mode. When omitted, the configured OKP default is used; otherwise 'hybrid' applies. 'keyword' and 'lexical' both use BM25 text search. |
 | filters | object | Solr provider filter payload passed through as params['solr']. Supports structured metadata filters (eq, ne, in, nin comparison operators). Legacy filter-only objects (e.g. fq) are still accepted. |
 
 

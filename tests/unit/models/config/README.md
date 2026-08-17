@@ -18,7 +18,7 @@ Unit tests for AuthenticationConfiguration model.
 
 ## [test_byok_rag.py](test_byok_rag.py)
 
-Unit tests for ByokRag model.
+Unit tests for RagStore model.
 
 ## [test_compaction_configuration.py](test_compaction_configuration.py)
 

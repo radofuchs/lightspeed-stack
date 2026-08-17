@@ -84,6 +84,10 @@ Function to dump the schema of all data models into OpenAPI-compatible format.
 
 Utility function to dump schema with list of models into OpenAPI-compatible JSON format.
 
+## [otel_tracing.py](otel_tracing.py)
+
+OpenTelemetry tracing utilities for Lightspeed Core Stack.
+
 ## [prompts.py](prompts.py)
 
 Utility functions for system prompts.
