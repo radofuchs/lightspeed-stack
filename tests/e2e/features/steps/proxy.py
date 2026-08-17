@@ -38,11 +38,7 @@ from tests.e2e.utils.llama_config_utils import (
     write_llama_config,
 )
 from tests.e2e.utils.prow_utils import get_namespace, run_e2e_ops
-from tests.e2e.utils.utils import (
-    is_prow_environment,
-    restart_container,
-    wait_for_lightspeed_stack_http_ready,
-)
+from tests.e2e.utils.utils import is_prow_environment
 
 _CLUSTER_INTERCEPTION_PROXY_PORTS = frozenset(
     {DEFAULT_INTERCEPTION_PROXY_PORT, ALTERNATE_INTERCEPTION_PROXY_PORT}
@@ -315,30 +311,6 @@ def restore_if_modified(context: Context) -> None:
 
     if restore_llama_config_if_modified():
         print("Restoring original Llama Stack config from backup...")
-
-
-# --- Service Restart Steps ---
-
-
-@given("Llama Stack is restarted")
-def restart_llama_stack(context: Context) -> None:
-    """Restart the Llama Stack container."""
-    from tests.e2e.features.steps.tls import (
-        is_tls_configuration_feature,
-        restart_llama_for_tls_feature,
-    )
-
-    if is_tls_configuration_feature(context):
-        restart_llama_for_tls_feature(context)
-        return
-    restart_container("llama-stack")
-
-
-@given("Lightspeed Stack is restarted")
-def restart_lightspeed_stack(context: Context) -> None:
-    """Restart the Lightspeed Stack container."""
-    restart_container("lightspeed-stack")
-    wait_for_lightspeed_stack_http_ready()
 
 
 # --- Tunnel Proxy Steps ---
