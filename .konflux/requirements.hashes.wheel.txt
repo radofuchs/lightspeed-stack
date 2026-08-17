@@ -415,8 +415,8 @@ urllib3==2.7.0 \
 uv-build==0.11.8 \
     --hash=sha256:11a1c0c3d861c4c827b8e2ac532ecf58667d0af5badf0fb1973f5fcc5f435325 \
     --hash=sha256:c1ebf95903bf3401582a417c20d98c4b55bc3a4e251a39fef8f2df6f05006ee4
-uvicorn==0.50.0 \
-    --hash=sha256:a4918e0239bcd78769e2d2ee2563dd9e49d1e537fe70567079c4f12c8a38f424
+uvicorn==0.51.0 \
+    --hash=sha256:e510a18c6896c39d758bd41eeddb9f736034fe2fcb19c55d0b601762e34ac193
 wcwidth==0.8.2 \
     --hash=sha256:ebd629eb2ba09f9535a63cbbcd47e675d48876f52909675dc91db331cb7ff7a8
 websocket-client==1.9.0 \
