@@ -1,6 +1,8 @@
 """Unit tests for utils/otel_tracing.py functions."""
 
 import re
+from collections.abc import Generator
+from typing import Any
 
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
@@ -20,7 +22,7 @@ from utils.otel_tracing import (
 
 
 @pytest.fixture(name="otel")
-def otel_fixture():
+def otel_fixture() -> Generator[Any, Any, Any]:
     """Provides an isolated tracer and exporter instance."""
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
