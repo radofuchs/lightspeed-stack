@@ -2657,16 +2657,17 @@
             },
             "SolrVectorSearchRequest": {
                 "additionalProperties": false,
-                "description": "LCORE Solr inline RAG options for vector_io.query (mode and provider filters).\n\nAttributes:\n    mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.\n    filters: Solr provider filter payload passed through as params['solr'].\n\nLegacy clients may send a plain JSON object with filter keys only;\nthat object is accepted as filters with mode unset (server default applies).",
+                "description": "LCORE Solr inline RAG options for vector_io.query (mode and provider filters).\n\nAttributes:\n    mode: Solr vector_io search mode. When omitted, the configured OKP default is used.\n    filters: Solr provider filter payload passed through as params['solr'].\n\nLegacy clients may send a plain JSON object with filter keys only;\nthat object is accepted as filters with mode unset (server default applies).",
                 "properties": {
                     "mode": {
                         "type": "string",
                         "nullable": true,
                         "default": null,
-                        "description": "Solr vector_io search mode. When omitted, the server default ('hybrid') is used.",
+                        "description": "Solr vector_io search mode. When omitted, the configured OKP default is used; otherwise 'hybrid' applies. 'keyword' and 'lexical' both use BM25 text search.",
                         "examples": [
                             "hybrid",
                             "semantic",
+                            "keyword",
                             "lexical"
                         ],
                         "title": "Mode"
