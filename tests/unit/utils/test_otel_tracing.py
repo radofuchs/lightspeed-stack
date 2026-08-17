@@ -36,7 +36,7 @@ def otel_fixture():
 class TestAnonymizeValue:
     """Tests for anonymize_value function."""
 
-    def test_short_string_no_content_leak(self):
+    def test_short_string_no_content_leak(self) -> None:
         """Test that short strings are fully anonymized with no content leak."""
         input_value = "MySensitiveData"
         result = anonymize_value(input_value, max_length=50)
@@ -47,7 +47,7 @@ class TestAnonymizeValue:
         assert ":short:" in result
         assert f"len={len(input_value)}]" in result
 
-    def test_long_string_no_content_leak(self):
+    def test_long_string_no_content_leak(self) -> None:
         """Test that long strings are fully anonymized with no content leak."""
         input_value = "ThisIsVeryLongSensitiveUserInputThatExceedsMaxLength" * 2
         result = anonymize_value(input_value, max_length=50)
@@ -59,7 +59,7 @@ class TestAnonymizeValue:
         assert ":long:" in result
         assert f"len={len(input_value)}]" in result
 
-    def test_exact_max_length_classified_as_long(self):
+    def test_exact_max_length_classified_as_long(self) -> None:
         """Test the max_length boundary: 50 chars = short, 51 chars = long."""
         # Test at exactly max_length (50 chars) - should be short
         input_at_boundary = "BoundaryTest" * 4 + "12"  # Exactly 50 chars
@@ -75,7 +75,7 @@ class TestAnonymizeValue:
         assert ":long:" in result_over_boundary
         assert "len=51]" in result_over_boundary
 
-    def test_custom_max_length(self):
+    def test_custom_max_length(self) -> None:
         """Test with custom max_length parameter."""
         input_value = "PersonalIdentifiableInformation"
         result = anonymize_value(input_value, max_length=4)
@@ -84,14 +84,14 @@ class TestAnonymizeValue:
         assert ":long:" in result
         assert f"len={len(input_value)}]" in result
 
-    def test_empty_string(self):
+    def test_empty_string(self) -> None:
         """Test with empty string."""
         result = anonymize_value("", max_length=50)
         assert "[hash:" in result
         assert ":short:" in result
         assert "len=0]" in result
 
-    def test_hash_consistency(self):
+    def test_hash_consistency(self) -> None:
         """Test that same input produces same hash digest."""
         input_str = "RepeatedSensitiveValue" * 20
         result1 = anonymize_value(input_str, max_length=10)
@@ -101,7 +101,7 @@ class TestAnonymizeValue:
         assert "RepeatedSensitiveValue" not in result1
         assert "Sensitive" not in result1
 
-    def test_hash_uniqueness(self):
+    def test_hash_uniqueness(self) -> None:
         """Test that different inputs produce different hashes."""
         result1 = anonymize_value("ConfidentialUserQuery1")
         result2 = anonymize_value("ConfidentialUserQuery2")
