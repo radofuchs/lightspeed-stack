@@ -17,8 +17,6 @@ jobs:
     if: github.event.action != 'labeled' || github.event.label.name == 'ok-to-test'
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
     outputs:
       authorized: ${{ steps.check.outputs.authorized }}
     steps:
@@ -27,8 +25,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
           USER: ${{ github.event.pull_request.user.login || github.actor }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ACTOR: ${{ github.actor }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -50,16 +49,12 @@ jobs:
             allow "$USER is an owner or developer."
           fi
 
-          [ -n "${PR_NUMBER:-}" ] || deny "$USER is not an owner or developer."
+          # ok-to-test only counts on the labeled event, so a later push cannot
+          # reuse an old owner approval against a new PR head.
+          [ "$EVENT_ACTION" = "labeled" ] || deny "$USER is not an owner or developer."
 
-          gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name' \
-            | grep -Fxq ok-to-test || deny "No ok-to-test label."
-
-          LABELER=$(gh api --paginate "repos/${REPOSITORY}/issues/${PR_NUMBER}/events?per_page=100" \
-            --jq '.[] | select(.event=="labeled" and .label.name=="ok-to-test") | .actor.login' \
-            | tail -n1)
-          LABELER_PERM=$(perm "$LABELER")
-          echo "ok-to-test labeler=$LABELER permission=$LABELER_PERM"
-          [ "$LABELER_PERM" = "admin" ] && allow "Owner $LABELER added ok-to-test."
+          LABELER_PERM=$(perm "$ACTOR")
+          echo "ok-to-test labeler=$ACTOR permission=$LABELER_PERM"
+          [ "$LABELER_PERM" = "admin" ] && allow "Owner $ACTOR added ok-to-test."
 
           deny "ok-to-test was not added by an owner."

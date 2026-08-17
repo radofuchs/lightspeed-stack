@@ -12,8 +12,6 @@ jobs:
     uses: ./.github/workflows/e2e_authorize.yaml
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
 
   e2e_tests:
     needs: authorize
@@ -66,9 +64,9 @@ jobs:
           # On push      → falls back to the current repository.
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
 
-          # On PR_TARGET → the PR head *commit* (reproducible).
+          # On PR_TARGET → the PR head commit at event time (not the moving branch).
           # On push      → the pushed commit that triggered the workflow.
-          ref: ${{ github.event.pull_request.head.ref || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
           # Tests need access to secrets.
           # This should be refactored if possible to mitigate the risk.
