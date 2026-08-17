@@ -16,7 +16,6 @@ jobs:
     if: github.event.action != 'labeled' || github.event.label.name == 'ok-to-test'
     permissions:
       contents: read
-      members: read
     outputs:
       authorized: ${{ steps.check.outputs.authorized }}
     steps:
@@ -28,6 +27,7 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
           USER: ${{ github.event.pull_request.user.login || github.actor }}
           ACTOR: ${{ github.actor }}
+          ASSOCIATION: ${{ github.event.pull_request.author_association }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -37,28 +37,20 @@ jobs:
 
           encode() { jq -nr --arg u "$1" '$u|@uri'; }
 
-          # True if the user is on this repository or an org owner/member.
-          is_repo_user_or_member() {
-            local encoded org role
-            encoded=$(encode "$1")
-            if gh api --silent "repos/${REPOSITORY}/collaborators/${encoded}"; then
-              return 0
-            fi
-            org="${REPOSITORY%%/*}"
-            role=$(gh api "orgs/${org}/memberships/${encoded}" \
-              --jq 'if .state == "active" then .role else "none" end' 2>/dev/null || echo none)
-            [ "$role" = "admin" ] || [ "$role" = "member" ]
-          }
-
           repo_permission() {
             gh api "repos/${REPOSITORY}/collaborators/$(encode "$1")/permission" --jq .permission 2>/dev/null || echo none
           }
 
           [ "$EVENT_NAME" = "schedule" ] && allow "Scheduled run."
 
-          echo "executor=$USER"
-          if is_repo_user_or_member "$USER"; then
-            allow "$USER is a user or member of ${REPOSITORY}."
+          USER_PERM=$(repo_permission "$USER")
+          echo "executor=$USER permission=$USER_PERM association=${ASSOCIATION:-none}"
+
+          if [ "$USER_PERM" = "admin" ] || [ "$USER_PERM" = "maintain" ] || [ "$USER_PERM" = "write" ] || [ "$USER_PERM" = "triage" ]; then
+            allow "$USER has ${USER_PERM} on ${REPOSITORY}."
+          fi
+          if [ "$ASSOCIATION" = "OWNER" ] || [ "$ASSOCIATION" = "MEMBER" ] || [ "$ASSOCIATION" = "COLLABORATOR" ]; then
+            allow "$USER is a repository ${ASSOCIATION}."
           fi
 
           [ "$EVENT_ACTION" = "labeled" ] || deny "$USER is not a user or member of ${REPOSITORY}."
