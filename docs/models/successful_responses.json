@@ -4900,6 +4900,13 @@
                         "title": "Score multiplier",
                         "type": "number"
                     },
+                    "relevance_cutoff_score": {
+                        "default": 0.3,
+                        "description": "Minimum raw similarity score to consider a result relevant. Results with a similarity score below this threshold are not returned.",
+                        "minimum": 0,
+                        "title": "Relevance cutoff score",
+                        "type": "number"
+                    },
                     "host": {
                         "type": "string",
                         "nullable": true,
