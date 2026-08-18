@@ -114,7 +114,9 @@ class TestAnonymizeValue:
         assert "Confidential" not in result1
         assert "Confidential" not in result2
 
-    def test_hmac_deterministic_with_env_secret(self, monkeypatch):
+    def test_hmac_deterministic_with_env_secret(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that HMAC produces deterministic results with environment secret."""
         # Set a known secret
         monkeypatch.setenv("OTEL_ANONYMIZATION_SECRET", "test-secret-key")
