@@ -2135,6 +2135,7 @@ BYOK (Bring Your Own Knowledge) RAG store configuration.
 | vector_db_id | string | Vector database identification. |
 | db_path | string | Path to RAG database. Required for faiss backend. |
 | score_multiplier | number | Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them. |
+| relevance_cutoff_score | number | Minimum raw similarity score to consider a result relevant. Results with a similarity score below this threshold are not returned. |
 | host | string | PostgreSQL host for pgvector backend. Defaults to ${env.POSTGRES_HOST} when backend is pgvector. |
 | port |  | PostgreSQL port for pgvector backend. Defaults to ${env.POSTGRES_PORT} when backend is pgvector. |
 | db | string | PostgreSQL database name for pgvector backend. Defaults to ${env.POSTGRES_DATABASE} when backend is pgvector. |
