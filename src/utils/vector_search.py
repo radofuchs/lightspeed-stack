@@ -432,7 +432,7 @@ def _process_solr_chunks_for_documents(
             if doc_url:
                 try:
                     parsed_url = AnyUrl(doc_url)
-                except Exception:  # pylint: disable=broad-exception-caught
+                except ValidationError:
                     parsed_url = None
 
             doc_ids_from_chunks.append(
