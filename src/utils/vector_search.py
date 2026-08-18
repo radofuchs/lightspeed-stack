@@ -14,7 +14,7 @@ from ogx_api.openai_responses import (
 )
 from ogx_client import AsyncOgxClient
 from opentelemetry import trace
-from pydantic import AnyUrl
+from pydantic import AnyUrl, ValidationError
 
 import constants
 from configuration import configuration
@@ -374,7 +374,7 @@ def _process_byok_rag_chunks_for_documents(
             if reference_url:
                 try:
                     parsed_url = AnyUrl(reference_url)
-                except Exception:  # pylint: disable=broad-exception-caught
+                except ValidationError:
                     parsed_url = None
 
             referenced_documents.append(
