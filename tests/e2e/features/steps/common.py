@@ -12,7 +12,6 @@ from tests.e2e.utils.utils import (
     create_config_backup,
     is_prow_environment,
     restart_container,
-    restart_lightspeed_stack_service,
     switch_config,
 )
 
@@ -203,55 +202,7 @@ def restart_service(context: Context) -> None:
     if getattr(context, "lightspeed_stack_skip_restart", False):
         context.lightspeed_stack_skip_restart = False
         return
-    restart_lightspeed_stack_service()
-
-
-@given("The service is restarted without restoring llama-stack")
-def restart_service_without_restoring_llama(context: Context) -> None:
-    """Restart LCS while leaving llama disrupted (degraded-mode startup e2e).
-
-    On Prow/Konflux, the default ``restart-lightspeed`` path restores llama when
-    it is unhealthy so LCS can come up. Degraded-mode scenarios need the
-    opposite: LCS must boot with llama still down. Docker Compose already
-    restarts only the LCS container, so this matches local server-mode behavior.
-    """
-    if getattr(context, "lightspeed_stack_skip_restart", False):
-        context.lightspeed_stack_skip_restart = False
-        return
-    restart_lightspeed_stack_service(skip_llama_restore=True)
-
-
-@given("Lightspeed Stack is restarted")
-def restart_lightspeed_stack(context: Context) -> None:
-    """Restart the Lightspeed Stack container (always; no skip-restart flag).
-
-    Parameters:
-    ----------
-        context (Context): Behave context (unused; kept for step signature).
-    """
-    _ = context
-    restart_lightspeed_stack_service()
-
-
-@given("Llama Stack is restarted")
-def restart_llama_stack(context: Context) -> None:
-    """Restart the Llama Stack container.
-
-    TLS configuration features use a full pod recreate path on Prow/Konflux.
-
-    Parameters:
-    ----------
-        context (Context): Behave context.
-    """
-    from tests.e2e.features.steps.tls import (
-        is_tls_configuration_feature,
-        restart_llama_for_tls_feature,
-    )
-
-    if is_tls_configuration_feature(context):
-        restart_llama_for_tls_feature(context)
-        return
-    restart_container("llama-stack")
+    restart_container("lightspeed-stack")
 
 
 @given("The system is in default state")
