@@ -240,7 +240,7 @@ class "SkillMetadata" as src.models.common.skills.SkillMetadata {
 }
 class "SolrVectorSearchRequest" as src.models.common.query.SolrVectorSearchRequest {
   filters : Optional[dict[str, Any]]
-  mode : Optional[Literal['semantic', 'hybrid', 'lexical']]
+  mode : Optional[Literal['semantic', 'hybrid', 'lexical', 'keyword']]
   model_config : ConfigDict
   coerce_legacy_plain_dict(data: Any) -> Any
 }

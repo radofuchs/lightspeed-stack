@@ -72,6 +72,10 @@ Unit tests for utils/model_list.py helpers.
 
 Unit tests for utils/models_dumper module.
 
+## [test_otel_tracing.py](test_otel_tracing.py)
+
+Unit tests for utils/otel_tracing.py functions.
+
 ## [test_prompts.py](test_prompts.py)
 
 Unit tests for prompts utility functions.
