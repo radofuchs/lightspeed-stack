@@ -11,6 +11,7 @@ from tests.e2e.utils.utils import (
     clear_llama_stack_storage,
     create_config_backup,
     is_prow_environment,
+    restart_container,
     restart_lightspeed_stack_service,
     switch_config,
 )
@@ -202,7 +203,7 @@ def restart_service(context: Context) -> None:
     if getattr(context, "lightspeed_stack_skip_restart", False):
         context.lightspeed_stack_skip_restart = False
         return
-    restart_lightspeed_stack_service()
+    restart_container("lightspeed-stack")
 
 
 @given("The service is restarted without restoring llama-stack")
@@ -217,7 +218,7 @@ def restart_service_without_restoring_llama(context: Context) -> None:
     if getattr(context, "lightspeed_stack_skip_restart", False):
         context.lightspeed_stack_skip_restart = False
         return
-    restart_lightspeed_stack_service(skip_llama_restore=True)
+    restart_lightspeed_stack_service(skip_llama_restore=True, wait_http=False)
 
 
 @given("The system is in default state")

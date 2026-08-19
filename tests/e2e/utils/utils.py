@@ -516,7 +516,7 @@ def restart_container(container_name: str) -> None:
 
 
 def restart_lightspeed_stack_service(
-    *, wait_http: bool = True, skip_llama_restore: bool = False
+    *, wait_http: bool = False, skip_llama_restore: bool = False
 ) -> None:
     """Restart the lightspeed-stack container used by Behave steps.
 
@@ -525,8 +525,9 @@ def restart_lightspeed_stack_service(
 
     Parameters:
     ----------
-        wait_http: When True (default), also call
-            ``wait_for_lightspeed_stack_http_ready`` after Docker health.
+        wait_http: When True, also call ``wait_for_lightspeed_stack_http_ready``
+            after Docker health. Default False — generic ``The service is
+            restarted`` relies on Docker health only; proxy/tls steps opt in.
         skip_llama_restore: When True on Prow/Konflux, tell e2e-ops not to
             bring llama back before recreating LCS (degraded-mode startup).
     """
@@ -555,13 +556,16 @@ def wait_for_lightspeed_stack_http_ready(
     accepts connections (Podman/Docker timing). Polls ``/liveness`` using the
     same host/port as Behave (``E2E_LSC_*``).
 
+    Treats HTTP 200 and 401 as success: the process is listening. Auth-enabled
+    configs (e.g. RBAC jwk-token) return 401 on probes without a Bearer token.
+
     Parameters:
     ----------
         max_attempts: Maximum GET attempts.
         delay_s: Sleep between attempts.
     Raises:
     ------
-        AssertionError: If ``/liveness`` does not return HTTP 200 in time.
+        AssertionError: If ``/liveness`` does not return an accepted status in time.
     """
     if is_prow_environment():
         return
@@ -571,7 +575,7 @@ def wait_for_lightspeed_stack_http_ready(
     for attempt in range(max_attempts):
         try:
             response = requests.get(url, timeout=5)
-            if response.status_code == 200:
+            if response.status_code in (200, 401):
                 return
             detail = response.text[:200].replace("\n", " ")
             print(
