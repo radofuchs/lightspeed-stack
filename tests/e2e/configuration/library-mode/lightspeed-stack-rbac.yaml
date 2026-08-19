@@ -99,3 +99,20 @@ authorization:
       actions:
         - "info"
 
+# Same e2e FAISS BYOK as default/authorized. Keep in sync with server-mode rbac
+# so enrichment still registers e2e-test-docs if this config is left active.
+rag:
+  byok:
+    stores:
+      - rag_id: e2e-test-docs
+        backend: faiss
+        embedding_model: sentence-transformers/all-mpnet-base-v2
+        embedding_dimension: 768
+        vector_db_id: ${env.FAISS_VECTOR_STORE_ID}
+        db_path: ${env.KV_RAG_PATH:=~/.llama/storage/rag/kv_store.db}
+        score_multiplier: 1.0
+  retrieval:
+    tool:
+      sources:
+        - e2e-test-docs
+
