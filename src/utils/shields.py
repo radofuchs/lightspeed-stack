@@ -9,6 +9,7 @@ from opentelemetry import trace
 from pydantic_ai.exceptions import AgentRunError
 
 from configuration import AppConfig
+from constants import OBFUSCATION_REJECTION_MESSAGE
 from log import get_logger
 from models.api.requests import QueryRequest
 from models.api.responses.error import (
@@ -29,7 +30,7 @@ from pydantic_ai_lightspeed.capabilities.redaction._capability import (
     PiiRedactionCapability,
 )
 from utils.agents.error_handler import map_agent_inference_error
-from utils.input_sanitization import OBFUSCATION_REJECTION_MESSAGE, sanitize_input
+from utils.input_sanitization import sanitize_input
 from utils.otel_tracing import SpanAttributes
 
 logger = get_logger(__name__)

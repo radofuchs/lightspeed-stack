@@ -21,12 +21,6 @@ from log import get_logger
 
 logger = get_logger(__name__)
 
-# Rejection message shown to the user when obfuscation is detected.
-OBFUSCATION_REJECTION_MESSAGE = (
-    "Your input contains characters or encoding patterns that cannot be "
-    "processed. Please rephrase your question in plain text."
-)
-
 # ---------------------------------------------------------------------------
 # Unicode block ranges considered obfuscation vectors
 # ---------------------------------------------------------------------------
@@ -37,11 +31,13 @@ _SUSPICIOUS_UNICODE_RANGES: list[tuple[int, int, str]] = [
     # Mathematical Alphanumeric Symbols — bold/italic/script variants
     # of Latin letters that visually resemble ASCII but bypass filters
     (0x1D400, 0x1D7FF, "Mathematical Alphanumeric Symbols"),
-    # Enclosed Alphanumerics / Enclosed Alphanumeric Supplement
+    # Enclosed Alphanumerics (circled digits/letters)
     (0x2460, 0x24FF, "Enclosed Alphanumerics"),
-    (0x1F100, 0x1F1FF, "Enclosed Alphanumeric Supplement"),
-    # Fullwidth Latin letters — visually similar to ASCII
-    (0xFF01, 0xFF5E, "Fullwidth Forms"),
+    # Fullwidth Latin letters only (A-Z, a-z) — visually similar to ASCII.
+    # Excludes fullwidth punctuation (U+FF01-FF20, U+FF3B-FF40, U+FF5B-FF5E)
+    # which may appear in legitimate CJK-context text.
+    (0xFF21, 0xFF3A, "Fullwidth Latin uppercase"),
+    (0xFF41, 0xFF5A, "Fullwidth Latin lowercase"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -140,12 +136,8 @@ def _check_xml_injection(text: str) -> Optional[str]:
     Returns:
         Description if suspicious XML tags are detected, or None if clean.
     """
-    match = _XML_INJECTION_PATTERN.search(text)
-    if match:
-        return (
-            f"Input contains suspicious XML/markup tags: "
-            f"'{match.group()}'."
-        )
+    if _XML_INJECTION_PATTERN.search(text):
+        return "Input contains suspicious XML/markup injection tags."
     return None
 
 
