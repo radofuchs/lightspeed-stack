@@ -2,12 +2,13 @@
 
 # pylint: disable=too-many-lines
 
+import os
 import re
 from enum import Enum
 from functools import cached_property
 from pathlib import Path
 from re import Pattern
-from typing import Any, Literal, Optional, Self
+from typing import Annotated, Any, Literal, Optional, Self
 
 import jsonpath_ng
 import yaml
@@ -667,6 +668,10 @@ class UnifiedInferenceProvider(ConfigurationBase):
         type: Canonical provider identifier. Vendor-neutral so it survives a
             future backend change; each backend-specific synthesizer maps it to
             its own provider vocabulary.
+        id: Optional identifier emitted as the Llama Stack provider_id. When
+            omitted, synthesized as type with underscores hyphenated. If set,
+            must be non-empty after stripping whitespace and may contain only
+            lowercase letters, digits, underscores, and hyphens.
         api_key_env: Name of the environment variable holding the provider API
             key. Emitted verbatim as `${env.<name>}` so the secret never lands
             on disk resolved.
@@ -694,6 +699,15 @@ class UnifiedInferenceProvider(ConfigurationBase):
         "Llama Stack provider_type by the synthesizer.",
     )
 
+    id: Optional[str] = Field(
+        None,
+        title="Provider ID",
+        description="Optional identifier emitted as the Llama Stack provider_id. "
+        "When omitted, synthesized as type with underscores hyphenated. If set, "
+        "must be non-empty after stripping whitespace and may contain only "
+        "lowercase letters, digits, underscores, and hyphens.",
+    )
+
     api_key_env: Optional[str] = Field(
         None,
         title="API key environment variable",
@@ -714,6 +728,37 @@ class UnifiedInferenceProvider(ConfigurationBase):
         description="Additional provider-config keys merged verbatim into the "
         "synthesized provider's config block.",
     )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, value: Optional[str]) -> Optional[str]:
+        """Strip and validate an optional high-level provider id.
+
+        Parameters:
+            value: The configured id, or None when omitted.
+
+        Returns:
+            The stripped id, or None when the field is omitted.
+
+        Raises:
+            ValueError: If the value is empty after stripping or contains
+                characters other than lowercase letters, digits, underscores,
+                and hyphens.
+        """
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError(
+                "id must be non-empty after stripping whitespace; "
+                "omit the field to use the type-derived default"
+            )
+        if not re.fullmatch(r"[a-z0-9_-]+", stripped):
+            raise ValueError(
+                "id may contain only lowercase letters, digits, "
+                "underscores, and hyphens"
+            )
+        return stripped
 
 
 class UnifiedLlamaStackConfig(ConfigurationBase):
@@ -796,8 +841,12 @@ class LlamaStackConfiguration(ConfigurationBase):
 
     library_client_config_path: Optional[str] = Field(
         None,
-        title="Llama Stack configuration path",
-        description="Path to configuration file used when Llama Stack is run in library mode",
+        title="Llama Stack configuration path (legacy, deprecated)",
+        description="Path to configuration file used when Llama Stack is run "
+        "in library mode. DEPRECATED legacy two-file setup: logs a startup "
+        "warning since 0.6 and is removed in 0.7 — use unified mode instead "
+        "(the config block below, and/or the root-level inference.providers "
+        "section); migrate with lightspeed-stack --migrate-config.",
     )
 
     timeout: PositiveInt = Field(
@@ -876,11 +925,11 @@ class LlamaStackConfiguration(ConfigurationBase):
             # it means that use_as_library_client attribute must be set to True
             if self.use_as_library_client is None:
                 raise ValueError(
-                    "Llama stack URL is not specified and library client mode is not specified"
+                    "Llama Stack URL is not specified and library client mode is not specified"
                 )
             if self.use_as_library_client is False:
                 raise ValueError(
-                    "Llama stack URL is not specified and library client mode is not enabled"
+                    "Llama Stack URL is not specified and library client mode is not enabled"
                 )
 
         # None -> False conversion
@@ -1229,6 +1278,7 @@ class Action(str, Enum):
     FEEDBACK = "feedback"
     GET_MODELS = "get_models"
     GET_TOOLS = "get_tools"
+    GET_SKILLS = "get_skills"
     GET_SHIELDS = "get_shields"
     LIST_PROVIDERS = "list_providers"
     GET_PROVIDER = "get_provider"
@@ -1262,6 +1312,9 @@ class Action(str, Enum):
     # Llama Stack stored prompt templates (/v1/prompts)
     MANAGE_PROMPTS = "manage_prompts"
     READ_PROMPTS = "read_prompts"
+
+    # User saved prompts (/v1/saved-prompts)
+    MANAGE_SAVED_PROMPTS = "manage_saved_prompts"
 
 
 class AccessRule(ConfigurationBase):
@@ -1978,8 +2031,8 @@ class A2AStateConfiguration(ConfigurationBase):
         return None
 
 
-class ByokRag(ConfigurationBase):
-    """BYOK (Bring Your Own Knowledge) RAG configuration."""
+class RagStore(ConfigurationBase):
+    """BYOK (Bring Your Own Knowledge) RAG store configuration."""
 
     rag_id: str = Field(
         ...,
@@ -1988,12 +2041,23 @@ class ByokRag(ConfigurationBase):
         description="Unique RAG ID",
     )
 
-    rag_type: str = Field(
-        constants.DEFAULT_RAG_TYPE,
+    backend: str = Field(
+        constants.DEFAULT_RAG_BACKEND,
         min_length=1,
-        title="RAG type",
-        description="Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
+        title="RAG backend",
+        description="Type of RAG database (e.g. 'faiss', 'pgvector').",
     )
+
+    @field_validator("backend")
+    @classmethod
+    def validate_backend(cls, value: str) -> str:
+        """Reject unsupported backend values at config load time."""
+        if value not in constants.SUPPORTED_RAG_BACKENDS:
+            raise ValueError(
+                f"Unsupported RAG backend '{value}'. "
+                f"Supported backends: {sorted(constants.SUPPORTED_RAG_BACKENDS)}"
+            )
+        return value
 
     embedding_model: str = Field(
         constants.DEFAULT_EMBEDDING_MODEL,
@@ -2018,7 +2082,7 @@ class ByokRag(ConfigurationBase):
     db_path: Optional[str] = Field(
         default=None,
         title="DB path",
-        description="Path to RAG database. Required for inline::faiss.",
+        description="Path to RAG database. Required for faiss backend.",
     )
 
     score_multiplier: float = Field(
@@ -2030,48 +2094,56 @@ class ByokRag(ConfigurationBase):
         "Values > 1 boost this store's results; values < 1 reduce them.",
     )
 
+    relevance_cutoff_score: float = Field(
+        constants.DEFAULT_BYOK_RAG_RELEVANCE_CUTOFF_SCORE,
+        gt=0,
+        title="Relevance cutoff score",
+        description="Minimum raw similarity score to consider a result relevant. "
+        "Results with a similarity score below this threshold are not returned.",
+    )
+
     host: Optional[str] = Field(
         default=None,
         title="PostgreSQL host",
-        description="PostgreSQL host for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
+        description="PostgreSQL host for pgvector backend. "
+        "Defaults to ${env.POSTGRES_HOST} when backend is pgvector.",
     )
 
-    port: Optional[str] = Field(
+    port: Optional[str | int] = Field(
         default=None,
         title="PostgreSQL port",
-        description="PostgreSQL port for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+        description="PostgreSQL port for pgvector backend. "
+        "Defaults to ${env.POSTGRES_PORT} when backend is pgvector.",
     )
 
     db: Optional[str] = Field(
         default=None,
         title="PostgreSQL database",
-        description="PostgreSQL database name for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.",
+        description="PostgreSQL database name for pgvector backend. "
+        "Defaults to ${env.POSTGRES_DATABASE} when backend is pgvector.",
     )
 
     user: Optional[str] = Field(
         default=None,
         title="PostgreSQL user",
-        description="PostgreSQL user for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.",
+        description="PostgreSQL user for pgvector backend. "
+        "Defaults to ${env.POSTGRES_USER} when backend is pgvector.",
     )
 
     password: Optional[SecretStr] = Field(
         default=None,
         title="PostgreSQL password",
-        description="PostgreSQL password for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.",
+        description="PostgreSQL password for pgvector backend. "
+        "Defaults to ${env.POSTGRES_PASSWORD} when backend is pgvector.",
     )
 
     @model_validator(mode="after")
-    def validate_rag_type_fields(self) -> Self:
-        """Validate and populate fields based on rag_type."""
-        if self.rag_type == "inline::faiss":
+    def validate_backend_fields(self) -> Self:
+        """Validate and populate fields based on backend."""
+        if self.backend == "faiss":
             if not self.db_path:
-                raise ValueError("db_path is required when rag_type is 'inline::faiss'")
-        elif self.rag_type == "remote::pgvector":
+                raise ValueError("db_path is required when backend is 'faiss'")
+        elif self.backend == "pgvector":
             pgvector_defaults: dict[str, str | SecretStr] = {
                 "host": "${env.POSTGRES_HOST}",
                 "port": "${env.POSTGRES_PORT}",
@@ -2082,6 +2154,251 @@ class ByokRag(ConfigurationBase):
             for field_name, default_value in pgvector_defaults.items():
                 if getattr(self, field_name) is None:
                     object.__setattr__(self, field_name, default_value)
+        return self
+
+
+class FaissVectorStoreProviderConfig(ConfigurationBase):
+    """Storage config for a FAISS dynamic vector-store provider."""
+
+    path: str = Field(
+        ...,
+        min_length=1,
+        title="DB path",
+        description="On-disk FAISS/SQLite path for this provider.",
+    )
+
+
+class PgvectorVectorStoreProviderConfig(ConfigurationBase):
+    """Storage config for a pgvector dynamic vector-store provider."""
+
+    host: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL host",
+        description="PostgreSQL host. Defaults to ${env.POSTGRES_HOST}.",
+    )
+
+    port: Optional[str | int] = Field(
+        default=None,
+        title="PostgreSQL port",
+        description="PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. "
+        "Accepts string placeholders and integer values.",
+    )
+
+    db: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL database",
+        description="PostgreSQL database name. Defaults to ${env.POSTGRES_DATABASE}.",
+    )
+
+    user: Optional[str] = Field(
+        default=None,
+        title="PostgreSQL user",
+        description="PostgreSQL user. Defaults to ${env.POSTGRES_USER}.",
+    )
+
+    password: Optional[SecretStr] = Field(
+        default=None,
+        title="PostgreSQL password",
+        description="PostgreSQL password. Defaults to ${env.POSTGRES_PASSWORD}.",
+    )
+
+    @model_validator(mode="after")
+    def apply_pgvector_env_defaults(self) -> Self:
+        """Fill unset connection fields with ${env.POSTGRES_*} references."""
+        pgvector_defaults: dict[str, str | SecretStr] = {
+            "host": "${env.POSTGRES_HOST}",
+            "port": "${env.POSTGRES_PORT}",
+            "db": "${env.POSTGRES_DATABASE}",
+            "user": "${env.POSTGRES_USER}",
+            "password": SecretStr("${env.POSTGRES_PASSWORD}"),
+        }
+        for field_name, default_value in pgvector_defaults.items():
+            if getattr(self, field_name) is None:
+                object.__setattr__(self, field_name, default_value)
+        return self
+
+
+class VectorStoreProviderBase(ConfigurationBase):
+    """Shared fields for dynamic vector-store provider capacity entries.
+
+    Attributes:
+        id: Llama Stack vector_io provider_id. Surrounding whitespace is
+            stripped before validation and emission.
+        embedding_model: Embedding model identification used for stores
+            created against this provider.
+        embedding_dimension: Dimensionality of embedding vectors for this
+            provider.
+    """
+
+    id: str = Field(
+        ...,
+        min_length=1,
+        title="Provider ID",
+        description=(
+            "Llama Stack vector_io provider_id. Surrounding whitespace is "
+            "stripped before validation and emission."
+        ),
+    )
+    embedding_model: str = Field(
+        ...,
+        min_length=1,
+        title="Embedding model",
+        description="Embedding model identification used for stores created "
+        "against this provider.",
+    )
+    embedding_dimension: PositiveInt = Field(
+        ...,
+        title="Embedding dimension",
+        description="Dimensionality of embedding vectors for this provider.",
+    )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, value: str) -> str:
+        """Validate and normalize the provider id.
+
+        Parameters:
+            value: Raw provider id from configuration.
+
+        Returns:
+            Stripped provider id.
+
+        Raises:
+            ValueError: If the id is empty, uses the reserved ``byok_`` prefix,
+                or contains characters outside ``[a-z0-9_-]``.
+        """
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("id must be non-empty after stripping whitespace")
+        if stripped.startswith("byok_"):
+            raise ValueError("id must not start with 'byok_' (reserved for BYOK RAG)")
+        if not re.fullmatch(r"[a-z0-9_-]+", stripped):
+            raise ValueError(
+                "id may contain only lowercase letters, digits, "
+                "underscores, and hyphens"
+            )
+        return stripped
+
+
+class FaissVectorStoreProvider(VectorStoreProviderBase):
+    """Dynamic FAISS vector-store provider (runtime create capacity)."""
+
+    type: Literal["faiss"] = Field(
+        "faiss",
+        title="Provider type",
+        description="Product type for this dynamic vector-store provider.",
+    )
+    config: FaissVectorStoreProviderConfig = Field(
+        ...,
+        title="Storage config",
+        description="FAISS storage settings for this provider.",
+    )
+
+
+class PgvectorVectorStoreProvider(VectorStoreProviderBase):
+    """Dynamic pgvector vector-store provider (runtime create capacity)."""
+
+    type: Literal["pgvector"] = Field(
+        "pgvector",
+        title="Provider type",
+        description="Product type for this dynamic vector-store provider.",
+    )
+    config: PgvectorVectorStoreProviderConfig = Field(
+        ...,
+        title="Storage config",
+        description="pgvector connection settings for this provider.",
+    )
+
+
+VectorStoreProvider = Annotated[
+    FaissVectorStoreProvider | PgvectorVectorStoreProvider,
+    Field(discriminator="type"),
+]
+
+
+class VectorStoreConfiguration(ConfigurationBase):
+    """Configuration for dynamic vector-store providers.
+
+    Mirrors ``InferenceConfiguration``: a providers list plus a sibling
+    ``default_provider`` pointer, rather than a per-entry default flag.
+
+    Attributes:
+        default_provider: Provider id used for vector_stores.default_* in the
+            synthesized Llama Stack config. Required when providers is
+            non-empty; must match one of providers[].id. Must be omitted when
+            providers is empty.
+        providers: Dynamic vector-store provider capacity for runtime
+            POST /v1/vector-stores creates. Not the same as rag.byok.stores (static
+            registered corpora).
+    """
+
+    default_provider: Optional[str] = Field(
+        None,
+        title="Default provider",
+        description=(
+            "Provider id used for vector_stores.default_* in the synthesized "
+            "Llama Stack config. Required when providers is non-empty; must "
+            "match one of providers[].id."
+        ),
+    )
+
+    providers: list[VectorStoreProvider] = Field(
+        default_factory=list,
+        title="Vector store providers",
+        description=(
+            "Dynamic vector-store provider capacity for runtime "
+            "POST /v1/vector-stores creates. "
+            "Not the same as rag.byok.stores (static registered corpora)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_providers_and_default(self) -> Self:
+        """Validate providers list and default_provider pointer.
+
+        When providers is empty, default_provider must be unset. When
+        providers is non-empty, default_provider is required and must match
+        exactly one providers[].id. Provider ids must be unique.
+
+        Returns:
+            Self: The validated configuration instance.
+
+        Raises:
+            ValueError: If ids are duplicated, default_provider is missing
+                for a non-empty list, is set for an empty list, or does not
+                match a provider id.
+        """
+        # pylint: disable=no-member
+        if not self.providers:
+            if self.default_provider is not None:
+                raise ValueError(
+                    "vector_store.default_provider must not be set when "
+                    "providers is empty"
+                )
+            return self
+
+        if self.default_provider is None:
+            raise ValueError(
+                "vector_store.default_provider is required when providers "
+                "is non-empty"
+            )
+
+        ids = [provider.id for provider in self.providers]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"vector_store.providers ids must be unique; got {ids}")
+
+        default_provider = self.default_provider.strip()
+        if not default_provider:
+            raise ValueError(
+                "vector_store.default_provider must be non-empty after "
+                "stripping whitespace"
+            )
+        if default_provider not in ids:
+            raise ValueError(
+                "vector_store.default_provider must match one of "
+                f"providers[].id; got {default_provider!r}, known ids: {ids}"
+            )
+        object.__setattr__(self, "default_provider", default_provider)
         return self
 
 
@@ -2206,43 +2523,113 @@ class QuotaHandlersConfiguration(ConfigurationBase):
     )
 
 
-class RagConfiguration(ConfigurationBase):
-    """RAG strategy configuration.
+class RerankerConfiguration(ConfigurationBase):
+    """Reranker configuration for RAG chunk reranking."""
 
-    Controls which RAG sources are used for inline and tool-based retrieval.
-
-    Each strategy lists RAG IDs to include. The special ID ``"okp"`` defined in constants,
-    activates the OKP provider; all other IDs refer to entries in ``byok_rag``.
-
-    Backward compatibility:
-        - ``inline`` defaults to ``[]`` (no inline RAG).
-        - ``tool`` defaults to ``[]`` (no tool RAG).
-
-    If no RAG strategy is defined (inline and tool are empty),
-    the RAG tool will register all stores available to llama-stack.
-    """
-
-    inline: list[str] = Field(
-        default_factory=list,
-        title="Inline RAG IDs",
-        description="RAG IDs whose sources are injected as context before the LLM call. "
-        f"Use '{constants.OKP_RAG_ID}' to enable OKP inline RAG. Empty by default (no inline RAG).",
+    enabled: bool = Field(
+        default=False,
+        title="Reranker enabled",
+        description="When True, reranking applied to RAG chunks. "
+        "When False, reranking is disabled and original scoring used.",
+    )
+    model: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L6-v2",
+        title="Reranker model",
+        description="Cross-encoder model name for reranking RAG chunks. "
+        "Defaults to 'cross-encoder/ms-marco-MiniLM-L6-v2' from sentence-transformers.",
     )
 
-    tool: list[str] = Field(
+    _explicitly_configured: bool = PrivateAttr(default=False)
+
+    @model_validator(mode="after")
+    def mark_as_explicitly_configured(self) -> Self:
+        """Mark this configuration as explicitly set when instantiated from user input."""
+        if self.model_fields_set:
+            self._explicitly_configured = True
+
+        return self
+
+
+class RetrievalStrategyConfiguration(ConfigurationBase):
+    """Configuration for a single retrieval strategy (inline or tool)."""
+
+    sources: list[str] = Field(
         default_factory=list,
-        title="Tool RAG IDs",
-        description="RAG IDs made available to the LLM as a file_search tool. "
-        f"Use '{constants.OKP_RAG_ID}' to include the OKP vector store. "
-        "When omitted, all registered BYOK vector stores are used (backward compatibility).",
+        title="RAG source IDs",
+        description="RAG IDs to use for this retrieval strategy. "
+        f"Use '{constants.OKP_RAG_ID}' to include the OKP vector store.",
     )
+
+    max_chunks: PositiveInt = Field(
+        default=constants.DEFAULT_INLINE_RAG_MAX_CHUNKS,
+        title="Max chunks",
+        description="Maximum number of chunks returned by this retrieval strategy.",
+    )
+
+    reranker: Optional[RerankerConfiguration] = Field(
+        default=None,
+        title="Reranker configuration",
+        description="Neural reranking of RAG chunks using cross-encoder. "
+        "Only applicable to inline retrieval.",
+    )
+
+
+class RetrievalConfiguration(ConfigurationBase):
+    """Configuration for inline and tool retrieval strategies."""
+
+    inline: RetrievalStrategyConfiguration = Field(
+        default_factory=lambda: RetrievalStrategyConfiguration(
+            max_chunks=constants.DEFAULT_INLINE_RAG_MAX_CHUNKS,
+            reranker=RerankerConfiguration(),
+        ),
+        title="Inline retrieval",
+        description="Inline RAG: context injected before the LLM request.",
+    )
+
+    tool: RetrievalStrategyConfiguration = Field(
+        default_factory=lambda: RetrievalStrategyConfiguration(
+            max_chunks=constants.DEFAULT_TOOL_RAG_MAX_CHUNKS,
+        ),
+        title="Tool retrieval",
+        description="Tool RAG: LLM can call file_search on demand.",
+    )
+
+
+class ByokConfiguration(ConfigurationBase):
+    """BYOK (Bring Your Own Knowledge) configuration."""
+
+    max_chunks: PositiveInt = Field(
+        default=constants.DEFAULT_BYOK_RAG_MAX_CHUNKS,
+        title="Max BYOK chunks",
+        description="Maximum total number of chunks returned across all BYOK stores.",
+    )
+
+    stores: list[RagStore] = Field(
+        default_factory=list,
+        title="BYOK RAG stores",
+        description="List of BYOK RAG store configurations.",
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_rag_ids(self) -> Self:
+        """Reject duplicate rag_id values across stores."""
+        seen: set[str] = set()
+        for store in self.stores:
+            if store.rag_id in seen:
+                raise ValueError(
+                    f"Duplicate rag_id '{store.rag_id}' in rag.byok.stores. "
+                    "Each store must have a unique rag_id."
+                )
+            seen.add(store.rag_id)
+        return self
 
 
 class OkpConfiguration(ConfigurationBase):
     """OKP (Offline Knowledge Portal) provider configuration.
 
     Controls provider-specific behaviour for the OKP vector store.
-    Only relevant when ``"okp"`` is listed in ``rag.inline`` or ``rag.tool``.
+    Only relevant when ``"okp"`` is listed in ``rag.retrieval.inline.sources``
+    or ``rag.retrieval.tool.sources``.
     """
 
     rhokp_url: Optional[AnyHttpUrl] = Field(
@@ -2267,31 +2654,90 @@ class OkpConfiguration(ConfigurationBase):
         "Use Solr boolean syntax, e.g. 'product:ansible AND product:*openshift*'.",
     )
 
-
-class RerankerConfiguration(ConfigurationBase):
-    """Reranker configuration for RAG chunk reranking."""
-
-    enabled: bool = Field(
-        default=False,
-        title="Reranker enabled",
-        description="When True, reranking applied to RAG chunks. "
-        "When False, reranking is disabled and original scoring used.",
-    )
-    model: str = Field(
-        default="cross-encoder/ms-marco-MiniLM-L6-v2",
-        title="Reranker model",
-        description="Cross-encoder model name for reranking RAG chunks. "
-        "Defaults to 'cross-encoder/ms-marco-MiniLM-L6-v2' from sentence-transformers.",
+    search_mode: Optional[Literal["semantic", "hybrid", "keyword"]] = Field(
+        default=None,
+        title="OKP search mode",
+        description="Default Solr search mode for OKP queries. "
+        "'keyword' uses BM25 text search (no embedding model needed). "
+        "'hybrid' combines vector + keyword search. "
+        "'semantic' uses pure vector search. "
+        "When unset, falls back to the global default ('hybrid').",
     )
 
-    # Private attribute to track if this was explicitly configured
-    _explicitly_configured: bool = PrivateAttr(default=False)
+    max_chunks: PositiveInt = Field(
+        default=constants.DEFAULT_OKP_RAG_MAX_CHUNKS,
+        title="Max OKP chunks",
+        description="Maximum number of chunks fetched from OKP.",
+    )
+
+
+class RagConfiguration(ConfigurationBase):
+    """Unified RAG configuration.
+
+    Groups all RAG-related settings: BYOK stores, OKP provider, and
+    retrieval strategies (inline and tool).
+    """
+
+    byok: ByokConfiguration = Field(
+        default_factory=ByokConfiguration,
+        title="BYOK configuration",
+        description="Bring Your Own Knowledge store configurations and settings.",
+    )
+
+    okp: OkpConfiguration = Field(
+        default_factory=OkpConfiguration,
+        title="OKP configuration",
+        description=f"OKP provider settings. Only used when '{constants.OKP_RAG_ID}' "
+        "is listed in retrieval.inline.sources or retrieval.tool.sources.",
+    )
+
+    retrieval: RetrievalConfiguration = Field(
+        default_factory=RetrievalConfiguration,
+        title="Retrieval configuration",
+        description="Inline and tool retrieval strategy settings.",
+    )
 
     @model_validator(mode="after")
-    def mark_as_explicitly_configured(self) -> Self:
-        """Mark this configuration as explicitly set when instantiated from user input."""
-        if self.model_fields_set:
-            self._explicitly_configured = True
+    def validate_retrieval_sources(self) -> Self:
+        """Reject retrieval source IDs not declared in byok.stores or OKP."""
+        # pylint: disable=no-member
+        known_ids = {store.rag_id for store in self.byok.stores}
+        known_ids.add(constants.OKP_RAG_ID)
+
+        for strategy_name in ("inline", "tool"):
+            strategy = getattr(self.retrieval, strategy_name)
+            unknown = set(strategy.sources) - known_ids
+            if unknown:
+                raise ValueError(
+                    f"retrieval.{strategy_name}.sources contains unknown RAG IDs: "
+                    f"{sorted(unknown)}. "
+                    f"Declared IDs: {sorted(known_ids)}"
+                )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_reranker_auto_enable(self) -> Self:
+        """Automatically enable reranker when both BYOK and OKP RAG are configured."""
+        # pylint: disable=no-member
+        has_byok = len(self.byok.stores) > 0
+        has_okp = constants.OKP_RAG_ID in self.retrieval.inline.sources
+        reranker = self.retrieval.inline.reranker
+
+        if (
+            has_byok
+            and has_okp
+            and reranker is not None
+            and not reranker._explicitly_configured  # pylint: disable=protected-access
+            and not reranker.enabled
+        ):
+            logger.info(
+                "Automatically enabling reranker: Both BYOK RAG (%d stores) and "
+                "OKP are configured. Reranking improves result quality when "
+                "multiple knowledge sources are available.",
+                len(self.byok.stores),
+            )
+            reranker.enabled = True
 
         return self
 
@@ -2335,7 +2781,7 @@ class SavedPromptsConfiguration(ConfigurationBase):
 
     Controls the maximum number of prompts a user can save, the maximum
     display name (title) length, and the maximum prompt content length.
-    All fields are optional and default to values defined in constants.
+    Omitted fields use the defaults defined in constants.
 
     Attributes:
         max_prompts_per_user: Maximum number of saved prompts allowed per user.
@@ -2343,93 +2789,32 @@ class SavedPromptsConfiguration(ConfigurationBase):
         max_content_length: Maximum character length for the prompt content body.
     """
 
-    max_prompts_per_user: Optional[PositiveInt] = Field(
-        default=None,
+    max_prompts_per_user: PositiveInt = Field(
+        default=constants.SAVED_PROMPTS_DEFAULT_MAX_PER_USER,
+        le=constants.SAVED_PROMPTS_MAX_PER_USER_UPPER_BOUND,
         title="Max prompts per user",
         description="Maximum number of saved prompts a user can create. "
         f"Defaults to {constants.SAVED_PROMPTS_DEFAULT_MAX_PER_USER}. "
         f"Cannot exceed {constants.SAVED_PROMPTS_MAX_PER_USER_UPPER_BOUND}.",
     )
 
-    max_display_name_length: Optional[PositiveInt] = Field(
-        default=None,
+    max_display_name_length: PositiveInt = Field(
+        default=constants.SAVED_PROMPTS_DEFAULT_MAX_DISPLAY_NAME_LENGTH,
+        le=constants.SAVED_PROMPTS_MAX_DISPLAY_NAME_LENGTH_UPPER_BOUND,
         title="Max display name length",
         description="Maximum character length for prompt display name (title). "
         f"Defaults to {constants.SAVED_PROMPTS_DEFAULT_MAX_DISPLAY_NAME_LENGTH}. "
         f"Cannot exceed {constants.SAVED_PROMPTS_MAX_DISPLAY_NAME_LENGTH_UPPER_BOUND}.",
     )
 
-    max_content_length: Optional[PositiveInt] = Field(
-        default=None,
+    max_content_length: PositiveInt = Field(
+        default=constants.SAVED_PROMPTS_DEFAULT_MAX_CONTENT_LENGTH,
+        le=constants.SAVED_PROMPTS_MAX_CONTENT_LENGTH_UPPER_BOUND,
         title="Max content length",
         description="Maximum character length for the prompt content body. "
         f"Defaults to {constants.SAVED_PROMPTS_DEFAULT_MAX_CONTENT_LENGTH}. "
         f"Cannot exceed {constants.SAVED_PROMPTS_MAX_CONTENT_LENGTH_UPPER_BOUND}.",
     )
-
-    @model_validator(mode="after")
-    def apply_defaults_and_validate_bounds(self) -> Self:
-        """Apply default values for None fields and validate upper bounds.
-
-        Logs an info message for each field that falls back to its default.
-
-        Returns:
-            Self: The validated model instance with defaults applied.
-
-        Raises:
-            ValueError: If any value exceeds its upper bound.
-        """
-        if self.max_prompts_per_user is None:
-            self.max_prompts_per_user = constants.SAVED_PROMPTS_DEFAULT_MAX_PER_USER
-            logger.info(
-                "saved_prompts.max_prompts_per_user not configured, "
-                "using default: %d",
-                constants.SAVED_PROMPTS_DEFAULT_MAX_PER_USER,
-            )
-        elif (
-            self.max_prompts_per_user > constants.SAVED_PROMPTS_MAX_PER_USER_UPPER_BOUND
-        ):
-            raise ValueError(
-                f"max_prompts_per_user ({self.max_prompts_per_user}) exceeds "
-                f"upper bound ({constants.SAVED_PROMPTS_MAX_PER_USER_UPPER_BOUND})."
-            )
-
-        if self.max_display_name_length is None:
-            self.max_display_name_length = (
-                constants.SAVED_PROMPTS_DEFAULT_MAX_DISPLAY_NAME_LENGTH
-            )
-            logger.info(
-                "saved_prompts.max_display_name_length not configured, "
-                "using default: %d",
-                constants.SAVED_PROMPTS_DEFAULT_MAX_DISPLAY_NAME_LENGTH,
-            )
-        elif (
-            self.max_display_name_length
-            > constants.SAVED_PROMPTS_MAX_DISPLAY_NAME_LENGTH_UPPER_BOUND
-        ):
-            raise ValueError(
-                f"max_display_name_length ({self.max_display_name_length}) exceeds "
-                f"database column limit "
-                f"({constants.SAVED_PROMPTS_MAX_DISPLAY_NAME_LENGTH_UPPER_BOUND})."
-            )
-
-        if self.max_content_length is None:
-            self.max_content_length = constants.SAVED_PROMPTS_DEFAULT_MAX_CONTENT_LENGTH
-            logger.info(
-                "saved_prompts.max_content_length not configured, "
-                + "using default: %d",
-                constants.SAVED_PROMPTS_DEFAULT_MAX_CONTENT_LENGTH,
-            )
-        elif (
-            self.max_content_length
-            > constants.SAVED_PROMPTS_MAX_CONTENT_LENGTH_UPPER_BOUND
-        ):
-            raise ValueError(
-                f"max_content_length ({self.max_content_length}) exceeds "
-                f"upper bound ({constants.SAVED_PROMPTS_MAX_CONTENT_LENGTH_UPPER_BOUND})."
-            )
-
-        return self
 
 
 class QuestionValidityConfig(ConfigurationBase):
@@ -2546,6 +2931,186 @@ class RedactionConfig(ConfigurationBase):
         return list(self._compiled_patterns)
 
 
+class ObservabilityConfiguration(ConfigurationBase):
+    """OpenTelemetry observability configuration.
+
+    This configuration is automatically populated from OTEL_* environment variables
+    to provide visibility into the active tracing setup.
+
+    Attributes:
+        otel: Dictionary of OTEL_* environment variables with secrets redacted.
+    """
+
+    otel: dict[str, str] = Field(
+        default_factory=dict,
+        title="OpenTelemetry configuration",
+        description="Active OpenTelemetry configuration from OTEL_* environment variables",
+    )
+
+    @field_validator("otel", mode="before")
+    @classmethod
+    def redact_secrets(cls, value: dict[str, str]) -> dict[str, str]:
+        """Redact sensitive OTEL environment variables.
+
+        For headers (e.g., OTEL_EXPORTER_OTLP_HEADERS), redacts values while preserving
+        key names for debugging. For certificates and client keys, redacts the entire value.
+
+        Parameters:
+        ----------
+            value: Dictionary of OTEL environment variables
+
+        Returns:
+            New dictionary with sensitive values redacted
+        """
+        # Let Pydantic handle type validation for non-dict inputs
+        if not isinstance(value, dict):
+            return value
+
+        if not value:
+            return value
+
+        # Create a new dict to avoid mutating caller's data
+        redacted = {}
+
+        for key, val in value.items():
+            # Redact generic and signal-specific OTLP headers
+            # Matches: OTEL_EXPORTER_OTLP_HEADERS,
+            #          OTEL_EXPORTER_OTLP_TRACES_HEADERS,
+            #          OTEL_EXPORTER_OTLP_METRICS_HEADERS,
+            #          OTEL_EXPORTER_OTLP_LOGS_HEADERS
+            # Format: "api-key=secret,tenant-id=acme" -> "api-key=[REDACTED],tenant-id=[REDACTED]"
+            if "HEADERS" in key and "OTLP" in key:
+                redacted[key] = cls._redact_header_values(val)
+            # Redact generic and signal-specific certificates
+            # Matches: OTEL_EXPORTER_OTLP_CERTIFICATE,
+            #          OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE, etc.
+            elif "CERTIFICATE" in key and "OTLP" in key:
+                redacted[key] = "[REDACTED]"
+            # Redact generic and signal-specific client keys
+            # Matches: OTEL_EXPORTER_OTLP_CLIENT_KEY,
+            #          OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY, etc.
+            elif "CLIENT_KEY" in key and "OTLP" in key:
+                redacted[key] = "[REDACTED]"
+            else:
+                redacted[key] = val
+
+        return redacted
+
+    @staticmethod
+    def _redact_header_values(header_string: str) -> str:
+        """Redact header values while preserving key names.
+
+        OTEL headers format: "key1=value1,key2=value2"
+        Result: "key1=[REDACTED],key2=[REDACTED]"
+
+        Parameters:
+        ----------
+            header_string: Comma-separated key=value pairs
+
+        Returns:
+            Header string with values redacted but keys preserved
+        """
+        if not header_string or "=" not in header_string:
+            # No key=value pairs found, redact entire string
+            return "[REDACTED]"
+
+        redacted_pairs = []
+        for pair in header_string.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                key_part = pair.split("=", 1)[0]
+                redacted_pairs.append(f"{key_part}=[REDACTED]")
+            else:
+                # Malformed pair without =, redact entirely
+                redacted_pairs.append("[REDACTED]")
+
+        return ",".join(redacted_pairs)
+
+    @classmethod
+    def from_environment(cls) -> "ObservabilityConfiguration":
+        """Collect all OTEL_* environment variables from the environment.
+
+        Sensitive variables (headers, certificates, keys) are automatically redacted
+        by the field validator.
+
+        Returns:
+            ObservabilityConfiguration with otel dict populated from environment.
+        """
+        otel_vars = {}
+        for key, value in os.environ.items():
+            if key.startswith("OTEL_"):
+                otel_vars[key] = value
+        return cls(otel=otel_vars)
+
+
+class QuestionValidityShieldConfiguration(ConfigurationBase):
+    """Configuration for a named question-validity guardrail shield.
+
+    Attributes:
+        name: Unique, user-facing name identifying this shield instance.
+        provider_id: Discriminator identifying this as a question-validity shield.
+        config: Question-validity-specific configuration.
+    """
+
+    name: str = Field(
+        ...,
+        title="Shield name",
+        description="Unique, user-facing name identifying this shield instance.",
+    )
+
+    provider_id: Literal["question_validity"] = Field(
+        ...,
+        title="Shield provider id",
+        description="Discriminator identifying this as a question-validity shield.",
+    )
+
+    config: QuestionValidityConfig = Field(
+        ...,
+        title="Shield configuration",
+        description="Question-validity-specific configuration for this shield.",
+    )
+
+
+class RedactionShieldConfiguration(ConfigurationBase):
+    """Configuration for a named PII-redaction guardrail shield.
+
+    Attributes:
+        name: Unique, user-facing name identifying this shield instance.
+        provider_id: Discriminator identifying this as a redaction shield.
+        config: Redaction-specific configuration.
+    """
+
+    name: str = Field(
+        ...,
+        title="Shield name",
+        description="Unique, user-facing name identifying this shield instance.",
+    )
+
+    provider_id: Literal["redaction"] = Field(
+        ...,
+        title="Shield provider id",
+        description="Discriminator identifying this as a redaction shield.",
+    )
+
+    config: RedactionConfig = Field(
+        ...,
+        title="Shield configuration",
+        description="Redaction-specific configuration for this shield.",
+    )
+
+
+ShieldConfiguration = Annotated[
+    QuestionValidityShieldConfiguration | RedactionShieldConfiguration,
+    Field(discriminator="provider_id"),
+]
+"""Configuration for a single named guardrail shield (question validity or redaction).
+
+A discriminated union on ``provider_id``: Pydantic selects
+``QuestionValidityShieldConfiguration`` or ``RedactionShieldConfiguration``
+and validates ``config`` against the matching model.
+"""
+
+
 class Configuration(ConfigurationBase):
     """Global service configuration."""
 
@@ -2553,6 +3118,18 @@ class Configuration(ConfigurationBase):
         ...,
         title="Service name",
         description="Name of the service. That value will be used in REST API endpoints.",
+    )
+
+    config_format_version: Optional[Literal["legacy", "unified"]] = Field(
+        None,
+        title="Configuration format version",
+        description="Optional explicit marker of the configuration format. "
+        "When set, it must agree with the shape detected from the "
+        "configuration body: 'unified' requires a synthesis input (a "
+        "non-empty inference.providers, a non-empty vector_store.providers, "
+        "or a llama_stack.config block), 'legacy' requires no synthesis "
+        "input. Reserved as the lever for a future breaking change of the "
+        "unified schema (R11).",
     )
 
     service: ServiceConfiguration = Field(
@@ -2657,11 +3234,19 @@ class Configuration(ConfigurationBase):
         description="Settings for human-in-the-loop approval of MCP tool invocations",
     )
 
-    byok_rag: list[ByokRag] = Field(
-        default_factory=list,
-        title="BYOK RAG configuration",
-        description="BYOK RAG configuration. This configuration can be used to "
-        "reconfigure Llama Stack through its run.yaml configuration file",
+    vector_store: VectorStoreConfiguration = Field(
+        default_factory=lambda: VectorStoreConfiguration(
+            default_provider=None, providers=[]
+        ),
+        title="Vector store configuration",
+        description=(
+            "Dynamic vector-store provider capacity for runtime "
+            "POST /v1/vector-stores creates. "
+            "Not the same as rag.byok.stores (static registered corpora). "
+            "When providers is non-empty, default_provider is required and "
+            "must match one of providers[].id. Applied in unified synthesis "
+            "only."
+        ),
     )
 
     a2a_state: A2AStateConfiguration = Field(
@@ -2692,6 +3277,13 @@ class Configuration(ConfigurationBase):
         description="Splunk HEC configuration for sending telemetry events.",
     )
 
+    observability: ObservabilityConfiguration = Field(
+        default_factory=ObservabilityConfiguration.from_environment,
+        title="Observability configuration",
+        description="OpenTelemetry and observability configuration collected "
+        "from OTEL_* environment variables.",
+    )
+
     deployment_environment: str = Field(
         "development",
         title="Deployment environment",
@@ -2702,20 +3294,8 @@ class Configuration(ConfigurationBase):
     rag: RagConfiguration = Field(
         default_factory=RagConfiguration,
         title="RAG configuration",
-        description="Configuration for all RAG strategies (inline and tool-based).",
-    )
-
-    okp: OkpConfiguration = Field(
-        default_factory=OkpConfiguration,
-        title="OKP configuration",
-        description=f"OKP provider settings. Only used when '{constants.OKP_RAG_ID}' is listed "
-        "in rag.inline or rag.tool.",
-    )
-
-    reranker: RerankerConfiguration = Field(
-        default_factory=RerankerConfiguration,
-        title="Reranker configuration",
-        description="Configuration for neural reranking of RAG chunks using cross-encoder.",
+        description="Unified RAG configuration: BYOK stores, OKP provider, "
+        "and retrieval strategies (inline and tool-based).",
     )
 
     skills: Optional[SkillsConfiguration] = Field(
@@ -2730,6 +3310,33 @@ class Configuration(ConfigurationBase):
         description="Configuration for saved prompts feature limits including "
         "maximum prompts per user, display name length, and content length.",
     )
+
+    shields: list[ShieldConfiguration] = Field(
+        default_factory=list,
+        title="Shields configuration",
+        description="List of pydantic-ai-lightspeed agent guardrail shields "
+        "(question validity and PII redaction). Each entry has a unique "
+        "'name', a 'provider_id' ('question_validity' or 'redaction'), "
+        "and a type-specific 'config'.",
+    )
+
+    @model_validator(mode="after")
+    def validate_shield_names_unique(self) -> Self:
+        """Reject shields lists containing duplicate names.
+
+        Returns:
+            Self: The model instance after validation.
+
+        Raises:
+            ValueError: If two or more shields share the same name.
+        """
+        names = [shield.name for shield in self.shields]
+        duplicates = {name for name in names if names.count(name) > 1}
+        if duplicates:
+            raise ValueError(
+                f"Shield names must be unique, found duplicates: {sorted(duplicates)}"
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_mcp_auth_headers(self) -> Self:
@@ -2834,77 +3441,49 @@ class Configuration(ConfigurationBase):
         return self
 
     @model_validator(mode="after")
-    def validate_reranker_auto_enable(self) -> Self:
-        """Automatically enable reranker when both BYOK and OKP RAG are configured.
-
-        When users have both BYOK entries in byok_rag and OKP
-        configured in the RAG strategies, automatically
-        enable the reranker if it's not explicitly disabled. This improves result
-        quality when multiple knowledge sources are available.
-
-        Returns:
-            Self: The validated configuration instance with reranker potentially enabled.
-        """
-        # Check if BYOK RAG entries are configured
-        has_byok = len(self.byok_rag) > 0
-
-        # Check if OKP is configured in either inline or tool RAG strategies
-        # pylint: disable=no-member
-        has_okp = constants.OKP_RAG_ID in self.rag.inline
-
-        # If both BYOK and OKP are present and reranker is using default settings,
-        # ensure it's enabled for optimal results
-        if (
-            has_byok
-            and has_okp
-            and not self.reranker._explicitly_configured  # pylint: disable=protected-access
-            and not self.reranker.enabled
-        ):
-            logger.info(
-                "Automatically enabling reranker: Both BYOK RAG (%d entries) or "
-                "other inline RAG and OKP are configured. Reranking improves result "
-                "quality when multiple knowledge sources are available.",
-                len(self.byok_rag),
-            )
-            self.reranker.enabled = True
-
-        return self
-
-    @model_validator(mode="after")
     def check_unified_vs_legacy(self) -> Self:
         """Reconcile unified synthesis inputs, legacy mode, and library-mode needs.
 
         Unified-mode *synthesis inputs* span the configuration root: a non-empty
-        top-level ``inference.providers`` (Decision S5) and/or a
-        ``llama_stack.config`` block. The legacy path is
-        ``llama_stack.library_client_config_path`` pointing at an external
-        run.yaml. Both checks live here on the root model rather than on
-        ``LlamaStackConfiguration`` (which cannot see ``inference.providers``):
+        top-level ``inference.providers`` (Decision S5), a non-empty
+        ``vector_store.providers``, and/or a ``llama_stack.config`` block. The
+        legacy path is ``llama_stack.library_client_config_path`` pointing at an
+        external run.yaml. Both checks live here on the root model rather than
+        on ``LlamaStackConfiguration`` (which cannot see root-level provider
+        lists):
 
         - A synthesis input and the legacy path are mutually exclusive — a
           single file must pick one shape.
         - Library mode needs *some* run source — a synthesis input or the
-          legacy path. ``inference.providers`` alone is sufficient; no
-          ``llama_stack.config`` block is required.
+          legacy path. ``inference.providers`` or ``vector_store.providers``
+          alone is sufficient; no ``llama_stack.config`` block is required.
+        - An explicit ``config_format_version``, when set, must agree with
+          the detected shape (R11): ``unified`` requires a synthesis input,
+          ``legacy`` requires its absence (remote-only configs count as
+          legacy-compatible).
 
         Returns:
             Self: The validated configuration instance.
 
         Raises:
             ValueError: If a synthesis input and the legacy
-                ``library_client_config_path`` are set together, or if library
-                mode has no run source at all.
+                ``library_client_config_path`` are set together, if library
+                mode has no run source at all, or if ``config_format_version``
+                contradicts the detected shape.
         """
         # pylint: disable=no-member
         synthesis_input = (
-            bool(self.inference.providers) or self.llama_stack.config is not None
+            bool(self.inference.providers)
+            or bool(self.vector_store.providers)
+            or self.llama_stack.config is not None
         )
         legacy_input = self.llama_stack.library_client_config_path is not None
         if synthesis_input and legacy_input:
             raise ValueError(
                 "Llama Stack configuration is ambiguous: unified synthesis "
-                "inputs (a non-empty inference.providers or a llama_stack.config "
-                "block) are mutually exclusive with the legacy "
+                "inputs (a non-empty inference.providers, a non-empty "
+                "vector_store.providers, or a llama_stack.config block) are "
+                "mutually exclusive with the legacy "
                 "llama_stack.library_client_config_path. Use one or the other. "
                 "To convert a legacy two-file setup to unified mode, run "
                 "`lightspeed-stack --migrate-config`."
@@ -2916,9 +3495,22 @@ class Configuration(ConfigurationBase):
         ):
             raise ValueError(
                 "Llama Stack library mode requires a run-configuration source: "
-                "set a non-empty inference.providers, a llama_stack.config "
-                "block, or library_client_config_path."
+                "set a non-empty inference.providers, a non-empty "
+                "vector_store.providers, a llama_stack.config block, or "
+                "library_client_config_path."
             )
+        if self.config_format_version is not None:
+            detected = "unified" if synthesis_input else "legacy"
+            if self.config_format_version != detected:
+                raise ValueError(
+                    f"config_format_version is '{self.config_format_version}' "
+                    f"but the configuration body is {detected}-shaped: a "
+                    "unified configuration carries a synthesis input (a "
+                    "non-empty inference.providers, a non-empty "
+                    "vector_store.providers, or a llama_stack.config block), "
+                    "a legacy one does not. Fix config_format_version or the "
+                    "configuration body."
+                )
         return self
 
     def dump(self, filename: str | Path = "configuration.json") -> None:

@@ -2,10 +2,18 @@
 
 
 
+## 🌍 Base URL
+
+
+| URL | Description |
+|-----|-------------|
+
+
+# 🛠️ APIs
 
 ---
 
-# 📋 Schemas for common models
+# 📋 Components
 
 
 
@@ -17,16 +25,88 @@ Model representing an attachment that can be sent from the UI as part of query.
 A list of attachments can be an optional part of 'query' request.
 
 Attributes:
-    attachment_type: The attachment type, like "log", "configuration" etc.
+    attachment_type: The attachment type, like "log", "configuration", "image" etc.
     content_type: The content type as defined in MIME standard
-    content: The actual attachment content
+    content: The actual attachment content (text or base64-encoded image data)
 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| attachment_type | string | The attachment type, like 'log', 'configuration' etc. |
+| attachment_type | string | The attachment type, like 'log', 'configuration', 'image' etc. |
 | content_type | string | The content type as defined in MIME standard |
-| content | string | The actual attachment content |
+| content | string | The actual attachment content (text or base64-encoded image data) |
+
+
+## CatalogModel
+
+
+Normalized model entry used by ``/models`` and internal model resolution.
+
+Unifies OpenAI-style, Anthropic, and Google ``models.list()`` payloads into
+one catalog shape.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| identifier | string | Model identifier |
+| metadata | object | Provider-specific metadata excluding core catalog fields |
+| api_model_type | string | API model type (typically mirrors model_type) |
+| provider_id | string | Provider identifier |
+| type | string | Object type, always 'model' |
+| provider_resource_id | string | Provider-native resource identifier for the model |
+| model_type | string | Model type such as 'llm' or 'embedding' |
+
+
+## CatalogShield
+
+
+Shield entry in the ``/shields`` catalog response.
+
+Attributes:
+    name: Unique, user-facing name identifying this shield instance.
+    provider_id: Shield provider / type discriminator.
+    type: Catalog entry type; always shield.
+    config: Type-specific shield configuration.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique, user-facing name of the shield instance |
+| provider_id | string | Shield provider / type discriminator |
+| type | string | Catalog entry type; always shield |
+| config | object | Type-specific shield configuration |
+
+
+## CatalogTool
+
+
+Tool entry in the ``/tools`` catalog response.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| identifier | string |  |
+| description | string |  |
+| parameters | array |  |
+| provider_id | string |  |
+| toolgroup_id | string |  |
+| server_source | string |  |
+| type | string |  |
+
+
+## CatalogToolParameter
+
+
+Parameter entry for a tool in the ``/tools`` catalog response.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string |  |
+| description | string |  |
+| parameter_type | string |  |
+| required | boolean |  |
+| default |  |  |
 
 
 ## ConversationData
@@ -110,6 +190,19 @@ Attributes:
 | model | string | Model identifier used for this turn |
 | started_at | string | ISO 8601 timestamp when the turn started |
 | completed_at | string | ISO 8601 timestamp when the turn completed |
+
+
+## ListedMcpTool
+
+
+Tool metadata returned from an MCP ``tools/list`` call.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string |  |
+| description | string |  |
+| input_schema | object |  |
 
 
 ## MCPListToolsSummary
@@ -215,6 +308,8 @@ URL citation annotation for referencing external web resources.
 ## OpenAIResponseAnnotationContainerFileCitation
 
 
+Container file citation annotation referencing a file within a container.
+
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -247,6 +342,8 @@ File citation annotation for referencing specific files in response content.
 
 ## OpenAIResponseAnnotationFilePath
 
+
+File path annotation referencing a generated file in response content.
 
 
 | Field | Type | Description |
@@ -361,6 +458,8 @@ scenarios.
 
 ## OpenAIResponseOutputMessageContentOutputText
 
+
+Text content within an output message of an OpenAI response.
 
 
 | Field | Type | Description |
@@ -478,6 +577,45 @@ MCP list tools output message containing available tools from an MCP server.
 | type | string |  |
 | server_label | string |  |
 | tools | array |  |
+
+
+## OpenAIResponseOutputMessageReasoningContent
+
+
+Reasoning text from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The reasoning text content from the model. |
+| type | string | The type identifier, always 'reasoning_text'. |
+
+
+## OpenAIResponseOutputMessageReasoningItem
+
+
+Reasoning output from the model, representing the model's thinking process.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique identifier for the reasoning output item. |
+| summary | array | Summary of the reasoning output. |
+| type | string | The type identifier, always 'reasoning'. |
+| content | array | The reasoning content from the model. |
+| status | string | The status of the reasoning output. |
+
+
+## OpenAIResponseOutputMessageReasoningSummary
+
+
+A summary of reasoning output from the model.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| text | string | The summary text of the reasoning output. |
+| type | string | The type identifier, always 'summary_text'. |
 
 
 ## OpenAIResponseOutputMessageWebSearchToolCall
@@ -604,7 +742,6 @@ Shield moderation blocked the content; refusal details are present.
 | decision | string |  |
 | message | string |  |
 | moderation_id | string |  |
-| refusal_response |  |  |
 
 
 ## ShieldModerationPassed
@@ -618,13 +755,29 @@ Shield moderation passed; no refusal.
 | decision | string |  |
 
 
+## SkillMetadata
+
+
+Metadata describing a single loaded agent skill.
+
+Attributes:
+    name: Unique name of the skill.
+    description: Human readable description of what the skill does.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique name of the skill |
+| description | string | Human readable description of what the skill does |
+
+
 ## SolrVectorSearchRequest
 
 
 LCORE Solr inline RAG options for vector_io.query (mode and provider filters).
 
 Attributes:
-    mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.
+    mode: Solr vector_io search mode. When omitted, the configured OKP default is used.
     filters: Solr provider filter payload passed through as params['solr'].
 
 Legacy clients may send a plain JSON object with filter keys only;
@@ -633,7 +786,7 @@ that object is accepted as filters with mode unset (server default applies).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| mode | string | Solr vector_io search mode. When omitted, the server default ('hybrid') is used. |
+| mode | string | Solr vector_io search mode. When omitted, the configured OKP default is used; otherwise 'hybrid' applies. 'keyword' and 'lexical' both use BM25 text search. |
 | filters | object | Solr provider filter payload passed through as params['solr']. Supports structured metadata filters (eq, ne, in, nin comparison operators). Legacy filter-only objects (e.g. fq) are still accepted. |
 
 
@@ -751,3 +904,5 @@ Summary of a turn in llama stack.
 | referenced_documents | array |  |
 | token_usage |  |  |
 | output_items | array | Structured response output items, captured for compacted-mode turn persistence (LCORE-1572). Empty on the non-compacted path. |
+| partial_tokens | array | Accumulated text deltas during streaming, used to reconstruct partial content on interruption. |
+| next_chunk_id | integer | Next monotonic SSE chunk index, kept in sync with the inner generator so the interrupt handler can emit a sequentially valid id. |

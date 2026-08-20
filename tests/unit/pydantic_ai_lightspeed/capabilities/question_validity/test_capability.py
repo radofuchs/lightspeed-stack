@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 from pydantic_ai import AgentRunResult, RunContext
 from pydantic_ai.messages import ImageUrl, ModelResponse, TextContent, TextPart
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from pydantic_ai.usage import RequestUsage, RunUsage
 from pytest_mock import MockerFixture, MockType
 
@@ -13,6 +14,7 @@ from constants import (
     DEFAULT_INVALID_QUESTION_RESPONSE,
     DEFAULT_MODEL_PROMPT,
 )
+from models.common.moderation import ShieldModerationBlocked, ShieldModerationPassed
 from models.config import (
     QuestionValidityConfig,
 )
@@ -20,9 +22,11 @@ from pydantic_ai_lightspeed.capabilities.question_validity._capability import (
     SUBJECT_ALLOWED,
     SUBJECT_REJECTED,
     QuestionValidity,
-    _create_model_from_llama_stack_client,
+    _extract_conversation_id,
     _extract_message_str_from_user_content,
 )
+
+_MODULE = "pydantic_ai_lightspeed.capabilities.question_validity._capability"
 
 
 class TestExtractMessageStrFromUserContent:
@@ -60,6 +64,47 @@ class TestExtractMessageStrFromUserContent:
         """Test extraction from a single-element sequence."""
         result = _extract_message_str_from_user_content([ImageUrl("fake.png"), "keep"])
         assert result == "keep"
+
+
+class TestExtractConversationId:
+    """Tests for _extract_conversation_id helper."""
+
+    def test_extracts_conversation_id(self, mocker: MockerFixture) -> None:
+        """Test extraction when extra_body.conversation is set."""
+        model = mocker.Mock()
+        model.settings = {"extra_body": {"conversation": "conv_123"}}
+
+        assert _extract_conversation_id(model) == "conv_123"
+
+    def test_returns_none_when_settings_missing(self, mocker: MockerFixture) -> None:
+        """Test that None settings yields None."""
+        model = mocker.Mock()
+        model.settings = None
+
+        assert _extract_conversation_id(model) is None
+
+    def test_returns_none_when_extra_body_missing(self, mocker: MockerFixture) -> None:
+        """Test that missing extra_body yields None."""
+        model = mocker.Mock()
+        model.settings = {}
+
+        assert _extract_conversation_id(model) is None
+
+    def test_returns_none_when_extra_body_not_dict(self, mocker: MockerFixture) -> None:
+        """Test that a non-dict extra_body yields None instead of raising."""
+        model = mocker.Mock()
+        model.settings = {"extra_body": "not-a-dict"}
+
+        assert _extract_conversation_id(model) is None
+
+    def test_returns_none_when_conversation_not_string(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that a non-string conversation value yields None."""
+        model = mocker.Mock()
+        model.settings = {"extra_body": {"conversation": 123}}
+
+        assert _extract_conversation_id(model) is None
 
 
 class TestQuestionValidityConfigInit:
@@ -104,72 +149,35 @@ class TestQuestionValidityConfigInit:
             QuestionValidityConfig(model_id="test", unknown_field="value")  # type: ignore[call-arg]
 
 
-class TestCreateModelFromLlamaStackClient:
-    """Tests for _create_model_from_llama_stack_client factory function."""
-
-    _MODULE = "pydantic_ai_lightspeed.capabilities.question_validity._capability"
-
-    def test_creates_model_with_correct_wiring(self, mocker: MockerFixture) -> None:
-        """Test that the factory wires client, provider, and model correctly."""
-        mock_client = mocker.Mock()
-        mock_holder = mocker.patch(f"{self._MODULE}.AsyncLlamaStackClientHolder")
-        mock_holder.return_value.get_client.return_value = mock_client
-
-        mock_provider = mocker.Mock()
-        mocker.patch(
-            f"{self._MODULE}.llama_stack_provider_from_client",
-            return_value=mock_provider,
-        )
-
-        mock_model_cls = mocker.patch(f"{self._MODULE}.LlamaStackResponsesModel")
-
-        result = _create_model_from_llama_stack_client("test-model")
-
-        mock_holder.return_value.get_client.assert_called_once()
-        mock_model_cls.assert_called_once()
-        call_args = mock_model_cls.call_args
-        assert call_args.args[0] == "test-model"
-        assert call_args.kwargs["provider"] is mock_provider
-        settings = call_args.kwargs["settings"]
-        assert settings == {"openai_store": False}
-        assert result is mock_model_cls.return_value
-
-    def test_passes_client_to_provider_factory(self, mocker: MockerFixture) -> None:
-        """Test that the client from the holder is passed to the provider factory."""
-        mock_client = mocker.Mock()
-        mock_holder = mocker.patch(f"{self._MODULE}.AsyncLlamaStackClientHolder")
-        mock_holder.return_value.get_client.return_value = mock_client
-
-        mock_from_client = mocker.patch(
-            f"{self._MODULE}.llama_stack_provider_from_client",
-        )
-
-        _create_model_from_llama_stack_client("any-model")
-
-        mock_from_client.assert_called_once_with(mock_client)
-
-
 class TestQuestionValidityInit:
     """Tests for QuestionValidity dataclass initialization."""
 
-    _MODULE = "pydantic_ai_lightspeed.capabilities.question_validity._capability"
+    def test_post_init_wires_client_and_model(self, mocker: MockerFixture) -> None:
+        """Test that __post_init__ obtains the client and passes it to from_ogx_client."""
+        mock_client = mocker.Mock()
+        mock_holder = mocker.patch(f"{_MODULE}.AsyncOgxClientHolder")
+        mock_holder.return_value.get_client.return_value = mock_client
 
-    def test_post_init_calls_create_model(self, mocker: MockerFixture) -> None:
-        """Test that __post_init__ delegates to _create_model_from_llama_stack_client."""
-        mock_create = mocker.patch(
-            f"{self._MODULE}._create_model_from_llama_stack_client",
+        mock_from_client = mocker.patch(
+            f"{_MODULE}.OgxResponsesModel.from_ogx_client",
         )
-        config = QuestionValidityConfig(model_id="my-model")
 
+        config = QuestionValidityConfig(model_id="test-model")
         QuestionValidity(config=config)
 
-        mock_create.assert_called_once_with("my-model")
+        mock_holder.return_value.get_client.assert_called_once()
+        mock_from_client.assert_called_once_with(
+            "test-model",
+            mock_client,
+            model_settings=OpenAIResponsesModelSettings(openai_store=False),
+        )
 
     def test_model_is_assigned_from_factory(self, mocker: MockerFixture) -> None:
-        """Test that the model returned by the factory is stored on the instance."""
+        """Test that the model returned by from_ogx_client is stored."""
         mock_model = mocker.Mock()
+        mocker.patch(f"{_MODULE}.AsyncOgxClientHolder")
         mocker.patch(
-            f"{self._MODULE}._create_model_from_llama_stack_client",
+            f"{_MODULE}.OgxResponsesModel.from_ogx_client",
             return_value=mock_model,
         )
         config = QuestionValidityConfig(model_id="test")
@@ -182,12 +190,11 @@ class TestQuestionValidityInit:
 class TestBuildPrompt:
     """Tests for QuestionValidity._build_prompt method."""
 
-    _MODULE = "pydantic_ai_lightspeed.capabilities.question_validity._capability"
-
     @pytest.fixture(autouse=True)
     def _mock_create_model(self, mocker: MockerFixture) -> None:
-        """Mock _create_model_from_llama_stack_client for all tests."""
-        mocker.patch(f"{self._MODULE}._create_model_from_llama_stack_client")
+        """Mock model creation for all tests."""
+        mocker.patch(f"{_MODULE}.AsyncOgxClientHolder")
+        mocker.patch(f"{_MODULE}.OgxResponsesModel.from_ogx_client")
 
     @pytest.fixture(name="question_validity")
     def question_validity_fixture(self) -> QuestionValidity:
@@ -245,19 +252,27 @@ class TestBuildPrompt:
 class TestWrapRun:
     """Tests for QuestionValidity.wrap_run method."""
 
-    _MODULE = "pydantic_ai_lightspeed.capabilities.question_validity._capability"
-
     @pytest.fixture(autouse=True)
     def _mock_create_model(self, mocker: MockerFixture) -> None:
-        """Mock _create_model_from_llama_stack_client for all tests."""
-        mocker.patch(f"{self._MODULE}._create_model_from_llama_stack_client")
+        """Mock model creation for all tests."""
+        mocker.patch(f"{_MODULE}.AsyncOgxClientHolder")
+        mocker.patch(f"{_MODULE}.OgxResponsesModel.from_ogx_client")
+
+    @pytest.fixture(name="mock_append_turn", autouse=True)
+    def mock_append_turn_fixture(self, mocker: MockerFixture) -> MockType:
+        """Mock the conversation-persistence call used on rejection."""
+        return mocker.patch(
+            f"{_MODULE}.append_turn_to_conversation", new_callable=mocker.AsyncMock
+        )
 
     @pytest.fixture(name="mock_ctx")
     def mock_ctx_fixture(self, mocker: MockerFixture) -> RunContext:
-        """Create a mock RunContext."""
+        """Create a mock RunContext bound to a model with a conversation ID."""
         ctx = mocker.Mock(spec=RunContext)
         ctx.prompt = "How do I create a pod?"
         ctx.usage = RunUsage()
+        ctx.model = mocker.Mock()
+        ctx.model.settings = {"extra_body": {"conversation": "conv_test"}}
         return ctx
 
     @pytest.fixture(name="mock_handler")
@@ -315,6 +330,89 @@ class TestWrapRun:
         mock_handler.assert_not_awaited()
         assert isinstance(result, AgentRunResult)
         assert result.output == DEFAULT_INVALID_QUESTION_RESPONSE
+
+    @pytest.mark.asyncio
+    async def test_rejected_question_persists_turn_to_conversation(
+        self,
+        mocker: MockerFixture,
+        mock_ctx: RunContext,
+        mock_handler: MockType,
+        mock_append_turn: MockType,
+    ) -> None:
+        """Test that a rejection appends the user question and refusal to the conversation."""
+        mock_client = mocker.Mock()
+        mocker.patch(
+            f"{_MODULE}.AsyncOgxClientHolder"
+        ).return_value.get_client.return_value = mock_client
+        mock_response = ModelResponse(
+            parts=[TextPart(content=SUBJECT_REJECTED)],
+            usage=RequestUsage(input_tokens=10, output_tokens=1),
+        )
+        mocker.patch(
+            "pydantic_ai_lightspeed.capabilities.question_validity._capability.model_request",
+            return_value=mock_response,
+        )
+
+        config = QuestionValidityConfig(model_id="test")
+        qv = QuestionValidity(config=config)
+        await qv.wrap_run(mock_ctx, handler=mock_handler)
+
+        mock_append_turn.assert_awaited_once_with(
+            mock_client,
+            "conv_test",
+            "How do I create a pod?",
+            DEFAULT_INVALID_QUESTION_RESPONSE,
+        )
+
+    @pytest.mark.asyncio
+    async def test_rejection_skips_persistence_when_conversation_id_missing(
+        self,
+        mocker: MockerFixture,
+        mock_ctx: RunContext,
+        mock_handler: MockType,
+        mock_append_turn: MockType,
+    ) -> None:
+        """Test that persistence is skipped (not crashed) without a conversation ID."""
+        mock_ctx.model = mocker.Mock(settings={})
+        mock_response = ModelResponse(
+            parts=[TextPart(content=SUBJECT_REJECTED)],
+            usage=RequestUsage(),
+        )
+        mocker.patch(
+            "pydantic_ai_lightspeed.capabilities.question_validity._capability.model_request",
+            return_value=mock_response,
+        )
+
+        config = QuestionValidityConfig(model_id="test")
+        qv = QuestionValidity(config=config)
+        result = await qv.wrap_run(mock_ctx, handler=mock_handler)
+
+        mock_append_turn.assert_not_awaited()
+        assert result.output == DEFAULT_INVALID_QUESTION_RESPONSE
+
+    @pytest.mark.asyncio
+    async def test_allowed_question_does_not_persist_turn(
+        self,
+        mocker: MockerFixture,
+        mock_ctx: RunContext,
+        mock_handler: MockType,
+        mock_append_turn: MockType,
+    ) -> None:
+        """Test that an allowed question does not touch the conversation."""
+        mock_response = ModelResponse(
+            parts=[TextPart(content=SUBJECT_ALLOWED)],
+            usage=RequestUsage(input_tokens=10, output_tokens=1),
+        )
+        mocker.patch(
+            "pydantic_ai_lightspeed.capabilities.question_validity._capability.model_request",
+            return_value=mock_response,
+        )
+
+        config = QuestionValidityConfig(model_id="test")
+        qv = QuestionValidity(config=config)
+        await qv.wrap_run(mock_ctx, handler=mock_handler)
+
+        mock_append_turn.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_unexpected_response_treated_as_rejected(
@@ -505,6 +603,8 @@ class TestWrapRun:
         ctx = mocker.Mock(spec=RunContext)
         ctx.prompt = None
         ctx.usage = RunUsage()
+        ctx.model = mocker.Mock()
+        ctx.model.settings = {"extra_body": {"conversation": "conv_test"}}
 
         mock_response = ModelResponse(
             parts=[TextPart(content=SUBJECT_REJECTED)],
@@ -569,3 +669,108 @@ class TestWrapRun:
         prompt_str = str(messages[0])
         assert "How to" in prompt_str
         assert "scale a deployment?" in prompt_str
+
+
+class TestQuestionValidityRun:
+    """Tests for QuestionValidity.run method."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_create_model(self, mocker: MockerFixture) -> None:
+        """Mock model creation for all tests."""
+        mocker.patch(f"{_MODULE}.AsyncOgxClientHolder")
+        mocker.patch(f"{_MODULE}.OgxResponsesModel.from_ogx_client")
+
+    @pytest.mark.asyncio
+    async def test_allowed_returns_passed(self, mocker: MockerFixture) -> None:
+        """Test that an allowed response returns ShieldModerationPassed."""
+        mock_response = ModelResponse(
+            parts=[TextPart(content=SUBJECT_ALLOWED)],
+            usage=RequestUsage(input_tokens=10, output_tokens=1),
+        )
+        mocker.patch(f"{_MODULE}.model_request", return_value=mock_response)
+
+        config = QuestionValidityConfig(model_id="test")
+        qv = QuestionValidity(config=config)
+        result = await qv.run("How do I create a pod?")
+
+        assert isinstance(result, ShieldModerationPassed)
+        assert result.decision == "passed"
+
+    @pytest.mark.asyncio
+    async def test_rejected_returns_blocked(self, mocker: MockerFixture) -> None:
+        """Test that a rejected response returns ShieldModerationBlocked."""
+        mock_response = ModelResponse(
+            parts=[TextPart(content=SUBJECT_REJECTED)],
+            usage=RequestUsage(input_tokens=10, output_tokens=1),
+        )
+        mocker.patch(f"{_MODULE}.model_request", return_value=mock_response)
+
+        config = QuestionValidityConfig(model_id="test")
+        qv = QuestionValidity(config=config)
+        result = await qv.run("What is the meaning of life?")
+
+        assert isinstance(result, ShieldModerationBlocked)
+        assert result.message == DEFAULT_INVALID_QUESTION_RESPONSE
+        assert result.moderation_id.startswith("modr-")
+        assert result.refusal_response.role == "assistant"
+        assert result.refusal_response.content == DEFAULT_INVALID_QUESTION_RESPONSE
+
+    @pytest.mark.asyncio
+    async def test_unexpected_response_returns_blocked(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that an unexpected model response is treated as blocked."""
+        mock_response = ModelResponse(
+            parts=[TextPart(content="I don't understand")],
+            usage=RequestUsage(input_tokens=10, output_tokens=5),
+        )
+        mocker.patch(f"{_MODULE}.model_request", return_value=mock_response)
+
+        config = QuestionValidityConfig(model_id="test")
+        qv = QuestionValidity(config=config)
+        result = await qv.run("some input")
+
+        assert isinstance(result, ShieldModerationBlocked)
+        assert result.message == DEFAULT_INVALID_QUESTION_RESPONSE
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "response_text",
+        [" ALLOWED", "ALLOWED ", " ALLOWED ", "ALLOWED\n"],
+        ids=["leading-space", "trailing-space", "both-spaces", "trailing-newline"],
+    )
+    async def test_allowed_with_whitespace_returns_passed(
+        self, mocker: MockerFixture, response_text: str
+    ) -> None:
+        """Test that ALLOWED with surrounding whitespace still returns passed."""
+        mock_response = ModelResponse(
+            parts=[TextPart(content=response_text)],
+            usage=RequestUsage(input_tokens=10, output_tokens=1),
+        )
+        mocker.patch(f"{_MODULE}.model_request", return_value=mock_response)
+
+        config = QuestionValidityConfig(model_id="test")
+        qv = QuestionValidity(config=config)
+        result = await qv.run("How do I scale pods?")
+
+        assert isinstance(result, ShieldModerationPassed)
+
+    @pytest.mark.asyncio
+    async def test_custom_invalid_response_message(self, mocker: MockerFixture) -> None:
+        """Test that a custom rejection message is used in the blocked result."""
+        mock_response = ModelResponse(
+            parts=[TextPart(content=SUBJECT_REJECTED)],
+            usage=RequestUsage(),
+        )
+        mocker.patch(f"{_MODULE}.model_request", return_value=mock_response)
+
+        config = QuestionValidityConfig(
+            model_id="test", invalid_question_response="Custom rejection."
+        )
+        qv = QuestionValidity(config=config)
+        result = await qv.run("off-topic question")
+
+        assert isinstance(result, ShieldModerationBlocked)
+        assert result.message == "Custom rejection."
+        assert result.refusal_response.role == "assistant"
+        assert result.refusal_response.content == "Custom rejection."

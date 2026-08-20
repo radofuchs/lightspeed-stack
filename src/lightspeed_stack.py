@@ -14,7 +14,7 @@ from llama_stack_configuration import migrate_config_dumb
 from log import get_logger, setup_logging
 from runners.quota_scheduler import start_quota_scheduler
 from runners.uvicorn import start_uvicorn
-from utils import schema_dumper
+from utils import config_dumper, models_dumper
 
 setup_logging()
 logger = get_logger(__name__)
@@ -27,6 +27,10 @@ def create_argument_parser() -> ArgumentParser:
     - -v / --verbose: enable verbose output
     - -d / --dump-configuration: dump the loaded configuration to JSON and exit
     - -s / --dump-schema: dump the configuration schema to OpenAPI JSON and exit
+    - -m / --dump-models: dump schemas for all models into OpenAPI-compatible file and quit
+    - -gr / --dump-models-group {conversation_summary,requests,successful_responses,
+                      error_responses,common,agents,common_responses}
+                      dump schemas for selected models group into OpenAPI-compatible file and quit
     - -c / --config: path to the configuration file (default "lightspeed-stack.yaml")
     - -g / --generate-llama-stack-configuration: generate a Llama Stack
                                                  configuration from the service configuration
@@ -60,6 +64,31 @@ def create_argument_parser() -> ArgumentParser:
         help="dump configuration schema into OpenAPI-compatible file and quit",
         action="store_true",
         default=False,
+    )
+    parser.add_argument(
+        "-m",
+        "--dump-models",
+        dest="dump_models",
+        help="dump schemas for all models into OpenAPI-compatible file and quit",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "-gr",
+        "--dump-models-group",
+        dest="dump_models_group",
+        help="dump schemas for selected models group into OpenAPI-compatible file and quit",
+        action="store",
+        choices=[
+            "conversation_summary",
+            "requests",
+            "successful_responses",
+            "error_responses",
+            "common",
+            "agents",
+            "common_responses",
+        ],
+        default=None,
     )
     parser.add_argument(
         "-c",
@@ -105,6 +134,7 @@ def create_argument_parser() -> ArgumentParser:
     return parser
 
 
+# pylint: disable=too-many-branches, too-many-statements
 def main() -> None:
     """Entry point to the web service.
 
@@ -156,8 +186,20 @@ def main() -> None:
     configuration.load_configuration(args.config_file)
     logger.info("Configuration: %s", configuration.configuration)
     logger.info(
-        "Llama stack configuration: %s", configuration.llama_stack_configuration
+        "Llama Stack configuration: %s", configuration.llama_stack_configuration
     )
+
+    # Deprecation schedule (Decision S2): the legacy two-file path keeps
+    # working through 0.6 with this single startup WARN and is removed in 0.7.
+    if configuration.llama_stack_configuration.library_client_config_path is not None:
+        logger.warning(
+            "DEPRECATED: the two-file configuration "
+            "(llama_stack.library_client_config_path + external run.yaml) is "
+            "deprecated and will be removed in release 0.7. Migrate to the "
+            "unified lightspeed-stack.yaml: https://lightspeed-core.github.io"
+            "/lightspeed-stack/design/llama-stack-config-merge"
+            "/llama-stack-config-merge.html#migration--backwards-compatibility"
+        )
 
     # -d or --dump-configuration CLI flags are used to dump the actual configuration
     # to a JSON file w/o doing any other operation
@@ -174,10 +216,33 @@ def main() -> None:
     # into a JSON file that is compatible with OpenAPI schema specification
     if args.dump_schema:
         try:
-            schema_dumper.dump_schema("schema.json")
+            config_dumper.dump_schema("schema.json")
             logger.info("Configuration schema dumped to schema.json")
         except Exception as e:
             logger.error("Failed to dump configuration schema: %s", e)
+            raise SystemExit(1) from e
+        return
+
+    # -m or --dump-models CLI flags are used to dump schema for all models
+    # into a JSON file that is compatible with OpenAPI schema specification
+    if args.dump_models:
+        try:
+            models_dumper.dump_models("models.json")
+            logger.info("Schema for all models dumped to models.json")
+        except Exception as e:
+            logger.error("Failed to dump schema for models: %s", e)
+            raise SystemExit(1) from e
+        return
+
+    # -gr or --dump-models-group CLI parameter is used to dump schema for
+    # selected models into a JSON file that is compatible with OpenAPI schema
+    # specification
+    if args.dump_models_group is not None:
+        try:
+            models_dumper.dump_models_group(args.dump_models_group)
+            logger.info("Schema for group %s of models dumped", args.dump_models_group)
+        except Exception as e:
+            logger.error("Failed to dump schema for models: %s", e)
             raise SystemExit(1) from e
         return
 

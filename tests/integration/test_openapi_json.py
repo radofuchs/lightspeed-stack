@@ -18,7 +18,7 @@ from configuration import configuration
 #   * presence of paths/methods and key response codes
 #   * presence and key attributes of important component schemas (enums, required fields)
 
-OPENAPI_FILE = "docs/openapi.json"
+OPENAPI_FILE = "docs/devel_doc/openapi.json"
 URL = "/openapi.json"
 
 
@@ -215,7 +215,7 @@ def test_servers_section_present_from_url(spec_from_url: dict[str, Any]) -> None
         ("/v1/info", "get", {"200", "401", "403", "503"}),
         ("/v1/models", "get", {"200", "401", "403", "500", "503"}),
         ("/v1/tools", "get", {"200", "401", "403", "500", "503"}),
-        ("/v1/shields", "get", {"200", "401", "403", "500", "503"}),
+        ("/v1/shields", "get", {"200", "401", "403", "500"}),
         ("/v1/providers", "get", {"200", "401", "403", "500", "503"}),
         (
             "/v1/providers/{provider_id}",
@@ -231,13 +231,13 @@ def test_servers_section_present_from_url(spec_from_url: dict[str, Any]) -> None
         (
             "/v1/mcp-servers",
             "post",
-            {"201", "401", "403", "409", "500", "503"},
+            {"201", "401", "403", "409", "500"},
         ),
         ("/v1/mcp-servers", "get", {"200", "401", "403", "500"}),
         (
             "/v1/mcp-servers/{name}",
             "delete",
-            {"200", "401", "403", "500", "503"},
+            {"200", "401", "403", "500"},
         ),
         ("/v1/query", "post", {"200", "401", "403", "404", "422", "429", "500", "503"}),
         (
@@ -256,6 +256,18 @@ def test_servers_section_present_from_url(spec_from_url: dict[str, Any]) -> None
             {"200", "401", "403", "404", "413", "422", "429", "500", "503"},
         ),
         ("/v1/config", "get", {"200", "401", "403", "500"}),
+        ("/v1/saved-prompts/config", "get", {"200", "401", "403", "500", "503"}),
+        ("/v1/saved-prompts", "get", {"200", "401", "403", "500"}),
+        (
+            "/v1/saved-prompts",
+            "post",
+            {"201", "401", "403", "409", "422", "500"},
+        ),
+        (
+            "/v1/saved-prompts/{prompt_id}",
+            "delete",
+            {"200", "400", "401", "403", "500"},
+        ),
         ("/v1/feedback", "post", {"200", "401", "403", "404", "500"}),
         ("/v1/feedback/status", "get", {"200"}),
         ("/v1/feedback/status", "put", {"200", "401", "403", "500"}),
@@ -319,7 +331,7 @@ def test_paths_and_responses_exist_from_file(
         ("/v1/info", "get", {"200", "401", "403", "503"}),
         ("/v1/models", "get", {"200", "401", "403", "500", "503"}),
         ("/v1/tools", "get", {"200", "401", "403", "500", "503"}),
-        ("/v1/shields", "get", {"200", "401", "403", "500", "503"}),
+        ("/v1/shields", "get", {"200", "401", "403", "500"}),
         ("/v1/providers", "get", {"200", "401", "403", "500", "503"}),
         (
             "/v1/providers/{provider_id}",
@@ -335,13 +347,13 @@ def test_paths_and_responses_exist_from_file(
         (
             "/v1/mcp-servers",
             "post",
-            {"201", "401", "403", "409", "500", "503"},
+            {"201", "401", "403", "409", "500"},
         ),
         ("/v1/mcp-servers", "get", {"200", "401", "403", "500"}),
         (
             "/v1/mcp-servers/{name}",
             "delete",
-            {"200", "401", "403", "500", "503"},
+            {"200", "401", "403", "500"},
         ),
         ("/v1/query", "post", {"200", "401", "403", "404", "422", "429", "500", "503"}),
         (
@@ -360,6 +372,18 @@ def test_paths_and_responses_exist_from_file(
             {"200", "401", "403", "404", "413", "422", "429", "500", "503"},
         ),
         ("/v1/config", "get", {"200", "401", "403", "500"}),
+        ("/v1/saved-prompts/config", "get", {"200", "401", "403", "500", "503"}),
+        ("/v1/saved-prompts", "get", {"200", "401", "403", "500"}),
+        (
+            "/v1/saved-prompts",
+            "post",
+            {"201", "401", "403", "409", "422", "500"},
+        ),
+        (
+            "/v1/saved-prompts/{prompt_id}",
+            "delete",
+            {"200", "400", "401", "403", "500"},
+        ),
         ("/v1/feedback", "post", {"200", "401", "403", "404", "500"}),
         ("/v1/feedback/status", "get", {"200"}),
         ("/v1/feedback/status", "put", {"200", "401", "403", "500"}),

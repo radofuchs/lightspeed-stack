@@ -64,6 +64,7 @@ create_secret() {
 create_secret hf-token-secret --from-literal=token="$HUGGING_FACE_HUB_TOKEN"
 create_secret vllm-api-key-secret --from-literal=key="$VLLM_API_KEY"
 create_secret openai-api-key-secret --from-literal=key=""
+create_secret vllm-model-secret --from-literal=key="$MODEL_NAME"
 
 # MCP token secrets for lightspeed-stack
 REPO_ROOT="$(cd "$PIPELINE_DIR/../../.." && pwd)"
@@ -225,7 +226,6 @@ export LLAMA_STACK_IMAGE
 oc new-build --name=llama-stack-e2e \
   --binary \
   --strategy=docker \
-  --image="registry.access.redhat.com/ubi9/ubi-minimal" \
   --to="llama-stack-e2e:latest" \
   -n "$NAMESPACE" 2>/dev/null || echo "BuildConfig llama-stack-e2e already exists"
 
@@ -256,7 +256,7 @@ create_secret api-url-secret --from-literal=key="$KSVC_URL"
 oc create configmap llama-stack-config -n "$NAMESPACE" \
   --from-file="$REPO_ROOT/tests/e2e-prow/rhoai/configs/run.yaml"
 oc create configmap lightspeed-stack-config -n "$NAMESPACE" \
-  --from-file="$REPO_ROOT/tests/e2e/configuration/server-mode/lightspeed-stack.yaml"
+  --from-file=lightspeed-stack.yaml="$REPO_ROOT/tests/e2e/configuration/server-mode/lightspeed-stack-rhoai.yaml"
 
 # Create RAG data ConfigMap from the e2e test RAG data
 echo "Creating RAG data ConfigMap..."
@@ -264,13 +264,14 @@ RAG_DB_PATH="$REPO_ROOT/tests/e2e/rag/kv_store.db"
 if [ -f "$RAG_DB_PATH" ]; then
     # Extract vector store ID from kv_store.db using Python (sqlite3 CLI may not be available)
     echo "Extracting vector store ID from kv_store.db..."
-    # Key format is: vector_stores:v3::vs_xxx or openai_vector_stores:v3::vs_xxx
+    # OGX 1.0 FAISS keys use persistence.namespace prefix, e.g.:
+    #   vector_io::faiss:vector_stores:v3::vs_xxx
     export FAISS_VECTOR_STORE_ID=$(python3 -c "
 import sqlite3
 import re
 conn = sqlite3.connect('$RAG_DB_PATH')
 cursor = conn.cursor()
-cursor.execute(\"SELECT key FROM kvstore WHERE key LIKE 'vector_stores:v%::%' LIMIT 1\")
+cursor.execute(\"SELECT key FROM kvstore WHERE key LIKE 'vector_io::faiss:vector_stores:v%::%' LIMIT 1\")
 row = cursor.fetchone()
 if row:
     # Extract the vs_xxx ID from the key
@@ -294,6 +295,19 @@ conn.close()
     echo "✅ RAG data ConfigMap created from $RAG_DB_PATH"
 else
     echo "⚠️  No kv_store.db found at $RAG_DB_PATH"
+fi
+
+# Agent skills E2E: same fixture docker-compose mounts at /app-root/skills
+SKILLS_DIR="$REPO_ROOT/tests/e2e/skills"
+if [ -d "$SKILLS_DIR" ]; then
+  tar czf /tmp/e2e-skills.tgz -C "$SKILLS_DIR" .
+  oc create configmap e2e-skills -n "$NAMESPACE" \
+    --from-file=skills.tgz=/tmp/e2e-skills.tgz \
+    --dry-run=client -o yaml | oc apply -f -
+  rm -f /tmp/e2e-skills.tgz
+  echo "✅ e2e-skills ConfigMap created from $SKILLS_DIR"
+else
+  echo "⚠️  No skills directory at $SKILLS_DIR — skills.feature will fail"
 fi
 
 ./pipeline-services.sh

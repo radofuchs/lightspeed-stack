@@ -3,12 +3,13 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from llama_stack_client import APIConnectionError
+from ogx_client import APIConnectionError
+from opentelemetry import trace
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
-from client import AsyncLlamaStackClientHolder
+from client import AsyncOgxClientHolder
 from configuration import configuration
 from log import get_logger
 from models.api.responses.constants import UNAUTHORIZED_OPENAPI_EXAMPLES
@@ -19,9 +20,11 @@ from models.api.responses.error import (
 )
 from models.api.responses.successful import InfoResponse
 from models.config import Action
+from utils.otel_tracing import set_span_attributes
 from version import __version__
 
 logger = get_logger(__name__)
+tracer = trace.get_tracer(__name__)
 router = APIRouter(tags=["info"])
 
 
@@ -30,7 +33,7 @@ get_info_responses: dict[int | str, dict[str, Any]] = {
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -66,24 +69,32 @@ async def info_endpoint_handler(
     # Nothing interesting in the request
     _ = request
 
-    logger.info("Response to /v1/info endpoint")
+    with tracer.start_as_current_span("info.handle_request") as span:
+        logger.info("Response to /v1/info endpoint")
 
-    try:
-        # try to get Llama Stack client
-        client = AsyncLlamaStackClientHolder().get_client()
-        # retrieve version
-        llama_stack_version_object = await client.inspect.version()
-        llama_stack_version = llama_stack_version_object.version
-        logger.debug("Service name: %s", configuration.configuration.name)
-        logger.debug("Service version: %s", __version__)
-        logger.debug("Llama Stack version: %s", llama_stack_version)
-        return InfoResponse(
-            name=configuration.configuration.name,
-            service_version=__version__,
-            llama_stack_version=llama_stack_version,
-        )
-    # connection to Llama Stack server
-    except APIConnectionError as e:
-        logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
-        raise HTTPException(**response.model_dump()) from e
+        try:
+            # try to get Llama Stack client
+            client = AsyncOgxClientHolder().get_client()
+            # retrieve version
+            llama_stack_version_object = await client.inspect.version()
+            llama_stack_version = llama_stack_version_object.version
+            logger.debug("Service name: %s", configuration.configuration.name)
+            logger.debug("Service version: %s", __version__)
+            logger.debug("Llama Stack version: %s", llama_stack_version)
+            set_span_attributes(
+                span,
+                {
+                    "service.name": configuration.configuration.name,
+                    "service.version": __version__,
+                },
+            )
+            return InfoResponse(
+                name=configuration.configuration.name,
+                service_version=__version__,
+                llama_stack_version=llama_stack_version,
+            )
+        # connection to Llama Stack server
+        except APIConnectionError as e:
+            logger.error("Unable to connect to Llama Stack: %s", e)
+            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            raise HTTPException(**response.model_dump()) from e

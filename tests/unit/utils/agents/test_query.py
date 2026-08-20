@@ -1,16 +1,15 @@
 """Unit tests for utils.agents.query module."""
 
+import base64
 from collections.abc import Callable
 from typing import Any, Optional
 
 import pytest
 from fastapi import HTTPException
-from llama_stack_api.openai_responses import (
-    OpenAIResponseMessage as ResponseMessage,
-)
-from llama_stack_client import APIConnectionError, APIStatusError
+from ogx_client import APIConnectionError, APIStatusError
 from pydantic_ai.messages import (
     FinishReason,
+    ImageUrl,
     ModelRequest,
     ModelResponse,
     NativeToolCallPart,
@@ -25,6 +24,7 @@ from pytest_mock import MockerFixture
 
 from constants import ENDPOINT_PATH_QUERY
 from models.common.moderation import ShieldModerationBlocked, ShieldModerationPassed
+from models.common.query import Attachment
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.responses.types import ResponseInput
 from models.common.turn_summary import TurnSummary
@@ -109,10 +109,6 @@ def blocked_moderation_fixture() -> ShieldModerationBlocked:
     return ShieldModerationBlocked(
         message="Content blocked by shield.",
         moderation_id="modr-test-456",
-        refusal_response=ResponseMessage(
-            role="assistant",
-            content="Content blocked by shield.",
-        ),
     )
 
 
@@ -432,6 +428,49 @@ class TestRetrieveAgentResponse:
         assert summary.id == "resp-success"
 
     @pytest.mark.asyncio
+    async def test_success_with_image_attachments_sends_multimodal_prompt(
+        self,
+        mocker: MockerFixture,
+        make_agent_run_result: Callable[..., Any],
+        make_responses_params: Callable[..., ResponsesApiParams],
+        patch_recording_metrics: None,
+    ) -> None:
+        """Test that image attachments produce a multimodal prompt."""
+        run_result = make_agent_run_result(
+            content="I see a screenshot.",
+            response_id="resp-image",
+        )
+        mock_agent = mocker.AsyncMock()
+        mock_agent.run = mocker.AsyncMock(return_value=run_result)
+        mocker.patch(
+            "utils.agents.query.build_agent",
+            return_value=mock_agent,
+        )
+
+        image_data = base64.b64encode(b"\xff\xd8\xff\xe0" + b"\x00" * 10).decode()
+        image_attachment = Attachment(
+            attachment_type="image",
+            content=image_data,
+            content_type="image/jpeg",
+        )
+        params = make_responses_params(input_text="describe this")
+
+        summary = await retrieve_agent_response(
+            client=mocker.AsyncMock(),
+            responses_params=params,
+            moderation_result=ShieldModerationPassed(),
+            endpoint_path=ENDPOINT_PATH_QUERY,
+            image_attachments=[image_attachment],
+        )
+
+        prompt_arg = mock_agent.run.call_args[0][0]
+        assert isinstance(prompt_arg, list)
+        assert prompt_arg[0] == "describe this"
+        assert isinstance(prompt_arg[1], ImageUrl)
+        assert prompt_arg[1].url == f"data:image/jpeg;base64,{image_data}"
+        assert summary.llm_response == "I see a screenshot."
+
+    @pytest.mark.asyncio
     @pytest.mark.usefixtures("patch_query_configuration")
     async def test_agent_connection_error_raises_http_exception(
         self,
@@ -484,7 +523,7 @@ class TestRetrieveAgentResponse:
             "detail": {"response": "Quota exceeded", "cause": "quota exceeded"},
         }
         mocker.patch(
-            "utils.agents.query.handle_known_apistatus_errors",
+            "utils.agents.error_handler.handle_known_apistatus_errors",
             return_value=mock_error,
         )
 

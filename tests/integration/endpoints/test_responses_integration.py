@@ -11,6 +11,8 @@ from typing import Any
 import pytest
 from fastapi import Request
 from fastapi.responses import StreamingResponse
+from ogx_client.types import ListModelsResponse
+from ogx_client.types.model import Model
 from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
 
@@ -19,6 +21,7 @@ from authentication.interface import AuthTuple
 from configuration import AppConfig
 from models.api.requests import ResponsesRequest
 from models.api.responses.successful import ResponsesResponse
+from models.common.moderation import ShieldModerationBlocked
 from models.common.responses.contexts import ResponsesContext
 from models.database.conversations import UserConversation, UserTurn
 
@@ -88,13 +91,20 @@ def _build_mock_client(mocker: MockerFixture) -> Any:
     mock_response.model_dump.return_value = _RESPONSE_DUMP.copy()
     mock_client.responses.create = mocker.AsyncMock(return_value=mock_response)
 
-    mock_model = mocker.MagicMock()
-    mock_model.id = "test-provider/test-model"
-    mock_model.custom_metadata = {
-        "provider_id": "test-provider",
-        "model_type": "llm",
-    }
-    mock_client.models.list.return_value = [mock_model]
+    mock_client.models.list.return_value = ListModelsResponse.model_construct(
+        data=[
+            Model.model_construct(
+                id="test-provider/test-model",
+                created=0,
+                owned_by="test",
+                object="model",
+                custom_metadata={
+                    "provider_id": "test-provider",
+                    "model_type": "llm",
+                },
+            )
+        ]
+    )
 
     mock_client.shields.list.return_value = []
 
@@ -110,7 +120,7 @@ def _build_mock_client(mocker: MockerFixture) -> Any:
 
 
 def _patch_client_holders(mocker: MockerFixture, mock_client: Any) -> None:
-    """Patch AsyncLlamaStackClientHolder in all modules used by the responses endpoint.
+    """Patch AsyncOgxClientHolder in all modules used by the responses endpoint.
 
     Patches three import locations (responses endpoint, utils.endpoints,
     utils.responses) and bypasses ResponsesContext Pydantic validation.
@@ -118,9 +128,8 @@ def _patch_client_holders(mocker: MockerFixture, mock_client: Any) -> None:
     for module in (
         "app.endpoints.responses",
         "utils.endpoints",
-        "utils.responses",
     ):
-        holder = mocker.patch(f"{module}.AsyncLlamaStackClientHolder")
+        holder = mocker.patch(f"{module}.AsyncOgxClientHolder")
         holder.return_value.get_client.return_value = mock_client
 
     original_cls = ResponsesContext
@@ -150,29 +159,22 @@ def _setup_test(mocker: MockerFixture) -> Any:
 
 def _configure_shield_blocked(
     mocker: MockerFixture,
-    mock_client: Any,
     moderation_id: str,
 ) -> None:
-    """Configure mock client to simulate shield-blocked moderation.
+    """Configure stub moderation to return a blocked result.
 
     Args:
         mocker: pytest-mock fixture.
-        mock_client: The mock Llama Stack client to configure.
         moderation_id: The moderation ID for the blocked response.
     """
-    mock_shield = mocker.MagicMock()
-    mock_shield.identifier = "test-shield"
-    mock_shield.provider_resource_id = "test-shield-model"
-    mock_shield.provider_id = "test-shield-provider"
-    mock_client.shields.list.return_value = [mock_shield]
-
-    mock_moderation = mocker.MagicMock()
-    mock_moderation.id = moderation_id
-    mock_result = mocker.MagicMock()
-    mock_result.flagged = True
-    mock_result.user_message = "Content blocked by safety shield"
-    mock_moderation.results = [mock_result]
-    mock_client.moderations.create = mocker.AsyncMock(return_value=mock_moderation)
+    blocked = ShieldModerationBlocked(
+        message="Content blocked by safety shield",
+        moderation_id=moderation_id,
+    )
+    mocker.patch(
+        "app.endpoints.responses.run_shield_moderation_v2",
+        return_value=blocked,
+    )
 
 
 @pytest.mark.asyncio
@@ -237,7 +239,7 @@ async def test_shield_blocked_persists_moderation_turn(
     """Test shield-blocked response persists moderation ID and skips last_response_id."""
     _ = test_config
     mock_client = _setup_test(mocker)
-    _configure_shield_blocked(mocker, mock_client, "modr_blocked_integ_123")
+    _configure_shield_blocked(mocker, "modr_blocked_integ_123")
 
     request = ResponsesRequest(
         input="Some blocked content",
@@ -320,7 +322,7 @@ async def test_streaming_blocked_returns_sse_and_persists_turn(
     """Test that shield-blocked streaming returns valid SSE events and persists to DB."""
     _ = test_config
     mock_client = _setup_test(mocker)
-    _configure_shield_blocked(mocker, mock_client, "modr_stream_blocked_123")
+    _configure_shield_blocked(mocker, "modr_stream_blocked_123")
 
     request = ResponsesRequest(
         input="Some blocked content",

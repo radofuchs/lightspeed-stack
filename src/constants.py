@@ -7,7 +7,7 @@ from typing import Final, Literal
 
 # Minimal and maximal supported Llama Stack version
 MINIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "0.2.17"
-MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "0.6.0"
+MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "1.0.2"
 
 # Path to the lightspeed-stack.yaml, exported so uvicorn workers (separate
 # processes) can reload the configuration that the parent process selected.
@@ -171,6 +171,10 @@ MCP_AUTH_KUBERNETES: Final[str] = "kubernetes"
 MCP_AUTH_CLIENT: Final[str] = "client"
 MCP_AUTH_OAUTH: Final[str] = "oauth"
 
+# MCP tool_runtime provider (Llama Stack run.yaml / unified synthesis)
+MCP_TOOL_RUNTIME_PROVIDER_ID: Final[str] = "model-context-protocol"
+MCP_TOOL_RUNTIME_PROVIDER_TYPE: Final[str] = "remote::model-context-protocol"
+
 # Media type constants for streaming responses
 MEDIA_TYPE_JSON: Final[str] = "application/json"
 MEDIA_TYPE_TEXT: Final[str] = "text/plain"
@@ -195,9 +199,11 @@ CACHE_TYPE_POSTGRES: Final[str] = "postgres"
 CACHE_TYPE_NOOP: Final[str] = "noop"
 
 # BYOK RAG
-# Default RAG type for bring-your-own-knowledge RAG configurations, that type
-# needs to be supported by Llama Stack
-DEFAULT_RAG_TYPE: Final[str] = "inline::faiss"
+# Backends that have enrichment support in llama_stack_configuration.py
+SUPPORTED_RAG_BACKENDS: Final[frozenset[str]] = frozenset({"faiss", "pgvector"})
+
+# Default RAG backend for bring-your-own-knowledge RAG configurations
+DEFAULT_RAG_BACKEND: Final[str] = "faiss"
 
 # Default sentence transformer model for embedding generation, that type needs
 # to be supported by Llama Stack and configured properly in providers and
@@ -214,23 +220,28 @@ DEFAULT_CROSS_ENCODER_MODEL: Final[str] = "cross-encoder/ms-marco-MiniLM-L6-v2"
 USER_QUOTA_LIMITER: Final[str] = "user_limiter"
 CLUSTER_QUOTA_LIMITER: Final[str] = "cluster_limiter"
 
-# Hard cap on total RAG chunks delivered to the LLM across all sources
-INLINE_RAG_MAX_CHUNKS: Final[int] = 10
+# Default chunk limits (used as Pydantic field defaults in RagConfiguration).
+# These replace the old hardcoded INLINE_RAG_MAX_CHUNKS, TOOL_RAG_MAX_CHUNKS,
+# BYOK_RAG_MAX_CHUNKS, and OKP_RAG_MAX_CHUNKS constants.
+DEFAULT_INLINE_RAG_MAX_CHUNKS: Final[int] = 10
+DEFAULT_TOOL_RAG_MAX_CHUNKS: Final[int] = 10
+DEFAULT_BYOK_RAG_MAX_CHUNKS: Final[int] = 10
+DEFAULT_OKP_RAG_MAX_CHUNKS: Final[int] = 5
 
 # RAG as a tool constants
 DEFAULT_RAG_TOOL: Final[str] = "file_search"
-TOOL_RAG_MAX_CHUNKS: Final[int] = 10  # retrieved from RAG as a tool
-
-# Inline RAG constants
-BYOK_RAG_MAX_CHUNKS: Final[int] = 10  # retrieved from BYOK RAG
-OKP_RAG_MAX_CHUNKS: Final[int] = 5  # retrieved from OKP RAG
 # Score multiplier applied to BYOK chunks after cross-encoder reranking (Solr chunks unchanged)
 BYOK_RAG_RERANK_BOOST: Final[float] = 1.2
+
+# Default minimum raw similarity per BYOK store
+DEFAULT_BYOK_RAG_RELEVANCE_CUTOFF_SCORE: Final[float] = 0.3
 
 # Solr OKP constants
 SOLR_VECTOR_SEARCH_DEFAULT_K: Final[int] = 5
 SOLR_VECTOR_SEARCH_DEFAULT_SCORE_THRESHOLD: Final[float] = 0.3
 SOLR_VECTOR_SEARCH_DEFAULT_MODE: Final[str] = "hybrid"
+# LCORE exposes "lexical" but Llama Stack dispatch recognizes "keyword"
+SOLR_SEARCH_MODE_MAP: Final[dict[str, str]] = {"lexical": "keyword"}
 
 # Internal Solr filter always applied to restrict results to chunk documents
 SOLR_CHUNK_FILTER_QUERY: Final[str] = "is_chunk:true"
@@ -248,12 +259,17 @@ SOLR_DEFAULT_EMBEDDING_MODEL: Final[str] = (
     "sentence-transformers/ibm-granite/granite-embedding-30m-english"
 )
 SOLR_DEFAULT_EMBEDDING_DIMENSION: Final[int] = 384
+SOLR_EMBEDDING_MODEL_ID: Final[str] = "sentence-transformers/solr_embedding"
 
 # Default score multiplier for BYOK RAG vector stores
 DEFAULT_SCORE_MULTIPLIER: Final[float] = 1.0
 
 # Special RAG ID that activates the OKP provider when listed in rag.inline or rag.tool
 OKP_RAG_ID: Final[str] = "okp"
+
+# OpenTelemetry anonymization configuration
+# Environment variable for HMAC secret used to anonymize sensitive trace data
+OTEL_ANONYMIZATION_SECRET_ENV_VAR: Final[str] = "OTEL_ANONYMIZATION_SECRET"
 
 # Logging configuration constants
 # Environment variable name for configurable log level

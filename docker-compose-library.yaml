@@ -56,11 +56,17 @@ services:
       # AWS Bedrock
       - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK:-}
       # Enable debug logging if needed
-      - LLAMA_STACK_LOGGING=${LLAMA_STACK_LOGGING:-}
+      - OGX_LOGGING=${OGX_LOGGING:-}
       # FAISS test and inline RAG config
       - FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}
       # Prevent HuggingFace Hub update checks (HTTP 429 rate-limiting in CI from parallel jobs).
       - HF_HUB_OFFLINE=1
+      # OpenTelemetry configuration (tracing disabled by default)
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-}
+      - OTEL_ANONYMIZATION_SECRET=${OTEL_ANONYMIZATION_SECRET:-lightspeed-stack-otel-anonymization-dev-default}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-true}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/liveness"]
       interval: 10s   # how often to run the check

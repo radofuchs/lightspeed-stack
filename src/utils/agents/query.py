@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, TypeAlias, cast
+from typing import Optional, cast
 
 from fastapi import HTTPException
-from llama_stack_client import APIConnectionError, APIStatusError, AsyncLlamaStackClient
+from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
+from opentelemetry import trace
 from pydantic_ai.exceptions import (
     AgentRunError,
-    ContentFilterError,
-    IncompleteToolCall,
-    ModelAPIError,
-    ModelHTTPError,
-    UnexpectedModelBehavior,
-    UsageLimitExceeded,
 )
 from pydantic_ai.messages import ModelRequest, ModelResponse, ToolReturnPart
 from pydantic_ai.run import AgentRunResult
@@ -27,14 +22,14 @@ from models.api.responses.error import (
     AbstractErrorResponse,
     InternalServerErrorResponse,
     PromptTooLongResponse,
-    QuotaExceededResponse,
-    ServiceUnavailableResponse,
 )
 from models.common.agents import AgentTurnAccumulator
 from models.common.moderation import ShieldModerationResult
+from models.common.query import Attachment
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.responses.types import ResponseInput
 from models.common.turn_summary import TurnSummary
+from utils.agents.error_handler import map_agent_inference_error
 from utils.agents.tool_processor import (
     process_function_tool_call,
     process_function_tool_result,
@@ -42,19 +37,24 @@ from utils.agents.tool_processor import (
     process_native_tool_result,
 )
 from utils.conversations import append_turn_items_to_conversation
-from utils.pydantic_ai import build_agent
+from utils.otel_tracing import (
+    SpanAttributes,
+    SpanEvents,
+    add_span_event,
+    set_span_attributes,
+)
+from utils.pydantic_ai_helpers import build_agent
 from utils.query import (
     build_multimodal_input,
     extract_provider_and_model_from_model_id,
-    handle_known_apistatus_errors,
-    is_context_length_error,
 )
 from utils.responses import extract_vector_store_ids_from_tools
 from utils.token_counter import TokenCounter
 
 logger = get_logger(__name__)
+tracer = trace.get_tracer(__name__)
 
-AgentInferenceError: TypeAlias = (
+type AgentInferenceError = (
     AgentRunError | APIStatusError | APIConnectionError | RuntimeError
 )
 
@@ -67,73 +67,6 @@ class AgentFinishReason(str, Enum):
     SUCCESS = "stop"
     LENGTH = "length"
     ERROR = "error"
-
-
-def map_agent_inference_error(
-    exc: AgentInferenceError,
-    model_id: str,
-) -> AbstractErrorResponse:
-    """Map agent run failures from pydantic-ai or Llama Stack to an LCS error response.
-
-    Args:
-        exc: Agent, HTTP status, connection, or context-length runtime error.
-        model_id: Model identifier in provider/model format.
-
-    Returns:
-        Structured error response for HTTP or SSE error events.
-
-    Raises:
-        RuntimeError: Re-raised when ``exc`` is a non-agent ``RuntimeError`` that is
-            not a recognized context-length failure.
-    """
-    match exc:
-        case AgentRunError() as agent_exc:
-            return map_pydantic_agent_run_error(agent_exc, model_id)
-        case APIStatusError() as status_exc:
-            return handle_known_apistatus_errors(status_exc, model_id)
-        case APIConnectionError() as connection_exc:
-            return ServiceUnavailableResponse(
-                backend_name="Llama Stack",
-                cause=str(connection_exc),
-            )
-        case RuntimeError() as runtime_exc if is_context_length_error(str(runtime_exc)):
-            return PromptTooLongResponse(model=model_id)
-        case _:
-            return InternalServerErrorResponse.generic()
-
-
-def map_pydantic_agent_run_error(
-    exc: AgentRunError, model_id: str
-) -> AbstractErrorResponse:
-    """Map pydantic-ai ``AgentRunError`` subclasses to LCS error responses.
-
-    Args:
-        exc: Agent exception to map.
-        model_id: Model identifier in provider/model format.
-
-    Returns:
-        Structured error response for HTTP or SSE error events.
-    """
-    match exc:
-        case ContentFilterError() as filter_exc:
-            return InternalServerErrorResponse.query_failed(str(filter_exc))
-        case IncompleteToolCall() | UnexpectedModelBehavior():
-            return PromptTooLongResponse(model=model_id)
-        case UsageLimitExceeded():
-            return QuotaExceededResponse.model(model_id)
-        case ModelHTTPError() as http_exc if is_context_length_error(str(http_exc)):
-            return PromptTooLongResponse(model=model_id)
-        case ModelHTTPError(status_code=429):
-            return QuotaExceededResponse.model(model_id)
-        case ModelHTTPError():
-            return InternalServerErrorResponse.generic()
-        case ModelAPIError() as api_exc:
-            return ServiceUnavailableResponse(
-                backend_name="Llama Stack",
-                cause=str(api_exc),
-            )
-        case _:
-            return InternalServerErrorResponse.query_failed(str(exc))
 
 
 def get_agent_finish_reason(response: ModelResponse) -> AgentFinishReason:
@@ -255,19 +188,40 @@ def build_turn_summary_from_agent_run(
         turn_summary=TurnSummary(),
     )
 
+    # Track tool calls for OTEL instrumentation
+    tool_call_names: list[str] = []
+
     for message in run_result.new_messages():
         if isinstance(message, ModelResponse):
             if message.text:
                 state.turn_summary.llm_response = message.text
             for tool_call_part in message.tool_calls:
                 process_function_tool_call(state, tool_call_part)
+                tool_call_names.append(tool_call_part.tool_name)
             for call_part, return_part in message.native_tool_calls:
                 process_native_tool_call(state, call_part)
                 process_native_tool_result(state, return_part)
+                tool_call_names.append(call_part.tool_name)
         elif isinstance(message, ModelRequest):
             for request_part in message.parts:
                 if isinstance(request_part, ToolReturnPart):
                     process_function_tool_result(state, request_part)
+
+    # Add tool execution attributes to current span (parent llm.inference span)
+    current_span = trace.get_current_span()
+    if current_span.is_recording() and tool_call_names:
+        set_span_attributes(
+            current_span,
+            {
+                SpanAttributes.TOOL_CALLS_COUNT: len(tool_call_names),
+                SpanAttributes.TOOL_CALLS_NAMES: tool_call_names,
+            },
+        )
+        add_span_event(
+            current_span,
+            SpanEvents.TOOL_EXECUTION_COMPLETED,
+            {"tool.calls": ", ".join(tool_call_names)},
+        )
 
     state.turn_summary.id = run_result.response.provider_response_id or ""
     state.turn_summary.token_usage = extract_agent_token_usage(
@@ -279,16 +233,16 @@ def build_turn_summary_from_agent_run(
 
 
 async def retrieve_agent_response(
-    client: AsyncLlamaStackClient,
+    client: AsyncOgxClient,
     responses_params: ResponsesApiParams,
     moderation_result: ShieldModerationResult,
     endpoint_path: str,
     _original_input: Optional[ResponseInput] = None,
     no_tools: bool = False,
+    image_attachments: Optional[list[Attachment]] = None,
+    shield_ids: Optional[list[str]] = None,
 ) -> TurnSummary:
     """Retrieve a turn summary from a blocking agent run.
-
-    Mirrors :func:`app.endpoints.query.retrieve_response` for the agent path.
 
     Args:
         client: Llama Stack client for conversation persistence on moderation block.
@@ -297,46 +251,92 @@ async def retrieve_agent_response(
         endpoint_path: Endpoint path used for metric labeling.
         _original_input: Original user input before the explicit-input rewrite.
         no_tools: Whether to skip tool processing.
+        image_attachments: Image attachments for multimodal prompt construction.
+        shield_ids: Optional list of shield names to run for this turn, mirroring
+            ``QueryRequest.shield_ids``. If ``None``, all configured shields run.
     Returns:
         Turn summary for the completed agent run.
 
     Raises:
         HTTPException: On moderation is not applicable; on agent or provider failure.
     """
-    if moderation_result.decision == "blocked":
-        await append_turn_items_to_conversation(
-            client,
-            responses_params.conversation,
-            responses_params.input,
-            [moderation_result.refusal_response],
+    with tracer.start_as_current_span("llm.inference") as span:
+        # Extract provider and model from model_id
+        provider_id, model_id = extract_provider_and_model_from_model_id(
+            responses_params.model
         )
-        return TurnSummary(
-            id=moderation_result.moderation_id,
-            llm_response=moderation_result.message,
-        )
-    try:
-        agent = build_agent(
-            client, responses_params, configuration.skills, no_tools=no_tools
-        )
-        logger.debug("Starting agent non-streaming response processing")
-        if responses_params.image_attachments:
-            prompt = build_multimodal_input(
-                cast(str, responses_params.input),
-                responses_params.image_attachments,
-            )
-        else:
-            prompt = cast(str, responses_params.input)
-        run_result = await agent.run(prompt)
-    except (AgentRunError, APIStatusError, APIConnectionError, RuntimeError) as exc:
-        response = map_agent_inference_error(exc, responses_params.model)
-        raise HTTPException(**response.model_dump()) from exc
 
-    vector_store_ids = extract_vector_store_ids_from_tools(responses_params.tools)
-    rag_id_mapping = configuration.rag_id_mapping
-    return build_turn_summary_from_agent_run(
-        run_result,
-        model_id=responses_params.model,
-        endpoint_path=endpoint_path,
-        vector_store_ids=vector_store_ids,
-        rag_id_mapping=rag_id_mapping,
-    )
+        # Set LLM attributes
+        set_span_attributes(
+            span,
+            {
+                SpanAttributes.LLM_MODEL_ID: model_id,
+                SpanAttributes.LLM_PROVIDER_ID: provider_id,
+            },
+        )
+
+        if moderation_result.decision == "blocked":
+            await append_turn_items_to_conversation(
+                client,
+                responses_params.conversation,
+                responses_params.input,
+                [moderation_result.refusal_response],
+            )
+            return TurnSummary(
+                id=moderation_result.moderation_id,
+                llm_response=moderation_result.message,
+            )
+
+        # Emit inference started event
+        add_span_event(span, SpanEvents.LLM_INFERENCE_STARTED)
+
+        try:
+            agent = build_agent(
+                client,
+                responses_params,
+                configuration,
+                shields=shield_ids,
+                no_tools=no_tools,
+            )
+            logger.debug("Starting agent non-streaming response processing")
+            if image_attachments:
+                prompt = build_multimodal_input(
+                    cast(str, responses_params.input),
+                    image_attachments,
+                )
+            else:
+                prompt = cast(str, responses_params.input)
+            run_result = await agent.run(prompt)
+        except (
+            AgentRunError,
+            APIStatusError,
+            APIConnectionError,
+            RuntimeError,
+        ) as exc:
+            response = map_agent_inference_error(exc, responses_params.model)
+            raise HTTPException(**response.model_dump()) from exc
+
+        # Set token usage attributes
+        if run_result.usage:
+            set_span_attributes(
+                span,
+                {
+                    SpanAttributes.LLM_USAGE_INPUT_TOKENS: run_result.usage.input_tokens,
+                    SpanAttributes.LLM_USAGE_OUTPUT_TOKENS: run_result.usage.output_tokens,
+                },
+            )
+
+        vector_store_ids = extract_vector_store_ids_from_tools(responses_params.tools)
+        rag_id_mapping = configuration.rag_id_mapping
+        turn_summary = build_turn_summary_from_agent_run(
+            run_result,
+            model_id=responses_params.model,
+            endpoint_path=endpoint_path,
+            vector_store_ids=vector_store_ids,
+            rag_id_mapping=rag_id_mapping,
+        )
+
+        # Emit inference completed event after successful summary build
+        add_span_event(span, SpanEvents.LLM_INFERENCE_COMPLETED)
+
+        return turn_summary

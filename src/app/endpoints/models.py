@@ -4,12 +4,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.params import Depends
-from llama_stack_client import APIConnectionError
+from ogx_client import APIConnectionError
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
-from client import AsyncLlamaStackClientHolder
+from client import AsyncOgxClientHolder
 from configuration import configuration
 from log import get_logger
 from models.api.requests.catalog import ModelFilter
@@ -23,42 +23,10 @@ from models.api.responses.error import (
 from models.api.responses.successful import ModelsResponse
 from models.config import Action
 from utils.endpoints import check_configuration_loaded
+from utils.model_list import parse_model_list_response
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["models"])
-
-
-def parse_llama_stack_model(model: Any) -> dict[str, Any]:
-    """
-    Parse llama-stack model.
-
-    Converting the new llama-stack model format (0.4.x) with custom_metadata.
-
-    Parameters:
-        model: Model object from llama-stack (has id, custom_metadata, object fields)
-
-    Returns:
-        dict: Model in legacy format with identifier, provider_id, model_type, etc.
-    """
-    custom_metadata = getattr(model, "custom_metadata", {}) or {}
-
-    model_type = str(custom_metadata.get("model_type", "unknown"))
-
-    metadata = {
-        k: v
-        for k, v in custom_metadata.items()
-        if k not in ("provider_id", "provider_resource_id", "model_type")
-    }
-
-    return {
-        "identifier": getattr(model, "id", ""),
-        "metadata": metadata,
-        "api_model_type": model_type,
-        "provider_id": str(custom_metadata.get("provider_id", "")),
-        "type": getattr(model, "object", "model"),
-        "provider_resource_id": str(custom_metadata.get("provider_resource_id", "")),
-        "model_type": model_type,
-    }
 
 
 models_responses: dict[int | str, dict[str, Any]] = {
@@ -67,7 +35,7 @@ models_responses: dict[int | str, dict[str, Any]] = {
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -119,23 +87,20 @@ async def models_endpoint_handler(
     check_configuration_loaded(configuration)
 
     llama_stack_configuration = configuration.llama_stack_configuration
-    logger.info("Llama stack config: %s", llama_stack_configuration)
+    logger.info("Llama Stack config: %s", llama_stack_configuration)
 
     try:
         # try to get Llama Stack client
-        client = AsyncLlamaStackClientHolder().get_client()
-        # retrieve models
-        models = await client.models.list()
-
-        # parse models to legacy format
-        parsed_models = [parse_llama_stack_model(model) for model in models]
+        client = AsyncOgxClientHolder().get_client()
+        # retrieve and normalize models across OpenAI/Anthropic/Google list shapes
+        parsed_models = parse_model_list_response(await client.models.list())
 
         # optional filtering by model type
         if model_type.model_type is not None:
             parsed_models = [
                 model
                 for model in parsed_models
-                if model["model_type"] == model_type.model_type
+                if model.model_type == model_type.model_type
             ]
 
         return ModelsResponse(models=parsed_models)
@@ -143,5 +108,5 @@ async def models_endpoint_handler(
     # Connection to Llama Stack server failed
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e

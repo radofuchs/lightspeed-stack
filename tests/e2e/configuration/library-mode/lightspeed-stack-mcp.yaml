@@ -1,3 +1,9 @@
+# @cfg_mcp
+# Merges: lightspeed-stack-mcp.yaml + lightspeed-stack-mcp-file-auth.yaml +
+#         lightspeed-stack-mcp-client-auth.yaml + lightspeed-stack-mcp-oauth-auth.yaml +
+#         lightspeed-stack-mcp-kubernetes-auth.yaml (valid tokens only)
+# All four MCP auth flavours share one process; scenarios select a server by name.
+# Keep @cfg_mcp_invalid separate (bad file token must be the only mcp-file entry).
 name: Lightspeed Core Service (LCS)
 service:
   host: 0.0.0.0
@@ -9,7 +15,10 @@ service:
 llama_stack:
   # Library mode - embeds llama-stack as library
   use_as_library_client: true
-  library_client_config_path: run.yaml
+  # Unified mode: run.yaml (materialized per provider by CI/the harness)
+  # is consumed as the synthesis profile instead of the legacy two-file path.
+  config:
+    profile: run.yaml
 user_data_collection:
   feedback_enabled: true
   feedback_storage: "/tmp/data/feedback"

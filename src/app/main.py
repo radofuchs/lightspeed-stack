@@ -9,8 +9,8 @@ import sentry_sdk  # pyright: ignore[reportMissingImports]
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from llama_stack_client import APIConnectionError, AsyncLlamaStackClient
-from starlette.routing import Mount, Route, WebSocketRoute
+from fastapi.routing import iter_route_contexts
+from ogx_client import APIConnectionError, AsyncOgxClient
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import version
@@ -19,14 +19,13 @@ from app import routers
 from app.database import create_tables, initialize_database
 from app.endpoints.streaming_query import shutdown_background_topic_summary_tasks
 from authorization.azure_token_manager import AzureEntraIDManager
-from client import AsyncLlamaStackClientHolder
+from client import AsyncOgxClientHolder
 from configuration import configuration
 from log import get_logger
 from metrics import recording
 from metrics.utils import setup_model_metrics
 from models.api.responses.error import InternalServerErrorResponse
 from sentry import initialize_sentry
-from utils.common import register_mcp_servers_async
 from utils.degraded_mode import DegradedModeTracker
 from utils.llama_stack_version import check_llama_stack_version
 
@@ -58,7 +57,12 @@ _OPENAPI_TAGS: Final[list[dict[str, str]]] = [
     {"name": "responses", "description": "OpenAI-compatible Responses API."},
     {"name": "rlsapi-v1", "description": "RLS API v1 (inference)."},
     {"name": "root", "description": "Service root."},
+    {
+        "name": "saved-prompts",
+        "description": "Saved prompts configuration and management.",
+    },
     {"name": "shields", "description": "Safety shields."},
+    {"name": "skills", "description": "Agent skills."},
     {"name": "streaming_query", "description": "Streaming query (SSE)."},
     {"name": "streaming_query_interrupt", "description": "Streaming interrupt."},
     {"name": "tools", "description": "Tools."},
@@ -80,8 +84,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     initialize_sentry()
 
     llama_stack_config = configuration.configuration.llama_stack
-    await AsyncLlamaStackClientHolder().load(llama_stack_config)
-    client: AsyncLlamaStackClient = AsyncLlamaStackClientHolder().get_client()
+    await AsyncOgxClientHolder().load(llama_stack_config)
+    client: AsyncOgxClient = AsyncOgxClientHolder().get_client()
     logger.debug("Llama Stack client initialized, trying to connect to Llama Stack")
     # Check connectivity to Llama Stack and set degraded mode if unavailable
     degraded_tracker = DegradedModeTracker()
@@ -116,10 +120,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     azure_entra_id_config = configuration.configuration.azure_entra_id
     if azure_entra_id_config is not None:
         AzureEntraIDManager().set_config(azure_entra_id_config)
-        azure_base_url = await AsyncLlamaStackClientHolder().get_azure_base_url()
+        azure_base_url = await AsyncOgxClientHolder().get_azure_base_url()
         AzureEntraIDManager().set_base_url(azure_base_url)
-    logger.info("Registering MCP servers")
-    await register_mcp_servers_async(logger, configuration.configuration)
 
     # Set up model metrics if in healthy mode
     if not degraded_tracker.is_degraded():
@@ -210,7 +212,7 @@ class RestApiMetricsMiddleware:  # pylint: disable=too-few-public-methods
         # requests with the full prefixed path (/api/lightspeed/v1/infer) but
         # app_routes_paths contains only application-level paths (/v1/infer).
         # Strip the prefix so the path check and metric labels match the routes.
-        root_path = scope.get("root_path", "")
+        root_path: str = app.root_path
         path: str = scope["path"]
         if root_path and path.startswith(root_path + "/"):
             path = path[len(root_path) :]
@@ -290,9 +292,10 @@ logger.info("Including routers")
 routers.include_routers(app)
 
 app_routes_paths = [
-    route.path
-    for route in app.routes
-    if isinstance(route, (Mount, Route, WebSocketRoute))
+    rc.original_route.path  # pyright: ignore[reportAttributeAccessIssue]
+    for rc in iter_route_contexts(app.routes)
+    if hasattr(rc.original_route, "path")
+    and rc.original_route.path  # pyright: ignore[reportAttributeAccessIssue]
 ]
 
 # Register pure ASGI middlewares.  Middleware execution order is the reverse of

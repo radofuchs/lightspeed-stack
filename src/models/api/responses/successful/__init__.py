@@ -1,5 +1,9 @@
 """Concrete successful HTTP response models grouped by domain."""
 
+from models.api.responses.successful.bases import (
+    AbstractDeleteResponse,
+    AbstractSuccessfulResponse,
+)
 from models.api.responses.successful.catalog import (
     ModelsResponse,
     ProviderResponse,
@@ -7,6 +11,7 @@ from models.api.responses.successful.catalog import (
     RAGInfoResponse,
     RAGListResponse,
     ShieldsResponse,
+    SkillsResponse,
     ToolsResponse,
 )
 from models.api.responses.successful.configuration import ConfigurationResponse
@@ -49,6 +54,12 @@ from models.api.responses.successful.rlsapi import (
     RlsapiV1InferData,
     RlsapiV1InferResponse,
 )
+from models.api.responses.successful.saved_prompts import (
+    SavedPromptDeleteResponse,
+    SavedPromptResponse,
+    SavedPromptsConfigResponse,
+    SavedPromptsListResponse,
+)
 from models.api.responses.successful.vector_stores import (
     FileResponse,
     VectorStoreDeleteResponse,
@@ -60,13 +71,15 @@ from models.api.responses.successful.vector_stores import (
 )
 
 __all__ = [
+    "AbstractDeleteResponse",
+    "AbstractSuccessfulResponse",
     "AuthorizedResponse",
     "ConfigurationResponse",
     "ConversationDeleteResponse",
     "ConversationResponse",
+    "ConversationUpdateResponse",
     "ConversationsListResponse",
     "ConversationsListResponseV2",
-    "ConversationUpdateResponse",
     "FeedbackResponse",
     "FeedbackStatusUpdateResponse",
     "FileResponse",
@@ -89,7 +102,12 @@ __all__ = [
     "ResponsesResponse",
     "RlsapiV1InferData",
     "RlsapiV1InferResponse",
+    "SavedPromptDeleteResponse",
+    "SavedPromptResponse",
+    "SavedPromptsConfigResponse",
+    "SavedPromptsListResponse",
     "ShieldsResponse",
+    "SkillsResponse",
     "StatusResponse",
     "StreamingInterruptResponse",
     "StreamingQueryResponse",

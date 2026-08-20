@@ -8,8 +8,9 @@ from typing import Any, Optional
 import pytest
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
-from llama_stack_api.openai_responses import OpenAIResponseObject
-from llama_stack_client.types import VersionInfo
+from ogx_api.openai_responses import OpenAIResponseObject
+from ogx_client.types import ListModelsResponse, VersionInfo
+from ogx_client.types.model import Model
 from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.messages import (
     ModelMessage,
@@ -446,6 +447,27 @@ def set_streaming_query_agent_run(
 
 
 @pytest.fixture(autouse=True)
+def otel_anonymization_secret() -> Generator[None, None, None]:
+    """Set OTEL_ANONYMIZATION_SECRET for all integration tests.
+
+    This fixture ensures that the OTEL anonymization secret is available
+    for any code that uses OpenTelemetry tracing during integration tests.
+    """
+    original_value = os.environ.get("OTEL_ANONYMIZATION_SECRET")
+    os.environ["OTEL_ANONYMIZATION_SECRET"] = (
+        "integration-test-secret-do-not-use-in-production"
+    )
+
+    yield
+
+    # Restore original value or remove if it wasn't set
+    if original_value is None:
+        os.environ.pop("OTEL_ANONYMIZATION_SECRET", None)
+    else:
+        os.environ["OTEL_ANONYMIZATION_SECRET"] = original_value
+
+
+@pytest.fixture(autouse=True)
 def reset_configuration_state() -> Generator:
     """Reset configuration state before each integration test.
 
@@ -714,8 +736,8 @@ def mock_request_with_auth_fixture() -> Request:
     return request
 
 
-@pytest.fixture(name="mock_llama_stack_client")
-def mock_llama_stack_client_fixture(
+@pytest.fixture(name="mock_ogx_client")
+def mock_ogx_client_fixture(
     mocker: MockerFixture,
 ) -> Generator[Any, None, None]:
     """Mock only the external Llama Stack client for integration tests.
@@ -724,7 +746,7 @@ def mock_llama_stack_client_fixture(
     defaults for integration tests. Individual tests can override specific
     behaviors as needed.
 
-    Patches AsyncLlamaStackClientHolder in both app.endpoints.query and app.main
+    Patches AsyncOgxClientHolder in both app.endpoints.query and app.main
     to ensure the mock is active during TestClient startup (when app.main imports
     and initializes the client) and during endpoint execution.
 
@@ -734,13 +756,13 @@ def mock_llama_stack_client_fixture(
     Yields:
         mock_client: The mocked Llama Stack client instance.
     """
-    # Patch AsyncLlamaStackClientHolder at multiple import locations
+    # Patch AsyncOgxClientHolder at multiple import locations
     # This ensures the mock is active both during app startup (app.main)
     # and during endpoint execution (query, conversations_v1, responses, etc.)
-    mock_holder_class = mocker.patch("app.endpoints.query.AsyncLlamaStackClientHolder")
-    mocker.patch("app.main.AsyncLlamaStackClientHolder", mock_holder_class)
+    mock_holder_class = mocker.patch("app.endpoints.query.AsyncOgxClientHolder")
+    mocker.patch("app.main.AsyncOgxClientHolder", mock_holder_class)
     mocker.patch(
-        "app.endpoints.conversations_v1.AsyncLlamaStackClientHolder", mock_holder_class
+        "app.endpoints.conversations_v1.AsyncOgxClientHolder", mock_holder_class
     )
 
     mock_client = mocker.AsyncMock()
@@ -767,13 +789,20 @@ def mock_llama_stack_client_fixture(
     mock_client.responses.create.return_value = mock_response
 
     # Mock models.list
-    mock_model = mocker.MagicMock()
-    mock_model.id = "test-provider/test-model"
-    mock_model.custom_metadata = {
-        "provider_id": "test-provider",
-        "model_type": "llm",
-    }
-    mock_client.models.list.return_value = [mock_model]
+    mock_client.models.list.return_value = ListModelsResponse.model_construct(
+        data=[
+            Model.model_construct(
+                id="test-provider/test-model",
+                created=0,
+                owned_by="test",
+                object="model",
+                custom_metadata={
+                    "provider_id": "test-provider",
+                    "model_type": "llm",
+                },
+            )
+        ]
+    )
 
     # Mock shields.list (empty by default)
     mock_client.shields.list.return_value = []

@@ -5,8 +5,17 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException
-from llama_stack_api import OpenAIResponseMessage
-from llama_stack_client import APIConnectionError, APIStatusError
+from ogx_api import OpenAIResponseMessage
+from ogx_client import APIConnectionError, APIStatusError
+from ogx_client.types.conversations.item_list_response import (
+    OpenAIResponseInputFunctionToolCallOutputOutputListOpenAIResponseInputMessageContentTextOpenAIResponseInputMessageContentImageOpenAIResponseInputMessageContentFileOpenAIResponseInputMessageContentFile as FunctionCallOutputFile,  # pylint: disable=line-too-long
+)
+from ogx_client.types.conversations.item_list_response import (
+    OpenAIResponseInputFunctionToolCallOutputOutputListOpenAIResponseInputMessageContentTextOpenAIResponseInputMessageContentImageOpenAIResponseInputMessageContentFileOpenAIResponseInputMessageContentImage as FunctionCallOutputImage,  # pylint: disable=line-too-long
+)
+from ogx_client.types.conversations.item_list_response import (
+    OpenAIResponseInputFunctionToolCallOutputOutputListOpenAIResponseInputMessageContentTextOpenAIResponseInputMessageContentImageOpenAIResponseInputMessageContentFileOpenAIResponseInputMessageContentText as FunctionCallOutputText,  # pylint: disable=line-too-long
+)
 from pytest_mock import MockerFixture
 
 from constants import DEFAULT_RAG_TOOL
@@ -15,7 +24,9 @@ from models.database.conversations import UserTurn
 from utils.conversations import (
     _build_tool_call_summary_from_item,
     _extract_text_from_content,
+    _function_call_output_to_str,
     append_turn_items_to_conversation,
+    append_turn_to_conversation,
     build_conversation_turns_from_items,
     get_all_conversation_items,
 )
@@ -353,6 +364,60 @@ class TestBuildToolCallSummaryFromItem:
 
         assert tool_result is not None
         assert tool_result.status == "success"  # Defaults to "success"
+
+    def test_function_call_output_with_structured_content(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test parsing function_call_output with mixed content parts."""
+        mock_item = mocker.Mock()
+        mock_item.type = "function_call_output"
+        mock_item.call_id = "call_456"
+        mock_item.status = "success"
+        mock_item.output = [
+            FunctionCallOutputText(type="input_text", text="result text"),
+            FunctionCallOutputImage(
+                type="input_image",
+                image_url="https://example.com/image.png",
+            ),
+            FunctionCallOutputFile(
+                type="input_file",
+                file_id="file_123",
+                filename="report.pdf",
+            ),
+        ]
+
+        _, tool_result = _build_tool_call_summary_from_item(mock_item)
+
+        assert tool_result is not None
+        content = tool_result.model_dump()["content"]
+        assert isinstance(content, str)
+        assert content.startswith("result text")
+        assert '"type":"input_image"' in content
+        assert '"file_id":"file_123"' in content
+
+
+class TestFunctionCallOutputToStr:
+    """Test cases for _function_call_output_to_str helper."""
+
+    def test_returns_string_output_unchanged(self) -> None:
+        """Return plain string output as-is."""
+        assert _function_call_output_to_str("plain result") == "plain result"
+
+    def test_extracts_text_and_serializes_other_parts(self) -> None:
+        """Extract text parts and JSON-serialize image/file parts."""
+        output = [
+            FunctionCallOutputText(type="input_text", text="hello"),
+            FunctionCallOutputImage(type="input_image", file_id="img_1"),
+            FunctionCallOutputFile(type="input_file", filename="data.csv"),
+        ]
+
+        content = _function_call_output_to_str(output)
+
+        assert content.startswith("hello")
+        assert '"type":"input_image"' in content
+        assert '"file_id":"img_1"' in content
+        assert '"type":"input_file"' in content
+        assert '"filename":"data.csv"' in content
 
     def test_unknown_item_type(self, mocker: MockerFixture) -> None:
         """Test parsing an unknown item type."""
@@ -761,6 +826,37 @@ class TestAppendTurnItemsToConversation:  # pylint: disable=too-few-public-metho
         assert items[1]["content"] == "I cannot help with that"
 
 
+class TestAppendTurnToConversation:  # pylint: disable=too-few-public-methods
+    """Tests for append_turn_to_conversation function."""
+
+    @pytest.mark.asyncio
+    async def test_appends_user_and_assistant_messages(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that append_turn_to_conversation creates conversation items correctly."""
+        mock_client = mocker.Mock()
+        mock_client.conversations.items.create = mocker.AsyncMock(return_value=None)
+
+        await append_turn_to_conversation(
+            mock_client,
+            conversation_id="conv-123",
+            user_message="Hello",
+            assistant_message="I cannot help with that",
+        )
+
+        mock_client.conversations.items.create.assert_called_once_with(
+            "conv-123",
+            items=[
+                {"type": "message", "role": "user", "content": "Hello"},
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": "I cannot help with that",
+                },
+            ],
+        )
+
+
 class TestGetAllConversationItems:
     """Tests for get_all_conversation_items function."""
 
@@ -837,7 +933,7 @@ class TestGetAllConversationItems:
             await get_all_conversation_items(mock_client, "conv_xyz")
 
         assert exc_info.value.status_code == 503
-        assert "Llama Stack" in str(exc_info.value.detail)
+        assert "OGX" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
     async def test_handles_api_status_error(self, mocker: MockerFixture) -> None:

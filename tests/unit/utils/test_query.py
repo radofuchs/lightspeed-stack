@@ -9,7 +9,8 @@ from typing import Any
 import psycopg2
 import pytest
 from fastapi import HTTPException
-from llama_stack_client.types import ModelListResponse
+from ogx_client.types import ListModelsResponse, ModelListResponse
+from ogx_client.types.model import Model
 from pydantic_ai.messages import ImageUrl
 from pytest_mock import MockerFixture
 from sqlalchemy.exc import SQLAlchemyError
@@ -33,8 +34,6 @@ from utils.query import (
     consume_query_tokens,
     extract_provider_and_model_from_model_id,
     handle_known_apistatus_errors,
-    is_input_shield,
-    is_output_shield,
     is_transcripts_enabled,
     persist_user_conversation_details,
     prepare_input,
@@ -56,24 +55,25 @@ def mock_config_fixture() -> AppConfig:
 
 @pytest.fixture(name="mock_models")
 def mock_models_fixture() -> ModelListResponse:
-    """Create mock models list."""
-    model1 = type(
-        "Model",
-        (),
-        {
-            "id": "provider1/model1",
-            "custom_metadata": {"model_type": "llm", "provider_id": "provider1"},
-        },
-    )()
-    model2 = type(
-        "Model",
-        (),
-        {
-            "id": "provider2/model2",
-            "custom_metadata": {"model_type": "llm", "provider_id": "provider2"},
-        },
-    )()
-    return [model1, model2]
+    """Create an OpenAI-style OGX models list response."""
+    return ListModelsResponse.model_construct(
+        data=[
+            Model.model_construct(
+                id="provider1/model1",
+                created=0,
+                owned_by="test",
+                object="model",
+                custom_metadata={"model_type": "llm", "provider_id": "provider1"},
+            ),
+            Model.model_construct(
+                id="provider2/model2",
+                created=0,
+                owned_by="test",
+                object="model",
+                custom_metadata={"model_type": "llm", "provider_id": "provider2"},
+            ),
+        ]
+    )
 
 
 class TestStoreConversationIntoCache:
@@ -196,40 +196,6 @@ class TestValidateModelProviderOverride:
         with pytest.raises(HTTPException) as exc_info:
             validate_model_provider_override("provider1/model1", None, set())
         assert exc_info.value.status_code == 403
-
-
-class TestShieldFunctions:
-    """Tests for shield-related functions."""
-
-    def test_is_output_shield_output_prefix(self) -> None:
-        """Test is_output_shield returns True for output_ prefix."""
-        shield = type("Shield", (), {"identifier": "output_test"})()
-        assert is_output_shield(shield) is True
-
-    def test_is_output_shield_inout_prefix(self) -> None:
-        """Test is_output_shield returns True for inout_ prefix."""
-        shield = type("Shield", (), {"identifier": "inout_test"})()
-        assert is_output_shield(shield) is True
-
-    def test_is_output_shield_other(self) -> None:
-        """Test is_output_shield returns False for other prefixes."""
-        shield = type("Shield", (), {"identifier": "input_test"})()
-        assert is_output_shield(shield) is False
-
-    def test_is_input_shield_input_prefix(self) -> None:
-        """Test is_input_shield returns True for input prefix."""
-        shield = type("Shield", (), {"identifier": "input_test"})()
-        assert is_input_shield(shield) is True
-
-    def test_is_input_shield_inout_prefix(self) -> None:
-        """Test is_input_shield returns True for inout_ prefix."""
-        shield = type("Shield", (), {"identifier": "inout_test"})()
-        assert is_input_shield(shield) is True
-
-    def test_is_input_shield_output_prefix(self) -> None:
-        """Test is_input_shield returns False for output_ prefix."""
-        shield = type("Shield", (), {"identifier": "output_test"})()
-        assert is_input_shield(shield) is False
 
 
 class TestPrepareInput:
@@ -392,6 +358,21 @@ class TestHandleKnownApistatusErrors:
         detail = result.model_dump()["detail"]
         assert "quota" in detail["response"].lower()
 
+    def test_vertex_429_wrapped_as_500(self) -> None:
+        """Test that Vertex AI RESOURCE_EXHAUSTED wrapped as 500 is treated as 429."""
+        error = type(
+            "APIStatusError",
+            (),
+            {
+                "status_code": 500,
+                "message": "RESOURCE_EXHAUSTED: Quota exceeded for model",
+            },
+        )()
+        result = handle_known_apistatus_errors(error, "model1")
+        assert isinstance(result, QuotaExceededResponse)
+        detail = result.model_dump()["detail"]
+        assert "quota" in detail["response"].lower()
+
     def test_generic_error(self) -> None:
         """Test handling generic error."""
         error = type(
@@ -440,6 +421,26 @@ class TestValidateAttachmentsMetadata:
             validate_attachments_metadata([attachment])
         assert exc_info.value.status_code == 422
         assert "Invalid attachment content type" in str(exc_info.value.detail)
+
+    def test_valid_image_attachment_jpeg(self) -> None:
+        """Test validation passes for JPEG image attachment."""
+        image_data = base64.b64encode(b"\xff\xd8\xff\xe0" + b"\x00" * 10).decode()
+        attachment = Attachment(
+            attachment_type="image",
+            content=image_data,
+            content_type="image/jpeg",
+        )
+        validate_attachments_metadata([attachment])
+
+    def test_valid_image_attachment_png(self) -> None:
+        """Test validation passes for PNG image attachment."""
+        image_data = base64.b64encode(b"\x89PNG" + b"\x00" * 10).decode()
+        attachment = Attachment(
+            attachment_type="image",
+            content=image_data,
+            content_type="image/png",
+        )
+        validate_attachments_metadata([attachment])
 
 
 class TestIsTranscriptsEnabled:

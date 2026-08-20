@@ -8,7 +8,7 @@ from enum import Enum
 from threading import Lock
 from typing import Any, Optional, cast
 
-from llama_stack_api import OpenAIResponseMessage
+from ogx_api import OpenAIResponseMessage
 
 from constants import (
     INTERRUPTED_RESPONSE_MESSAGE,
@@ -19,11 +19,13 @@ from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.responses.types import ResponseInput
 from models.common.turn_summary import TurnSummary
-from utils.conversations import append_turn_items_to_conversation
+from utils.conversations import (
+    append_turn_items_to_conversation,
+    append_turn_to_conversation,
+)
 from utils.markdown_repair import close_open_markdown
 from utils.query import store_query_results, update_conversation_topic_summary
 from utils.responses import get_topic_summary
-from utils.shields import append_turn_to_conversation
 from utils.types import Singleton
 
 logger = get_logger(__name__)
@@ -204,7 +206,7 @@ async def background_update_topic_summary(
                 user_id=context.user_id,
                 skip_userid_check=context.skip_userid_check,
             )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning(
             "Topic summary timed out for interrupted turn, request %s",
             context.request_id,

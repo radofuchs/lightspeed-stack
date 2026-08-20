@@ -79,13 +79,45 @@ class ConfigurationResponse(AbstractSuccessfulResponse):
                             "sqlite": None,
                             "postgres": None,
                         },
-                        "byok_rag": [],
+                        "rag": {
+                            "byok": {"max_chunks": 10, "stores": []},
+                            "okp": {
+                                "rhokp_url": None,
+                                "offline": True,
+                                "chunk_filter_query": None,
+                                "max_chunks": 5,
+                            },
+                            "retrieval": {
+                                "inline": {
+                                    "sources": [],
+                                    "max_chunks": 10,
+                                    "reranker": {
+                                        "enabled": False,
+                                        "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                                    },
+                                },
+                                "tool": {
+                                    "sources": [],
+                                    "max_chunks": 10,
+                                    "reranker": None,
+                                },
+                            },
+                        },
                         "quota_handlers": {
                             "sqlite": None,
                             "postgres": None,
                             "limiters": [],
                             "scheduler": {"period": 1},
                             "enable_token_history": False,
+                        },
+                        "observability": {
+                            "otel": {
+                                "OTEL_SDK_DISABLED": "true",
+                                "OTEL_EXPORTER_OTLP_ENDPOINT": "",
+                                "OTEL_EXPORTER_OTLP_PROTOCOL": "",
+                                "OTEL_SERVICE_NAME": "",
+                                "OTEL_EXPORTER_OTLP_HEADERS": "api-key=[REDACTED]",
+                            }
                         },
                     }
                 }

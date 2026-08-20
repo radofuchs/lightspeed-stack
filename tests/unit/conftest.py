@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator
+import os
+from collections.abc import Callable, Generator
 from pathlib import Path
+from typing import Any, Optional
 
 import httpx
 import pytest
-from llama_stack_client import AsyncLlamaStackClient
+from ogx_client import AsyncOgxClient
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
 from pytest_mock import AsyncMockType, MockerFixture
 
 from configuration import AppConfig
 from constants import DEFAULT_LOGGER_NAME
 from models.common.responses.responses_api_params import ResponsesApiParams
-from models.config import SkillsConfiguration
+from models.config import ShieldConfiguration, SkillsConfiguration
 
 type AgentFixtures = Generator[
     tuple[
@@ -24,6 +31,39 @@ type AgentFixtures = Generator[
     None,
     None,
 ]
+
+
+@pytest.fixture(autouse=True)
+def otel_anonymization_secret() -> Generator[None, None, None]:
+    """Set OTEL_ANONYMIZATION_SECRET for all unit tests.
+
+    This fixture ensures that the OTEL anonymization secret is available
+    for any code that uses OpenTelemetry tracing during unit tests.
+    """
+    original_value = os.environ.get("OTEL_ANONYMIZATION_SECRET")
+    os.environ["OTEL_ANONYMIZATION_SECRET"] = (
+        "unit-test-secret-do-not-use-in-production"
+    )
+
+    yield
+
+    # Restore original value or remove if it wasn't set
+    if original_value is None:
+        os.environ.pop("OTEL_ANONYMIZATION_SECRET", None)
+    else:
+        os.environ["OTEL_ANONYMIZATION_SECRET"] = original_value
+
+
+@pytest.fixture(name="otel")
+def otel_fixture() -> Generator[tuple[Any, InMemorySpanExporter], None, None]:
+    """Provide an isolated tracer and exporter for OTEL tests."""
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("unit-test-tracer")
+    yield tracer, exporter
+    exporter.clear()
+    provider.shutdown()
 
 
 @pytest.fixture(autouse=True)
@@ -57,7 +97,7 @@ def prepare_agent_mocks_fixture(
 ) -> AgentFixtures:
     """Prepare for mock for the LLM agent.
 
-    Provides common mocks for AsyncLlamaStackClient and AsyncAgent
+    Provides common mocks for AsyncOgxClient and AsyncAgent
     with proper agent_id setup to avoid initialization errors.
 
     Yields:
@@ -109,12 +149,13 @@ def minimal_config_fixture() -> AppConfig:
 @pytest.fixture(name="mock_client")
 def mock_client_fixture(  # pylint: disable=protected-access
     mocker: MockerFixture,
-) -> AsyncLlamaStackClient:
+) -> AsyncOgxClient:
     """Remote Llama Stack client mock for build_agent tests."""
-    client = mocker.Mock(spec=AsyncLlamaStackClient)
+    client = mocker.Mock(spec=AsyncOgxClient)
     client.base_url = "http://localhost:8321"
     client.api_key = "test-key"
     client._client = mocker.Mock(spec=httpx.AsyncClient)
+    client.default_headers = {}
     return client
 
 
@@ -142,3 +183,26 @@ def mock_skills_configuration_fixture(tmp_path: Path) -> SkillsConfiguration:
         encoding="utf-8",
     )
     return SkillsConfiguration(paths=[skills_root])
+
+
+@pytest.fixture(name="make_agent_config")
+def make_agent_config_fixture(
+    mocker: MockerFixture,
+) -> Callable[..., AppConfig]:
+    """Return a factory building a duck-typed AppConfig stand-in for build_agent.
+
+    ``build_agent`` only reads ``config.skills`` and ``config.shields`` off the
+    config object it receives, so tests can pass a lightweight mock instead of
+    a fully-initialized ``AppConfig``.
+    """
+
+    def _make(
+        skills: Optional[SkillsConfiguration] = None,
+        shields: Optional[list[ShieldConfiguration]] = None,
+    ) -> AppConfig:
+        config = mocker.Mock()
+        config.skills = skills
+        config.shields = shields or []
+        return config
+
+    return _make

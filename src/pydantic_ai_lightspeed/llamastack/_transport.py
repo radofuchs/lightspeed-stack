@@ -1,23 +1,158 @@
-"""httpx transport that routes OpenAI-compatible requests through a Llama Stack library client."""
+"""httpx transports for Llama Stack library and server modes."""
 
 from __future__ import annotations as _annotations
 
 import json
-from collections.abc import AsyncGenerator, AsyncIterator
-from typing import Any
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from typing import Any, Optional
 
 import httpx
-from llama_stack.core.library_client import (
-    AsyncLlamaStackAsLibraryClient,
+from ogx.core.library_client import (
+    AsyncOGXAsLibraryClient,
     convert_pydantic_to_json_value,
 )
-from llama_stack.core.request_headers import (
+from ogx.core.request_headers import (
     PROVIDER_DATA_VAR,
     request_provider_data_context,
 )
-from llama_stack.core.server.routes import find_matching_route
-from llama_stack.core.utils.context import preserve_contexts_async_generator
+from ogx.core.server.routes import find_matching_route
+from ogx.core.utils.context import preserve_contexts_async_generator
 from starlette.responses import StreamingResponse
+
+_PROVIDER_DATA_HEADER_KEYS = (
+    "X-OGX-Provider-Data",
+    "x-llamastack-provider-data",
+)
+
+
+def decode_request_headers(request: httpx.Request) -> dict[str, str]:
+    """Decode raw httpx request headers into a string-to-string mapping.
+
+    Args:
+        request: The outgoing httpx request.
+
+    Returns:
+        Request headers with byte keys and values decoded to UTF-8 strings.
+    """
+    return {
+        k.decode("utf-8") if isinstance(k, bytes) else k: (
+            v.decode("utf-8") if isinstance(v, bytes) else v
+        )
+        for k, v in request.headers.raw
+    }
+
+
+def inject_provider_data_into_headers(
+    headers: Mapping[str, str],
+    provider_data: Optional[Mapping[str, Any]],
+) -> dict[str, str]:
+    """Add ``X-OGX-Provider-Data`` when provider data is configured.
+
+    Args:
+        headers: Existing request headers.
+        provider_data: Provider credentials/metadata to forward to Llama Stack.
+
+    Returns:
+        Headers with provider data injected when absent from the request.
+    """
+    if not provider_data:
+        return dict(headers)
+    if any(key in headers for key in _PROVIDER_DATA_HEADER_KEYS):
+        return dict(headers)
+    result = dict(headers)
+    result["X-OGX-Provider-Data"] = json.dumps(provider_data)
+    return result
+
+
+def request_with_provider_data_headers(
+    request: httpx.Request,
+    provider_data: Optional[Mapping[str, Any]],
+) -> httpx.Request:
+    """Return a request copy with provider data headers injected when needed.
+
+    Args:
+        request: The outgoing httpx request.
+        provider_data: Provider credentials/metadata to forward to Llama Stack.
+
+    Returns:
+        The original request, or a copy with provider data headers added.
+    """
+    headers = inject_provider_data_into_headers(
+        decode_request_headers(request),
+        provider_data,
+    )
+    if headers == decode_request_headers(request):
+        return request
+    return httpx.Request(
+        method=request.method,
+        url=request.url,
+        headers=headers,
+        content=request.content,
+        extensions=request.extensions,
+    )
+
+
+def wrap_http_client_with_provider_data(
+    http_client: httpx.AsyncClient,
+    provider_data: Optional[Mapping[str, Any]],
+) -> httpx.AsyncClient:
+    """Wrap an httpx client so outbound requests include provider data headers.
+
+    Args:
+        http_client: The client whose transport will be wrapped.
+        provider_data: Provider credentials/metadata to forward to Llama Stack.
+
+    Returns:
+        The original client when ``provider_data`` is empty, otherwise a new
+        client with a wrapping transport.
+    """
+    if not provider_data:
+        return http_client
+
+    transport = OgxServerTransport(
+        http_client._transport,  # pylint: disable=protected-access
+        provider_data=provider_data,
+    )
+    return httpx.AsyncClient(
+        transport=transport,
+        timeout=http_client.timeout,
+        follow_redirects=http_client.follow_redirects,
+    )
+
+
+class OgxServerTransport(httpx.AsyncBaseTransport):
+    """httpx transport that injects provider data headers before delegating over HTTP."""
+
+    def __init__(
+        self,
+        transport: httpx.AsyncBaseTransport,
+        *,
+        provider_data: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        """Initialize the wrapping transport.
+
+        Args:
+            transport: The underlying transport used for real HTTP requests.
+            provider_data: Provider credentials/metadata to forward to Llama Stack.
+        """
+        self._transport = transport
+        self._provider_data = provider_data
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        """Inject provider data headers and delegate to the wrapped transport.
+
+        Args:
+            request: The outgoing httpx request.
+
+        Returns:
+            The response from the wrapped transport.
+        """
+        request = request_with_provider_data_headers(request, self._provider_data)
+        return await self._transport.handle_async_request(request)
+
+    async def aclose(self) -> None:
+        """Close the wrapped transport."""
+        await self._transport.aclose()
 
 
 class _AsyncByteStream(httpx.AsyncByteStream):
@@ -41,7 +176,7 @@ class _AsyncByteStream(httpx.AsyncByteStream):
             yield chunk
 
 
-class LlamaStackLibraryTransport(httpx.AsyncBaseTransport):
+class OgxLibraryTransport(httpx.AsyncBaseTransport):
     """Custom httpx transport that dispatches requests through a Llama Stack library client.
 
     Instead of making real HTTP calls, this transport routes requests directly
@@ -49,11 +184,11 @@ class LlamaStackLibraryTransport(httpx.AsyncBaseTransport):
     route matching and body conversion logic.
     """
 
-    def __init__(self, client: AsyncLlamaStackAsLibraryClient) -> None:
+    def __init__(self, client: AsyncOGXAsLibraryClient) -> None:
         """Initialize the transport with a Llama Stack library client.
 
         Args:
-            client: An initialized ``AsyncLlamaStackAsLibraryClient`` whose route
+            client: An initialized ``AsyncOGXAsLibraryClient`` whose route
                 handlers will receive dispatched requests.
         """
         self._client = client
@@ -80,19 +215,10 @@ class LlamaStackLibraryTransport(httpx.AsyncBaseTransport):
 
         body = json.loads(request.content) if request.content else {}
 
-        headers: dict[str, str] = {
-            k.decode("utf-8") if isinstance(k, bytes) else k: (
-                v.decode("utf-8") if isinstance(v, bytes) else v
-            )
-            for k, v in request.headers.raw
-        }
-
-        if self._client.provider_data:
-            keys = ["X-LlamaStack-Provider-Data", "x-llamastack-provider-data"]
-            if all(key not in headers for key in keys):
-                headers["X-LlamaStack-Provider-Data"] = json.dumps(
-                    self._client.provider_data
-                )
+        headers = inject_provider_data_into_headers(
+            decode_request_headers(request),
+            self._client.provider_data,
+        )
 
         with request_provider_data_context(headers):
             is_stream = body.get("stream", False)
@@ -193,7 +319,7 @@ class LlamaStackLibraryTransport(httpx.AsyncBaseTransport):
             else:
                 async for chunk in result:
                     data = json.dumps(convert_pydantic_to_json_value(chunk))
-                    yield f"data: {data}\n\n".encode("utf-8")
+                    yield f"data: {data}\n\n".encode()
 
         wrapped_gen = preserve_contexts_async_generator(gen(), [PROVIDER_DATA_VAR])
 

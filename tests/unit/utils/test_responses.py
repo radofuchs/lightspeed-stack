@@ -2,69 +2,74 @@
 
 # pylint: disable=line-too-long,too-many-lines
 
+import base64
 import json
 from pathlib import Path
 from typing import Any, Optional, cast
 
 import pytest
 from fastapi import HTTPException
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     AllowedToolsFilter,
     OpenAIResponseInputToolChoiceAllowedTools,
 )
-from llama_stack_api.openai_responses import ApprovalFilter as LlamaStackApprovalFilter
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import ApprovalFilter as OgxApprovalFilter
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolChoiceFileSearch as ToolChoiceFileSearch,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolChoiceMode as ToolChoiceMode,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolFileSearch as InputToolFileSearch,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolFunction as InputToolFunction,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseInputToolWebSearch as InputToolWebSearch,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseMCPApprovalRequest as MCPApprovalRequest,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseMCPApprovalResponse as MCPApprovalResponse,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageFileSearchToolCall as FileSearchCall,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageFunctionToolCall as FunctionCall,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageMCPCall as MCPCall,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageMCPListTools as MCPListTools,
 )
-from llama_stack_api.openai_responses import (
+from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageWebSearchToolCall as WebSearchCall,
 )
-from llama_stack_client import APIConnectionError, APIStatusError, AsyncLlamaStackClient
+from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
+from ogx_client.types import ListModelsResponse
+from ogx_client.types.model import Model
 from pydantic import AnyUrl, BaseModel
 from pytest_mock import MockerFixture
 
 import constants
 from models.api.requests import QueryRequest
+from models.common.query import Attachment
 from models.common.responses.types import InputTool, InputToolMCP
 from models.config import (
     ApprovalFilter,
-    ByokRag,
     InferenceConfiguration,
     ModelContextProtocolServer,
+    RagStore,
 )
 from utils.query import normalize_vertex_ai_model_id
 from utils.responses import (
     _build_chunk_attributes,
+    _build_okp_doc_url,
     _merge_tools,
     build_mcp_tool_call_from_arguments_done,
     build_tool_call_summary,
@@ -78,7 +83,6 @@ from utils.responses import (
     get_mcp_tools,
     get_rag_tools,
     get_topic_summary,
-    get_vector_store_ids,
     is_server_deployed_output,
     parse_arguments_string,
     parse_referenced_documents,
@@ -448,7 +452,7 @@ class TestGetMCPTools:
 
         tools = await get_mcp_tools(token=None)
         assert len(tools) == 1
-        assert isinstance(tools[0].require_approval, LlamaStackApprovalFilter)
+        assert isinstance(tools[0].require_approval, OgxApprovalFilter)
         assert tools[0].require_approval.always == ["create_issue"]
         assert tools[0].require_approval.never == ["list_repos"]
 
@@ -926,7 +930,7 @@ class TestGetTopicSummary:
     @pytest.mark.asyncio
     async def test_get_topic_summary_success(self, mocker: MockerFixture) -> None:
         """Test successful topic summary generation."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         mock_output_item = make_output_item(
             item_type="message", role="assistant", content="Topic Summary"
         )
@@ -948,7 +952,7 @@ class TestGetTopicSummary:
         self, mocker: MockerFixture
     ) -> None:
         """Test topic summary with empty response."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         mock_response = mocker.Mock()
         mock_response.output = []
         mock_client.responses.create = mocker.AsyncMock(return_value=mock_response)
@@ -966,7 +970,7 @@ class TestGetTopicSummary:
         self, mocker: MockerFixture
     ) -> None:
         """Test topic summary raises HTTPException on connection error."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         mock_client.responses.create = mocker.AsyncMock(
             side_effect=APIConnectionError(
                 message="Connection failed", request=mocker.Mock()
@@ -985,7 +989,7 @@ class TestGetTopicSummary:
     @pytest.mark.asyncio
     async def test_get_topic_summary_api_error(self, mocker: MockerFixture) -> None:
         """Test topic summary raises HTTPException on API error."""
-        mock_client = mocker.AsyncMock(spec=AsyncLlamaStackClient)
+        mock_client = mocker.AsyncMock(spec=AsyncOgxClient)
         # Create a mock exception that will be caught by except APIStatusError
         mock_error = APIStatusError(
             message="API error", response=mocker.Mock(request=None), body=None
@@ -1035,7 +1039,6 @@ class TestResolveToolChoice:
         self, mocker: MockerFixture, tools_arg: Optional[list[InputTool]]
     ) -> None:
         """ToolChoiceMode.none always yields (None, None)."""
-        mocker.patch("utils.responses.AsyncLlamaStackClientHolder.get_client")
         mocker.patch("utils.responses.prepare_tools", new_callable=mocker.AsyncMock)
         out = await resolve_tool_choice(
             tools_arg,
@@ -1119,7 +1122,6 @@ class TestResolveToolChoice:
             new_callable=mocker.AsyncMock,
             return_value=None,
         )
-        mocker.patch("utils.responses.AsyncLlamaStackClientHolder.get_client")
         tool_choice_obj = ToolChoiceFileSearch()
         prepared, choice = await resolve_tool_choice(
             None,
@@ -1250,7 +1252,6 @@ class TestResolveToolChoice:
             new_callable=mocker.AsyncMock,
             return_value=[fs],
         )
-        mocker.patch("utils.responses.AsyncLlamaStackClientHolder.get_client")
         prepared, choice = await resolve_tool_choice(
             None,
             mode_choice,
@@ -1269,7 +1270,6 @@ class TestResolveToolChoice:
             new_callable=mocker.AsyncMock,
             return_value=None,
         )
-        mocker.patch("utils.responses.AsyncLlamaStackClientHolder.get_client")
         prepared, choice = await resolve_tool_choice(
             None,
             ToolChoiceMode.auto,
@@ -1290,7 +1290,6 @@ class TestResolveToolChoice:
             new_callable=mocker.AsyncMock,
             return_value=[fs, mcp],
         )
-        mocker.patch("utils.responses.AsyncLlamaStackClientHolder.get_client")
         allowed = OpenAIResponseInputToolChoiceAllowedTools(
             mode="auto",
             tools=[{"type": "mcp", "server_label": "s1"}],
@@ -1316,7 +1315,6 @@ class TestResolveToolChoice:
             new_callable=mocker.AsyncMock,
             return_value=[mcp],
         )
-        mocker.patch("utils.responses.AsyncLlamaStackClientHolder.get_client")
         allowed = OpenAIResponseInputToolChoiceAllowedTools(
             mode="auto",
             tools=[{"type": "file_search"}],
@@ -1336,7 +1334,6 @@ class TestResolveToolChoice:
             new_callable=mocker.AsyncMock,
             return_value=[mcp],
         )
-        mocker.patch("utils.responses.AsyncLlamaStackClientHolder.get_client")
         allowed = OpenAIResponseInputToolChoiceAllowedTools(
             mode="required",
             tools=[{"type": "mcp"}],
@@ -1605,119 +1602,56 @@ class TestPrepareTools:
         self, mocker: MockerFixture
     ) -> None:
         """Test prepare_tools with specified vector store IDs."""
-        mock_client = mocker.AsyncMock()
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
-        result = await prepare_tools(mock_client, ["vs1", "vs2"], False, "token")
+        result = await prepare_tools(["vs1", "vs2"], False, "token")
         assert result is not None
         assert len(result) == 1
         assert result[0].type == "file_search"
         assert result[0].vector_store_ids == ["vs1", "vs2"]
 
     @pytest.mark.asyncio
-    async def test_prepare_tools_fetch_vector_stores(
-        self, mocker: MockerFixture
-    ) -> None:
-        """Test prepare_tools fetches vector stores when not specified."""
-        mock_client = mocker.AsyncMock()
-        mock_vector_store1 = mocker.Mock()
-        mock_vector_store1.id = "vs1"
-        mock_vector_store2 = mocker.Mock()
-        mock_vector_store2.id = "vs2"
-        mock_vector_stores = mocker.Mock()
-        mock_vector_stores.data = [mock_vector_store1, mock_vector_store2]
-        mock_client.vector_stores.list = mocker.AsyncMock(
-            return_value=mock_vector_stores
-        )
-        mocker.patch("utils.responses.get_mcp_tools", return_value=None)
-
-        result = await prepare_tools(mock_client, None, False, "token")
-        assert result is not None
-        assert len(result) == 1
-        assert isinstance(result[0], InputToolFileSearch)
-        assert result[0].vector_store_ids == ["vs1", "vs2"]
-
-    @pytest.mark.asyncio
-    async def test_prepare_tools_connection_error(self, mocker: MockerFixture) -> None:
-        """Test prepare_tools raises HTTPException on connection error."""
-        mock_client = mocker.AsyncMock()
-        mock_client.vector_stores.list = mocker.AsyncMock(
-            side_effect=APIConnectionError(
-                message="Connection failed", request=mocker.Mock()
-            )
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await prepare_tools(mock_client, None, False, "token")
-        assert exc_info.value.status_code == 503
-
-    @pytest.mark.asyncio
     async def test_prepare_tools_with_mcp_servers(self, mocker: MockerFixture) -> None:
         """Test prepare_tools includes MCP tools."""
-        mock_client = mocker.AsyncMock()
         mock_mcp_tool = InputToolMCP(
             server_label="test-server",
             server_url="http://test",
         )
         mocker.patch("utils.responses.get_mcp_tools", return_value=[mock_mcp_tool])
 
-        result = await prepare_tools(mock_client, ["vs1"], False, "token")
+        result = await prepare_tools(["vs1"], False, "token")
         assert result is not None
         assert len(result) == 2  # RAG tool + MCP tool
         assert any(tool.type == "mcp" for tool in result)
 
     @pytest.mark.asyncio
-    async def test_prepare_tools_api_status_error(self, mocker: MockerFixture) -> None:
-        """Test prepare_tools raises HTTPException on API status error when fetching vector stores."""
-        mock_client = mocker.AsyncMock()
-        mock_client.vector_stores.list = mocker.AsyncMock(
-            side_effect=APIStatusError(
-                message="API error", response=mocker.Mock(request=None), body=None
-            )
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await prepare_tools(mock_client, None, False, "token")
-        assert exc_info.value.status_code == 500
-
-    @pytest.mark.asyncio
     async def test_prepare_tools_empty_toolgroups(self, mocker: MockerFixture) -> None:
         """Test prepare_tools returns None when no tools are available."""
-        mock_client = mocker.AsyncMock()
-        mock_vector_stores = mocker.Mock()
-        mock_vector_stores.data = []  # No vector stores
-        mock_client.vector_stores.list = mocker.AsyncMock(
-            return_value=mock_vector_stores
-        )
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
-        result = await prepare_tools(mock_client, None, False, "token")
+        result = await prepare_tools(None, False, "token")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_prepare_tools_no_tools_true(self, mocker: MockerFixture) -> None:
+    async def test_prepare_tools_no_tools_true(self) -> None:
         """Test prepare_tools returns None when no_tools=True."""
-        mock_client = mocker.AsyncMock()
-
         # Should return None immediately without fetching vector stores or MCP tools
-        result = await prepare_tools(mock_client, ["vs1", "vs2"], True, "token")
+        result = await prepare_tools(["vs1", "vs2"], True, "token")
 
         assert result is None
-        # Verify that vector_stores.list was not called
-        mock_client.vector_stores.list.assert_not_called()
 
 
 class TestResolveVectorStoreIds:
     """Tests for resolve_vector_store_ids function."""
 
     @staticmethod
-    def _make_byok_rag(rag_id: str, vector_db_id: str) -> ByokRag:
-        """Create a ByokRag instance for testing."""
-        return ByokRag(
+    def _make_byok_rag(rag_id: str, vector_db_id: str) -> RagStore:
+        """Create a RagStore instance for testing."""
+        return RagStore(
             rag_id=rag_id,
             vector_db_id=vector_db_id,
             db_path="tests/configuration/rag.txt",
-            rag_type="rag",
+            backend="faiss",
             embedding_model="model",
             embedding_dimension=768,
             score_multiplier=1.0,
@@ -1773,7 +1707,6 @@ class TestPrepareToolsTranslatesVectorStoreIds:
         self, mocker: MockerFixture
     ) -> None:
         """Test that prepare_tools translates customer-facing IDs to internal IDs."""
-        mock_client = mocker.AsyncMock()
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         # Configure BYOK RAG mapping
@@ -1781,12 +1714,15 @@ class TestPrepareToolsTranslatesVectorStoreIds:
         mock_byok_rag.rag_id = "ocp_docs"
         mock_byok_rag.vector_db_id = "vs-001"
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = [mock_byok_rag]
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = [mock_byok_rag]
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
-        result = await prepare_tools(mock_client, ["ocp_docs"], False, "token")
+        result = await prepare_tools(["ocp_docs"], False, "token")
         assert result is not None
         assert len(result) == 1
         assert result[0].type == "file_search"
@@ -1797,52 +1733,22 @@ class TestPrepareToolsTranslatesVectorStoreIds:
         self, mocker: MockerFixture
     ) -> None:
         """Test that prepare_tools passes through IDs not in BYOK config."""
-        mock_client = mocker.AsyncMock()
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         # Configure empty BYOK RAG
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
-        result = await prepare_tools(mock_client, ["raw-internal-id"], False, "token")
+        result = await prepare_tools(["raw-internal-id"], False, "token")
         assert result is not None
         assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["raw-internal-id"]
-
-    @pytest.mark.asyncio
-    async def test_does_not_translate_when_ids_fetched_from_llama_stack(
-        self, mocker: MockerFixture
-    ) -> None:
-        """Test that IDs fetched from llama-stack (None path) are not translated."""
-        mock_client = mocker.AsyncMock()
-        mock_vector_store = mocker.Mock()
-        mock_vector_store.id = "vs-internal"
-        mock_vector_stores = mocker.Mock()
-        mock_vector_stores.data = [mock_vector_store]
-        mock_client.vector_stores.list = mocker.AsyncMock(
-            return_value=mock_vector_stores
-        )
-        mocker.patch("utils.responses.get_mcp_tools", return_value=None)
-
-        # Configure BYOK RAG whose rag_id matches the fetched ID so that
-        # accidental translation would change the result and fail the assertion
-        mock_byok_rag = mocker.Mock()
-        mock_byok_rag.rag_id = "vs-internal"
-        mock_byok_rag.vector_db_id = "vs-translated"
-        mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = [mock_byok_rag]
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = []
-        mocker.patch("utils.responses.configuration", mock_config)
-
-        result = await prepare_tools(mock_client, None, False, "token")
-        assert result is not None
-        # The IDs from llama-stack should be used as-is (no BYOK translation on None path)
-        assert isinstance(result[0], InputToolFileSearch)
-        assert result[0].vector_store_ids == ["vs-internal"]
 
 
 class TestPrepareToolsVectorStoreResolution:
@@ -1853,113 +1759,112 @@ class TestPrepareToolsVectorStoreResolution:
         self, mocker: MockerFixture
     ) -> None:
         """Test that rag.tool config IDs are used when no per-request IDs are provided."""
-        mock_client = mocker.AsyncMock()
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = ["rag-tool-id-1", "rag-tool-id-2"]
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = [
+            "rag-tool-id-1",
+            "rag-tool-id-2",
+        ]
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
-        result = await prepare_tools(mock_client, None, False, "token")
+        result = await prepare_tools(None, False, "token")
 
         assert result is not None
         assert len(result) == 1
         assert result[0].type == "file_search"
         assert result[0].vector_store_ids == ["rag-tool-id-1", "rag-tool-id-2"]
-        mock_client.vector_stores.list.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_rag_tool_config_ids_are_translated(
         self, mocker: MockerFixture
     ) -> None:
         """Test that rag.tool config IDs are translated from rag_ids to vector_db_ids."""
-        mock_client = mocker.AsyncMock()
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_byok_rag = mocker.Mock()
         mock_byok_rag.rag_id = "ocp_docs"
         mock_byok_rag.vector_db_id = "vs-001"
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = [mock_byok_rag]
-        mock_config.configuration.rag.tool = ["ocp_docs"]
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = [mock_byok_rag]
+        mock_config.configuration.rag.retrieval.tool.sources = ["ocp_docs"]
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
-        result = await prepare_tools(mock_client, None, False, "token")
+        result = await prepare_tools(None, False, "token")
 
         assert result is not None
         assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["vs-001"]
-        mock_client.vector_stores.list.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_inline_rag_disables_tool_rag(self, mocker: MockerFixture) -> None:
-        """Test that configuring rag.inline without rag.tool disables tool RAG."""
-        mock_client = mocker.AsyncMock()
+    async def test_inline_rag_config_does_not_affect_tool_rag(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that configuring rag.inline have no effect on tool rag."""
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = [
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.configuration.rag.retrieval.inline.sources = [
             "inline-store-id"
         ]  # inline is configured
         mocker.patch("utils.responses.configuration", mock_config)
 
-        result = await prepare_tools(mock_client, None, False, "token")
+        result = await prepare_tools(None, False, "token")
 
-        # Tool RAG should be disabled — no RAG tool in result, no llama-stack fetch
         assert result is None
-        mock_client.vector_stores.list.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_per_request_ids_override_rag_tool_config(
         self, mocker: MockerFixture
     ) -> None:
         """Test that per-request vector_store_ids take priority over rag.tool config."""
-        mock_client = mocker.AsyncMock()
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = ["config-id-1"]
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = ["config-id-1"]
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
-        result = await prepare_tools(mock_client, ["request-id-1"], False, "token")
+        result = await prepare_tools(["request-id-1"], False, "token")
 
         assert result is not None
         assert isinstance(result[0], InputToolFileSearch)
         assert result[0].vector_store_ids == ["request-id-1"]
-        mock_client.vector_stores.list.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_all_registered_dbs_used_when_neither_tool_nor_inline_configured(
+    async def test_tool_rag_disabled_when_tool_not_configured(
         self, mocker: MockerFixture
     ) -> None:
-        """Test fallback to all registered vector DBs when neither rag.tool nor rag.inline are set."""
-        mock_client = mocker.AsyncMock()
-        mock_vs = mocker.Mock()
-        mock_vs.id = "vs-registered"
-        mock_list = mocker.Mock()
-        mock_list.data = [mock_vs]
-        mock_client.vector_stores.list = mocker.AsyncMock(return_value=mock_list)
+        """Test no rag tools is returned when rag.tool is not set and there is no per-request vector ids."""
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
-        result = await prepare_tools(mock_client, None, False, "token")
+        result = await prepare_tools(None, False, "token")
 
-        assert result is not None
-        assert isinstance(result[0], InputToolFileSearch)
-        assert result[0].vector_store_ids == ["vs-registered"]
-        mock_client.vector_stores.list.assert_called_once()
+        assert result is None
 
 
 class TestPrepareResponsesParams:
@@ -1971,10 +1876,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params with existing conversation ID."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         query_request = QueryRequest(
             query="test", conversation_id="123e4567-e89b-12d3-a456-426614174000"
@@ -2003,10 +1920,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params creates new conversation when ID not provided."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         mock_conversation = mocker.Mock()
         mock_conversation.id = "new_conv_id"
@@ -2056,10 +1985,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params raises HTTPException on connection error when creating conversation."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
         mock_client.conversations.create = mocker.AsyncMock(
             side_effect=APIConnectionError(
                 message="Connection failed", request=mocker.Mock()
@@ -2106,10 +2047,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test that extra_headers with x-llamastack-provider-data is set when MCP tools have headers."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         mock_conversation = mocker.Mock()
         mock_conversation.id = "new_conv_id"
@@ -2170,10 +2123,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test that extra_headers is None when no MCP tools have headers."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
 
         mock_conversation = mocker.Mock()
         mock_conversation.id = "new_conv_id"
@@ -2203,10 +2168,22 @@ class TestPrepareResponsesParams:
     ) -> None:
         """Test prepare_responses_params raises HTTPException on API status error when creating conversation."""
         mock_client = mocker.AsyncMock()
-        mock_model = mocker.Mock()
-        mock_model.id = "provider1/model1"
-        mock_model.custom_metadata = {"model_type": "llm", "provider_id": "provider1"}
-        mock_client.models.list = mocker.AsyncMock(return_value=[mock_model])
+        mock_client.models.list = mocker.AsyncMock(
+            return_value=ListModelsResponse.model_construct(
+                data=[
+                    Model.model_construct(
+                        id="provider1/model1",
+                        created=0,
+                        owned_by="test",
+                        object="model",
+                        custom_metadata={
+                            "model_type": "llm",
+                            "provider_id": "provider1",
+                        },
+                    )
+                ]
+            )
+        )
         mock_client.conversations.create = mocker.AsyncMock(
             side_effect=APIStatusError(
                 message="API error", response=mocker.Mock(request=None), body=None
@@ -2225,6 +2202,53 @@ class TestPrepareResponsesParams:
         with pytest.raises(HTTPException) as exc_info:
             await prepare_responses_params(mock_client, query_request, None, "token")
         assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_image_attachments_excluded_from_input(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that image attachments are excluded from text input."""
+        mock_client = mocker.AsyncMock()
+        mock_conversation = mocker.Mock()
+        mock_conversation.id = "new_conv_id"
+        mock_client.conversations.create = mocker.AsyncMock(
+            return_value=mock_conversation
+        )
+
+        image_data = base64.b64encode(b"\xff\xd8\xff\xe0" + b"\x00" * 10).decode()
+        text_attachment = Attachment(
+            attachment_type="log",
+            content="log output",
+            content_type="text/plain",
+        )
+        image_attachment = Attachment(
+            attachment_type="image",
+            content=image_data,
+            content_type="image/jpeg",
+        )
+        query_request = QueryRequest(
+            query="describe this",
+            attachments=[text_attachment, image_attachment],
+        )  # pyright: ignore[reportCallIssue]
+
+        mock_config = mocker.Mock()
+        mock_config.inference = InferenceConfiguration()
+        mocker.patch("utils.responses.configuration", mock_config)
+        mocker.patch("utils.responses.get_system_prompt", return_value="System prompt")
+        mocker.patch("utils.responses.prepare_tools", return_value=None)
+        mocker.patch(
+            "utils.responses.select_model_for_responses",
+            return_value="provider1/model1",
+        )
+        mocker.patch("utils.responses.check_model_configured", return_value=True)
+
+        result = await prepare_responses_params(
+            mock_client, query_request, None, "token"
+        )
+
+        assert isinstance(result.input, str)
+        assert "log output" in result.input
+        assert image_data not in result.input
 
 
 class TestParseReferencedDocuments:
@@ -3145,65 +3169,235 @@ class TestParseReferencedDocumentsWithSource:
         assert docs[0].source is None
 
 
-class TestGetVectorStoreIds:
-    """Tests for get_vector_store_ids utility function."""
+class TestBuildOkpDocUrl:
+    """Tests for _build_okp_doc_url OKP URL construction."""
 
-    @pytest.mark.asyncio
-    async def test_returns_provided_ids_directly(self, mocker: MockerFixture) -> None:
-        """Test that provided vector_store_ids are returned without fetching."""
-        client_mock = mocker.AsyncMock()
-        result = await get_vector_store_ids(client_mock, ["vs1", "vs2"])
-        assert result == ["vs1", "vs2"]
-        client_mock.vector_stores.list.assert_not_called()
+    def test_online_mode_uses_reference_url(self, mocker: MockerFixture) -> None:
+        """Test that online mode (offline=False) uses reference_url."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
 
-    @pytest.mark.asyncio
-    async def test_fetches_all_when_no_ids_provided(
+        url = _build_okp_doc_url(
+            {
+                "reference_url": "/docs/pipelines/config.html",
+                "source_path": "pipelines/config.html",
+            }
+        )
+        assert url == "https://docs.openshift.com/docs/pipelines/config.html"
+
+    def test_offline_mode_uses_source_path(self, mocker: MockerFixture) -> None:
+        """Test that offline mode (offline=True) uses source_path."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = True
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url(
+            {
+                "reference_url": "/docs/pipelines/config.html",
+                "source_path": "pipelines/config.html",
+            }
+        )
+        assert url == "https://docs.openshift.com/pipelines/config.html"
+
+    def test_online_falls_back_to_doc_id(self, mocker: MockerFixture) -> None:
+        """Test online mode falls back to doc_id when reference_url is absent."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url({"doc_id": "some-doc-id"})
+        assert url == "https://docs.openshift.com/some-doc-id"
+
+    def test_offline_falls_back_to_doc_id(self, mocker: MockerFixture) -> None:
+        """Test offline mode falls back to doc_id when source_path is absent."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = True
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url({"doc_id": "some-doc-id"})
+        assert url == "https://docs.openshift.com/some-doc-id"
+
+    def test_returns_none_when_no_reference(self, mocker: MockerFixture) -> None:
+        """Test returns None when no reference_url, source_path, or doc_id."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url({"title": "Some Doc"})
+        assert url is None
+
+    def test_uses_default_url_when_rhokp_url_is_none(
         self, mocker: MockerFixture
     ) -> None:
-        """Test that all vector stores are fetched when no IDs provided."""
-        mock_store1 = mocker.Mock()
-        mock_store1.id = "vs-fetched-1"
-        mock_store2 = mocker.Mock()
-        mock_store2.id = "vs-fetched-2"
+        """Test uses RH_SERVER_OKP_DEFAULT_URL when rhokp_url is not configured."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = None
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
 
-        mock_list_result = mocker.Mock()
-        mock_list_result.data = [mock_store1, mock_store2]
+        url = _build_okp_doc_url({"reference_url": "/docs/page.html"})
+        assert url == "http://localhost:8081/docs/page.html"
 
-        client_mock = mocker.AsyncMock()
-        client_mock.vector_stores.list.return_value = mock_list_result
 
-        result = await get_vector_store_ids(client_mock, None)
-        assert result == ["vs-fetched-1", "vs-fetched-2"]
-        client_mock.vector_stores.list.assert_called_once()
+class TestParseReferencedDocumentsOkp:
+    """Tests for parse_referenced_documents with OKP/Solr file_search results."""
 
-    @pytest.mark.asyncio
-    async def test_raises_on_connection_error(self, mocker: MockerFixture) -> None:
-        """Test that APIConnectionError raises HTTPException 503."""
-        client_mock = mocker.AsyncMock()
-        client_mock.vector_stores.list.side_effect = APIConnectionError.__new__(
-            APIConnectionError
-        )
+    def test_okp_online_builds_full_url(self, mocker: MockerFixture) -> None:
+        """Test OKP result builds full URL from reference_url in online mode."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_vector_store_ids(client_mock, None)
-        assert exc_info.value.status_code == 503
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "reference_url": "/docs/pipelines/config.html",
+            "source_path": "pipelines/config.html",
+            "title": "Pipeline Config",
+            "doc_id": "doc-001",
+            "source": "okp",
+        }
 
-    @pytest.mark.asyncio
-    async def test_raises_on_api_status_error(self, mocker: MockerFixture) -> None:
-        """Test that APIStatusError raises HTTPException 500."""
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
         mock_response = mocker.Mock()
-        mock_response.status_code = 500
-        mock_response.headers = {}
-        mock_response.text = "error"
+        mock_response.output = [mock_output]
 
-        client_mock = mocker.AsyncMock()
-        client_mock.vector_stores.list.side_effect = APIStatusError(
-            "error", response=mock_response, body=None
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["portal-rag"],
+            rag_id_mapping={"portal-rag": "okp"},
         )
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_vector_store_ids(client_mock, None)
-        assert exc_info.value.status_code == 500
+        assert len(docs) == 1
+        assert (
+            str(docs[0].doc_url)
+            == "https://docs.openshift.com/docs/pipelines/config.html"
+        )
+        assert docs[0].doc_title == "Pipeline Config"
+        assert docs[0].source == "okp"
+
+    def test_okp_offline_builds_url_from_source_path(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test OKP result builds URL from source_path in offline mode."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = True
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "reference_url": "/docs/pipelines/config.html",
+            "source_path": "pipelines/config.html",
+            "title": "Pipeline Config",
+            "doc_id": "doc-001",
+            "source": "okp",
+        }
+
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
+        mock_response = mocker.Mock()
+        mock_response.output = [mock_output]
+
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["portal-rag"],
+            rag_id_mapping={"portal-rag": "okp"},
+        )
+
+        assert len(docs) == 1
+        assert (
+            str(docs[0].doc_url) == "https://docs.openshift.com/pipelines/config.html"
+        )
+        assert docs[0].source == "okp"
+
+    def test_okp_multistore_detected_via_source_attribute(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test OKP detected in multi-store scenario via source attribute."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "reference_url": "/docs/builds.html",
+            "title": "Builds",
+            "source": "okp",
+        }
+
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
+        mock_response = mocker.Mock()
+        mock_response.output = [mock_output]
+
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["portal-rag", "byok-store"],
+            rag_id_mapping={"portal-rag": "okp", "byok-store": "my-docs"},
+        )
+
+        assert len(docs) == 1
+        assert str(docs[0].doc_url) == "https://docs.openshift.com/docs/builds.html"
+        assert docs[0].source == "okp"
+
+    def test_non_okp_result_unaffected(self, mocker: MockerFixture) -> None:
+        """Test non-OKP results still use existing doc_url/url attribute lookup."""
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "url": "https://example.com/byok-doc",
+            "title": "BYOK Doc",
+            "document_id": "byok-001",
+        }
+
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
+        mock_response = mocker.Mock()
+        mock_response.output = [mock_output]
+
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["byok-store"],
+            rag_id_mapping={"byok-store": "my-docs"},
+        )
+
+        assert len(docs) == 1
+        assert str(docs[0].doc_url) == "https://example.com/byok-doc"
+        assert docs[0].source == "my-docs"
 
 
 class TestGetRAGToolsWithConfig:
@@ -3396,15 +3590,8 @@ class TestResolveToolChoiceMerge:
         self, mocker: MockerFixture
     ) -> None:
         """Test client tools used as-is without merge header."""
-        mock_client = mocker.AsyncMock()
-        mock_holder = mocker.Mock()
-        mock_holder.get_client.return_value = mock_client
-        mocker.patch(
-            "utils.responses.AsyncLlamaStackClientHolder",
-            return_value=mock_holder,
-        )
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
 
@@ -3421,15 +3608,8 @@ class TestResolveToolChoiceMerge:
     @pytest.mark.asyncio
     async def test_client_tools_with_merge_header(self, mocker: MockerFixture) -> None:
         """Test client tools merged with server tools when header is set."""
-        mock_client = mocker.AsyncMock()
-        mock_holder = mocker.Mock()
-        mock_holder.get_client.return_value = mock_client
-        mocker.patch(
-            "utils.responses.AsyncLlamaStackClientHolder",
-            return_value=mock_holder,
-        )
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
 
@@ -3458,15 +3638,8 @@ class TestResolveToolChoiceMerge:
         self, mocker: MockerFixture
     ) -> None:
         """Test 409 when merge header is set and tools conflict."""
-        mock_client = mocker.AsyncMock()
-        mock_holder = mocker.Mock()
-        mock_holder.get_client.return_value = mock_client
-        mocker.patch(
-            "utils.responses.AsyncLlamaStackClientHolder",
-            return_value=mock_holder,
-        )
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
 
@@ -3492,13 +3665,6 @@ class TestResolveToolChoiceMerge:
     @pytest.mark.asyncio
     async def test_no_tools_uses_prepare_tools(self, mocker: MockerFixture) -> None:
         """Test that no client tools falls through to prepare_tools."""
-        mock_client = mocker.AsyncMock()
-        mock_holder = mocker.Mock()
-        mock_holder.get_client.return_value = mock_client
-        mocker.patch(
-            "utils.responses.AsyncLlamaStackClientHolder",
-            return_value=mock_holder,
-        )
         server_tool = InputToolFileSearch(type="file_search", vector_store_ids=["vs1"])
         mock_prepare = mocker.AsyncMock(return_value=[server_tool])
         mocker.patch("utils.responses.prepare_tools", new=mock_prepare)
@@ -3517,15 +3683,8 @@ class TestResolveToolChoiceMerge:
         self, mocker: MockerFixture
     ) -> None:
         """Test merge header with no server tools returns client tools unchanged."""
-        mock_client = mocker.AsyncMock()
-        mock_holder = mocker.Mock()
-        mock_holder.get_client.return_value = mock_client
-        mocker.patch(
-            "utils.responses.AsyncLlamaStackClientHolder",
-            return_value=mock_holder,
-        )
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
         mocker.patch(

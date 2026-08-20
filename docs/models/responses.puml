@@ -95,6 +95,7 @@ class "ForbiddenResponse" as src.models.api.responses.error.forbidden.ForbiddenR
   feedback_disabled() -> Self
   mcp_server_static_config(server_name: str) -> Self
   model_override() -> Self
+  saved_prompt(action: str, resource_id: str, user_id: str) -> Self
 }
 class "InfoResponse" as src.models.api.responses.successful.probes.InfoResponse {
   llama_stack_version : Optional[str]
@@ -139,7 +140,7 @@ class "MCPServerRegistrationResponse" as src.models.api.responses.successful.mcp
 }
 class "ModelsResponse" as src.models.api.responses.successful.catalog.ModelsResponse {
   model_config : dict
-  models : Optional[list[dict[str, Any]]]
+  models : Optional[list[CatalogModel]]
 }
 class "NotFoundResponse" as src.models.api.responses.error.not_found.NotFoundResponse {
   description : ClassVar[str]
@@ -213,7 +214,9 @@ class "RAGListResponse" as src.models.api.responses.successful.catalog.RAGListRe
   rags : Optional[list[str]]
 }
 class "ReadinessResponse" as src.models.api.responses.successful.probes.ReadinessResponse {
+  impacts : Optional[list[str]]
   model_config : dict
+  overall_status : Optional[HealthStatus]
   providers : Optional[list[ProviderHealthStatus]]
   ready : Optional[bool]
   reason : Optional[str]
@@ -264,13 +267,40 @@ class "RlsapiV1InferResponse" as src.models.api.responses.successful.rlsapi.Rlsa
   data : Optional[RlsapiV1InferData]
   model_config : dict
 }
+class "SavedPromptDeleteResponse" as src.models.api.responses.successful.saved_prompts.SavedPromptDeleteResponse {
+  model_config : dict
+  prompt_id : Optional[str]
+  resource_name : ClassVar[str]
+}
+class "SavedPromptResponse" as src.models.api.responses.successful.saved_prompts.SavedPromptResponse {
+  content : Optional[str]
+  created_at : Optional[datetime]
+  id : Optional[str]
+  model_config : dict
+  name : Optional[str]
+  updated_at : Optional[datetime]
+}
+class "SavedPromptsConfigResponse" as src.models.api.responses.successful.saved_prompts.SavedPromptsConfigResponse {
+  max_content_length : Optional[int]
+  max_display_name_length : Optional[int]
+  max_prompts_per_user : Optional[int]
+  model_config : dict
+}
+class "SavedPromptsListResponse" as src.models.api.responses.successful.saved_prompts.SavedPromptsListResponse {
+  model_config : dict
+  prompts : Optional[list[SavedPromptResponse]]
+}
 class "ServiceUnavailableResponse" as src.models.api.responses.error.service_unavailable.ServiceUnavailableResponse {
   description : ClassVar[str]
   model_config : dict
 }
 class "ShieldsResponse" as src.models.api.responses.successful.catalog.ShieldsResponse {
   model_config : dict
-  shields : Optional[list[dict[str, Any]]]
+  shields : Optional[list[CatalogShield]]
+}
+class "SkillsResponse" as src.models.api.responses.successful.catalog.SkillsResponse {
+  model_config : dict
+  skills : Optional[list[SkillMetadata]]
 }
 class "StatusResponse" as src.models.api.responses.successful.probes.StatusResponse {
   functionality : Optional[str]
@@ -289,7 +319,7 @@ class "StreamingQueryResponse" as src.models.api.responses.successful.query.Stre
 }
 class "ToolsResponse" as src.models.api.responses.successful.catalog.ToolsResponse {
   model_config : dict
-  tools : Optional[list[dict[str, Any]]]
+  tools : Optional[list[CatalogTool]]
 }
 class "UnauthorizedResponse" as src.models.api.responses.error.unauthorized.UnauthorizedResponse {
   description : ClassVar[str]

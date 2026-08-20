@@ -6,7 +6,9 @@ from typing import Any
 import pytest
 from fastapi import Request
 from fastapi.exceptions import HTTPException
-from llama_stack_client import APIConnectionError
+from ogx_client import APIConnectionError
+from ogx_client.types import ListModelsResponse
+from ogx_client.types.model import Model
 from pytest_mock import AsyncMockType, MockerFixture
 
 from app.endpoints.models import models_endpoint_handler
@@ -15,8 +17,8 @@ from configuration import AppConfig
 from models.api.requests import ModelFilter
 
 
-@pytest.fixture(name="mock_llama_stack_client")
-def mock_llama_stack_client_fixture(
+@pytest.fixture(name="mock_ogx_client")
+def mock_ogx_client_fixture(
     mocker: MockerFixture,
 ) -> Generator[Any, None, None]:
     """Mock only the external Llama Stack client.
@@ -33,24 +35,35 @@ def mock_llama_stack_client_fixture(
         mock_client: The mocked Llama Stack client instance configured as described above.
     """
     # Patch in app.endpoints.models where it's actually used by models_endpoint_handler_base
-    mock_holder_class = mocker.patch("app.endpoints.models.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.models.AsyncOgxClientHolder")
 
     mock_client = mocker.AsyncMock()
 
     # Mock models list (required for model selection)
-    mock_model1 = mocker.MagicMock()
-    mock_model1.id = "test-provider/test-model-1"
-    mock_model1.custom_metadata = {
-        "provider_id": "test-provider",
-        "model_type": "llm",
-    }
-    mock_model2 = mocker.MagicMock()
-    mock_model2.id = "test-provider/test-model-2"
-    mock_model2.custom_metadata = {
-        "provider_id": "test-provider",
-        "model_type": "embedding",
-    }
-    mock_client.models.list.return_value = [mock_model1, mock_model2]
+    mock_client.models.list.return_value = ListModelsResponse.model_construct(
+        data=[
+            Model.model_construct(
+                id="test-provider/test-model-1",
+                created=0,
+                owned_by="test",
+                object="model",
+                custom_metadata={
+                    "provider_id": "test-provider",
+                    "model_type": "llm",
+                },
+            ),
+            Model.model_construct(
+                id="test-provider/test-model-2",
+                created=0,
+                owned_by="test",
+                object="model",
+                custom_metadata={
+                    "provider_id": "test-provider",
+                    "model_type": "embedding",
+                },
+            ),
+        ]
+    )
 
     # Create a mock holder instance
     mock_holder_instance = mock_holder_class.return_value
@@ -59,8 +72,8 @@ def mock_llama_stack_client_fixture(
     yield mock_client
 
 
-@pytest.fixture(name="mock_llama_stack_client_failing")
-def mock_llama_stack_client_failing_fixture(
+@pytest.fixture(name="mock_ogx_client_failing")
+def mock_ogx_client_failing_fixture(
     mocker: MockerFixture,
 ) -> Generator[Any, None, None]:
     """Mock only the external Llama Stack client.
@@ -77,7 +90,7 @@ def mock_llama_stack_client_failing_fixture(
         mock_client: The mocked Llama Stack client instance configured as described above.
     """
     # Patch in app.endpoints.models where it's actually used by models_endpoint_handler_base
-    mock_holder_class = mocker.patch("app.endpoints.models.AsyncLlamaStackClientHolder")
+    mock_holder_class = mocker.patch("app.endpoints.models.AsyncOgxClientHolder")
 
     mock_client = mocker.AsyncMock()
 
@@ -131,7 +144,7 @@ MODEL_FILTER_TEST_CASES = [
 async def test_models_list_with_filter(
     test_case: dict,
     test_config: AppConfig,
-    mock_llama_stack_client: AsyncMockType,
+    mock_ogx_client: AsyncMockType,
     test_request: Request,
     test_auth: AuthTuple,
 ) -> None:
@@ -147,12 +160,12 @@ async def test_models_list_with_filter(
         test_case: Dictionary containing test parameters (filter_type,
             expected_count, expected_models)
         test_config: Test configuration
-        mock_llama_stack_client: Mocked Llama Stack client
+        mock_ogx_client: Mocked Llama Stack client
         test_request: FastAPI request
         test_auth: noop authentication tuple
     """
     _ = test_config
-    _ = mock_llama_stack_client
+    _ = mock_ogx_client
 
     filter_type = test_case["filter_type"]
     expected_count = test_case["expected_count"]
@@ -170,14 +183,14 @@ async def test_models_list_with_filter(
 
     # Verify each expected model
     for i, expected_model in enumerate(expected_models):
-        assert response.models[i]["identifier"] == expected_model["identifier"]
-        assert response.models[i]["api_model_type"] == expected_model["api_model_type"]
+        assert response.models[i].identifier == expected_model["identifier"]
+        assert response.models[i].api_model_type == expected_model["api_model_type"]
 
 
 @pytest.mark.asyncio
 async def test_models_list_on_api_connection_error(
     test_config: AppConfig,
-    mock_llama_stack_client_failing: AsyncMockType,
+    mock_ogx_client_failing: AsyncMockType,
     test_request: Request,
     test_auth: AuthTuple,
 ) -> None:
@@ -190,12 +203,12 @@ async def test_models_list_on_api_connection_error(
     Parameters:
     ----------
         test_config: Test configuration
-        mock_llama_stack_client_failing: Mocked Llama Stack client that raises APIConnectionError
+        mock_ogx_client_failing: Mocked Llama Stack client that raises APIConnectionError
         test_request: FastAPI request
         test_auth: noop authentication tuple
     """
     _ = test_config
-    _ = mock_llama_stack_client_failing
+    _ = mock_ogx_client_failing
 
     # we should catch HTTPException, not APIConnectionError!
     with pytest.raises(HTTPException) as exc_info:
@@ -207,6 +220,6 @@ async def test_models_list_on_api_connection_error(
 
     assert exc_info.value.status_code == 503
     assert isinstance(exc_info.value.detail, dict)
-    expected = "Unable to connect to Llama Stack"
+    expected = "Unable to connect to OGX"
     assert exc_info.value.detail["response"] == expected  # type: ignore[reportArgumentType]
     assert "cause" in exc_info.value.detail

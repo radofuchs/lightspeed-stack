@@ -130,6 +130,11 @@ class "RlsapiV1SystemInfo" as src.models.api.requests.rlsapi.RlsapiV1SystemInfo 
 class "RlsapiV1Terminal" as src.models.api.requests.rlsapi.RlsapiV1Terminal {
   output : Optional[str]
 }
+class "SavedPromptCreateRequest" as src.models.api.requests.saved_prompts.SavedPromptCreateRequest {
+  content : Optional[str]
+  model_config : dict
+  name : Optional[str]
+}
 class "StreamingInterruptRequest" as src.models.api.requests.query.StreamingInterruptRequest {
   model_config : dict
   request_id : Optional[str]

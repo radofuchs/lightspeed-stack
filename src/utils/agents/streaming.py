@@ -1,15 +1,18 @@
 """Agent streaming helpers for the streaming_query flow."""
 
+# pylint: disable=R0913,R0914, R0917
+
 from __future__ import annotations
 
 import asyncio
 import datetime
 from collections.abc import AsyncIterator
 from functools import singledispatch
-from typing import Any, Final, Optional, TypeAlias, cast
+from typing import Any, Final, Optional, cast
 
 from fastapi import HTTPException
-from llama_stack_client import APIConnectionError, APIStatusError
+from ogx_client import APIConnectionError, APIStatusError
+from opentelemetry import trace
 from pydantic_ai import Agent, AgentRunError, AgentRunResultEvent, ToolReturnPart
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -39,16 +42,17 @@ from models.common.agents import (
     ToolResultStreamPayload,
     TurnCompleteStreamPayload,
 )
+from models.common.query import Attachment
 from models.common.responses import ResponseInput
 from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.turn_summary import TurnSummary
+from utils.agents.error_handler import map_agent_inference_error
 from utils.agents.query import (
     AgentFinishReason,
     extract_agent_token_usage,
     get_agent_finish_reason,
     get_finish_reason_error,
-    map_agent_inference_error,
 )
 from utils.agents.tool_processor import (
     process_function_tool_call,
@@ -57,7 +61,14 @@ from utils.agents.tool_processor import (
     process_native_tool_result,
 )
 from utils.conversations import append_turn_items_to_conversation
-from utils.pydantic_ai import build_agent
+from utils.otel_tracing import (
+    SpanAttributes,
+    SpanEvents,
+    add_span_event,
+    anonymize_value,
+    set_span_attributes,
+)
+from utils.pydantic_ai_helpers import build_agent
 from utils.query import (
     build_multimodal_input,
     consume_query_tokens,
@@ -76,7 +87,7 @@ from utils.stream_interrupts import (
 )
 from utils.streaming_sse import shield_violation_generator
 
-AgentDispatchEvent: TypeAlias = AgentStreamEvent | AgentRunResultEvent
+type AgentDispatchEvent = AgentStreamEvent | AgentRunResultEvent
 
 logger = get_logger(__name__)
 
@@ -90,6 +101,7 @@ async def retrieve_agent_response_generator(
     context: ResponseGeneratorContext,
     endpoint_path: str,
     no_tools: bool = False,
+    image_attachments: Optional[list[Attachment]] = None,
 ) -> tuple[AsyncIterator[str], TurnSummary]:
     """Return the SSE generator and mutable turn summary for an agent run.
 
@@ -98,6 +110,7 @@ async def retrieve_agent_response_generator(
         context: Streaming request context and moderation result.
         endpoint_path: Endpoint path used for metric labeling.
         no_tools: Whether to skip tool processing.
+        image_attachments: Image attachments for multimodal prompt construction.
 
     Returns:
         Tuple of SSE async iterator and mutable turn summary.
@@ -125,7 +138,11 @@ async def retrieve_agent_response_generator(
             )
 
         agent = build_agent(
-            context.client, responses_params, configuration.skills, no_tools=no_tools
+            context.client,
+            responses_params,
+            configuration,
+            shields=context.query_request.shield_ids,
+            no_tools=no_tools,
         )
 
         return (
@@ -135,6 +152,7 @@ async def retrieve_agent_response_generator(
                 context,
                 turn_summary,
                 endpoint_path,
+                image_attachments=image_attachments,
             ),
             turn_summary,
         )
@@ -143,7 +161,7 @@ async def retrieve_agent_response_generator(
         raise HTTPException(**response.model_dump()) from exc
 
 
-async def generate_agent_response(
+async def generate_agent_response(  # pylint: disable=too-many-statements
     generator: AsyncIterator[str],
     context: ResponseGeneratorContext,
     responses_params: ResponsesApiParams,
@@ -151,6 +169,7 @@ async def generate_agent_response(
     background_topic_summary_tasks: list[asyncio.Task[None]],
     emit_start: bool = True,
     original_input: Optional[ResponseInput] = None,
+    root_span: Optional[trace.Span] = None,
 ) -> AsyncIterator[str]:
     """Wrap an agent SSE generator with cleanup logic.
 
@@ -169,6 +188,8 @@ async def generate_agent_response(
         original_input: In compacted mode, the original user input before the
             explicit-input rewrite. Used to persist the completed turn with its
             structured input (preserving attachments); ``None`` otherwise.
+        root_span: OpenTelemetry root span for this request.
+
     Yields:
         SSE-formatted strings from the wrapped generator.
     """
@@ -231,6 +252,8 @@ async def generate_agent_response(
         deregister_stream(context.request_id)
 
     if not stream_completed:
+        if root_span is not None:
+            root_span.end()
         return
 
     should_generate_topic_summary = (
@@ -259,6 +282,8 @@ async def generate_agent_response(
             ),
             media_type,
         )
+        if root_span is not None:
+            root_span.end()
         return
     logger.info("Consuming tokens")
     consume_query_tokens(
@@ -292,6 +317,40 @@ async def generate_agent_response(
         skip_userid_check=context.skip_userid_check,
         topic_summary=topic_summary,
     )
+
+    # Set final OTEL span attributes
+    if root_span is not None:
+        add_span_event(root_span, SpanEvents.TURN_PERSISTED)
+        if turn_summary.tool_calls:
+            tool_names = [tc.name for tc in turn_summary.tool_calls]
+            set_span_attributes(
+                root_span,
+                {
+                    SpanAttributes.TOOL_CALLS_COUNT: len(tool_names),
+                    SpanAttributes.TOOL_CALLS_NAMES: tool_names,
+                },
+            )
+            add_span_event(
+                root_span,
+                SpanEvents.TOOL_EXECUTION_COMPLETED,
+                {"tool.calls": ", ".join(tool_names)},
+            )
+        set_span_attributes(
+            root_span,
+            {
+                SpanAttributes.SESSION_ID: context.conversation_id,
+                SpanAttributes.LLM_USAGE_INPUT_TOKENS: (
+                    turn_summary.token_usage.input_tokens
+                ),
+                SpanAttributes.LLM_USAGE_OUTPUT_TOKENS: (
+                    turn_summary.token_usage.output_tokens
+                ),
+                SpanAttributes.OUTPUT: anonymize_value(turn_summary.llm_response),
+            },
+        )
+        add_span_event(root_span, SpanEvents.LLM_RESPONSE_COMPLETED)
+        root_span.end()
+
     logger.info("Agent streaming complete")
 
 
@@ -301,6 +360,7 @@ async def agent_response_generator(
     context: ResponseGeneratorContext,
     turn_summary: TurnSummary,
     endpoint_path: str,
+    image_attachments: Optional[list[Attachment]] = None,
 ) -> AsyncIterator[str]:
     """Stream SSE events from an agent run and update the turn summary.
 
@@ -310,6 +370,7 @@ async def agent_response_generator(
         context: Streaming request context.
         turn_summary: Mutable summary to fill while streaming.
         endpoint_path: Endpoint path used for metric labeling.
+        image_attachments: Image attachments for multimodal prompt construction.
 
     Yields:
         Serialized SSE event strings.
@@ -320,10 +381,10 @@ async def agent_response_generator(
         rag_id_mapping=context.rag_id_mapping,
         turn_summary=turn_summary,
     )
-    if responses_params.image_attachments:
+    if image_attachments:
         prompt = build_multimodal_input(
             cast(str, responses_params.input),
-            responses_params.image_attachments,
+            image_attachments,
         )
     else:
         prompt = cast(str, responses_params.input)
@@ -397,7 +458,7 @@ def _process_token(
 
 
 @singledispatch
-def dispatch_stream_event(
+def dispatch_stream_event(  # pylint: disable=useless-return
     event: AgentDispatchEvent,
     _state: AgentTurnAccumulator,
 ) -> Optional[StreamEventPayload]:
@@ -411,6 +472,7 @@ def dispatch_stream_event(
         None when the event does not map to an SSE payload.
     """
     logger.debug("Ignoring event kind=%s", event.event_kind)
+
     return None
 
 

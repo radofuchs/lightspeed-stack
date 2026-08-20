@@ -5,12 +5,46 @@ from typing import Any, Optional
 from pydantic import Field
 
 from models.api.responses.successful.bases import AbstractSuccessfulResponse
+from models.common import CatalogModel, CatalogShield
+from models.common.skills import SkillMetadata
+from models.common.tools import CatalogTool
+
+
+class SkillsResponse(AbstractSuccessfulResponse):
+    """Model representing a response to skills request.
+
+    Attributes:
+        skills: List of loaded skills with metadata (name and description).
+    """
+
+    skills: list[SkillMetadata] = Field(
+        description="List of loaded skills with metadata",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "skills": [
+                        {
+                            "name": "code-review",
+                            "description": "Review code for quality and security",
+                        },
+                        {
+                            "name": "openshift-troubleshooting",
+                            "description": "Troubleshoot OpenShift cluster issues",
+                        },
+                    ],
+                }
+            ]
+        }
+    }
 
 
 class ModelsResponse(AbstractSuccessfulResponse):
     """Model representing a response to models request."""
 
-    models: list[dict[str, Any]] = Field(
+    models: list[CatalogModel] = Field(
         ...,
         description="List of models available",
     )
@@ -39,7 +73,7 @@ class ModelsResponse(AbstractSuccessfulResponse):
 class ToolsResponse(AbstractSuccessfulResponse):
     """Model representing a response to tools request."""
 
-    tools: list[dict[str, Any]] = Field(
+    tools: list[CatalogTool] = Field(
         description=(
             "List of tools available from all configured MCP servers and built-in toolgroups"
         ),
@@ -77,9 +111,9 @@ class ToolsResponse(AbstractSuccessfulResponse):
 class ShieldsResponse(AbstractSuccessfulResponse):
     """Model representing a response to shields request."""
 
-    shields: list[dict[str, Any]] = Field(
+    shields: list[CatalogShield] = Field(
         ...,
-        description="List of shields available",
+        description="List of shields configured in Lightspeed Core Stack",
     )
 
     model_config = {
@@ -88,12 +122,32 @@ class ShieldsResponse(AbstractSuccessfulResponse):
                 {
                     "shields": [
                         {
-                            "identifier": "lightspeed_question_validity-shield",
-                            "provider_resource_id": "lightspeed_question_validity-shield",
-                            "provider_id": "lightspeed_question_validity",
+                            "name": "question-validity",
+                            "provider_id": "question_validity",
                             "type": "shield",
-                            "params": {},
-                        }
+                            "config": {
+                                "model_id": "openai/gpt-4o-mini",
+                                "model_prompt": "Is this question valid?",
+                                "invalid_question_response": (
+                                    "I can only answer questions about the product."
+                                ),
+                            },
+                        },
+                        {
+                            "name": "pii-redaction",
+                            "provider_id": "redaction",
+                            "type": "shield",
+                            "config": {
+                                "rules": [
+                                    {
+                                        "pattern": r"\b\d{3}-\d{2}-\d{4}\b",
+                                        "replacement": "[REDACTED]",
+                                        "case_sensitive": None,
+                                    }
+                                ],
+                                "case_sensitive": False,
+                            },
+                        },
                     ],
                 }
             ]

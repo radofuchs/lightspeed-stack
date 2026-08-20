@@ -1,10 +1,10 @@
-@e2e_group_3 @skip-in-library-mode @Authorized
+@skip-in-library-mode @Authorized
 Feature: Llama Stack connection disrupted
 
   End-to-end scenarios that stop the Llama Stack container (or simulate disconnect) and
   assert degraded responses (503, readiness, etc.). Config order matches test_list.txt:
-  default stack, then noop-token (query/conversations/…), then rbac (rlsapi errors), then
-  mcp (immediately before mcp.feature). Skipped in library mode.
+  default stack, then noop-token (query/conversations/…), then rbac (rlsapi errors).
+  Skipped in library mode.
 
   Background:
     Given The service is started locally
@@ -13,9 +13,13 @@ Feature: Llama Stack connection disrupted
       And the Lightspeed stack configuration directory is "tests/e2e/configuration"
 
 
-  # --- lightspeed-stack.yaml (aligned with health, info, models, …) ---
+  # --- lightspeed-stack-default.yaml (aligned with health, info, models, …) ---
+
+# --- @cfg_default ---
+
+  @cfg_default
   Scenario: Check if models endpoint reports error when llama-stack is unreachable
-    Given The service uses the lightspeed-stack.yaml configuration
+    Given The service uses the lightspeed-stack-default.yaml configuration
       And The service is restarted
     Given The system is in default state
     And The llama-stack connection is disrupted
@@ -23,11 +27,13 @@ Feature: Llama Stack connection disrupted
     Then The status code of the response is 503
     And The body of the response is the following
     """
-       {"detail": {"response": "Unable to connect to Llama Stack", "cause": "Connection error."}}
+       {"detail": {"response": "Unable to connect to OGX", "cause": "Connection error."}}
     """
 
+
+  @cfg_default
   Scenario: Check if service report proper readiness state when llama stack is not available
-    Given The service uses the lightspeed-stack.yaml configuration
+    Given The service uses the lightspeed-stack-default.yaml configuration
       And The service is restarted
     Given The system is in default state
     And The llama-stack connection is disrupted
@@ -38,8 +44,10 @@ Feature: Llama Stack connection disrupted
     {"ready": false, "reason": "Cannot connect to backend service", "overall_status": "unhealthy", "impacts": ["LLM inference unavailable", "Provider health checks unavailable"]}
     """
 
+
+  @cfg_default
   Scenario: Check if service report proper liveness state even when llama stack is not available
-    Given The service uses the lightspeed-stack.yaml configuration
+    Given The service uses the lightspeed-stack-default.yaml configuration
       And The service is restarted
     Given The system is in default state
     And The llama-stack connection is disrupted
@@ -50,44 +58,41 @@ Feature: Llama Stack connection disrupted
     {"alive": true}
     """
 
+
+  @cfg_default
   Scenario: Check if info endpoint reports error when llama-stack connection is not working
-    Given The service uses the lightspeed-stack.yaml configuration
+    Given The service uses the lightspeed-stack-default.yaml configuration
       And The service is restarted
     And The llama-stack connection is disrupted
     When I access REST API endpoint "info" using HTTP GET method
     Then The status code of the response is 503
     And The body of the response is the following
     """
-       {"detail": {"response": "Unable to connect to Llama Stack", "cause": "Connection error."}}
+       {"detail": {"response": "Unable to connect to OGX", "cause": "Connection error."}}
     """
 
-  Scenario: Check if shields endpoint reports error when llama-stack is unreachable
-    Given The service uses the lightspeed-stack.yaml configuration
-      And The service is restarted
-    And The llama-stack connection is disrupted
-    When I access REST API endpoint "shields" using HTTP GET method
-    Then The status code of the response is 503
-    And The body of the response is the following
-    """
-       {"detail": {"response": "Unable to connect to Llama Stack", "cause": "Connection error."}}
-    """
 
+# --- @cfg_default (noop auth; tools list needs no bearer) ---
+
+  @cfg_default
   Scenario: Check if tools endpoint reports error when llama-stack is unreachable
-    Given The service uses the lightspeed-stack.yaml configuration
+    Given The service uses the lightspeed-stack-default.yaml configuration
       And The service is restarted
     And The llama-stack connection is disrupted
     When I access REST API endpoint "tools" using HTTP GET method
     Then The status code of the response is 503
     And The body of the response is the following
     """
-       {"detail": {"response": "Unable to connect to Llama Stack", "cause": "Connection error."}}
+       {"detail": {"response": "Unable to connect to OGX", "cause": "Connection error."}}
     """
 
 
-  # --- lightspeed-stack-auth-noop-token.yaml (aligned with query, responses, conversations, …) ---
+  # --- lightspeed-stack-authorized.yaml (aligned with query, responses, conversations, …) ---
+
+  @cfg_authorized
   Scenario: Check if LLM responds for query request with error for inability to connect to llama-stack
     Given Llama Stack is restarted
-    And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
@@ -96,10 +101,12 @@ Feature: Llama Stack connection disrupted
     {"query": "Say hello"}
     """
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Responses returns error when unable to connect to llama-stack
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     Given The system is in default state
     And The llama-stack connection is disrupted
@@ -109,10 +116,12 @@ Feature: Llama Stack connection disrupted
     {"input": "Say hello", "model": "{PROVIDER}/{MODEL}", "stream": false}
     """
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Streaming responses returns error when unable to connect to llama-stack
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
@@ -121,28 +130,34 @@ Feature: Llama Stack connection disrupted
     {"input": "Say hello", "model": "{PROVIDER}/{MODEL}", "stream": true}
     """
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if rags endpoint fails when llama-stack is unavailable
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
     When I access REST API endpoint rags using HTTP GET method
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if prompts list endpoint fails when llama-stack is unavailable
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
     When I access REST API endpoint "prompts" using HTTP GET method
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if prompts create endpoint fails when llama-stack is unavailable
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
@@ -151,19 +166,23 @@ Feature: Llama Stack connection disrupted
     {"prompt": "Summarize: {{text}}", "variables": ["text"]}
     """
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if prompts get by id endpoint fails when llama-stack is unavailable
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
     When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP GET method
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if prompts update endpoint fails when llama-stack is unavailable
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
@@ -172,20 +191,24 @@ Feature: Llama Stack connection disrupted
     {"prompt": "Summarize in bullets: {{text}}", "version": 1, "set_as_default": true, "variables": ["text"]}
     """
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if prompts delete endpoint fails when llama-stack is unavailable
-    Given The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    Given The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And The llama-stack connection is disrupted
     When I access REST API endpoint "prompts/pmpt_5c76d7f7c633ef97477adeb2f642150d8d08e8a6526e9909" using HTTP DELETE method
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if conversations/{conversation_id} GET endpoint fails when llama-stack is unavailable
     Given Llama Stack is restarted
-    And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And I use "query" to ask question with authorization header
@@ -197,11 +220,13 @@ Feature: Llama Stack connection disrupted
     And The llama-stack connection is disrupted
     When I use REST API conversation endpoint with conversation_id from above using HTTP GET method
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check if conversations/{conversation_id} DELETE endpoint fails when llama-stack is unavailable
     Given Llama Stack is restarted
-    And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And I use "query" to ask question with authorization header
@@ -213,11 +238,13 @@ Feature: Llama Stack connection disrupted
     And The llama-stack connection is disrupted
     When I use REST API conversation endpoint with conversation_id from above using HTTP DELETE method
     Then The status code of the response is 503
-    And The body of the response contains Unable to connect to Llama Stack
+    And The body of the response contains Unable to connect to OGX
 
+
+  @cfg_authorized
   Scenario: Check conversations/{conversation_id} works when llama-stack is down
     Given Llama Stack is restarted
-    And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And REST API service prefix is /v1
@@ -237,9 +264,13 @@ Feature: Llama Stack connection disrupted
     And The conversation history has correct metadata
     And The conversation uses model {MODEL} and provider {PROVIDER}
 
+
+# --- still @cfg_authorized (noop-with-token; not RBAC) ---
+
+  @cfg_authorized
   Scenario: V2 conversations DELETE endpoint works even when llama-stack is down
     Given Llama Stack is restarted
-    And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+    And The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
     And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
     And REST API service prefix is /v1
@@ -264,7 +295,8 @@ Feature: Llama Stack connection disrupted
 
 
   # --- lightspeed-stack-rbac.yaml (aligned with rbac.feature / rlsapi_v1_errors.feature) ---
-  @RBAC
+
+  @RBAC @cfg_rbac
   Scenario: Returns 503 when llama-stack connection is broken
     Given Llama Stack is restarted
     And The service uses the lightspeed-stack-rbac.yaml configuration
@@ -276,19 +308,4 @@ Feature: Llama Stack connection disrupted
     {"question": "How do I list files?"}
     """
     Then The status code of the response is 503
-    And The body of the response contains Llama Stack
-
-
-  # --- lightspeed-stack-mcp.yaml (aligned with mcp.feature / mcp_servers_api.feature next in test_list) ---
-  @MCP
-  Scenario: Register MCP server returns 503 when Llama Stack is unreachable
-    Given Llama Stack is restarted
-    And The service uses the lightspeed-stack-mcp.yaml configuration
-      And The service is restarted
-    And The llama-stack connection is disrupted
-    When I access REST API endpoint "mcp-servers" using HTTP POST method
-    """
-    {"name": "unreachable-server", "url": "http://mock-mcp:3000", "provider_id": "model-context-protocol"}
-    """
-    Then The status code of the response is 503
-    And The body of the response contains Llama Stack
+    And The body of the response contains OGX

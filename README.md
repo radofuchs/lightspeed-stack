@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/license-Apache-blue)](https://github.com/lightspeed-core/lightspeed-stack/blob/main/LICENSE)
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 [![Required Python version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Flightspeed-core%2Flightspeed-stack%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)](https://www.python.org/)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lightspeed-core/lightspeed-stack)
 [![Tag](https://img.shields.io/github/v/tag/lightspeed-core/lightspeed-stack)](https://github.com/lightspeed-core/lightspeed-stack/releases/tag/0.6.0rc2)
 
 Lightspeed Core Stack (LCS) is an AI-powered assistant that provides answers to product questions using backend LLM services, agents, and RAG databases.
@@ -18,6 +19,8 @@ The service includes comprehensive user data collection capabilities for various
 * [Architecture](#architecture)
 * [Prerequisites](#prerequisites)
 * [Installation](#installation)
+    * [Clone the Repository](#clone-the-repository)
+    * [System-Specific Installation](#system-specific-installation)
 * [Run LCS locally](#run-lcs-locally)
     * [Container Runtime Requirements](#container-runtime-requirements)
 * [Configuration](#configuration)
@@ -682,13 +685,24 @@ service:
   access_log: true
 llama_stack:
   use_as_library_client: true
-  library_client_config_path: <path-to-llama-stack-run.yaml-file>
+  # Unified mode (recommended): LCORE synthesizes the Llama Stack run.yaml.
+  # Point profile at a run.yaml-shaped file you author, or omit the config
+  # block and drive everything from the top-level inference.providers
+  # section over the built-in default baseline.
+  config:
+    profile: <path-to-llama-stack-run.yaml-file>
 user_data_collection:
   feedback_enabled: true
   feedback_storage: "/tmp/data/feedback"
   transcripts_enabled: true
   transcripts_storage: "/tmp/data/transcripts"
 ```
+
+> [!WARNING]
+> The legacy two-file setup (`library_client_config_path:` pointing at an
+> externally maintained `run.yaml`) is deprecated — it logs a startup
+> warning since 0.6 and is removed in 0.7. See the
+> [migration guide](docs/user_doc/deployment_guide.md#migrating-from-the-legacy-two-file-configuration).
 
 ## Llama Stack version check
 
@@ -769,21 +783,28 @@ For the configuration guide, skill authoring instructions, and examples, see the
 
 ## Safety Shields
 
-A single Llama Stack configuration file can include multiple safety shields, which are utilized in agent
-configurations to monitor input and/or output streams. LCS uses the following naming convention to specify how each safety shield is
-utilized:
+Safety shields used by `/query`, `/streaming_query`, `/responses`, and `/rlsapi`
+are **owned by Lightspeed Core Stack** and configured in `lightspeed-stack.yaml`
+(not via the Llama Stack / OGX Safety or Moderations APIs).
 
-1. If the `shield_id` starts with `input_`, it will be used for input only.
-1. If the `shield_id` starts with `output_`, it will be used for output only.
-1. If the `shield_id` starts with `inout_`, it will be used both for input and output.
-1. Otherwise, it will be used for input only.
+Supported shield types (`provider_id`):
 
-Additionally, an optional list parameter `shield_ids` can be specified in `/query` and `/streaming_query` endpoints to override which shields are applied. You can use this config to disable shield overrides:
+- `question_validity` — topic / off-topic classification
+- `redaction` — regex-based PII redaction
+
+List configured shields with `GET /v1/shields`. Optionally override which
+shields apply with the `shield_ids` request field (`null` = all, `[]` = none,
+or a list of configured `identifier` values). To forbid client overrides on
+`/query` and `/streaming_query`:
 
 ```yaml
 customization:
   disable_shield_ids_override: true
 ```
+
+For configuration details, endpoint application (direct-run vs agent
+capabilities), and examples, see the
+[Safety Shields Guide](docs/user_doc/shields_guide.md).
 
 ## Authentication
 
@@ -849,7 +870,8 @@ The following configurations are llama-stack config examples from production dep
 # Usage
 
 ```
-usage: lightspeed_stack.py [-h] [-v] [-d] [-c CONFIG_FILE]
+usage: lightspeed_stack.py [-h] [-v] [-d] [-s] [-m] [-c CONFIG_FILE] [--synthesized-config-output SYNTHESIZED_CONFIG_OUTPUT]
+                           [--migrate-config] [--run-yaml RUN_YAML] [--migrate-output MIGRATE_OUTPUT]
 
 options:
   -h, --help            show this help message and exit
@@ -857,9 +879,20 @@ options:
   -d, --dump-configuration
                         dump actual configuration into JSON file and quit
   -s, --dump-schema     dump configuration schema into OpenAPI-compatible file and quit
-  -c CONFIG_FILE, --config CONFIG_FILE
+  -m, --dump-models     dump schemas for all models into OpenAPI-compatible file and quit
+  -gr, --dump-models-group {conversation_summary,requests,successful_responses,error_responses,common,agents,common_responses}
+                        dump schemas for selected models group into OpenAPI-compatible file and quit
+  -c, --config CONFIG_FILE
                         path to configuration file (default: lightspeed-stack.yaml)
-
+  --synthesized-config-output SYNTHESIZED_CONFIG_OUTPUT
+                        path where the synthesized Llama Stack run.yaml is written in unified library mode (overwritten each boot,
+                        mode 0600; default: ./.generated/run.yaml)
+  --migrate-config      migrate a legacy two-file config to a unified single file and exit. Lifts the run.yaml given by --run-yaml
+                        into the llama_stack.config.native_override of the -c lightspeed-stack.yaml and writes the result to
+                        --migrate-output. Replace literal secrets with ${env.VAR} references before or after migrating.
+  --run-yaml RUN_YAML   path to the legacy Llama Stack run.yaml to migrate (used with --migrate-config)
+  --migrate-output MIGRATE_OUTPUT
+                        path to write the unified lightspeed-stack.yaml (used with --migrate-config)
 ```
 
 ## CLI options
@@ -898,7 +931,7 @@ test-unit                         Run the unit tests
 test-integration                  Run integration tests tests
 test-e2e                          Run end to end tests for the service
 test-e2e-local                    Run end to end tests for the service (no script wrapper)
-test-e2e-tagged                   Run e2e tests with E2E_BEHAVE_TAG_EXPR (default: all @e2e_group_*)
+test-e2e-tagged                   Run e2e tests with E2E_BEHAVE_TAG_EXPR (default: all @cfg_*)
 test-e2e-tagged-local             Same as test-e2e-tagged without script wrapper
 benchmarks                        Run benchmarks
 check-types-src                   Check type hints in sources only
@@ -906,11 +939,19 @@ check-types-tests                 Check type hints in tests only
 check-types                       Checks type hints in sources and tests
 security-check                    Check the project for security issues
 format                            Format the code into unified format
-schema                            Generate OpenAPI schema file stored in docs subdirectory
+schema                            Generate OpenAPI schema file stored in docs/devel_doc subdirectory
 openapi-doc                       Generate OpenAPI documentation
-generate-documentation            Generate documentation
-doc                               Generate documentation for developers
+generate-documentation            Generate or regenerated content of the whole /docs subdirectory
+doc                               Generate or regenerated content of the whole /docs subdirectory
+devel-doc                         Generate documentation for developers
 docs/models                       Generate documentation about models
+docs/models/requests.json         Generate OpenAPI specification with requests models
+docs/models/conversation_summary.json Generate OpenAPI specification with conversation_summary models
+docs/models/successful_responses.json Generate OpenAPI specification with successful_responses models
+docs/models/error_responses.json  Generate OpenAPI specification with error_responses models
+docs/models/common.json           Generate OpenAPI specification with common models
+docs/models/agents.json           Generate OpenAPI specification with agents models
+docs/models/common_responses.json Generate OpenAPI specification with common_responses models
 docs/models/requests.puml         Generate PlantUML class diagram for requests data models
 docs/models/responses.puml        Generate PlantUML class diagram for responses data models
 docs/models/common.puml           Generate PlantUML class diagram for common data models
@@ -932,9 +973,9 @@ lint-openapi                      Lint docs/openapi.json (Spectral OAS ruleset; 
 verify                            Run all linters
 distribution-archives             Generate distribution archives to be uploaded into Python registry
 upload-distribution-archives      Upload distribution archives into Python registry
-konflux-requirements              Generate hermetic requirements.*.txt file for konflux build
-konflux-rpm-lock                  Generate rpm.lock.yaml file for konflux build
-konflux-artifacts-lock            Regenerate artifacts.lock.yaml file for konflux build
+konflux-requirements              Generate hermetic requirements.*.txt file for Konflux build
+konflux-rpm-lock                  Generate rpm.lock.yaml file for Konflux build
+konflux-artifacts-lock            Regenerate artifacts.lock.yaml file for Konflux build
 help                              Show this help screen
 ```
 
@@ -1018,7 +1059,11 @@ When embedding llama-stack directly in the container, use the existing `deploy/l
 ```yaml
 llama_stack:
   use_as_library_client: true
-  library_client_config_path: /app-root/run.yaml
+  # Unified mode: the mounted run.yaml is the synthesis profile. (The
+  # legacy library_client_config_path equivalent is deprecated, removed
+  # in 0.7.)
+  config:
+    profile: /app-root/run.yaml
 ```
 
 **Build and run**:
@@ -1119,7 +1164,7 @@ ENV PATH="/app-root/.venv/bin:$PATH"
 
 # Run the application
 EXPOSE 8080
-ENTRYPOINT ["python3.12", "src/lightspeed_stack.py"]
+ENTRYPOINT ["opentelemetry-instrument", "python3.12", "src/lightspeed_stack.py"]
 USER 1001
 ```
 
@@ -1231,6 +1276,57 @@ will be returned.
       "model_type": "embedding"
     }
   ]
+}
+```
+
+## Skills endpoint
+
+**Endpoint:** `GET /v1/skills`
+
+Process GET requests and return the list of agent skills loaded from the
+directories configured under `skills.paths` in the service configuration
+(see [Agent Skills](#agent-skills) and the [Agent Skills Guide](docs/user_doc/skills_guide.md)
+for configuration and authoring instructions). Each skill's name and
+description are read from its `SKILL.md` frontmatter.
+
+This endpoint reads the configured skill directories directly and does not
+invoke an LLM or agent — it is intended for clients (e.g. the RHDH UI or
+other tooling) that need a deterministic way to introspect configured
+skills without the cost, latency, or non-determinism of an LLM tool call.
+This is distinct from the `list_skills` tool that the agent itself may
+invoke during a `/v1/query` or `/v1/streaming_query` turn.
+
+If [authentication](#authentication) is enabled, include the appropriate
+credentials; otherwise the request returns `401`/`403`.
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8080/v1/skills
+```
+
+**Response Body:**
+
+```json
+{
+  "skills": [
+    {
+      "name": "code-review",
+      "description": "Review code for quality and security"
+    },
+    {
+      "name": "openshift-troubleshooting",
+      "description": "Troubleshoot OpenShift cluster issues"
+    }
+  ]
+}
+```
+
+If no skills are configured (or `skills.paths` is empty), the endpoint
+returns an empty list:
+
+```json
+{
+  "skills": []
 }
 ```
 
@@ -1395,6 +1491,8 @@ The version X.Y.Z indicates:
 * Y is the minor version (backward-compatible), and
 * Z is the patch version (backward-compatible bug fix).
 
+For upgrade instructions between versions, see the [Migration Guides](docs/migrations/).
+
 # Konflux
 
 The official image of Lightspeed Core Stack is built on [Konflux](https://konflux-ui.apps.kflux-prd-rh02.0fk9.p1.openshiftapps.com/ns/lightspeed-core-tenant/applications/lightspeed-stack).
@@ -1421,9 +1519,9 @@ make konflux-requirements
 This compiles Python dependencies from `pyproject.toml` using `uv`, splits packages by their source index (PyPI vs Red Hat's internal registry), and generates hermetic requirements files with pinned versions and hashes for Konflux builds.
 
 **Files produced:**
-- `requirements.hashes.source.txt` – PyPI packages with hashes
-- `requirements.hashes.wheel.txt` – Red Hat registry packages with hashes
-- `requirements-build.txt` – Build-time dependencies for source packages
+- `.konflux/requirements.hashes.source.txt` – PyPI packages with hashes
+- `.konflux/requirements.hashes.wheel.txt` – Red Hat registry packages with hashes
+- `.konflux/requirements-build.txt` – Build-time dependencies for source packages
 
 The script also updates the Tekton pipeline configurations (`.tekton/lightspeed-stack-*.yaml`) with the list of pre-built wheel packages.
 

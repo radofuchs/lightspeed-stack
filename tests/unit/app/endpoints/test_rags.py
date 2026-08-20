@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException, Request, status
-from llama_stack_client import APIConnectionError, BadRequestError
+from ogx_client import APIConnectionError, BadRequestError
 from pytest_mock import MockerFixture
 
 from app.endpoints.rags import (
@@ -46,7 +46,7 @@ async def test_rags_endpoint_connection_error(
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.list.side_effect = APIConnectionError(request=None)  # type: ignore
     mocker.patch(
-        "app.endpoints.rags.AsyncLlamaStackClientHolder"
+        "app.endpoints.rags.AsyncOgxClientHolder"
     ).return_value.get_client.return_value = mock_client
 
     request = Request(scope={"type": "http"})
@@ -60,7 +60,7 @@ async def test_rags_endpoint_connection_error(
     detail = e.value.detail
     assert isinstance(detail, dict)
     assert "response" in detail
-    assert "Unable to connect to Llama Stack" in detail["response"]  # type: ignore[index]
+    assert "Unable to connect to OGX" in detail["response"]  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -103,7 +103,7 @@ async def test_rags_endpoint_success(
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.list.return_value = RagList()
     mocker.patch(
-        "app.endpoints.rags.AsyncLlamaStackClientHolder"
+        "app.endpoints.rags.AsyncOgxClientHolder"
     ).return_value.get_client.return_value = mock_client
 
     request = Request(scope={"type": "http"})
@@ -149,7 +149,7 @@ async def test_rag_info_endpoint_rag_not_found(
         )
     )  # type: ignore
     mocker.patch(
-        "app.endpoints.rags.AsyncLlamaStackClientHolder"
+        "app.endpoints.rags.AsyncOgxClientHolder"
     ).return_value.get_client.return_value = mock_client
 
     request = Request(scope={"type": "http"})
@@ -177,7 +177,7 @@ async def test_rag_info_endpoint_connection_error(
         request=None  # type: ignore
     )
     mocker.patch(
-        "app.endpoints.rags.AsyncLlamaStackClientHolder"
+        "app.endpoints.rags.AsyncOgxClientHolder"
     ).return_value.get_client.return_value = mock_client
 
     request = Request(scope={"type": "http"})
@@ -191,7 +191,7 @@ async def test_rag_info_endpoint_connection_error(
     detail = e.value.detail
     assert isinstance(detail, dict)
     assert "response" in detail
-    assert "Unable to connect to Llama Stack" in detail["response"]  # type: ignore[index]
+    assert "Unable to connect to OGX" in detail["response"]  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -231,7 +231,7 @@ async def test_rag_info_endpoint_success(
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.retrieve.return_value = RagInfo()
     mocker.patch(
-        "app.endpoints.rags.AsyncLlamaStackClientHolder"
+        "app.endpoints.rags.AsyncOgxClientHolder"
     ).return_value.get_client.return_value = mock_client
 
     request = Request(scope={"type": "http"})
@@ -269,24 +269,28 @@ def _make_byok_config(tmp_path: Any) -> AppConfig:
             "user_data_collection": {},
             "authentication": {"module": "noop"},
             "authorization": {"access_rules": []},
-            "byok_rag": [
-                {
-                    "rag_id": "ocp-4.18-docs",
-                    "rag_type": "inline::faiss",
-                    "embedding_model": "all-MiniLM-L6-v2",
-                    "embedding_dimension": 384,
-                    "vector_db_id": "vs_abc123",
-                    "db_path": str(db_file),
+            "rag": {
+                "byok": {
+                    "stores": [
+                        {
+                            "rag_id": "ocp-4.18-docs",
+                            "backend": "faiss",
+                            "embedding_model": "all-MiniLM-L6-v2",
+                            "embedding_dimension": 384,
+                            "vector_db_id": "vs_abc123",
+                            "db_path": str(db_file),
+                        },
+                        {
+                            "rag_id": "company-kb",
+                            "backend": "faiss",
+                            "embedding_model": "all-MiniLM-L6-v2",
+                            "embedding_dimension": 384,
+                            "vector_db_id": "vs_def456",
+                            "db_path": str(db_file),
+                        },
+                    ],
                 },
-                {
-                    "rag_id": "company-kb",
-                    "rag_type": "inline::faiss",
-                    "embedding_model": "all-MiniLM-L6-v2",
-                    "embedding_dimension": 384,
-                    "vector_db_id": "vs_def456",
-                    "db_path": str(db_file),
-                },
-            ],
+            },
         }
     )
     return cfg
@@ -323,7 +327,7 @@ async def test_rags_endpoint_returns_rag_ids_from_config(
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.list.return_value = RagList()
     mocker.patch(
-        "app.endpoints.rags.AsyncLlamaStackClientHolder"
+        "app.endpoints.rags.AsyncOgxClientHolder"
     ).return_value.get_client.return_value = mock_client
 
     request = Request(scope={"type": "http"})
@@ -359,7 +363,7 @@ async def test_rag_info_endpoint_accepts_rag_id_from_config(
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.retrieve.return_value = RagInfo()
     mocker.patch(
-        "app.endpoints.rags.AsyncLlamaStackClientHolder"
+        "app.endpoints.rags.AsyncOgxClientHolder"
     ).return_value.get_client.return_value = mock_client
 
     request = Request(scope={"type": "http"})
@@ -379,7 +383,7 @@ async def test_rag_info_endpoint_accepts_rag_id_from_config(
 def test_resolve_rag_id_to_vector_db_id_with_mapping(tmp_path: Path) -> None:
     """Test that _resolve_rag_id_to_vector_db_id maps rag_id to vector_db_id."""
     byok_config = _make_byok_config(str(tmp_path))
-    byok_rags = byok_config.configuration.byok_rag
+    byok_rags = byok_config.configuration.rag.byok.stores
     assert _resolve_rag_id_to_vector_db_id("ocp-4.18-docs", byok_rags) == "vs_abc123"
     assert _resolve_rag_id_to_vector_db_id("company-kb", byok_rags) == "vs_def456"
 
@@ -387,5 +391,5 @@ def test_resolve_rag_id_to_vector_db_id_with_mapping(tmp_path: Path) -> None:
 def test_resolve_rag_id_to_vector_db_id_passthrough(tmp_path: Path) -> None:
     """Test that unmapped IDs are passed through unchanged."""
     byok_config = _make_byok_config(str(tmp_path))
-    byok_rags = byok_config.configuration.byok_rag
+    byok_rags = byok_config.configuration.rag.byok.stores
     assert _resolve_rag_id_to_vector_db_id("vs_unknown", byok_rags) == "vs_unknown"

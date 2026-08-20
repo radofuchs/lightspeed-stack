@@ -3,7 +3,7 @@
 from re import Pattern
 from typing import Any
 
-from llama_stack_api import ImageContentItem, TextContentItem
+from ogx_api import ImageContentItem, TextContentItem
 
 type SingletonInstances = dict[type, Any]
 
@@ -51,5 +51,5 @@ class Singleton(type):
             object: The singleton instance for this class.
         """
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+            cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]

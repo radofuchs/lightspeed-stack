@@ -7,7 +7,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Own job so repository secrets are never sent to a runner unless this passes.
+  authorize:
+    uses: ./.github/workflows/e2e_authorize.yaml
+
   e2e_tests:
+    needs: authorize
+    if: needs.authorize.outputs.authorized == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -15,21 +21,21 @@ jobs:
         mode: ["server", "library"]
         environment: ["azure", "vertexai", "watsonx", "bedrock"]
         # Expected default LLM for Behave (matches tests/e2e/configs/run-<env>.yaml).
-        # | environment | model_id                            | provider_id   |
-        # |-------------|-------------------------------------|---------------|
-        # | azure       | gpt-4o-mini                         | azure         |
-        # | vertexai    | google/gemini-2.5-flash             | google-vertex |
-        # | watsonx     | meta-llama/llama-3-3-70b-instruct   | watsonx       |
-        # | bedrock     | deepseek.v3-v1:0                    | aws-bedrock   |
+        # | environment | model_id                                   | provider_id   |
+        # |-------------|--------------------------------------------| --------------|
+        # | azure       | gpt-4o-mini                                | azure         |
+        # | vertexai    | publishers/google/models/gemini-2.5-flash  | google-vertex |
+        # | watsonx     | meta-llama/llama-3-3-70b-instruct          | watsonx       |
+        # | bedrock     | deepseek.v3-v1:0                           | aws-bedrock   |
         include:
           - environment: azure
             e2e_default_model: gpt-4o-mini
             e2e_default_provider: azure
           - environment: vertexai
-            e2e_default_model: google/gemini-2.5-flash
+            e2e_default_model: publishers/google/models/gemini-2.5-flash
             e2e_default_provider: google-vertex
           - environment: watsonx
-            e2e_default_model: watsonx/meta-llama/llama-3-3-70b-instruct
+            e2e_default_model: meta-llama/llama-3-3-70b-instruct
             e2e_default_provider: watsonx
           - environment: bedrock
             e2e_default_model: deepseek.v3-v1:0
@@ -49,7 +55,7 @@ jobs:
       E2E_DEFAULT_PROVIDER_OVERRIDE: ${{ matrix.e2e_default_provider }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # On PR_TARGET → the fork (or same repo) that opened the PR.
           # On push      → falls back to the current repository.
@@ -58,6 +64,11 @@ jobs:
           # On PR_TARGET → the PR head *commit* (reproducible).
           # On push      → the pushed commit that triggered the workflow.
           ref: ${{ github.event.pull_request.head.ref || github.sha }}
+
+          # Tests need access to secrets.
+          # This should be refactored if possible to mitigate the risk.
+          # https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target
+          allow-unsafe-pr-checkout: true
 
           # Don’t keep credentials when running untrusted PR code under PR_TARGET.
           persist-credentials: ${{ github.event_name != 'pull_request_target' }}
@@ -209,13 +220,6 @@ jobs:
           python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-mpnet-base-v2')"
           echo "HF_CACHE_PATH=/tmp/hf-cache" >> $GITHUB_ENV
 
-      - name: Docker Login for quay access
-        env:
-          QUAY_ROBOT_USERNAME: ${{ secrets.QUAY_DOWNSTREAM_USERNAME }}
-          QUAY_ROBOT_TOKEN: ${{ secrets.QUAY_DOWNSTREAM_TOKEN }}
-        run: |
-          echo $QUAY_ROBOT_TOKEN | docker login quay.io -u=$QUAY_ROBOT_USERNAME --password-stdin
-
       - name: Create dummy GCP keys directory
         if: matrix.environment != 'vertexai'
         run: |
@@ -331,10 +335,6 @@ jobs:
       - name: Wait for watsonx library mode to finish
         if: matrix.environment == 'watsonx' && matrix.mode == 'server'
         run: sleep 3600  # 120 minutes
-
-      - name: Remove the prefix for watsonx default model
-        if: matrix.environment == 'watsonx'
-        run: echo "E2E_DEFAULT_MODEL_OVERRIDE=meta-llama/llama-3-3-70b-instruct" >> $GITHUB_ENV
 
       - name: Run e2e tests
         env:

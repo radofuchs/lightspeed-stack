@@ -1,0 +1,403 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Lightspeed Core Stack",
+        "version": "0.3.0"
+    },
+    "components": {
+        "schemas": {
+            "EndEventData": {
+                "description": "Nested data for event: \"end\".",
+                "properties": {
+                    "referenced_documents": {
+                        "items": {
+                            "$ref": "`#/components/schemas/`ReferencedDocument"
+                        },
+                        "title": "Referenced Documents",
+                        "type": "array"
+                    },
+                    "truncated": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "title": "Truncated"
+                    },
+                    "input_tokens": {
+                        "title": "Input Tokens",
+                        "type": "integer"
+                    },
+                    "output_tokens": {
+                        "title": "Output Tokens",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "referenced_documents",
+                    "truncated",
+                    "input_tokens",
+                    "output_tokens"
+                ],
+                "title": "EndEventData",
+                "type": "object"
+            },
+            "EndStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE end-of-stream body (includes available_quotas beside data).",
+                "properties": {
+                    "event": {
+                        "const": "end",
+                        "default": "end",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`EndEventData"
+                    },
+                    "available_quotas": {
+                        "additionalProperties": {
+                            "type": "integer"
+                        },
+                        "title": "Available Quotas",
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "data",
+                    "available_quotas"
+                ],
+                "title": "EndStreamPayload",
+                "type": "object"
+            },
+            "ErrorEventData": {
+                "description": "Payload for event: \"error\".",
+                "properties": {
+                    "status_code": {
+                        "title": "Status Code",
+                        "type": "integer"
+                    },
+                    "response": {
+                        "title": "Response",
+                        "type": "string"
+                    },
+                    "cause": {
+                        "title": "Cause",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "status_code",
+                    "response",
+                    "cause"
+                ],
+                "title": "ErrorEventData",
+                "type": "object"
+            },
+            "ErrorStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE error event body (event + typed data).",
+                "properties": {
+                    "event": {
+                        "const": "error",
+                        "default": "error",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`ErrorEventData"
+                    }
+                },
+                "required": [
+                    "data"
+                ],
+                "title": "ErrorStreamPayload",
+                "type": "object"
+            },
+            "InterruptedEventData": {
+                "description": "Payload for event: \"interrupted\".",
+                "properties": {
+                    "request_id": {
+                        "title": "Request Id",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "request_id"
+                ],
+                "title": "InterruptedEventData",
+                "type": "object"
+            },
+            "InterruptedStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE interrupted stream body.",
+                "properties": {
+                    "event": {
+                        "const": "interrupted",
+                        "default": "interrupted",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`InterruptedEventData"
+                    }
+                },
+                "required": [
+                    "data"
+                ],
+                "title": "InterruptedStreamPayload",
+                "type": "object"
+            },
+            "ReferencedDocument": {
+                "description": "Model representing a document referenced in generating a response.\n\nAttributes:\n    doc_url: Url to the referenced doc.\n    doc_title: Title of the referenced doc.\n    document_id: Document ID for preserving identity during deduplication.",
+                "properties": {
+                    "doc_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "URL of the referenced document",
+                        "title": "Doc Url"
+                    },
+                    "doc_title": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Title of the referenced document",
+                        "title": "Doc Title"
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Index name identifying the knowledge source from configuration",
+                        "title": "Source"
+                    },
+                    "document_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Document ID for preserving identity during deduplication",
+                        "title": "Document Id"
+                    }
+                },
+                "title": "ReferencedDocument",
+                "type": "object"
+            },
+            "StartEventData": {
+                "description": "Payload for event: \"start\".",
+                "properties": {
+                    "conversation_id": {
+                        "title": "Conversation Id",
+                        "type": "string"
+                    },
+                    "request_id": {
+                        "title": "Request Id",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "conversation_id",
+                    "request_id"
+                ],
+                "title": "StartEventData",
+                "type": "object"
+            },
+            "StartStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE stream start body.",
+                "properties": {
+                    "event": {
+                        "const": "start",
+                        "default": "start",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`StartEventData"
+                    }
+                },
+                "required": [
+                    "data"
+                ],
+                "title": "StartStreamPayload",
+                "type": "object"
+            },
+            "StreamPayloadBase": {
+                "additionalProperties": false,
+                "description": "Base for streaming SSE JSON payloads.",
+                "properties": {},
+                "title": "StreamPayloadBase",
+                "type": "object"
+            },
+            "TokenChunkData": {
+                "description": "Structured data for token and turn-complete stream lines.",
+                "properties": {
+                    "id": {
+                        "title": "Id",
+                        "type": "integer"
+                    },
+                    "token": {
+                        "title": "Token",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "token"
+                ],
+                "title": "TokenChunkData",
+                "type": "object"
+            },
+            "TokenStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE token delta (event: \"token\").",
+                "properties": {
+                    "event": {
+                        "const": "token",
+                        "default": "token",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`TokenChunkData"
+                    }
+                },
+                "required": [
+                    "data"
+                ],
+                "title": "TokenStreamPayload",
+                "type": "object"
+            },
+            "ToolCallStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE tool call summary.",
+                "properties": {
+                    "event": {
+                        "const": "tool_call",
+                        "default": "tool_call",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`ToolCallSummary"
+                    }
+                },
+                "required": [
+                    "data"
+                ],
+                "title": "ToolCallStreamPayload",
+                "type": "object"
+            },
+            "ToolCallSummary": {
+                "description": "Model representing a tool call made during response generation (for tool_calls list).",
+                "properties": {
+                    "id": {
+                        "description": "ID of the tool call",
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Name of the tool called",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "args": {
+                        "additionalProperties": true,
+                        "description": "Arguments passed to the tool",
+                        "title": "Args",
+                        "type": "object"
+                    },
+                    "type": {
+                        "default": "tool_call",
+                        "description": "Type indicator for tool call",
+                        "title": "Type",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name"
+                ],
+                "title": "ToolCallSummary",
+                "type": "object"
+            },
+            "ToolResultStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE tool result summary.",
+                "properties": {
+                    "event": {
+                        "const": "tool_result",
+                        "default": "tool_result",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`ToolResultSummary"
+                    }
+                },
+                "required": [
+                    "data"
+                ],
+                "title": "ToolResultStreamPayload",
+                "type": "object"
+            },
+            "ToolResultSummary": {
+                "description": "Model representing a result from a tool call (for tool_results list).",
+                "properties": {
+                    "id": {
+                        "description": "ID of the tool call/result, matches the corresponding tool call 'id'",
+                        "title": "Id",
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "Status of the tool execution (e.g., 'success')",
+                        "title": "Status",
+                        "type": "string"
+                    },
+                    "content": {
+                        "description": "Content/result returned from the tool",
+                        "title": "Content",
+                        "type": "string"
+                    },
+                    "type": {
+                        "default": "tool_result",
+                        "description": "Type indicator for tool result",
+                        "title": "Type",
+                        "type": "string"
+                    },
+                    "round": {
+                        "description": "Round number or step of tool execution",
+                        "title": "Round",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status",
+                    "content",
+                    "round"
+                ],
+                "title": "ToolResultSummary",
+                "type": "object"
+            },
+            "TurnCompleteStreamPayload": {
+                "additionalProperties": false,
+                "description": "SSE turn completion (same data shape as token).",
+                "properties": {
+                    "event": {
+                        "const": "turn_complete",
+                        "default": "turn_complete",
+                        "title": "Event",
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "`#/components/schemas/`TokenChunkData"
+                    }
+                },
+                "required": [
+                    "data"
+                ],
+                "title": "TurnCompleteStreamPayload",
+                "type": "object"
+            }
+        }
+    },
+    "paths": {}
+}

@@ -6,10 +6,9 @@ from typing import Optional
 
 import psycopg2
 from fastapi import HTTPException
-from llama_stack_client import (
+from ogx_client import (
     APIStatusError as LLSApiStatusError,
 )
-from llama_stack_client.types import Shield
 from openai._exceptions import APIStatusError as OpenAIAPIStatusError
 from pydantic_ai.messages import ImageUrl, UserContent
 from sqlalchemy import func
@@ -119,52 +118,6 @@ def validate_model_provider_override(
     if has_override and Action.MODEL_OVERRIDE not in authorized_actions:
         response = ForbiddenResponse.model_override()
         raise HTTPException(**response.model_dump())
-
-
-def _is_inout_shield(shield: Shield) -> bool:
-    """
-    Determine if the shield identifier indicates an input/output shield.
-
-    Parameters:
-    ----------
-        shield (Shield): The shield to check.
-
-    Returns:
-    -------
-        bool: True if the shield identifier starts with "inout_", otherwise False.
-    """
-    return shield.identifier.startswith("inout_")
-
-
-def is_output_shield(shield: Shield) -> bool:
-    """
-    Determine if the shield is for monitoring output.
-
-    Return True if the given shield is classified as an output or
-    inout shield.
-
-    A shield is considered an output shield if its identifier
-    starts with "output_" or "inout_".
-    """
-    return _is_inout_shield(shield) or shield.identifier.startswith("output_")
-
-
-def is_input_shield(shield: Shield) -> bool:
-    """
-    Determine if the shield is for monitoring input.
-
-    Return True if the shield is classified as an input or inout
-    shield.
-
-    Parameters:
-    ----------
-        shield (Shield): The shield identifier to classify.
-
-    Returns:
-    -------
-        bool: True if the shield is for input or both input/output monitoring; False otherwise.
-    """
-    return _is_inout_shield(shield) or not is_output_shield(shield)
 
 
 def prepare_input(
@@ -586,6 +539,23 @@ def normalize_vertex_ai_model_id(model_id: str) -> str:
     return model_id
 
 
+def is_resource_exhausted_error(error_message: str) -> bool:
+    """Detect Vertex AI RESOURCE_EXHAUSTED errors wrapped as 500 by llama-stack.
+
+    llama-stack's remote::vertexai provider translates Vertex AI's 429
+    RESOURCE_EXHAUSTED into a generic 500 InternalServerError, losing the
+    original status code.  The original gRPC status name is preserved in
+    the error message, so we match on that.
+
+    Args:
+        error_message: The error message to inspect.
+
+    Returns:
+        True if the message indicates a wrapped RESOURCE_EXHAUSTED error.
+    """
+    return "resource_exhausted" in error_message.lower()
+
+
 def handle_known_apistatus_errors(
     error: LLSApiStatusError | OpenAIAPIStatusError, model_id: str
 ) -> AbstractErrorResponse:
@@ -602,5 +572,12 @@ def handle_known_apistatus_errors(
     if is_context_length_error(error_message):
         return PromptTooLongResponse(model=model_id)
     if error.status_code == 429:
+        return QuotaExceededResponse.model(model_id)
+    if is_resource_exhausted_error(error_message):
+        logger.warning(
+            "Detected RESOURCE_EXHAUSTED in error message with status %d; "
+            "treating as 429 (llama-stack wraps Vertex AI 429 as 500)",
+            error.status_code,
+        )
         return QuotaExceededResponse.model(model_id)
     return InternalServerErrorResponse.generic()

@@ -1,4 +1,4 @@
-@e2e_group_2 @Authorized
+@cfg_authorized @Authorized
 Feature: streaming_query endpoint API tests
 
   Background:
@@ -7,7 +7,7 @@ Feature: streaming_query endpoint API tests
       And I set the Authorization header to Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva
       And REST API service prefix is /v1
       And the Lightspeed stack configuration directory is "tests/e2e/configuration"
-      And The service uses the lightspeed-stack-auth-noop-token.yaml configuration
+      And The service uses the lightspeed-stack-authorized.yaml configuration
       And The service is restarted
 
   Scenario: Check if streaming_query response in tokens matches the full response
@@ -146,6 +146,118 @@ Feature: streaming_query endpoint API tests
     """
     Then The status code of the response is 200
 
+  @flaky
+  Scenario: Check if LLM responds properly when a valid image attachment is sent via streaming
+    And I use "streaming_query" to ask question with authorization header
+    """
+    {
+      "query": "Describe this image",
+      "attachments": [
+        {
+          "attachment_type": "image",
+          "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+          "content_type": "image/png"
+        }
+      ],
+      "model": "{MODEL}",
+      "provider": "{PROVIDER}",
+      "system_prompt": "You are a helpful assistant"
+    }
+    """
+    When I wait for the response to be completed
+    Then The status code of the response is 200
+      And The streamed response contains following fragments
+          | Fragments in LLM response |
+          | image                     |
+
+  Scenario: Check if streaming_query rejects image attachment with mismatched attachment_type and content_type
+    When I use "streaming_query" to ask question with authorization header
+    """
+    {
+      "query": "Describe this image",
+      "attachments": [
+        {
+          "attachment_type": "configuration",
+          "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+          "content_type": "image/png"
+        }
+      ],
+      "model": "{MODEL}",
+      "provider": "{PROVIDER}"
+    }
+    """
+    Then The status code of the response is 422
+      And The body of the response contains attachment_type and content_type are inconsistent
+
+  Scenario: Check if streaming_query rejects image attachment with valid base64 but non-image data
+    When I use "streaming_query" to ask question with authorization header
+    """
+    {
+      "query": "Describe this image",
+      "attachments": [
+        {
+          "attachment_type": "image",
+          "content": "dGhpcyBpcyBub3QgYW4gaW1hZ2UgYXQgYWxs",
+          "content_type": "image/png"
+        }
+      ],
+      "model": "{MODEL}",
+      "provider": "{PROVIDER}"
+    }
+    """
+    Then The status code of the response is 422
+      And The body of the response contains invalid image data
+
+  Scenario: Check if streaming_query rejects image attachment with invalid base64 content
+    When I use "streaming_query" to ask question with authorization header
+    """
+    {
+      "query": "Describe this image",
+      "attachments": [
+        {
+          "attachment_type": "image",
+          "content": "not-valid-base64!!!",
+          "content_type": "image/png"
+        }
+      ],
+      "model": "{MODEL}",
+      "provider": "{PROVIDER}"
+    }
+    """
+    Then The status code of the response is 422
+      And The body of the response contains Invalid base64 content for image attachment
+
+  @flaky
+  Scenario: Check if LLM responds properly when text and image attachments are sent together via streaming
+    And I use "streaming_query" to ask question with authorization header
+    """
+    {
+      "query": "Summarize the log and describe the image",
+      "attachments": [
+        {
+          "attachment_type": "log",
+          "content": "error: something went wrong",
+          "content_type": "text/plain"
+        },
+        {
+          "attachment_type": "image",
+          "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+          "content_type": "image/png"
+        }
+      ],
+      "model": "{MODEL}",
+      "provider": "{PROVIDER}",
+      "system_prompt": "You are a helpful assistant"
+    }
+    """
+    When I wait for the response to be completed
+    Then The status code of the response is 200
+      And The streamed response contains following fragments
+          | Fragments in LLM response |
+          | error                     |
+          | image                     |
+
+  @skip
   Scenario: Check if streaming_query with shields returns 413 when question is too long for model context
     When I use "streaming_query" to ask question with too-long query and authorization header
     Then The status code of the response is 413

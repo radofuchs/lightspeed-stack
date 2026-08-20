@@ -54,9 +54,11 @@ services:
       # AWS Bedrock
       - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK:-}
       # Enable debug logging if needed
-      - LLAMA_STACK_LOGGING=${LLAMA_STACK_LOGGING:-}
+      - OGX_LOGGING=${OGX_LOGGING:-}
       # FAISS test
       - FAISS_VECTOR_STORE_ID=${FAISS_VECTOR_STORE_ID:-}
+      # Disable OGX ~/.llama → ~/.ogx migration (bind-mount under ~/.llama/storage/rag).
+      - OGX_CONFIG_DIR=/opt/app-root/src/.ogx
       # Prevent HuggingFace Hub update checks (HTTP 429 rate-limiting in CI from parallel jobs).
       - HF_HUB_OFFLINE=1
       # OKP/Solr RAG
@@ -101,6 +103,12 @@ services:
       # Substituted in mounted lightspeed-stack.yaml (llama_stack.url); GitHub Actions sets via vars
       - E2E_LLAMA_HOSTNAME=${E2E_LLAMA_HOSTNAME:-llama-stack}
       - E2E_LLAMA_PORT=${E2E_LLAMA_PORT:-8321}
+      # OpenTelemetry configuration (tracing disabled by default)
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-}
+      - OTEL_ANONYMIZATION_SECRET=${OTEL_ANONYMIZATION_SECRET:-lightspeed-stack-otel-anonymization-dev-default}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-true}
     depends_on:
         llama-stack:
           condition: service_healthy

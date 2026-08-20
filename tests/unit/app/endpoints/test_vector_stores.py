@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException, Request, status
-from llama_stack_client import APIConnectionError, BadRequestError
+from ogx_client import APIConnectionError, BadRequestError
 from pytest_mock import MockerFixture
 
 from app.endpoints.vector_stores import (
@@ -190,7 +190,7 @@ async def test_create_vector_store_success(mocker: MockerFixture) -> None:
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.create.return_value = VectorStore("vs_123", "test_store")
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -218,7 +218,7 @@ async def test_create_vector_store_connection_error(mocker: MockerFixture) -> No
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.create.side_effect = APIConnectionError(request=None)  # type: ignore
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -231,7 +231,7 @@ async def test_create_vector_store_connection_error(mocker: MockerFixture) -> No
         await create_vector_store(request=request, auth=auth, body=body)
 
     assert e.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert e.value.detail["response"] == "Unable to connect to Llama Stack"  # type: ignore
+    assert e.value.detail["response"] == "Unable to connect to OGX"  # type: ignore
 
 
 @pytest.mark.asyncio
@@ -248,7 +248,7 @@ async def test_list_vector_stores_success(mocker: MockerFixture) -> None:
         [VectorStore("vs_1", "store1"), VectorStore("vs_2", "store2")]
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -277,7 +277,7 @@ async def test_get_vector_store_success(mocker: MockerFixture) -> None:
         "vs_123", "test_store"
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -310,7 +310,7 @@ async def test_get_vector_store_not_found(mocker: MockerFixture) -> None:
         message="Not found", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -337,7 +337,7 @@ async def test_update_vector_store_success(mocker: MockerFixture) -> None:
         "vs_123", "updated_store"
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -366,7 +366,7 @@ async def test_delete_vector_store_success(mocker: MockerFixture) -> None:
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.delete.return_value = None
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -393,7 +393,7 @@ async def test_create_file_success(mocker: MockerFixture) -> None:
     mock_client = mocker.AsyncMock()
     mock_client.files.create.return_value = File("file_123", "test.txt", 1024)
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -428,7 +428,7 @@ async def test_add_file_to_vector_store_success(mocker: MockerFixture) -> None:
         "file_123", "vs_123"
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -464,7 +464,7 @@ async def test_add_file_to_vector_store_retry_on_database_lock(
         VectorStoreFile("file_123", "vs_123"),
     ]
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -505,7 +505,7 @@ async def test_add_file_to_vector_store_max_retries_exceeded(
     # All attempts fail with database lock error
     mock_client.vector_stores.files.create.side_effect = Exception("database is locked")
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -549,7 +549,7 @@ async def test_add_file_to_vector_store_non_lock_error_no_retry(
     # Raise a non-lock error
     mock_client.vector_stores.files.create.side_effect = Exception("Some other error")
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -590,7 +590,7 @@ async def test_list_vector_store_files_success(mocker: MockerFixture) -> None:
         ]
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -621,7 +621,7 @@ async def test_get_vector_store_file_success(mocker: MockerFixture) -> None:
         "file_123", "vs_123"
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -649,7 +649,7 @@ async def test_delete_vector_store_file_success(mocker: MockerFixture) -> None:
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.files.delete.return_value = None
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -679,7 +679,7 @@ async def test_list_vector_stores_connection_error(mocker: MockerFixture) -> Non
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.list.side_effect = APIConnectionError(request=None)  # type: ignore
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -704,7 +704,7 @@ async def test_update_vector_store_connection_error(mocker: MockerFixture) -> No
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.update.side_effect = APIConnectionError(request=None)  # type: ignore
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -736,7 +736,7 @@ async def test_update_vector_store_not_found(mocker: MockerFixture) -> None:
         message="Not found", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -764,7 +764,7 @@ async def test_delete_vector_store_connection_error(mocker: MockerFixture) -> No
     mock_client = mocker.AsyncMock()
     mock_client.vector_stores.delete.side_effect = APIConnectionError(request=None)  # type: ignore
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -793,7 +793,7 @@ async def test_delete_vector_store_not_found(mocker: MockerFixture) -> None:
         message="Not found", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -820,7 +820,7 @@ async def test_create_file_connection_error(mocker: MockerFixture) -> None:
     mock_client = mocker.AsyncMock()
     mock_client.files.create.side_effect = APIConnectionError(request=None)  # type: ignore
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -854,7 +854,7 @@ async def test_create_file_bad_request(mocker: MockerFixture) -> None:
         message="File too large", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -951,7 +951,7 @@ async def test_add_file_to_vector_store_connection_error(
         request=None  # type: ignore
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -983,7 +983,7 @@ async def test_add_file_to_vector_store_not_found(mocker: MockerFixture) -> None
         message="File not found", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1015,7 +1015,7 @@ async def test_list_vector_store_files_connection_error(
         request=None  # type: ignore
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1046,7 +1046,7 @@ async def test_list_vector_store_files_not_found(mocker: MockerFixture) -> None:
         message="Vector store not found", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1076,7 +1076,7 @@ async def test_get_vector_store_file_connection_error(mocker: MockerFixture) -> 
         request=None  # type: ignore
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1107,7 +1107,7 @@ async def test_get_vector_store_file_not_found(mocker: MockerFixture) -> None:
         message="File not found", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1138,7 +1138,7 @@ async def test_delete_vector_store_file_connection_error(
         request=None  # type: ignore
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1169,7 +1169,7 @@ async def test_delete_vector_store_file_not_found(mocker: MockerFixture) -> None
         message="File not found", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1198,7 +1198,7 @@ async def test_get_vector_store_connection_error(mocker: MockerFixture) -> None:
         request=None  # type: ignore
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1225,7 +1225,7 @@ async def test_create_file_adds_txt_extension_when_missing(
     mock_client = mocker.AsyncMock()
     mock_client.files.create.return_value = File("file_123", "uploaded_file.txt", 12)
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)
@@ -1265,7 +1265,7 @@ async def test_create_file_non_size_bad_request_returns_400(
         message="Invalid file format", response=mock_response, body=None
     )
     mock_lsc = mocker.patch(
-        "app.endpoints.vector_stores.AsyncLlamaStackClientHolder.get_client"
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
     )
     mock_lsc.return_value = mock_client
     mocker.patch("app.endpoints.vector_stores.configuration", cfg)

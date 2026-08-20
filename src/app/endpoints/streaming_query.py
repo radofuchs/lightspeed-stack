@@ -3,53 +3,28 @@
 import asyncio
 import datetime
 from collections.abc import AsyncIterator
-from typing import Annotated, Any, Optional, cast
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from llama_stack_api import (
-    OpenAIResponseObject,
-    OpenAIResponseObjectStream,
-)
-from llama_stack_api import (
-    OpenAIResponseObjectStreamResponseMcpCallArgumentsDone as MCPArgsDoneChunk,
-)
-from llama_stack_api import (
-    OpenAIResponseObjectStreamResponseOutputItemAdded as OutputItemAddedChunk,
-)
-from llama_stack_api import (
-    OpenAIResponseObjectStreamResponseOutputItemDone as OutputItemDoneChunk,
-)
-from llama_stack_api import (
-    OpenAIResponseObjectStreamResponseOutputTextDelta as TextDeltaChunk,
-)
-from llama_stack_api import (
-    OpenAIResponseObjectStreamResponseOutputTextDone as TextDoneChunk,
-)
-from llama_stack_api import (
-    OpenAIResponseOutputMessageMCPCall as MCPCall,
-)
-from llama_stack_client import (
+from ogx_client import (
     APIConnectionError,
 )
-from llama_stack_client import (
+from ogx_client import (
     APIStatusError as LLSApiStatusError,
 )
 from openai._exceptions import APIStatusError as OpenAIAPIStatusError
-from typing_extensions import deprecated
+from opentelemetry import trace
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.azure_token_manager import AzureEntraIDManager
 from authorization.middleware import authorize
-from client import AsyncLlamaStackClientHolder
+from client import AsyncOgxClientHolder
 from configuration import configuration
 from constants import (
     ENDPOINT_PATH_STREAMING_QUERY,
-    LLM_TOKEN_EVENT,
-    LLM_TOOL_CALL_EVENT,
-    LLM_TOOL_RESULT_EVENT,
-    LLM_TURN_COMPLETE_EVENT,
+    IMAGE_CONTENT_TYPES,
     MEDIA_TYPE_EVENT_STREAM,
     MEDIA_TYPE_JSON,
     MEDIA_TYPE_TEXT,
@@ -69,10 +44,10 @@ from models.api.responses.error import (
     UnprocessableEntityResponse,
 )
 from models.api.responses.successful import StreamingQueryResponse
+from models.common.query import Attachment
 from models.common.responses.contexts import ResponseGeneratorContext
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.responses.types import ResponseInput
-from models.common.turn_summary import TurnSummary
 from models.config import Action
 from utils.agents.streaming import (
     generate_agent_response,
@@ -84,62 +59,49 @@ from utils.conversation_compaction import (
     apply_compaction,
     configured_conversation_cache,
     needs_compaction_path,
-    store_compacted_turn,
 )
-from utils.conversations import append_turn_items_to_conversation
 from utils.endpoints import (
     check_configuration_loaded,
     validate_and_retrieve_conversation,
 )
 from utils.mcp_headers import McpHeaders, mcp_headers_dependency
 from utils.mcp_oauth_probe import check_mcp_auth
+from utils.otel_tracing import (
+    SpanAttributes,
+    SpanEvents,
+    add_span_event,
+    anonymize_value,
+    set_span_attributes,
+)
 from utils.query import (
-    consume_query_tokens,
     extract_provider_and_model_from_model_id,
     handle_known_apistatus_errors,
     is_context_length_error,
     prepare_input,
-    store_query_results,
     validate_attachments_metadata,
     validate_model_provider_override,
 )
-from utils.quota_utils import check_tokens_available, get_available_quotas
+from utils.quota_utils import check_tokens_available
 from utils.responses import (
-    build_mcp_tool_call_from_arguments_done,
-    build_tool_call_summary,
-    build_tool_result_from_mcp_output_item_done,
     deduplicate_referenced_documents,
-    extract_token_usage,
     extract_vector_store_ids_from_tools,
-    get_topic_summary,
-    parse_rag_chunks,
-    parse_referenced_documents,
     prepare_responses_params,
 )
 from utils.shields import (
     run_shield_moderation,
     validate_shield_ids_override,
 )
-from utils.stream_interrupts import (
-    build_interrupted_response,
-    deregister_stream,
-    persist_interrupted_turn,
-    register_interrupt_callback,
-)
 from utils.streaming_sse import (
     http_exception_stream_event,
-    shield_violation_generator,
     stream_compaction_event,
-    stream_end_event,
-    stream_event,
     stream_http_error_event,
-    stream_interrupted_event,
     stream_start_event,
 )
 from utils.suid import get_suid, normalize_conversation_id
 from utils.vector_search import build_rag_context
 
 logger = get_logger(__name__)
+tracer = trace.get_tracer(__name__)
 router = APIRouter(tags=["streaming_query"])
 
 # Tracks background topic summary tasks for graceful shutdown.
@@ -161,7 +123,7 @@ streaming_query_responses: dict[int | str, dict[str, Any]] = {
     429: QuotaExceededResponse.openapi_response(),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -203,12 +165,56 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     - 422: Unprocessable Entity - Request validation failed
     - 429: Quota limit exceeded - The token quota for model or user has been exceeded
     - 500: Internal Server Error - Configuration not loaded or other server errors
-    - 503: Service Unavailable - Unable to connect to Llama Stack backend
+    - 503: Service Unavailable - Unable to connect to OGX backend
+    """
+    root_span = tracer.start_span("streaming_query.handle_request")
+    try:
+        return await _handle_streaming_query_with_tracing(
+            request, query_request, auth, mcp_headers, root_span
+        )
+    except Exception:
+        root_span.end()
+        raise
+
+
+async def _handle_streaming_query_with_tracing(  # pylint: disable=too-many-locals
+    request: Request,
+    query_request: QueryRequest,
+    auth: AuthTuple,
+    mcp_headers: McpHeaders,
+    root_span: trace.Span,
+) -> StreamingResponse:
+    """Handle streaming query request with OTEL tracing instrumentation.
+
+    Parameters:
+        request: The incoming HTTP request.
+        query_request: Request payload containing query and optional parameters.
+        auth: Authentication tuple (user_id, username, skip_check, token).
+        mcp_headers: Headers to be passed to MCP servers.
+        root_span: OpenTelemetry root span for this request.
+
+    Returns:
+        StreamingResponse with SSE-formatted events.
+
+    Raises:
+        HTTPException: On authentication, authorization, quota, or model errors.
     """
     check_configuration_loaded(configuration)
 
     user_id, _user_name, _skip_userid_check, token = auth
     started_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Set initial span attributes
+    set_span_attributes(
+        root_span,
+        {
+            SpanAttributes.USER_ID: anonymize_value(user_id),
+            SpanAttributes.INPUT: anonymize_value(query_request.query),
+            SpanAttributes.REQUEST_ATTACHMENTS_COUNT: (
+                len(query_request.attachments) if query_request.attachments else 0
+            ),
+        },
+    )
 
     # Check MCP Auth
     await check_mcp_auth(configuration, mcp_headers, token, request.headers)
@@ -228,6 +234,9 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     if query_request.attachments:
         validate_attachments_metadata(query_request.attachments)
 
+    # Validation completed
+    add_span_event(root_span, SpanEvents.VALIDATION_COMPLETED)
+
     # Retrieve conversation if conversation_id is provided
     user_conversation = None
     if query_request.conversation_id:
@@ -242,7 +251,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
             in request.state.authorized_actions,
         )
 
-    client = AsyncLlamaStackClientHolder().get_client()
+    client = AsyncOgxClientHolder().get_client()
 
     # Moderation input is the raw user content (query + attachments) without injected RAG
     # context, to avoid false positives from retrieved document content.
@@ -281,7 +290,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         and AzureEntraIDManager().is_token_expired
         and AzureEntraIDManager().refresh_token()
     ):
-        client = await AsyncLlamaStackClientHolder().update_azure_token()
+        client = await AsyncOgxClientHolder().update_azure_token()
 
     request_id = get_suid()
 
@@ -307,6 +316,13 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
     )
     recording.record_llm_call(provider_id, model_id, endpoint_path)
 
+    # Extract image attachments for multimodal support
+    image_attachments = [
+        a
+        for a in (query_request.attachments or [])
+        if a.content_type in IMAGE_CONTENT_TYPES
+    ] or None
+
     response_media_type = (
         MEDIA_TYPE_TEXT
         if query_request.media_type == MEDIA_TYPE_TEXT
@@ -330,6 +346,8 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
                 context=context,
                 responses_params=responses_params,
                 endpoint_path=endpoint_path,
+                image_attachments=image_attachments,
+                root_span=root_span,
             ),
             media_type=response_media_type,
         )
@@ -339,6 +357,7 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
         context=context,
         endpoint_path=endpoint_path,
         no_tools=bool(query_request.no_tools),
+        image_attachments=image_attachments,
     )
 
     # Combine inline RAG results (BYOK + Solr) with tool-based results
@@ -354,89 +373,10 @@ async def streaming_query_endpoint_handler(  # pylint: disable=too-many-locals
             responses_params=responses_params,
             turn_summary=turn_summary,
             background_topic_summary_tasks=_background_topic_summary_tasks,
+            root_span=root_span,
         ),
         media_type=response_media_type,
     )
-
-
-@deprecated(
-    "Deprecated in favor of utils.agents.streaming.retrieve_agent_response_generator.",
-    stacklevel=2,
-)
-async def retrieve_response_generator(
-    responses_params: ResponsesApiParams,
-    context: ResponseGeneratorContext,
-    endpoint_path: str,
-) -> tuple[AsyncIterator[str], TurnSummary]:
-    """
-    Retrieve the appropriate response generator.
-
-    Handles shield moderation check and retrieves response.
-    Returns the generator (shield violation or response generator) and turn_summary.
-    Fills turn_summary attributes for token usage, referenced documents, and tool calls.
-
-    Args:
-        responses_params: The Responses API parameters
-        context: The response generator context
-        endpoint_path: API endpoint path used for metric labeling.
-    Returns:
-        tuple[AsyncIterator[str], TurnSummary]: The response generator and turn summary
-
-    """
-    turn_summary = TurnSummary()
-    try:
-        if context.moderation_result.decision == "blocked":
-            turn_summary.llm_response = context.moderation_result.message
-            turn_summary.id = context.moderation_result.moderation_id
-            turn_summary.output_items = [context.moderation_result.refusal_response]
-            # In compacted mode the conversation parameter was omitted, so the
-            # refusal turn (with the original input) is persisted by
-            # generate_response; storing it here too would duplicate it.
-            if not responses_params.omit_conversation:
-                await append_turn_items_to_conversation(
-                    context.client,
-                    responses_params.conversation,
-                    responses_params.input,
-                    [context.moderation_result.refusal_response],
-                )
-            media_type = context.query_request.media_type or MEDIA_TYPE_JSON
-            return (
-                shield_violation_generator(
-                    context.moderation_result.message,
-                    media_type,
-                ),
-                turn_summary,
-            )
-        # Retrieve response stream (may raise exceptions)
-        response = await context.client.responses.create(
-            **responses_params.model_dump(exclude_none=True)
-        )
-        # Store pre-RAG documents for later merging with tool-based RAG
-        return (
-            response_generator(
-                response,
-                context,
-                turn_summary,
-                endpoint_path,
-            ),
-            turn_summary,
-        )
-    # Handle know LLS client errors only at stream creation time and shield execution
-    except RuntimeError as e:  # library mode wraps 413 into runtime error
-        if is_context_length_error(str(e)):
-            error_response = PromptTooLongResponse(model=responses_params.model)
-            raise HTTPException(**error_response.model_dump()) from e
-        raise e
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="Llama Stack",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
-
-    except (LLSApiStatusError, OpenAIAPIStatusError) as e:
-        error_response = handle_known_apistatus_errors(e, responses_params.model)
-        raise HTTPException(**error_response.model_dump()) from e
 
 
 async def shutdown_background_topic_summary_tasks() -> None:
@@ -461,6 +401,8 @@ async def generate_response_with_compaction(
     context: ResponseGeneratorContext,
     responses_params: ResponsesApiParams,
     endpoint_path: str,
+    image_attachments: Optional[list[Attachment]] = None,
+    root_span: Optional[trace.Span] = None,
 ) -> AsyncIterator[str]:
     """Stream a response for a conversation that requires compaction.
 
@@ -475,479 +417,86 @@ async def generate_response_with_compaction(
         context: The response generator context.
         responses_params: The base Responses API parameters.
         endpoint_path: API endpoint path used for metric labeling.
+        image_attachments: Image attachments for multimodal prompt construction.
+        root_span: OpenTelemetry root span for this request.
 
     Yields:
         SSE-formatted strings.
     """
-    media_type = context.query_request.media_type or MEDIA_TYPE_JSON
-    yield stream_start_event(
-        conversation_id=context.conversation_id,
-        request_id=context.request_id,
-    )
-
-    compacted_original_input: Optional[ResponseInput] = None
     try:
-        async for item in apply_compaction(
-            context.client,
-            responses_params,
-            configuration.inference,
-            configuration.compaction,
-            emit_events=True,
-            cache=configured_conversation_cache(),
-            user_id=context.user_id,
-            skip_user_id_check=context.skip_userid_check,
-        ):
-            if isinstance(item, CompactionStartedEvent):
-                yield stream_compaction_event(context.conversation_id)
-            elif isinstance(item, CompactionResult):
-                responses_params = item.params
-                compacted_original_input = item.original_input
-
-        generator, turn_summary = await retrieve_agent_response_generator(
-            responses_params=responses_params,
-            context=context,
-            endpoint_path=endpoint_path,
-        )
-    except HTTPException as e:
-        yield http_exception_stream_event(e)
-        return
-    except RuntimeError as e:  # library mode wraps 413 into runtime error
-        error_response = (
-            PromptTooLongResponse(model=responses_params.model)
-            if is_context_length_error(str(e))
-            else InternalServerErrorResponse.generic()
-        )
-        yield stream_http_error_event(error_response, media_type)
-        return
-    except APIConnectionError as e:
-        yield stream_http_error_event(
-            ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e)),
-            media_type,
-        )
-        return
-    except (LLSApiStatusError, OpenAIAPIStatusError) as e:
-        yield stream_http_error_event(
-            handle_known_apistatus_errors(e, responses_params.model), media_type
-        )
-        return
-
-    # Combine inline RAG results (BYOK + Solr) with tool-based results
-    if context.moderation_result.decision == "passed":
-        turn_summary.referenced_documents = deduplicate_referenced_documents(
-            context.inline_rag_context.referenced_documents
-            + turn_summary.referenced_documents
+        media_type = context.query_request.media_type or MEDIA_TYPE_JSON
+        yield stream_start_event(
+            conversation_id=context.conversation_id,
+            request_id=context.request_id,
         )
 
-    # The start event was already emitted above; delegate the rest (re-yield,
-    # finalization, compacted-turn storage) to the shared generator.
-    async for event in generate_agent_response(
-        generator,
-        context,
-        responses_params,
-        turn_summary,
-        background_topic_summary_tasks=_background_topic_summary_tasks,
-        emit_start=False,
-        original_input=compacted_original_input,
-    ):
-        yield event
-
-
-@deprecated(
-    "Deprecated in favor of utils.agents.streaming.generate_agent_response.",
-    stacklevel=2,
-)
-async def generate_response(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
-    generator: AsyncIterator[str],
-    context: ResponseGeneratorContext,
-    responses_params: ResponsesApiParams,
-    turn_summary: TurnSummary,
-    emit_start: bool = True,
-    compacted: bool = False,
-    original_input: Optional[ResponseInput] = None,
-) -> AsyncIterator[str]:
-    """Wrap a generator with cleanup logic.
-
-    Re-yields events from the generator, handles errors, and ensures
-    persistence and token consumption after completion.  When the
-    stream is interrupted via ``CancelledError``, the user query and
-    an interrupted response are persisted to the conversation, but
-    token consumption is skipped (no usage data is available).
-
-    Args:
-        generator: The base generator to wrap
-        context: The response generator context
-        responses_params: The Responses API parameters
-        turn_summary: TurnSummary populated during streaming
-        emit_start: Whether to emit the SSE start event. False when the caller
-            (the compaction-aware wrapper) has already emitted it.
-        compacted: Whether the conversation is in compacted mode. When True the
-            conversation parameter was not sent to Llama Stack, so the completed
-            turn is appended to the conversation here rather than being stored
-            automatically.
-        original_input: In compacted mode, the original user input before the
-            explicit-input rewrite. Used to persist the completed turn with its
-            structured input (preserving attachments); ``None`` otherwise.
-
-    Yields:
-        SSE-formatted strings from the wrapped generator
-    """
-    persist_guard = register_interrupt_callback(
-        context,
-        responses_params,
-        turn_summary,
-        _background_topic_summary_tasks,
-        original_input,
-    )
-
-    stream_completed = False
-    try:
-        if emit_start:
-            yield stream_start_event(
-                conversation_id=context.conversation_id,
-                request_id=context.request_id,
-            )
-
-        # Re-yield all events from the generator
-        async for event in generator:
-            yield event
-
-        stream_completed = True
-
-    # Handle known LLS client errors during response generation time
-    except RuntimeError as e:  # library mode wraps 413 into runtime error
-        error_response = (
-            PromptTooLongResponse(model=responses_params.model)
-            if is_context_length_error(str(e))
-            else InternalServerErrorResponse.generic()
-        )
-        yield stream_http_error_event(error_response, context.query_request.media_type)
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="Llama Stack",
-            cause=str(e),
-        )
-        yield stream_http_error_event(error_response, context.query_request.media_type)
-    except (LLSApiStatusError, OpenAIAPIStatusError) as e:
-        error_response = handle_known_apistatus_errors(e, responses_params.model)
-        yield stream_http_error_event(error_response, context.query_request.media_type)
-    except asyncio.CancelledError:
-        logger.info("Streaming request %s interrupted by user", context.request_id)
-        current_task = asyncio.current_task()
-        if current_task is not None:
-            current_task.uncancel()
-        full_text, suffix = build_interrupted_response(turn_summary.partial_tokens)
-        if not persist_guard[0]:
-            persist_guard[0] = True
-            turn_summary.llm_response = full_text
-            await persist_interrupted_turn(
-                context,
-                responses_params,
-                turn_summary,
-                _background_topic_summary_tasks,
-                original_input,
-            )
-        yield stream_event(
-            {"id": turn_summary.next_chunk_id, "token": suffix},
-            LLM_TOKEN_EVENT,
-            context.query_request.media_type or MEDIA_TYPE_JSON,
-        )
-        yield stream_interrupted_event(context.request_id)
-    finally:
-        deregister_stream(context.request_id)
-
-    if not stream_completed:
-        return
-
-    # Post-stream side effects: only run when streaming finished successfully
-
-    # Get topic summary for new conversations if needed
-    topic_summary = None
-    if not context.query_request.conversation_id:
-        should_generate = context.query_request.generate_topic_summary
-        if should_generate:
-            logger.debug("Generating topic summary for new conversation")
-            topic_summary = await get_topic_summary(
-                context.query_request.query,
-                context.client,
-                responses_params.model,
-            )
-
-    # Consume tokens
-    logger.info("Consuming tokens")
-    consume_query_tokens(
-        user_id=context.user_id,
-        model_id=responses_params.model,
-        token_usage=turn_summary.token_usage,
-    )
-    # Get available quotas
-    logger.info("Getting available quotas")
-    available_quotas = get_available_quotas(
-        quota_limiters=configuration.quota_limiters, user_id=context.user_id
-    )
-
-    yield stream_end_event(
-        turn_summary.token_usage,
-        available_quotas,
-        turn_summary.referenced_documents,
-        context.query_request.media_type or MEDIA_TYPE_JSON,
-    )
-    completed_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    # In compacted mode the conversation parameter was not sent, so Llama Stack
-    # did not persist this turn. Append it ourselves to keep the recent-turn
-    # buffer and audit history intact for the next request.
-    if compacted:
+        compacted_original_input: Optional[ResponseInput] = None
         try:
-            await store_compacted_turn(
+            async for item in apply_compaction(
                 context.client,
-                responses_params.conversation,
-                (
-                    original_input
-                    if original_input is not None
-                    else context.query_request.query
-                ),
-                turn_summary.output_items,
+                responses_params,
+                configuration.inference,
+                configuration.compaction,
+                emit_events=True,
+                cache=configured_conversation_cache(),
+                user_id=context.user_id,
+                skip_user_id_check=context.skip_userid_check,
+            ):
+                if isinstance(item, CompactionStartedEvent):
+                    yield stream_compaction_event(context.conversation_id)
+                elif isinstance(item, CompactionResult):
+                    responses_params = item.params
+                    compacted_original_input = item.original_input
+
+            generator, turn_summary = await retrieve_agent_response_generator(
+                responses_params=responses_params,
+                context=context,
+                endpoint_path=endpoint_path,
+                image_attachments=image_attachments,
             )
-        except Exception:  # pylint: disable=broad-except
-            logger.exception(
-                "Failed to append compacted turn to conversation for request %s",
-                context.request_id,
-            )
-
-    # Store query results (transcript, conversation details, cache)
-    logger.info("Storing query results")
-    store_query_results(
-        user_id=context.user_id,
-        conversation_id=context.conversation_id,
-        model=responses_params.model,
-        completed_at=completed_at,
-        started_at=context.started_at,
-        summary=turn_summary,
-        query=context.query_request.query,
-        attachments=context.query_request.attachments,
-        skip_userid_check=context.skip_userid_check,
-        topic_summary=topic_summary,
-    )
-
-
-@deprecated(
-    "Deprecated in favor of utils.agents.streaming.agent_response_generator.",
-    stacklevel=2,
-)
-async def response_generator(  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-    turn_response: AsyncIterator[OpenAIResponseObjectStream],
-    context: ResponseGeneratorContext,
-    turn_summary: TurnSummary,
-    endpoint_path: str,
-) -> AsyncIterator[str]:
-    """Generate SSE formatted streaming response.
-
-    Processes streaming chunks from Llama Stack and converts them to
-    Server-Sent Events (SSE) format. Uses handler functions to process
-    different event types and populate turn_summary during streaming.
-
-    Args:
-        turn_response: The streaming response from Llama Stack
-        context: The response generator context
-        turn_summary: TurnSummary to populate during streaming
-        endpoint_path: API endpoint path used for metric labeling.
-
-    Yields:
-        SSE-formatted strings for tokens, tool calls, tool results,
-        turn completion, and error events.
-    """
-    chunk_id = 0
-    media_type = context.query_request.media_type or MEDIA_TYPE_JSON
-    text_parts: list[str] = []
-    mcp_calls: dict[int, tuple[str, str]] = (
-        {}
-    )  # output_index -> (mcp_call_id, mcp_call_name)
-    latest_response_object: Optional[OpenAIResponseObject] = None
-
-    logger.debug("Starting streaming response (Responses API) processing")
-
-    async for chunk in turn_response:
-        event_type = getattr(chunk, "type", None)
-        logger.debug("Processing chunk %d, type: %s", chunk_id, event_type)
-
-        # Content part started - emit an empty token to kick off UI streaming
-        if event_type == "response.content_part.added":
-            event_id = chunk_id
-            chunk_id += 1
-            turn_summary.next_chunk_id = chunk_id
-            yield stream_event(
-                {
-                    "id": event_id,
-                    "token": "",
-                },
-                LLM_TOKEN_EVENT,
-                media_type,
-            )
-
-        # Store MCP call item info for later lookup when arguments.done event occurs
-        elif event_type == "response.output_item.added":
-            item_added_chunk = cast(OutputItemAddedChunk, chunk)
-            if item_added_chunk.item.type == "mcp_call":
-                mcp_call_item = cast(MCPCall, item_added_chunk.item)
-                mcp_calls[item_added_chunk.output_index] = (
-                    mcp_call_item.id,
-                    mcp_call_item.name,
-                )
-
-        # Text streaming - emit token delta
-        elif event_type == "response.output_text.delta":
-            delta_chunk = cast(TextDeltaChunk, chunk)
-            text_parts.append(delta_chunk.delta)
-            turn_summary.partial_tokens.append(delta_chunk.delta)
-            event_id = chunk_id
-            chunk_id += 1
-            turn_summary.next_chunk_id = chunk_id
-            yield stream_event(
-                {
-                    "id": event_id,
-                    "token": delta_chunk.delta,
-                },
-                LLM_TOKEN_EVENT,
-                media_type,
-            )
-
-        # Final text of the output (capture, but emit at response.completed)
-        elif event_type == "response.output_text.done":
-            text_done_chunk = cast(TextDoneChunk, chunk)
-            turn_summary.llm_response = text_done_chunk.text
-
-        # Emit tool call when MCP call arguments are done
-        elif event_type == "response.mcp_call.arguments.done":
-            mcp_arguments_done_chunk = cast(MCPArgsDoneChunk, chunk)
-            tool_call = build_mcp_tool_call_from_arguments_done(
-                mcp_arguments_done_chunk.output_index,
-                mcp_arguments_done_chunk.arguments,
-                mcp_calls,
-            )
-            if tool_call:
-                turn_summary.tool_calls.append(tool_call)
-                yield stream_event(
-                    tool_call.model_dump(),
-                    LLM_TOOL_CALL_EVENT,
-                    media_type,
-                )
-
-        # Process tool calls and results when output items are done
-        # For mcp_call, only emit result (call was already emitted when arguments.done)
-        # For other types, emit both call and result
-        elif event_type == "response.output_item.done":
-            output_item_done_chunk = cast(OutputItemDoneChunk, chunk)
-            item_type = output_item_done_chunk.item.type
-            # Skip message items as they are parsed separately
-            if item_type == "message":
-                continue
-
-            output_index = output_item_done_chunk.output_index
-
-            # For mcp_call, only emit result if call was already emitted when arguments.done
-            # (indicated by output_index not being in mcp_calls dict)
-            # If output_index is in dict, process in else branch (emit both call and result)
-            if item_type == "mcp_call" and output_index not in mcp_calls:
-                # Call was already emitted during arguments.done, only emit result
-                mcp_call_item = cast(MCPCall, output_item_done_chunk.item)
-                tool_result = build_tool_result_from_mcp_output_item_done(mcp_call_item)
-                turn_summary.tool_results.append(tool_result)
-                yield stream_event(
-                    tool_result.model_dump(),
-                    LLM_TOOL_RESULT_EVENT,
-                    media_type,
-                )
-            else:
-                # For all other types (and mcp_call when arguments.done didn't happen),
-                # emit both call and result together
-                tool_call, tool_result = build_tool_call_summary(
-                    output_item_done_chunk.item
-                )
-                if tool_call:
-                    turn_summary.tool_calls.append(tool_call)
-                    yield stream_event(
-                        tool_call.model_dump(),
-                        LLM_TOOL_CALL_EVENT,
-                        media_type,
-                    )
-                if tool_result:
-                    turn_summary.tool_results.append(tool_result)
-                    yield stream_event(
-                        tool_result.model_dump(),
-                        LLM_TOOL_RESULT_EVENT,
-                        media_type,
-                    )
-
-        # Completed response - capture final text and response object
-        elif event_type == "response.completed":
-            latest_response_object = cast(
-                OpenAIResponseObject,
-                getattr(chunk, "response"),  # noqa: B009
-            )
-            turn_summary.llm_response = turn_summary.llm_response or "".join(text_parts)
-            # Capture structured output items for compacted-mode turn storage
-            # (LCORE-1572), so the persisted turn keeps non-text output items
-            # rather than being flattened to the response text.
-            turn_summary.output_items = list(latest_response_object.output or [])
-            event_id = chunk_id
-            chunk_id += 1
-            turn_summary.next_chunk_id = chunk_id
-            yield stream_event(
-                {
-                    "id": event_id,
-                    "token": turn_summary.llm_response,
-                },
-                LLM_TURN_COMPLETE_EVENT,
-                media_type,
-            )
-
-        # Incomplete or failed response - emit error
-        elif event_type in ("response.incomplete", "response.failed"):
-            latest_response_object = cast(
-                OpenAIResponseObject,
-                getattr(chunk, "response"),  # noqa: B009
-            )
-            # Capture any partial output items so a compacted-mode turn is not
-            # persisted with empty output on these terminals (LCORE-1572).
-            turn_summary.output_items = list(latest_response_object.output or [])
-            error_message = (
-                latest_response_object.error.message
-                if latest_response_object.error
-                else "An unexpected error occurred while processing the request."
-            )
+        except HTTPException as e:
+            yield http_exception_stream_event(e)
+            return
+        except RuntimeError as e:  # library mode wraps 413 into runtime error
             error_response = (
-                PromptTooLongResponse(model=context.model_id)
-                if is_context_length_error(error_message)
-                else InternalServerErrorResponse.query_failed(error_message)
+                PromptTooLongResponse(model=responses_params.model)
+                if is_context_length_error(str(e))
+                else InternalServerErrorResponse.generic()
             )
             yield stream_http_error_event(error_response, media_type)
+            return
+        except APIConnectionError as e:
+            yield stream_http_error_event(
+                ServiceUnavailableResponse(backend_name="OGX", cause=str(e)),
+                media_type,
+            )
+            return
+        except (LLSApiStatusError, OpenAIAPIStatusError) as e:
+            yield stream_http_error_event(
+                handle_known_apistatus_errors(e, responses_params.model), media_type
+            )
+            return
 
-    logger.debug(
-        "Streaming complete - Tool calls: %d, Response chars: %d",
-        len(turn_summary.tool_calls),
-        len(turn_summary.llm_response),
-    )
+        # Combine inline RAG results (BYOK + Solr) with tool-based results
+        if context.moderation_result.decision == "passed":
+            turn_summary.referenced_documents = deduplicate_referenced_documents(
+                context.inline_rag_context.referenced_documents
+                + turn_summary.referenced_documents
+            )
 
-    # Extract token usage and referenced documents from the final response object
-    if not latest_response_object:
-        return
-
-    turn_summary.token_usage = extract_token_usage(
-        latest_response_object.usage, context.model_id, endpoint_path
-    )
-    # Parse tool-based referenced documents from the final response object
-    tool_rag_docs = parse_referenced_documents(
-        latest_response_object,
-        vector_store_ids=context.vector_store_ids,
-        rag_id_mapping=context.rag_id_mapping,
-    )
-    # Combine inline RAG results (BYOK + Solr) with tool-based results
-    turn_summary.referenced_documents = deduplicate_referenced_documents(
-        context.inline_rag_context.referenced_documents + tool_rag_docs
-    )
-    tool_rag_chunks = parse_rag_chunks(
-        latest_response_object,
-        vector_store_ids=context.vector_store_ids,
-        rag_id_mapping=context.rag_id_mapping,
-    )
-    turn_summary.rag_chunks = context.inline_rag_context.rag_chunks + tool_rag_chunks
+        # The start event was already emitted above; delegate the rest (re-yield,
+        # finalization, compacted-turn storage) to the shared generator.
+        async for event in generate_agent_response(
+            generator,
+            context,
+            responses_params,
+            turn_summary,
+            background_topic_summary_tasks=_background_topic_summary_tasks,
+            emit_start=False,
+            original_input=compacted_original_input,
+            root_span=root_span,
+        ):
+            yield event
+    finally:
+        if root_span is not None:
+            root_span.end()

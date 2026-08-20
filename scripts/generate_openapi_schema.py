@@ -7,23 +7,23 @@ import sys
 
 from fastapi.openapi.utils import get_openapi
 
-from client import AsyncLlamaStackClientHolder
+from client import AsyncOgxClientHolder
 
 # it is needed to read proper configuration in order to start the app to generate schema
 from configuration import configuration
 
-cfg_file = "lightspeed-stack.yaml"
-configuration.load_configuration(cfg_file)
+CFG_FILE = "lightspeed-stack.yaml"
+configuration.load_configuration(CFG_FILE)
 
 # Llama Stack client needs to be loaded before REST API is fully initialized
-import asyncio  # noqa: E402
+import asyncio  # noqa: E402  pylint: disable=C0411,C0413
 
-asyncio.run(AsyncLlamaStackClientHolder().load(configuration.configuration.llama_stack))
+asyncio.run(AsyncOgxClientHolder().load(configuration.configuration.llama_stack))
 
 from app.main import app  # noqa: E402  pylint: disable=C0413
 
 
-def read_version_from_openapi(filename: str) -> str:
+def read_version_from_openapi(openapi_filename: str) -> str:
     """
     Extract the OpenAPI document's version from a generated OpenAPI JSON file.
 
@@ -31,7 +31,7 @@ def read_version_from_openapi(filename: str) -> str:
         str: The value of the OpenAPI document's `info.version`.
     """
     # retrieve pre-generated OpenAPI schema
-    with open(filename, encoding="utf-8") as fin:
+    with open(openapi_filename, encoding="utf-8") as fin:
         pre_generated_schema = json.load(fin)
         assert pre_generated_schema is not None
         assert "info" in pre_generated_schema, "node 'info' not found in openapi.json"
@@ -58,13 +58,8 @@ def read_version_from_pyproject() -> str:
     return completed.stdout.decode("utf-8").strip()
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python generate_openapi_schema.py <filename>")
-        sys.exit(1)
-
-    filename = sys.argv[1]
-
+def generate_openapi_schema(schema_file_name: str) -> None:
+    """Generate OpenAPI schema into file with provided name."""
     print("Service metadata:")
     print(app.title)
     print(app.description)
@@ -89,12 +84,21 @@ if __name__ == "__main__":
     )
 
     # dump the schema into file
-    with open(filename, "w", encoding="utf-8") as fout:
+    with open(schema_file_name, "w", encoding="utf-8") as fout:
         json.dump(open_api, fout, indent=4)
 
-    openapi_version = read_version_from_openapi(filename)
+    openapi_version = read_version_from_openapi(schema_file_name)
     project_version = read_version_from_pyproject()
     assert (
         openapi_version == project_version
     ), f"OpenAPI version {openapi_version} != project version {project_version}"
-    print(f"OpenAPI schema generated into file {filename}")
+    print(f"OpenAPI schema generated into file {schema_file_name}")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python generate_openapi_schema.py <filename>")
+        sys.exit(1)
+
+    filename = sys.argv[1]
+    generate_openapi_schema(filename)

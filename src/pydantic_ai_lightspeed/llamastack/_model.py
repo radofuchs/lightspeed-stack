@@ -10,8 +10,11 @@ and pydantic_ai registers them with a ``-call`` vendor_part_id suffix.  The buff
 deltas must be replayed with the matching suffix so pydantic_ai can append the
 streamed ``tool_args`` content to the correct part.
 
-This module provides ``LlamaStackResponsesModel`` which wraps the event stream to
+This module provides ``OgxResponsesModel`` which wraps the event stream to
 buffer those early delta events and replay them correctly once the item is announced.
+
+Additionally overrides ``_responses_create`` to filter out ``reasoning.encrypted_content``
+from the include parameter, which llama-stack / OGX doesn't support.
 """
 
 from __future__ import annotations as _annotations
@@ -19,8 +22,10 @@ from __future__ import annotations as _annotations
 from collections import defaultdict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Optional, cast
+from typing import Any, Final, Optional, cast
 
+from ogx.core.library_client import AsyncOGXAsLibraryClient
+from ogx_client import AsyncOgxClient
 from openai import AsyncStream
 from openai.types import responses
 from pydantic_ai import UnexpectedModelBehavior
@@ -38,11 +43,56 @@ from pydantic_ai.models.openai import (
     OpenAIResponsesStreamedResponse,
     _map_api_errors,
 )
+from pydantic_ai.profiles import ModelProfileSpec
 from pydantic_ai.settings import ModelSettings
 
 from log import get_logger
+from models.common.responses.responses_api_params import ResponsesApiParams
+from pydantic_ai_lightspeed.llamastack._provider import OgxProvider
 
 logger = get_logger(__name__)
+
+_LLS_RESPONSES_EXTRA_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "conversation",
+        "max_infer_iters",
+        "tool_choice",
+        "include",
+        "text",
+        "reasoning",
+        "prompt",
+        "metadata",
+        "max_tool_calls",
+        "safety_identifier",
+    }
+)
+
+
+def _model_settings_from_responses_params(
+    responses_params: ResponsesApiParams,
+) -> OpenAIResponsesModelSettings:
+    """Map ``ResponsesApiParams`` into Pydantic AI OpenAI Responses model settings."""
+    payload = responses_params.model_dump(exclude_none=True)
+    extra_body = {k: v for k, v in payload.items() if k in _LLS_RESPONSES_EXTRA_FIELDS}
+    settings_dict: dict[str, Any] = {}
+    if extra_body:
+        settings_dict["extra_body"] = extra_body
+    if responses_params.max_output_tokens is not None:
+        settings_dict["max_tokens"] = responses_params.max_output_tokens
+    if responses_params.temperature is not None:
+        settings_dict["temperature"] = responses_params.temperature
+    if responses_params.parallel_tool_calls is not None:
+        settings_dict["parallel_tool_calls"] = responses_params.parallel_tool_calls
+    if responses_params.extra_headers:
+        settings_dict["extra_headers"] = dict(responses_params.extra_headers)
+    settings_dict["openai_store"] = responses_params.store
+    if responses_params.tools is not None:
+        settings_dict["openai_native_tools"] = responses_params.tools
+    if responses_params.previous_response_id is not None:
+        settings_dict["openai_previous_response_id"] = (
+            responses_params.previous_response_id
+        )
+    return cast(OpenAIResponsesModelSettings, settings_dict)
 
 
 class _FilteredResponseStream:
@@ -173,13 +223,55 @@ class _FilteredResponseStream:
         ]
 
 
-class LlamaStackResponsesModel(OpenAIResponsesModel):
+class OgxResponsesModel(OpenAIResponsesModel):
     """OpenAI Responses model with Llama Stack streaming compatibility fixes.
 
     Overrides the streaming response processing to buffer and replay
     ``ResponseFunctionCallArgumentsDeltaEvent`` events that Llama Stack emits
     before the corresponding ``McpCall`` or ``ResponseFunctionToolCall`` item.
+
+    Also filters ``reasoning.encrypted_content`` from the include parameter since
+    OGX doesn't support it.
     """
+
+    async def _responses_create(
+        self,
+        messages: list[ModelMessage],
+        stream: bool,
+        model_settings: OpenAIResponsesModelSettings,
+        model_request_parameters: ModelRequestParameters,
+    ) -> Any:
+        """Call parent's ``_responses_create``, filtering encrypted reasoning include.
+
+        OGX doesn't support ``reasoning.encrypted_content`` in the include
+        parameter. pydantic-ai adds it automatically based on the model profile, so we
+        disable that profile flag before sending.
+
+        Args:
+            messages: Model messages for the request.
+            stream: Whether this is a streaming request.
+            model_settings: Model-specific settings.
+            model_request_parameters: Request parameters for the model.
+
+        Returns:
+            Response from the Responses API.
+        """
+        # Parent gates include on this profile flag; disable it for OGX.
+        self.profile["openai_supports_encrypted_reasoning_content"] = False
+        # Branch on stream so mypy matches OpenAIResponsesModel overloads
+        if stream:
+            return await super()._responses_create(
+                messages,
+                True,
+                model_settings,
+                model_request_parameters,
+            )
+        return await super()._responses_create(
+            messages,
+            False,
+            model_settings,
+            model_request_parameters,
+        )
 
     async def request(  # pylint: disable=unused-argument
         self,
@@ -294,6 +386,9 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
                     f"Expected ResponseCreatedEvent, got {type(first_chunk).__name__}"
                 )
 
+            tool_call_ids_are_response_scoped = self.profile.get(  # type: ignore[attr-defined]
+                "openai_responses_tool_call_ids_are_response_scoped", False
+            )
             yield OpenAIResponsesStreamedResponse(
                 model_request_parameters=model_request_parameters,
                 _model_name=first_chunk.response.model,
@@ -306,4 +401,55 @@ class LlamaStackResponsesModel(OpenAIResponsesModel):
                     if first_chunk.response.created_at
                     else None
                 ),
+                _tool_call_ids_are_response_scoped=tool_call_ids_are_response_scoped,
             )
+
+    @staticmethod
+    def from_ogx_client(
+        model_name: str,
+        client: AsyncOgxClient | AsyncOGXAsLibraryClient,
+        *,
+        responses_params: Optional[ResponsesApiParams] = None,
+        model_settings: Optional[ModelSettings] = None,
+        profile: Optional[ModelProfileSpec] = None,
+    ) -> OgxResponsesModel:
+        """Create a ``OgxResponsesModel`` from a Llama Stack client.
+
+        Mirrors ``OpenAIResponsesModel.__init__`` parameters, but accepts a
+        Llama Stack client instead of a provider.  Exactly one of
+        ``responses_params`` or ``model_settings`` may be provided.
+
+        Args:
+            model_name: The model name/ID to use.
+            client: Llama Stack client to build the provider from.
+            responses_params: Optional ``ResponsesApiParams``, converted to
+                ``OpenAIResponsesModelSettings`` internally.  Mutually
+                exclusive with ``model_settings``.
+            model_settings: Optional raw ``ModelSettings`` passed through
+                directly.  Mutually exclusive with ``responses_params``.
+            profile: Optional model profile specification.
+
+        Raises:
+            ValueError: If both ``responses_params`` and ``model_settings``
+                are provided.
+
+        Returns:
+            Configured ``OgxResponsesModel`` instance.
+        """
+        provider = OgxProvider.from_ogx_client(client)
+
+        if responses_params is not None and model_settings is not None:
+            raise ValueError(
+                "You can only pass either ResponsesApiParams or ModelSetting not both."
+            )
+
+        _settings: Optional[OpenAIResponsesModelSettings | ModelSettings] = None
+
+        if responses_params is not None:
+            _settings = _model_settings_from_responses_params(responses_params)
+        elif model_settings is not None:
+            _settings = model_settings
+
+        return OgxResponsesModel(
+            model_name, provider=provider, profile=profile, settings=_settings
+        )

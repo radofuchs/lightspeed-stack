@@ -67,8 +67,10 @@ oc get ns "$NAMESPACE" >/dev/null 2>&1 || oc create namespace "$NAMESPACE"
 
 create_secret() {
     local name=$1; shift
-    log "Creating secret $name..."
-    oc create secret generic "$name" "$@" -n "$NAMESPACE" 2>/dev/null || log "Secret $name exists"
+    log "Creating/updating secret $name..."
+    # Upsert: a stale FAISS_VECTOR_STORE_ID from a prior run in this namespace
+    # would otherwise leave registration/search pointing at the wrong store.
+    oc create secret generic "$name" "$@" -n "$NAMESPACE" --dry-run=client -o yaml | oc apply -f -
 }
 
 create_secret openai-api-key-secret --from-literal=key="$OPENAI_API_KEY"
@@ -189,13 +191,14 @@ RAG_DB_PATH="$REPO_ROOT/tests/e2e/rag/kv_store.db"
 if [ -f "$RAG_DB_PATH" ]; then
     # Extract vector store ID from kv_store.db using Python (sqlite3 CLI may not be available)
     log "Extracting vector store ID from kv_store.db..."
-    # Key format is: vector_stores:v3::vs_xxx or openai_vector_stores:v3::vs_xxx
+    # OGX 1.0 FAISS keys use persistence.namespace prefix, e.g.:
+    #   vector_io::faiss:vector_stores:v3::vs_xxx
     export FAISS_VECTOR_STORE_ID=$(python3 -c "
 import sqlite3
 import re
 conn = sqlite3.connect('$RAG_DB_PATH')
 cursor = conn.cursor()
-cursor.execute(\"SELECT key FROM kvstore WHERE key LIKE 'vector_stores:v%::%' LIMIT 1\")
+cursor.execute(\"SELECT key FROM kvstore WHERE key LIKE 'vector_io::faiss:vector_stores:v%::%' LIMIT 1\")
 row = cursor.fetchone()
 if row:
     # Extract the vs_xxx ID from the key
@@ -214,11 +217,29 @@ conn.close()
     fi
 
     gzip -c "$RAG_DB_PATH" > /tmp/kv_store.db.gz
-    oc create configmap rag-data -n "$NAMESPACE" --from-file=kv_store.db.gz=/tmp/kv_store.db.gz
+    # Do not use `oc apply` here: client-side apply stores the full object in
+    # metadata.annotations.kubectl.kubernetes.io/last-applied-configuration
+    # (256KiB limit). The gzipped FAISS fixture (~800KiB+) overflows that.
+    oc delete configmap rag-data -n "$NAMESPACE" --ignore-not-found
+    oc create configmap rag-data -n "$NAMESPACE" \
+      --from-file=kv_store.db.gz=/tmp/kv_store.db.gz
     rm /tmp/kv_store.db.gz
     log "✅ RAG data ConfigMap created from $RAG_DB_PATH"
 else
     log "⚠️  No kv_store.db found at $RAG_DB_PATH"
+fi
+
+# Agent skills E2E: same fixture docker-compose mounts at /app-root/skills
+SKILLS_DIR="$REPO_ROOT/tests/e2e/skills"
+if [ -d "$SKILLS_DIR" ]; then
+  tar czf /tmp/e2e-skills.tgz -C "$SKILLS_DIR" .
+  oc create configmap e2e-skills -n "$NAMESPACE" \
+    --from-file=skills.tgz=/tmp/e2e-skills.tgz \
+    --dry-run=client -o yaml | oc apply -f -
+  rm -f /tmp/e2e-skills.tgz
+  log "✅ e2e-skills ConfigMap created from $SKILLS_DIR"
+else
+  log "⚠️  No skills directory at $SKILLS_DIR — skills.feature will fail"
 fi
 
 
@@ -313,7 +334,7 @@ PF_JWKS_PID=$!
 
 # Behave runs in this shell; pipeline-services-konflux.sh cannot export here. MCP hooks call
 # Llama Stack directly — mirror LCS and forward llama-stack-service-svc to localhost:8321.
-log "Starting port-forward for llama-stack (MCP / llama_stack_client hooks)..."
+log "Starting port-forward for llama-stack (MCP / ogx_client hooks)..."
 oc port-forward svc/llama-stack-service-svc 8321:8321 -n $NAMESPACE &
 PF_LLAMA_PID=$!
 echo "$PF_LLAMA_PID" >"$E2E_LLAMA_PORT_FORWARD_PID_FILE"
@@ -393,8 +414,6 @@ export E2E_DEFAULT_PROVIDER_OVERRIDE E2E_DEFAULT_MODEL_OVERRIDE
 log "LCS accessible at: http://$E2E_LSC_HOSTNAME:8080"
 log "Mock JWKS accessible at: http://$E2E_JWKS_HOSTNAME:8000"
 log "Llama Stack (e2e client hooks) at: http://$E2E_LLAMA_HOSTNAME:$E2E_LLAMA_PORT"
-
-
 
 #========================================
 # 7. RUN TESTS

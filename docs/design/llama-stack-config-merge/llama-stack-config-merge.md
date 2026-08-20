@@ -151,7 +151,7 @@ files — authors read it to write Gherkin scenarios.
 | R4 | `--migrate-config` on a legacy pair yields a unified file driving byte-identical LS behavior; migrate→synthesize round-trips to the original `run.yaml` | e2e + unit (round-trip) |
 | R5 | `native_override` overlapping a baseline/high-level key deep-merges: maps merge, lists replace wholesale, scalars replace | unit (parametric) + e2e (one scalar + one list key) |
 | R6 | Synthesized `run.yaml` on disk carries `${env.FOO}` refs for LCORE-emitted secrets, never resolved values | e2e (inspect file) + unit |
-| R7 | Enrichment (Azure Entra ID, BYOK RAG, Solr/OKP) yields the same synthesized result in unified mode as legacy for equivalent inputs | unit + integration |
+| R7 | Enrichment (Azure Entra ID, BYOK RAG, Solr/OKP) yields the same synthesized result in unified mode as legacy for equivalent inputs | unit + integration (integration coverage tracked by LCORE-2747) |
 | R8 | A relative `profile:` path resolves against the loaded `lightspeed-stack.yaml` directory; absolute paths always resolve | e2e + unit |
 | R9 | Unknown fields rejected (`extra="forbid"`); root validator enforces synthesis-input ⊕ legacy mutual exclusion | unit |
 | R10 | Synthesized file written to the persistent known path with mode `0600`, path logged at startup; `--synthesized-config-output` overrides the location | e2e (perms + path) + unit |
@@ -182,7 +182,7 @@ lightspeed-stack.yaml (unified mode)
   Library mode                       Server mode
   ────────────                       ───────────
   Write to deterministic path.       Written by LS container's entrypoint
-  AsyncLlamaStackAsLibraryClient     script (same synthesizer, same CLI,
+  AsyncOGXAsLibraryClient     script (same synthesizer, same CLI,
   reads the path and initializes.    auto-detects unified via Python).
                                      `llama stack run <path>` starts LS.
                                      LCORE connects by URL.
@@ -381,7 +381,7 @@ removed `-g/-i/-o` flags is cleaned up as part of the docs JIRA.
   from scratch with only high-level keys produces synthesized output
   with no literal secrets on disk. LS itself resolves env refs to
   values in-memory at startup via `replace_env_vars()` in
-  `llama_stack.core.library_client`.
+  `ogx.core.library_client`.
 - **`native_override` (and dumb-mode migration output) MAY carry
   literal secrets**: `native_override` is whatever raw YAML the
   operator drops in, and `migrate_config_dumb()` lifts an existing

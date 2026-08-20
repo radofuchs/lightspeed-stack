@@ -740,6 +740,22 @@ To verify: `uv run make test-e2e` runs every new scenario green and
 behave reports zero undefined steps.
 ```
 
+<!-- type: Story -->
+<!-- key: LCORE-2747 -->
+#### LCORE-2747: Integration tests for unified-mode synthesis
+
+**Description**: Add pytest integration tests under `tests/integration/` that
+exercise the unified-mode synthesis path (baseline → enrichment → high-level
+inference → native_override) and confirm enrichment parity with legacy mode, so
+requirement R7 ("enrichment yields the same synthesized result in unified mode
+as legacy for equivalent inputs") is verified at the integration level, not only
+by unit tests. Fills the gap between the synthesizer unit tests (LCORE-2336) and
+the behave e2e suite (LCORE-2341 / LCORE-2343). Filed post-spike during
+implementation.
+
+**Blocked by**: LCORE-2336 (synthesizer), LCORE-2337 (migrate-then-synthesize
+parity cases).
+
 ### Epic: Documentation for unified mode
 
 Make the single-file unified configuration the primary documented path,
@@ -893,10 +909,10 @@ Summary of validation:
 
 ### Findings discovered during PoC
 
-- **`AsyncLlamaStackAsLibraryClient` takes a file path, not a dict.** The
+- **`AsyncOGXAsLibraryClient` takes a file path, not a dict.** The
   initial design assumed we could pass the synthesized configuration to the
   library client in memory and avoid touching the filesystem. In practice
-  `llama_stack.core.library_client.AsyncLlamaStackAsLibraryClient` accepts
+  `ogx.core.library_client.AsyncOGXAsLibraryClient` accepts
   only a string path (or, in newer versions, a `StackRunConfig` object that
   is itself built from a parsed YAML file). There is no dict-only entry
   point in the public API. Consequences for the implementation:
@@ -1085,7 +1101,7 @@ new list — they don't need to know a patch syntax.
 ### Process-model recap (no LCORE supervision of LS)
 
 **Library mode**: LCORE process embeds the Llama Stack library client. LCORE
-synthesizes `run.yaml` to a file, calls `AsyncLlamaStackAsLibraryClient(path)`,
+synthesizes `run.yaml` to a file, calls `AsyncOGXAsLibraryClient(path)`,
 initializes, serves. One process.
 
 **Server mode**: Llama Stack runs as a separate process (container). LCORE

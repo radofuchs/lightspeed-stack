@@ -17,10 +17,24 @@ LLAMA_STACK_IMAGE ?= lightspeed-llama-stack:local
 LLAMA_STACK_PORT ?= 8321
 CONTAINER_RUNTIME ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
-.PHONY: run run-stack build-llama-stack-image remove-llama-stack-container stop-llama-stack-container start-llama-stack-container wait-for-llama-stack-health clean-llama-stack
+.PHONY: run \
+	run-stack \
+	build-llama-stack-image \
+	remove-llama-stack-container \
+	stop-llama-stack-container \
+	start-llama-stack-container \
+	wait-for-llama-stack-health \
+	clean-llama-stack \
+	doc \
+	docs/models \
+	generate-documentation
 
 run-stack: ## Run lightspeed-stack directly, without building dependent service/s
-	uv run src/lightspeed_stack.py -c $(CONFIG)
+	@if [ "$${OTEL_SDK_DISABLED:-true}" = "false" ]; then \
+		uv run opentelemetry-instrument python src/lightspeed_stack.py -c $(CONFIG); \
+	else \
+		uv run python src/lightspeed_stack.py -c $(CONFIG); \
+	fi
 
 run: start-llama-stack-container ## Run the service locally with dependent services
 	@echo "Starting Lightspeed Core Stack..."
@@ -94,7 +108,7 @@ start-llama-stack-container: build-llama-stack-image ## Start llama-stack contai
 		-e WATSONX_API_KEY \
 		-e LITELLM_DROP_PARAMS=true \
 		-e AWS_BEARER_TOKEN_BEDROCK \
-		-e LLAMA_STACK_LOGGING=$${LLAMA_STACK_LOGGING:-} \
+		-e OGX_LOGGING=$${OGX_LOGGING:-} \
 		-e FAISS_VECTOR_STORE_ID=$${FAISS_VECTOR_STORE_ID:-} \
 		-e RH_SERVER_OKP \
 		-e SOLR_URL \
@@ -130,7 +144,7 @@ clean-llama-stack: remove-llama-stack-container ## Remove container and image
 
 run-llama-stack: ## Start Llama Stack with enriched config (for local service mode)
 	uv run src/llama_stack_configuration.py -c $(CONFIG) -i $(LLAMA_STACK_CONFIG) -o $(LLAMA_STACK_CONFIG) && \
-	uv run llama stack run $(LLAMA_STACK_CONFIG)
+	uv run ogx stack run $(LLAMA_STACK_CONFIG)
 
 test-unit: ## Run the unit tests
 	@echo "Running unit tests..."
@@ -148,11 +162,11 @@ test-e2e: ## Run end to end tests for the service
 test-e2e-local: ## Run end to end tests for the service (no script wrapper)
 	uv run behave --color --format pretty --tags=-skip -D dump_errors=true @tests/e2e/test_list.txt
 
-# Tag-based subsets (@e2e_group_* on feature files). Default runs all groups; override for one shard, e.g.
-#   E2E_BEHAVE_TAG_EXPR='not @skip and @e2e_group_2' make test-e2e-tagged-local
-E2E_BEHAVE_TAG_EXPR ?= not @skip and (e2e_group_1 or e2e_group_2 or e2e_group_3)
+# Tag-based subsets (@cfg_* on features/scenarios). Default runs all config groups; override for one shard, e.g.
+#   E2E_BEHAVE_TAG_EXPR='not @skip and @cfg_authorized' make test-e2e-tagged-local
+E2E_BEHAVE_TAG_EXPR ?= not @skip and (@cfg_default or @cfg_authorized or @cfg_mcp or @cfg_mcp_invalid or @cfg_mcp_api_auth or @cfg_rbac or @cfg_rh_identity or @cfg_negative or @cfg_skills or @cfg_skills_directory or @cfg_byok_pdf or @cfg_tls or @cfg_degraded or @cfg_unified)
 
-test-e2e-tagged: ## Run e2e tests with E2E_BEHAVE_TAG_EXPR (default: all @e2e_group_*)
+test-e2e-tagged: ## Run e2e tests with E2E_BEHAVE_TAG_EXPR (default: all @cfg_*)
 	script -q -e -c "uv run behave --color --format pretty --tags=\"$(E2E_BEHAVE_TAG_EXPR)\" -D dump_errors=true @tests/e2e/test_list.txt"
 
 test-e2e-tagged-local: ## Same as test-e2e-tagged without script wrapper
@@ -176,36 +190,84 @@ format: ## Format the code into unified format
 	uv run black --line-length 88 src tests
 	uv run ruff check src tests --fix
 
-schema:	## Generate OpenAPI schema file stored in docs subdirectory
-	uv run scripts/generate_openapi_schema.py docs/openapi.json
+schema:	## Generate OpenAPI schema file stored in docs/devel_doc subdirectory
+	uv run scripts/generate_openapi_schema.py docs/devel_doc/openapi.json
 
-openapi-doc:	docs/openapi.json scripts/fix_openapi_doc.py	## Generate OpenAPI documentation
-	openapi-to-markdown --input_file docs/openapi.json --output_file output.md
+openapi-doc:	docs/devel_doc/openapi.json scripts/fix_openapi_doc.py	## Generate OpenAPI documentation
+	openapi-to-markdown --input_file docs/devel_doc/openapi.json --output_file output.md
 	# LCORE-1494: don't overwrite the original docs/output.md for now
 	python3 scripts/fix_openapi_doc.py < output.md > openapi2.md
 	rm output.md
 
-generate-documentation:	## Generate documentation
+generate-documentation:	devel-doc schema docs/models	## Generate or regenerated content of the whole /docs subdirectory
+
+doc:	generate-documentation	## Generate or regenerated content of the whole /docs subdirectory
+
+devel-doc:	## Generate documentation for developers
 	scripts/gen_doc.py
 
-doc:	## Generate documentation for developers
-	scripts/gen_doc.py
+docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml docs/models/requests.svg docs/models/responses.svg docs/models/database.svg docs/models/common.svg docs/models/requests.md docs/models/successful_responses.md docs/models/error_responses.md docs/models/common.md docs/models/agents.md docs/models/conversation_summary.md docs/models/common.md	## Generate documentation about models
+	rm -f docs/models/packages.puml
 
-docs/models:	docs/models/requests.puml docs/models/responses.puml docs/models/database.puml docs/models/common.puml	## Generate documentation about models
+docs/models/requests.md:	docs/models/requests.json
+	openapi-to-markdown --input_file $< --output_file $@
 
-docs/models/requests.puml: ## Generate PlantUML class diagram for requests data models
+docs/models/conversation_summary.md:	docs/models/conversation_summary.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/common.md:	docs/models/common.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/successful_responses.md:	docs/models/successful_responses.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/error_responses.md:	docs/models/error_responses.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/agents.md:	docs/models/agents.json
+	openapi-to-markdown --input_file $< --output_file $@
+
+docs/models/requests.json:	$(wildcard src/models/api/requests/*)	## Generate OpenAPI specification with requests models
+	uv run src/lightspeed_stack.py --dump-models-group requests
+	mv requests.json $@
+
+docs/models/conversation_summary.json:	src/models/compaction.py	## Generate OpenAPI specification with conversation_summary models
+	uv run src/lightspeed_stack.py --dump-models-group conversation_summary
+	mv conversation_summary.json $@
+
+docs/models/successful_responses.json:	$(wildcard src/models/api/responses/successful/*)	## Generate OpenAPI specification with successful_responses models
+	uv run src/lightspeed_stack.py --dump-models-group successful_responses
+	mv successful_responses.json $@
+
+docs/models/error_responses.json:	$(wildcard src/models/api/responses/error/*)	## Generate OpenAPI specification with error_responses models
+	uv run src/lightspeed_stack.py --dump-models-group error_responses
+	mv error_responses.json $@
+
+docs/models/common.json:	$(wildcard src/models/common/*)	## Generate OpenAPI specification with common models
+	uv run src/lightspeed_stack.py --dump-models-group common
+	mv common.json $@
+
+docs/models/agents.json:	$(wildcard src/models/common/agents/*)	## Generate OpenAPI specification with agents models
+	uv run src/lightspeed_stack.py --dump-models-group agents
+	mv agents.json $@
+
+docs/models/common_responses.json:	$(wildcard src/models/common/responses/*)	## Generate OpenAPI specification with common_responses models
+	uv run src/lightspeed_stack.py --dump-models-group common_responses
+	mv common_responses.json $@
+
+docs/models/requests.puml:	$(wildcard src/models/api/requests/*)	## Generate PlantUML class diagram for requests data models
 	uv run pyreverse src/models/api/requests/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/requests.puml
 
-docs/models/responses.puml: ## Generate PlantUML class diagram for responses data models
+docs/models/responses.puml:	$(wildcard src/models/api/responses/error/* src/models/api/responses/successful/*)	## Generate PlantUML class diagram for responses data models
 	uv run pyreverse src/models/api/responses/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/responses.puml
 
-docs/models/common.puml: ## Generate PlantUML class diagram for common data models
+docs/models/common.puml:	$(wildcard src/models/common/* src/models/common/agents/* src/models/common/responses/* )	## Generate PlantUML class diagram for common data models
 	uv run pyreverse src/models/common/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/common.puml
 
-docs/models/database.puml: ## Generate PlantUML class diagram for database data models
+docs/models/database.puml:	$(wildcard src/models/database/*)	## Generate PlantUML class diagram for database data models
 	uv run pyreverse src/models/database/ --output puml --output-directory=docs/models/
 	mv docs/models/classes.puml docs/models/database.puml
 
@@ -238,7 +300,7 @@ docs/models/database.svg:	docs/models/database.puml	## Generate a SVG with datab
 	popd
 
 docs/config.puml:	src/models/config.py ## Generate PlantUML class diagram for configuration
-	uv run pyreverse src/models/config.py --output puml --output-directory=docs/
+	uv run pyreverse $< --output puml --output-directory=docs/
 	mv docs/classes.puml docs/config.puml
 
 # Omit --theme rose on the CLI: it fails with some plantuml.jar builds on pyreverse output.
@@ -300,13 +362,13 @@ distribution-archives:	## Generate distribution archives to be uploaded into Pyt
 upload-distribution-archives:	## Upload distribution archives into Python registry
 	uv run python -m twine upload --repository ${PYTHON_REGISTRY} dist/*
 
-konflux-requirements:	## Generate hermetic requirements.*.txt file for konflux build
+konflux-requirements:	## Generate hermetic requirements.*.txt file for Konflux build
 	./scripts/konflux_requirements.sh
 
-konflux-rpm-lock:	## Generate rpm.lock.yaml file for konflux build
+konflux-rpm-lock:	## Generate rpm.lock.yaml file for Konflux build
 	./scripts/generate-rpm-lock.sh
 
-konflux-artifacts-lock: ## Regenerate artifacts.lock.yaml file for konflux build
+konflux-artifacts-lock: ## Regenerate artifacts.lock.yaml file for Konflux build
 	./scripts/generate-artifacts-lock.sh
 
 help: ## Show this help screen

@@ -26,7 +26,7 @@ from typing import Any, Optional
 from urllib.parse import urljoin
 
 import yaml
-from llama_stack.core.stack import replace_env_vars
+from ogx.core.stack import replace_env_vars
 from pydantic import SecretStr
 
 import constants
@@ -80,6 +80,26 @@ VECTOR_IO_TEMPLATES: dict[str, dict[str, Any]] = {
         },
     },
 }
+
+BACKEND_TO_PROVIDER_TYPE: dict[str, str] = {
+    "faiss": "inline::faiss",
+    "pgvector": "remote::pgvector",
+}
+
+
+def _resolve_rag_type(brag: dict[str, Any]) -> str:
+    """Resolve the full Llama Stack provider type from a BYOK RAG dict.
+
+    Parameters:
+        brag (dict[str, Any]): A single BYOK RAG entry dict, expected to
+            contain a ``backend`` key (e.g. ``"faiss"``, ``"pgvector"``).
+
+    Returns:
+        str: The fully-qualified Llama Stack provider type
+            (e.g. ``"inline::faiss"``, ``"remote::pgvector"``).
+    """
+    backend = brag.get("backend", constants.DEFAULT_RAG_BACKEND)
+    return BACKEND_TO_PROVIDER_TYPE.get(backend, f"inline::{backend}")
 
 
 class YamlDumper(yaml.Dumper):  # pylint: disable=too-many-ancestors
@@ -206,7 +226,7 @@ def construct_storage_backends_section(
     for brag in byok_rag:
         if not brag.get("rag_id"):
             raise ValueError(f"BYOK RAG entry is missing required 'rag_id': {brag}")
-        rag_type = brag.get("rag_type", constants.DEFAULT_RAG_TYPE)
+        rag_type = _resolve_rag_type(brag)
         template = VECTOR_IO_TEMPLATES.get(rag_type, {})
         if not template.get("needs_storage_backend", True):
             continue
@@ -245,7 +265,8 @@ def construct_vector_stores_section(
         list[dict[str, Any]]: The `vector_stores` list where each entry is a mapping with keys:
             - `vector_store_id`: identifier of the vector store (for Llama Stack config)
             - `provider_id`: provider identifier prefixed with `"byok_"`
-            - `embedding_model`: name of the embedding model
+            - `embedding_model`: registered OGX model id
+              (``sentence-transformers/byok_<rag_id>_embedding``), not the load path
             - `embedding_dimension`: embedding vector dimensionality
     """
     output = []
@@ -275,12 +296,13 @@ def construct_vector_stores_section(
             continue
         existing_store_ids.add(vector_db_id)
         added += 1
-        embedding_model = brag.get("embedding_model", constants.DEFAULT_EMBEDDING_MODEL)
+        # OGX registers BYOK embeddings as sentence-transformers/byok_<rag_id>_embedding
+        # (see construct_models_section). Lookups must use that id, not the load path.
         output.append(
             {
                 "vector_store_id": vector_db_id,
                 "provider_id": f"byok_{rag_id}",
-                "embedding_model": embedding_model,
+                "embedding_model": f"sentence-transformers/byok_{rag_id}_embedding",
                 "embedding_dimension": brag.get("embedding_dimension"),
             }
         )
@@ -331,14 +353,16 @@ def construct_models_section(
         provider_model_id = embedding_model
         provider_model_id = provider_model_id.removeprefix("sentence-transformers/")
 
-        # Skip if embedding model already registered
-        existing_model_ids = [m.get("provider_model_id") for m in output]
-        if provider_model_id in existing_model_ids:
+        # Dedupe by generated model_id (not load path). Vector stores look up
+        # sentence-transformers/byok_<rag_id>_embedding; shared paths still need
+        # one alias per rag_id.
+        model_id = f"byok_{rag_id}_embedding"
+        if any(model.get("model_id") == model_id for model in output):
             continue
 
         output.append(
             {
-                "model_id": f"byok_{rag_id}_embedding",
+                "model_id": model_id,
                 "model_type": "embedding",
                 "provider_id": "sentence-transformers",
                 "provider_model_id": provider_model_id,
@@ -355,17 +379,21 @@ def construct_models_section(
 
 
 def _build_vector_io_config(
-    rag_type: str, backend_name: str, brag: dict[str, Any]
+    rag_type: str, backend_name: str, extra_fields: dict[str, Any]
 ) -> dict[str, Any]:
     """Build the provider config dict from VECTOR_IO_TEMPLATES.
 
     Parameters:
         rag_type: Llama Stack provider type (e.g. 'inline::faiss', 'remote::pgvector').
         backend_name: Storage backend name (used when template has '{backend_name}').
-        brag: BYOK RAG entry dict — extra_fields are read from here.
+        extra_fields: Source values for template ``extra_fields`` (e.g. db_path,
+            host/port/db/user/password). Used by BYOK and vector_store.providers.
 
     Returns:
         dict[str, Any]: Provider config mapping.
+
+    Raises:
+        ValueError: If ``rag_type`` is not present in VECTOR_IO_TEMPLATES.
     """
     template = VECTOR_IO_TEMPLATES.get(rag_type)
     if template is None:
@@ -383,7 +411,7 @@ def _build_vector_io_config(
         }
     }
     for field, default in template.get("extra_fields", {}).items():
-        value = brag.get(field)
+        value = extra_fields.get(field)
         if isinstance(value, SecretStr):
             value = value.get_secret_value()
         if value is None or (isinstance(value, str) and not value.strip()):
@@ -443,7 +471,7 @@ def construct_vector_io_providers_section(
             continue
         existing_ids.add(provider_id)
         added += 1
-        rag_type = brag.get("rag_type", constants.DEFAULT_RAG_TYPE)
+        rag_type = _resolve_rag_type(brag)
         config = _build_vector_io_config(rag_type, backend_name, brag)
         output.append(
             {
@@ -502,18 +530,276 @@ def enrich_byok_rag(ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]) -
 
 
 # =============================================================================
+# Enrichment: vector_store
+# =============================================================================
+
+
+def _vector_store_provider_by_id(
+    providers: list[dict[str, Any]], provider_id: Optional[str]
+) -> Optional[dict[str, Any]]:
+    """Return the provider entry matching ``provider_id``.
+
+    Parameters:
+        providers: High-level ``vector_store.providers`` entries.
+        provider_id: Id from ``vector_store.default_provider``.
+
+    Returns:
+        Matching provider dict, or None when unset / not found.
+    """
+    if provider_id is None:
+        return None
+    cleaned = provider_id.strip()
+    if not cleaned:
+        return None
+    for provider in providers:
+        if str(provider.get("id", "")).strip() == cleaned:
+            return provider
+    return None
+
+
+def _upsert_vsprov_embedding_model(
+    ls_config: dict[str, Any],
+    provider_id: str,
+    embedding_model: str,
+    embedding_dimension: int,
+) -> None:
+    """Register or refresh a vsprov embedding model alias by model_id.
+
+    Uses ``model_id`` ``vsprov_<provider_id>_embedding`` (not load path) so
+    BYOK and ``vector_store`` can share a ``provider_model_id`` and both
+    resolve. Re-enrichment updates path and metadata when the same
+    ``model_id`` already exists.
+
+    Parameters:
+        ls_config: Llama Stack configuration modified in place.
+        provider_id: Dynamic provider id used to name the model row.
+        embedding_model: Configured embedding model path or id.
+        embedding_dimension: Embedding vector dimensionality (required on
+            validated ``vector_store.providers`` entries).
+    """
+    models = ls_config.setdefault("registered_resources", {}).setdefault("models", [])
+    model_id = f"vsprov_{provider_id}_embedding"
+    provider_model_id = embedding_model.removeprefix("sentence-transformers/")
+    entry = {
+        "model_id": model_id,
+        "model_type": "embedding",
+        "provider_id": "sentence-transformers",
+        "provider_model_id": provider_model_id,
+        "metadata": {"embedding_dimension": embedding_dimension},
+    }
+    for index, model in enumerate(models):
+        if model.get("model_id") == model_id:
+            models[index] = entry
+            return
+    models.append(entry)
+
+
+def _vsprov_fields_and_backend(
+    product_type: str, provider_id: str, cfg: dict[str, Any]
+) -> tuple[dict[str, Any], str, Optional[dict[str, Any]]]:
+    """Build template extra fields and optional faiss storage backend.
+
+    Parameters:
+        product_type: Product type (``faiss`` or ``pgvector``).
+        provider_id: Dynamic provider id.
+        cfg: Nested provider ``config`` dict.
+
+    Returns:
+        Tuple of (extra_fields, backend_name, backend_entry_or_None).
+
+    Raises:
+        ValueError: If ``product_type`` is not a supported vector-store
+            provider type.
+    """
+    backend_name = f"vsprov_{provider_id}_storage"
+    if product_type == "faiss":
+        return (
+            {"db_path": cfg["path"]},
+            backend_name,
+            {"type": "kv_sqlite", "db_path": cfg["path"]},
+        )
+    if product_type == "pgvector":
+        return (
+            {
+                "host": cfg.get("host"),
+                "port": cfg.get("port"),
+                "db": cfg.get("db"),
+                "user": cfg.get("user"),
+                "password": cfg.get("password"),
+            },
+            backend_name,
+            None,
+        )
+    raise ValueError(
+        f"Unsupported vector_store.providers type '{product_type}'. "
+        f"Supported types: {list(BACKEND_TO_PROVIDER_TYPE)}"
+    )
+
+
+def _replace_or_append_vector_io(
+    vector_io: list[dict[str, Any]],
+    existing_ids: set[str],
+    provider_entry: dict[str, Any],
+) -> None:
+    """Replace a vector_io entry with the same provider_id, else append.
+
+    Parameters:
+        vector_io: Mutable providers.vector_io list.
+        existing_ids: Set of provider_ids already present (updated on append).
+        provider_entry: New provider entry to install.
+    """
+    provider_id = provider_entry["provider_id"]
+    if provider_id not in existing_ids:
+        vector_io.append(provider_entry)
+        existing_ids.add(provider_id)
+        return
+
+    for index, existing in enumerate(vector_io):
+        if isinstance(existing, dict) and existing.get("provider_id") == provider_id:
+            logger.info(
+                "Replacing existing vector_io provider with "
+                "provider_id=%r from vector_store.providers",
+                provider_id,
+            )
+            vector_io[index] = provider_entry
+            return
+
+
+def _apply_vector_stores_defaults(
+    ls_config: dict[str, Any], designated: dict[str, Any]
+) -> None:
+    """Write vector_stores.default_* from the designated provider entry.
+
+    Parameters:
+        ls_config: Llama Stack configuration modified in place.
+        designated: Provider entry selected by ``vector_store.default_provider``.
+    """
+    vector_stores = ls_config.get("vector_stores")
+    if not isinstance(vector_stores, dict):
+        vector_stores = {}
+        ls_config["vector_stores"] = vector_stores
+    provider_id = str(designated["id"]).strip()
+    vector_stores["default_provider_id"] = provider_id
+    # Match _upsert_vsprov_embedding_model model_id; OGX validates
+    # provider_id/model_id against registered models, not the load path.
+    if designated.get("embedding_model"):
+        vector_stores["default_embedding_model"] = {
+            "provider_id": "sentence-transformers",
+            "model_id": f"vsprov_{provider_id}_embedding",
+        }
+
+
+def _enrich_one_vector_store_provider(
+    entry: dict[str, Any],
+    backends: dict[str, Any],
+    vector_io: list[Any],
+    existing_ids: set[str],
+    ls_config: dict[str, Any],
+) -> None:
+    """Enrich LS config for a single ``vector_store.providers`` entry.
+
+    Parameters:
+        entry: One high-level provider dict from Lightspeed config.
+        backends: ``storage.backends`` map (modified in place for faiss).
+        vector_io: ``providers.vector_io`` list (modified in place).
+        existing_ids: Known ``provider_id`` values already in ``vector_io``.
+        ls_config: Full Llama Stack config (for embedding model registration).
+    """
+    provider_id = str(entry["id"]).strip()
+    product_type = entry["type"]
+    ls_type = BACKEND_TO_PROVIDER_TYPE[product_type]
+    extra_fields, backend_name, backend_entry = _vsprov_fields_and_backend(
+        product_type, provider_id, entry.get("config") or {}
+    )
+    if backend_entry is not None:
+        backends[backend_name] = backend_entry
+
+    _replace_or_append_vector_io(
+        vector_io,
+        existing_ids,
+        {
+            "provider_id": provider_id,
+            "provider_type": ls_type,
+            "config": _build_vector_io_config(ls_type, backend_name, extra_fields),
+        },
+    )
+
+    embedding_model = entry.get("embedding_model")
+    embedding_dimension = entry.get("embedding_dimension")
+    if embedding_model and embedding_dimension is not None:
+        _upsert_vsprov_embedding_model(
+            ls_config,
+            provider_id=provider_id,
+            embedding_model=embedding_model,
+            embedding_dimension=embedding_dimension,
+        )
+
+
+def enrich_vector_store(
+    ls_config: dict[str, Any],
+    vector_store: Optional[dict[str, Any]] = None,
+) -> None:
+    """Enrich LS config with dynamic vector-store provider capacity.
+
+    Appends or replaces ``providers.vector_io`` entries and faiss storage
+    backends, registers embedding models when needed, and writes
+    ``vector_stores.default_provider_id`` / ``default_embedding_model`` from
+    ``vector_store.default_provider``. Does not register
+    ``registered_resources.vector_stores``.
+
+    Parameters:
+        ls_config: Llama Stack configuration dictionary (modified in place).
+        vector_store: High-level ``vector_store`` section
+            (``default_provider`` + ``providers``) as a dict.
+    """
+    vector_store = vector_store or {}
+    providers = vector_store.get("providers") or []
+    if not providers:
+        logger.debug("vector_store.providers not configured: skipping")
+        dedupe_providers_vector_io(ls_config)
+        return
+
+    backends = ls_config.setdefault("storage", {}).setdefault("backends", {})
+    providers_section = ls_config.setdefault("providers", {})
+    vector_io = providers_section.get("vector_io")
+    if not isinstance(vector_io, list):
+        vector_io = []
+        providers_section["vector_io"] = vector_io
+    ls_config.setdefault("registered_resources", {}).setdefault("models", [])
+
+    existing_ids = {
+        str(entry.get("provider_id")).strip()
+        for entry in vector_io
+        if isinstance(entry, dict) and entry.get("provider_id")
+    }
+
+    for entry in providers:
+        _enrich_one_vector_store_provider(
+            entry, backends, vector_io, existing_ids, ls_config
+        )
+
+    designated = _vector_store_provider_by_id(
+        providers, vector_store.get("default_provider")
+    )
+    if designated is not None:
+        _apply_vector_stores_defaults(ls_config, designated)
+
+    dedupe_providers_vector_io(ls_config)
+
+
+# =============================================================================
 # Enrichment: Solr
 # =============================================================================
 
 
-def enrich_solr(  # pylint: disable=too-many-locals
+def enrich_solr(  # pylint: disable=too-many-locals,too-many-statements
     ls_config: dict[str, Any],
     rag_config: dict[str, Any],
     okp_config: dict[str, Any],
 ) -> None:
     """Enrich Llama Stack config with Solr settings.
 
-    Args:
+    Parameters:
         ls_config: Llama Stack configuration dict (modified in place)
         rag_config: RAG configuration dict. Used keys:
             - inline (list[str]): inline RAG IDs
@@ -617,16 +903,11 @@ def enrich_solr(  # pylint: disable=too-many-locals
         for vs in ls_config["registered_resources"]["vector_stores"]
     ]
     if constants.SOLR_DEFAULT_VECTOR_STORE_ID not in existing_stores:
-        # Build environment variable expression
-        embedding_model_env = (
-            f"${{env.SOLR_EMBEDDING_MODEL:={constants.SOLR_DEFAULT_EMBEDDING_MODEL}}}"
-        )
-
         ls_config["registered_resources"]["vector_stores"].append(
             {
                 "vector_store_id": constants.SOLR_DEFAULT_VECTOR_STORE_ID,
                 "provider_id": constants.SOLR_PROVIDER_ID,
-                "embedding_model": embedding_model_env,
+                "embedding_model": constants.SOLR_EMBEDDING_MODEL_ID,
                 "embedding_dimension": constants.SOLR_DEFAULT_EMBEDDING_DIMENSION,
             }
         )
@@ -652,7 +933,7 @@ def enrich_solr(  # pylint: disable=too-many-locals
 
         ls_config["registered_resources"]["models"].append(
             {
-                "model_id": "solr_embedding",
+                "model_id": constants.SOLR_EMBEDDING_MODEL_ID,
                 "model_type": "embedding",
                 "provider_id": "sentence-transformers",
                 "provider_model_id": provider_model_env,
@@ -662,6 +943,27 @@ def enrich_solr(  # pylint: disable=too-many-locals
             }
         )
         logger.info("Added OKP embedding model to registered_resources.models")
+
+    # Propagate search_mode to OGX's top-level vector_stores config so that
+    # rag.tool (file_search) uses keyword/hybrid instead of defaulting to
+    # vector similarity — critical for air-gap environments without an
+    # embedding model.
+    okp_search_mode = okp_config.get("search_mode")
+    if okp_search_mode:
+        ogx_mode = constants.SOLR_SEARCH_MODE_MAP.get(okp_search_mode, okp_search_mode)
+        # LCORE uses "semantic"; OGX uses "vector"
+        if ogx_mode == "semantic":
+            ogx_mode = "vector"
+        if "vector_stores" not in ls_config:
+            ls_config["vector_stores"] = {}
+        chunk_params = ls_config["vector_stores"].setdefault(
+            "chunk_retrieval_params", {}
+        )
+        chunk_params["default_search_mode"] = ogx_mode
+        logger.info(
+            "Set vector_stores.chunk_retrieval_params.default_search_mode=%s",
+            ogx_mode,
+        )
 
 
 # =============================================================================
@@ -718,12 +1020,14 @@ def apply_high_level_inference(
 
     Each high-level provider is mapped to a Llama Stack ``providers.inference``
     entry via :data:`PROVIDER_TYPE_MAP`. The emitted ``provider_id`` is the
-    provider ``type`` with underscores hyphenated, so an inline embedder declared
-    as ``sentence_transformers`` becomes ``sentence-transformers`` and matches the
+    optional explicit high-level ``id`` when set; otherwise the provider ``type``
+    with underscores hyphenated, so an inline embedder declared as
+    ``sentence_transformers`` becomes ``sentence-transformers`` and matches the
     baseline's ecosystem convention (e.g. the default embedding model reference).
-    An entry whose ``provider_id`` already exists in the baseline is replaced; new
-    ones are appended. Secrets are emitted as ``${env.<VAR>}`` references, never
-    resolved values (R6).
+    An entry whose ``provider_id`` already exists in the baseline (or was emitted
+    by an earlier high-level entry) is replaced with an info log; new ones are
+    appended. Secrets are emitted as ``${env.<VAR>}`` references, never resolved
+    values (R6).
 
     Parameters:
         ls_config: The Llama Stack configuration being synthesized (modified in
@@ -743,7 +1047,7 @@ def apply_high_level_inference(
 
     for provider in providers:
         provider_type = provider["type"]
-        emitted_id = provider_type.replace("_", "-")
+        emitted_id = provider.get("id") or provider_type.replace("_", "-")
         ls_provider_type = PROVIDER_TYPE_MAP[provider_type]
         entry: dict[str, Any] = {
             "provider_id": emitted_id,
@@ -764,6 +1068,11 @@ def apply_high_level_inference(
         # Replace a baseline provider with the same id, else append.
         for index, existing in enumerate(inference_list):
             if isinstance(existing, dict) and existing.get("provider_id") == emitted_id:
+                logger.info(
+                    "Replacing existing inference provider with "
+                    "provider_id=%r; a later high-level entry overwrote it",
+                    emitted_id,
+                )
                 inference_list[index] = entry
                 break
         else:
@@ -772,6 +1081,47 @@ def apply_high_level_inference(
     logger.info(
         "Applied %d high-level inference provider(s) to synthesized config",
         len(providers),
+    )
+
+
+def ensure_mcp_tool_runtime(ls_config: dict[str, Any]) -> None:
+    """Ensure the default MCP tool_runtime provider exists in ``ls_config``.
+
+    Adds ``tool_runtime`` to ``apis`` when missing, then appends the default
+    ``model-context-protocol`` provider under ``providers.tool_runtime`` when
+    no entry with that ``provider_id`` is already present. Existing entries
+    (including ``rag-runtime``) are left untouched.
+
+    Parameters:
+        ls_config: The Llama Stack configuration being synthesized (modified
+            in place).
+
+    Returns:
+        None: ``ls_config`` is modified in place.
+    """
+    apis = ls_config.setdefault("apis", [])
+    if "tool_runtime" not in apis:
+        apis.append("tool_runtime")
+
+    providers_section = ls_config.setdefault("providers", {})
+    tool_runtime = providers_section.setdefault("tool_runtime", [])
+    for existing in tool_runtime:
+        if (
+            isinstance(existing, dict)
+            and existing.get("provider_id") == constants.MCP_TOOL_RUNTIME_PROVIDER_ID
+        ):
+            return
+
+    tool_runtime.append(
+        {
+            "provider_id": constants.MCP_TOOL_RUNTIME_PROVIDER_ID,
+            "provider_type": constants.MCP_TOOL_RUNTIME_PROVIDER_TYPE,
+            "config": {},
+        }
+    )
+    logger.info(
+        "Added MCP tool_runtime provider provider_id=%r",
+        constants.MCP_TOOL_RUNTIME_PROVIDER_ID,
     )
 
 
@@ -795,7 +1145,7 @@ def _resolve_profile_path(profile: str, config_file_dir: Optional[str]) -> Path:
     return path
 
 
-def synthesize_configuration(
+def synthesize_configuration(  # pylint: disable=too-many-locals
     lcs_config: dict[str, Any],
     config_file_dir: Optional[str] = None,
     default_baseline: Optional[dict[str, Any]] = None,
@@ -805,8 +1155,9 @@ def synthesize_configuration(
     Implements the unified-mode synthesis pipeline: select a baseline (profile
     file, empty, or the built-in default), apply the existing enrichment
     (Azure Entra ID, BYOK RAG, Solr/OKP) for parity with legacy mode (R7),
-    expand the high-level ``inference.providers`` section, and deep-merge the
-    raw ``native_override`` last (R5).
+    expand the high-level ``inference.providers`` section, ensure the default
+    MCP tool_runtime provider when the baseline was not empty, and deep-merge
+    the raw ``native_override`` last (R5).
 
     Parameters:
         lcs_config: The full ``lightspeed-stack.yaml`` parsed into a dict.
@@ -818,10 +1169,10 @@ def synthesize_configuration(
     Returns:
         dict[str, Any]: The synthesized Llama Stack configuration.
     """
-    llama_stack = lcs_config.get("llama_stack") or {}
-    unified = llama_stack.get("config")  # None when only top-level inputs are set
+    unified = (lcs_config.get("llama_stack") or {}).get("config")
 
     # 1-2. Select the baseline.
+    baseline_was_empty = False
     if unified and unified.get("profile"):
         profile_path = _resolve_profile_path(unified["profile"], config_file_dir)
         logger.info("Loading synthesis baseline from profile %s", profile_path)
@@ -829,6 +1180,7 @@ def synthesize_configuration(
             baseline = yaml.safe_load(file) or {}
     elif unified and unified.get("baseline") == "empty":
         logger.info("Synthesizing from an empty baseline")
+        baseline_was_empty = True
         baseline = {}
     else:
         baseline = (
@@ -845,19 +1197,33 @@ def synthesize_configuration(
     # 4. Existing enrichment — same calls as legacy generate_configuration so
     #    unified output matches legacy output for equivalent inputs (R7).
     enrich_azure_entra_id_inference(ls_config, lcs_config.get("azure_entra_id"))
-    enrich_byok_rag(ls_config, lcs_config.get("byok_rag", []))
-    enrich_solr(ls_config, lcs_config.get("rag", {}), lcs_config.get("okp", {}))
+    rag_section = lcs_config.get("rag", {})
+    byok_stores = rag_section.get("byok", {}).get("stores", [])
+    enrich_byok_rag(ls_config, byok_stores)
+    retrieval = rag_section.get("retrieval", {})
+    rag_config_for_solr = {
+        "inline": retrieval.get("inline", {}).get("sources", []),
+        "tool": retrieval.get("tool", {}).get("sources", []),
+    }
+    okp_config = rag_section.get("okp", {})
+    enrich_solr(ls_config, rag_config_for_solr, okp_config)
+    enrich_vector_store(ls_config, lcs_config.get("vector_store"))
 
     # 5. High-level inference providers (Decision S5 — a root-level section).
     inference = lcs_config.get("inference") or {}
     if inference.get("providers"):
         apply_high_level_inference(ls_config, inference)
 
-    # 6. Raw escape hatch, deep-merged last with list replacement (R5).
+    # 6. Ensure MCP tool_runtime for default/profile baselines (skipped for
+    #    baseline: empty so migrate round-trips stay lossless).
+    if not baseline_was_empty:
+        ensure_mcp_tool_runtime(ls_config)
+
+    # 7. Raw escape hatch, deep-merged last with list replacement (R5).
     if unified and unified.get("native_override"):
         ls_config = deep_merge_list_replace(ls_config, unified["native_override"])
 
-    # 7. Dedupe again in case native_override or enrichment reintroduced dupes.
+    # 8. Dedupe again in case native_override or enrichment reintroduced dupes.
     dedupe_providers_vector_io(ls_config)
 
     return ls_config
@@ -1010,10 +1376,18 @@ def generate_configuration(
     enrich_azure_entra_id_inference(ls_config, config.get("azure_entra_id"))
 
     # Enrichment: BYOK RAG
-    enrich_byok_rag(ls_config, config.get("byok_rag", []))
+    rag_section = config.get("rag", {})
+    byok_stores = rag_section.get("byok", {}).get("stores", [])
+    enrich_byok_rag(ls_config, byok_stores)
 
     # Enrichment: Solr - enabled when "okp" appears in either inline or tool list
-    enrich_solr(ls_config, config.get("rag", {}), config.get("okp", {}))
+    retrieval = rag_section.get("retrieval", {})
+    rag_config_for_solr = {
+        "inline": retrieval.get("inline", {}).get("sources", []),
+        "tool": retrieval.get("tool", {}).get("sources", []),
+    }
+    okp_config = rag_section.get("okp", {})
+    enrich_solr(ls_config, rag_config_for_solr, okp_config)
 
     dedupe_providers_vector_io(ls_config)
 

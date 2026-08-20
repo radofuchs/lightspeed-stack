@@ -4,18 +4,22 @@
 # pyright: reportCallIssue=false
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
+import pytest
 from pydantic import SecretStr
 
 import constants
 from models.config import (
-    ByokRag,
+    ByokConfiguration,
     CompactionConfiguration,
     Configuration,
     CORSConfiguration,
     DatabaseConfiguration,
+    FaissVectorStoreProvider,
+    FaissVectorStoreProviderConfig,
     InferenceConfiguration,
     LlamaStackConfiguration,
     ModelContextProtocolServer,
@@ -23,10 +27,14 @@ from models.config import (
     QuotaHandlersConfiguration,
     QuotaLimiterConfiguration,
     QuotaSchedulerConfiguration,
+    RagConfiguration,
+    RagStore,
     ServiceConfiguration,
     SkillsConfiguration,
     TLSConfiguration,
+    UnifiedLlamaStackConfig,
     UserDataCollection,
+    VectorStoreConfiguration,
 )
 
 _DEFAULT_APPROVALS_DUMP: dict[str, int] = {
@@ -46,6 +54,26 @@ _MCP_SERVER_DUMP_DEFAULTS: dict[str, Any] = {
     "require_approval": "never",
     "timeout": None,
 }
+
+
+@pytest.fixture(name="clear_otel_env", autouse=True)
+def clear_otel_env_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear OTEL_* environment variables to prevent ambient leakage in tests.
+
+    This fixture ensures dump configuration tests have stable expectations
+    regardless of whether they run on instrumented CI runners.
+    """
+    for key in list(os.environ.keys()):
+        if key.startswith("OTEL_"):
+            monkeypatch.delenv(key, raising=False)
+
+
+def _get_expected_observability_dump() -> dict[str, dict[str, str]]:
+    """Get expected observability dump based on current environment.
+
+    Returns empty otel dict when OTEL_* vars are cleared by fixture.
+    """
+    return {"otel": {}}
 
 
 def test_dump_configuration_minimal_cfg(tmp_path: Path) -> None:
@@ -98,14 +126,15 @@ def test_dump_configuration_minimal_cfg(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
         assert "azure_entra_id" in content
-        assert "reranker" in content
+        assert "reranker" in content["rag"]["retrieval"]["inline"]
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -193,7 +222,10 @@ def test_dump_configuration_minimal_cfg(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -211,26 +243,36 @@ def test_dump_configuration_minimal_cfg(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {"max_chunks": 10, "stores": []},
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -307,14 +349,15 @@ def test_dump_configuration_valid_values(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
         assert "azure_entra_id" in content
-        assert "reranker" in content
+        assert "reranker" in content["rag"]["retrieval"]["inline"]
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -416,7 +459,10 @@ def test_dump_configuration_valid_values(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -434,26 +480,39 @@ def test_dump_configuration_valid_values(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -666,14 +725,15 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
         assert "azure_entra_id" in content
-        assert "reranker" in content
+        assert "reranker" in content["rag"]["retrieval"]["inline"]
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -775,7 +835,10 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -808,26 +871,39 @@ def test_dump_configuration_with_quota_limiters(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -926,12 +1002,13 @@ def test_dump_configuration_with_quota_limiters_different_values(
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -1033,7 +1110,10 @@ def test_dump_configuration_with_quota_limiters_different_values(
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -1066,27 +1146,93 @@ def test_dump_configuration_with_quota_limiters_different_values(
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
+
+
+def test_dump_configuration_with_vector_store(tmp_path: Path) -> None:
+    """Dump preserves a configured vector_store default_provider and providers."""
+    cfg = Configuration(
+        name="test_name",
+        service=ServiceConfiguration(
+            tls_config=TLSConfiguration(
+                tls_certificate_path=Path("tests/configuration/server.crt"),
+                tls_key_path=Path("tests/configuration/server.key"),
+                tls_key_password=Path("tests/configuration/password"),
+            ),
+            cors=CORSConfiguration(),
+        ),
+        llama_stack=LlamaStackConfiguration(
+            use_as_library_client=True,
+            config=UnifiedLlamaStackConfig(baseline="default"),
+            api_key=SecretStr("whatever"),
+        ),
+        user_data_collection=UserDataCollection(
+            feedback_enabled=False, feedback_storage=None
+        ),
+        vector_store=VectorStoreConfiguration(
+            default_provider="notebooks",
+            providers=[
+                FaissVectorStoreProvider(
+                    id="notebooks",
+                    type="faiss",
+                    embedding_model="/rag-content/embeddings_model",
+                    embedding_dimension=768,
+                    config=FaissVectorStoreProviderConfig(path="/var/lib/notebooks.db"),
+                )
+            ],
+        ),
+    )
+    dump_file = tmp_path / "test.json"
+    cfg.dump(dump_file)
+
+    with open(dump_file, "r", encoding="utf-8") as fin:
+        content = json.load(fin)
+
+    assert content["vector_store"] == {
+        "default_provider": "notebooks",
+        "providers": [
+            {
+                "id": "notebooks",
+                "type": "faiss",
+                "embedding_model": "/rag-content/embeddings_model",
+                "embedding_dimension": 768,
+                "config": {"path": "/var/lib/notebooks.db"},
+            }
+        ],
+    }
 
 
 def test_dump_configuration_byok(tmp_path: Path) -> None:
@@ -1136,13 +1282,17 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
             default_provider="default_provider",
             default_model="default_model",
         ),
-        byok_rag=[
-            ByokRag(
-                rag_id="rag_id",
-                vector_db_id="vector_db_id",
-                db_path="tests/configuration/rag.txt",
+        rag=RagConfiguration(
+            byok=ByokConfiguration(
+                stores=[
+                    RagStore(
+                        rag_id="rag_id",
+                        vector_db_id="vector_db_id",
+                        db_path="tests/configuration/rag.txt",
+                    ),
+                ],
             ),
-        ],
+        ),
     )
     assert cfg is not None
     dump_file = tmp_path / "test.json"
@@ -1164,12 +1314,13 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -1271,22 +1422,10 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [
-                {
-                    "db_path": "tests/configuration/rag.txt",
-                    "embedding_dimension": 768,
-                    "embedding_model": "sentence-transformers/all-mpnet-base-v2",
-                    "rag_id": "rag_id",
-                    "rag_type": "inline::faiss",
-                    "vector_db_id": "vector_db_id",
-                    "score_multiplier": 1.0,
-                    "host": None,
-                    "port": None,
-                    "db": None,
-                    "user": None,
-                    "password": None,
-                },
-            ],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -1304,26 +1443,57 @@ def test_dump_configuration_byok(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [
+                        {
+                            "rag_id": "rag_id",
+                            "backend": "faiss",
+                            "embedding_model": "sentence-transformers/all-mpnet-base-v2",
+                            "embedding_dimension": 768,
+                            "vector_db_id": "vector_db_id",
+                            "db_path": "tests/configuration/rag.txt",
+                            "score_multiplier": 1.0,
+                            "relevance_cutoff_score": (
+                                constants.DEFAULT_BYOK_RAG_RELEVANCE_CUTOFF_SCORE
+                            ),
+                            "host": None,
+                            "port": None,
+                            "db": None,
+                            "user": None,
+                            "password": None,
+                        },
+                    ],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -1397,12 +1567,13 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -1504,7 +1675,10 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -1522,26 +1696,39 @@ def test_dump_configuration_pg_namespace(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -1773,14 +1960,15 @@ def test_dump_configuration_allow_degraded_mode(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
         assert "azure_entra_id" in content
-        assert "reranker" in content
+        assert "reranker" in content["rag"]["retrieval"]["inline"]
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -1882,7 +2070,10 @@ def test_dump_configuration_allow_degraded_mode(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -1900,26 +2091,39 @@ def test_dump_configuration_allow_degraded_mode(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -1997,14 +2201,15 @@ def test_dump_configuration_max_retries_settings(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
         assert "azure_entra_id" in content
-        assert "reranker" in content
+        assert "reranker" in content["rag"]["retrieval"]["inline"]
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -2106,7 +2311,10 @@ def test_dump_configuration_max_retries_settings(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -2124,26 +2332,39 @@ def test_dump_configuration_max_retries_settings(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -2221,14 +2442,15 @@ def test_dump_configuration_retry_count_settings(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
         assert "azure_entra_id" in content
-        assert "reranker" in content
+        assert "reranker" in content["rag"]["retrieval"]["inline"]
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -2330,7 +2552,10 @@ def test_dump_configuration_retry_count_settings(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.3,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -2348,26 +2573,39 @@ def test_dump_configuration_retry_count_settings(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {
+                    "max_chunks": 10,
+                    "stores": [],
+                },
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }
 
 
@@ -2451,15 +2689,16 @@ def test_dump_configuration_specific_compaction_values(tmp_path: Path) -> None:
         assert "customization" in content
         assert "inference" in content
         assert "database" in content
-        assert "byok_rag" in content
+        assert "rag" in content
         assert "quota_handlers" in content
         assert "azure_entra_id" in content
-        assert "reranker" in content
+        assert "reranker" in content["rag"]["retrieval"]["inline"]
         assert "compaction" in content
 
         # check the whole deserialized JSON file content
         assert content == {
             "name": "test_name",
+            "config_format_version": None,
             "service": {
                 "host": "localhost",
                 "port": 8080,
@@ -2561,7 +2800,10 @@ def test_dump_configuration_specific_compaction_values(tmp_path: Path) -> None:
                 "buffer_max_ratio": 0.5,
             },
             "approvals": _DEFAULT_APPROVALS_DUMP,
-            "byok_rag": [],
+            "vector_store": {
+                "default_provider": None,
+                "providers": [],
+            },
             "quota_handlers": {
                 "sqlite": None,
                 "postgres": None,
@@ -2579,24 +2821,34 @@ def test_dump_configuration_specific_compaction_values(tmp_path: Path) -> None:
             },
             "azure_entra_id": None,
             "rag": {
-                "inline": [],
-                "tool": [],
-            },
-            "okp": {
-                "rhokp_url": None,
-                "offline": True,
-                "chunk_filter_query": None,
+                "byok": {"max_chunks": 10, "stores": []},
+                "okp": {
+                    "rhokp_url": None,
+                    "offline": True,
+                    "chunk_filter_query": None,
+                    "search_mode": None,
+                    "max_chunks": 5,
+                },
+                "retrieval": {
+                    "inline": {
+                        "sources": [],
+                        "max_chunks": 10,
+                        "reranker": {
+                            "enabled": False,
+                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+                        },
+                    },
+                    "tool": {"sources": [], "max_chunks": 10, "reranker": None},
+                },
             },
             "rlsapi_v1": {
                 "allow_verbose_infer": False,
                 "quota_subject": None,
             },
             "splunk": None,
+            "observability": _get_expected_observability_dump(),
             "deployment_environment": "development",
-            "reranker": {
-                "enabled": False,
-                "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
-            },
             "saved_prompts": _DEFAULT_SAVED_PROMPTS_DUMP,
             "skills": None,
+            "shields": [],
         }

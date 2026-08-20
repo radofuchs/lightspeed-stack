@@ -5,11 +5,11 @@ import os
 from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from llama_stack_client import (
+from ogx_client import (
     APIConnectionError,
     BadRequestError,
 )
-from llama_stack_client import (
+from ogx_client import (
     APIStatusError as LLSApiStatusError,
 )
 from openai._exceptions import APIStatusError as OpenAIAPIStatusError
@@ -17,7 +17,7 @@ from openai._exceptions import APIStatusError as OpenAIAPIStatusError
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple
 from authorization.middleware import authorize
-from client import AsyncLlamaStackClientHolder
+from client import AsyncOgxClientHolder
 from configuration import configuration
 from constants import DEFAULT_MAX_FILE_UPLOAD_SIZE
 from log import get_logger
@@ -59,7 +59,7 @@ vector_stores_list_responses: dict[int | str, dict[str, Any]] = {
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -70,7 +70,7 @@ vector_store_responses: dict[int | str, dict[str, Any]] = {
     404: NotFoundResponse.openapi_response(examples=["vector store"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -81,7 +81,7 @@ file_responses: dict[int | str, dict[str, Any]] = {
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -92,7 +92,7 @@ vector_store_file_responses: dict[int | str, dict[str, Any]] = {
     404: NotFoundResponse.openapi_response(examples=["file"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -103,7 +103,7 @@ vector_store_files_list_responses: dict[int | str, dict[str, Any]] = {
     404: NotFoundResponse.openapi_response(examples=["vector store"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -113,7 +113,7 @@ vector_store_delete_responses: dict[int | str, dict[str, Any]] = {
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -123,7 +123,7 @@ vector_store_file_delete_responses: dict[int | str, dict[str, Any]] = {
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["llama stack", "kubernetes api"]
+        examples=["ogx", "kubernetes api"]
     ),
 }
 
@@ -150,7 +150,7 @@ async def create_vector_store(
             - 401: Authentication failed
             - 403: Authorization failed
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
     _ = request
@@ -158,7 +158,7 @@ async def create_vector_store(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
 
         # Extract provider_id for extra_body (not a direct client parameter)
         body_dict = body.model_dump(exclude_none=True)
@@ -193,7 +193,7 @@ async def create_vector_store(
         )
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except (LLSApiStatusError, OpenAIAPIStatusError) as e:
         logger.error("API status error while creating vector store: %s", e)
@@ -221,7 +221,7 @@ async def list_vector_stores(
             - 401: Authentication failed
             - 403: Authorization failed
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
     _ = request
@@ -229,7 +229,7 @@ async def list_vector_stores(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
         vector_stores = await client.vector_stores.list()
 
         data = [
@@ -249,7 +249,7 @@ async def list_vector_stores(
         return VectorStoresListResponse(data=data)
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except (LLSApiStatusError, OpenAIAPIStatusError) as e:
         logger.error("API status error while listing vector stores: %s", e)
@@ -280,7 +280,7 @@ async def get_vector_store(
             - 403: Authorization failed
             - 404: Vector store not found
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
     _ = request
@@ -288,7 +288,7 @@ async def get_vector_store(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
         vector_store = await client.vector_stores.retrieve(vector_store_id)
 
         return VectorStoreResponse(
@@ -303,7 +303,7 @@ async def get_vector_store(
         )
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except BadRequestError as e:
         logger.error("Vector store not found: %s", e)
@@ -342,7 +342,7 @@ async def update_vector_store(
             - 403: Authorization failed
             - 404: Vector store not found
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
     _ = request
@@ -350,7 +350,7 @@ async def update_vector_store(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
         vector_store = await client.vector_stores.update(
             vector_store_id, **body.model_dump(exclude_none=True)
         )
@@ -367,7 +367,7 @@ async def update_vector_store(
         )
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except BadRequestError as e:
         logger.error("Vector store not found: %s", e)
@@ -403,7 +403,7 @@ async def delete_vector_store(
             - 401: Authentication failed
             - 403: Authorization failed
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
 
     Returns:
         VectorStoreDeleteResponse: Delete outcome for the requested vector store.
@@ -414,12 +414,12 @@ async def delete_vector_store(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
         await client.vector_stores.delete(vector_store_id)
         return VectorStoreDeleteResponse(deleted=True, vector_store_id=vector_store_id)
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except (BadRequestError, ValueError) as e:
         logger.error("Vector store delete failed: %s", e)
@@ -453,7 +453,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
             - 401: Authentication failed
             - 403: Authorization failed
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
 
@@ -484,7 +484,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
             raise HTTPException(**response.model_dump())
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
 
         # Determine the size WITHOUT reading the file into memory: seek to the
         # end of the spooled temp file, record the position, then rewind so the
@@ -535,7 +535,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
         )
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except BadRequestError as e:
         logger.error("Bad request for file upload: %s", e)
@@ -545,7 +545,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
             response = FileTooLargeResponse.from_backend_rejection(message=str(e))
         else:
             response = InternalServerErrorResponse.query_failed(
-                cause=f"File upload rejected by Llama Stack: {str(e)}"
+                cause=f"File upload rejected by Llama Stack: {e!s}"
             )
             # Override to use 400 status code since it's a client error
             response.status_code = status.HTTP_400_BAD_REQUEST
@@ -584,7 +584,7 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
             - 403: Authorization failed
             - 404: Vector store or file not found
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
     _ = request
@@ -592,7 +592,7 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
 
         # Retry logic for database lock errors
         max_retries = 3
@@ -659,7 +659,7 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
         )
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except BadRequestError as e:
         logger.error("Vector store file operation failed: %s", e)
@@ -701,7 +701,7 @@ async def list_vector_store_files(
             - 403: Authorization failed
             - 404: Vector store not found
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
     _ = request
@@ -709,7 +709,7 @@ async def list_vector_store_files(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
         files = await client.vector_stores.files.list(vector_store_id=vector_store_id)
 
         data = [
@@ -730,7 +730,7 @@ async def list_vector_store_files(
         return VectorStoreFilesListResponse(data=data)
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except BadRequestError as e:
         logger.error("Vector store not found: %s", e)
@@ -772,7 +772,7 @@ async def get_vector_store_file(
             - 403: Authorization failed
             - 404: File not found in vector store
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
     """
     _ = auth
     _ = request
@@ -780,7 +780,7 @@ async def get_vector_store_file(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
         vs_file = await client.vector_stores.files.retrieve(
             vector_store_id=vector_store_id,
             file_id=file_id,
@@ -800,7 +800,7 @@ async def get_vector_store_file(
         )
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except BadRequestError as e:
         logger.error("Vector store file not found: %s", e)
@@ -836,7 +836,7 @@ async def delete_vector_store_file(
             - 401: Authentication failed
             - 403: Authorization failed
             - 500: Lightspeed Stack configuration not loaded
-            - 503: Unable to connect to Llama Stack
+            - 503: Unable to connect to OGX
 
     Returns:
         VectorStoreFileDeleteResponse: Delete outcome for the requested file.
@@ -847,7 +847,7 @@ async def delete_vector_store_file(
     check_configuration_loaded(configuration)
 
     try:
-        client = AsyncLlamaStackClientHolder().get_client()
+        client = AsyncOgxClientHolder().get_client()
         await client.vector_stores.files.delete(
             vector_store_id=vector_store_id,
             file_id=file_id,
@@ -855,7 +855,7 @@ async def delete_vector_store_file(
         return VectorStoreFileDeleteResponse(deleted=True, file_id=file_id)
     except APIConnectionError as e:
         logger.error("Unable to connect to Llama Stack: %s", e)
-        response = ServiceUnavailableResponse(backend_name="Llama Stack", cause=str(e))
+        response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
         raise HTTPException(**response.model_dump()) from e
     except (BadRequestError, ValueError) as e:
         logger.error("Vector store file delete failed: %s", e)

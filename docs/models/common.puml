@@ -19,6 +19,38 @@ class "Attachment" as src.models.common.query.Attachment {
   content : Optional[str]
   content_type : Optional[str]
   model_config : dict
+  validate_image_attachment() -> Self
+}
+class "CatalogModel" as src.models.common.models.CatalogModel {
+  api_model_type : Optional[str]
+  identifier : Optional[str]
+  metadata : Optional[dict[str, Any]]
+  model_type : Optional[str]
+  provider_id : Optional[str]
+  provider_resource_id : Optional[str]
+  type : Optional[str]
+}
+class "CatalogShield" as src.models.common.shields.CatalogShield {
+  config : Optional[dict[str, Any]]
+  name : Optional[str]
+  provider_id : Optional[Literal['question_validity', 'redaction']]
+  type : Optional[Literal['shield']]
+}
+class "CatalogTool" as src.models.common.tools.CatalogTool {
+  description : str
+  identifier : str
+  parameters : list[CatalogToolParameter]
+  provider_id : str
+  server_source : str
+  toolgroup_id : str
+  type : str
+}
+class "CatalogToolParameter" as src.models.common.tools.CatalogToolParameter {
+  default : Optional[Any]
+  description : str
+  name : str
+  parameter_type : str
+  required : bool
 }
 class "ConversationData" as src.models.common.conversation.ConversationData {
   conversation_id : str
@@ -85,6 +117,11 @@ class "InterruptedStreamPayload" as src.models.common.agents.stream_payloads.Int
   event : Literal['interrupted']
   create() -> Self
 }
+class "ListedMcpTool" as src.models.common.tools.ListedMcpTool {
+  description : Optional[str]
+  input_schema : Optional[dict[str, Any]]
+  name : str
+}
 class "MCPListToolsSummary" as src.models.common.turn_summary.MCPListToolsSummary {
   server_label : Optional[str]
   tools : Optional[list[ToolInfoSummary]]
@@ -127,7 +164,7 @@ class "ReferencedDocument" as src.models.common.turn_summary.ReferencedDocument 
   source : Optional[str]
 }
 class "ResponseGeneratorContext" as src.models.common.responses.contexts.ResponseGeneratorContext {
-  client : AsyncLlamaStackClient
+  client : AsyncOgxClient
   conversation_id : str
   inline_rag_context : RAGContext
   model_id : str
@@ -169,7 +206,7 @@ class "ResponsesApiParams" as src.models.common.responses.responses_api_params.R
 class "ResponsesContext" as src.models.common.responses.contexts.ResponsesContext {
   auth : Optional[tuple[str, str, bool, str]]
   background_tasks : Optional[BackgroundTasks]
-  client : Optional[AsyncLlamaStackClient]
+  client : Optional[AsyncOgxClient]
   compacted_original_input : Optional[ResponseInput]
   endpoint_path : Optional[str]
   filter_server_tools : Optional[bool]
@@ -192,14 +229,18 @@ class "ShieldModerationBlocked" as src.models.common.moderation.ShieldModeration
   decision : Literal['blocked']
   message : str
   moderation_id : str
-  refusal_response : OpenAIResponseMessage
+  refusal_response : ResponseMessage
 }
 class "ShieldModerationPassed" as src.models.common.moderation.ShieldModerationPassed {
   decision : Literal['passed']
 }
+class "SkillMetadata" as src.models.common.skills.SkillMetadata {
+  description : Optional[str]
+  name : Optional[str]
+}
 class "SolrVectorSearchRequest" as src.models.common.query.SolrVectorSearchRequest {
   filters : Optional[dict[str, Any]]
-  mode : Optional[Literal['semantic', 'hybrid', 'lexical']]
+  mode : Optional[Literal['semantic', 'hybrid', 'lexical', 'keyword']]
   model_config : ConfigDict
   coerce_legacy_plain_dict(data: Any) -> Any
 }
@@ -283,7 +324,9 @@ class "TurnCompleteStreamPayload" as src.models.common.agents.stream_payloads.Tu
 class "TurnSummary" as src.models.common.turn_summary.TurnSummary {
   id : Optional[str]
   llm_response : str
+  next_chunk_id : Optional[int]
   output_items : Optional[list[OpenAIResponseOutput]]
+  partial_tokens : Optional[list[str]]
   rag_chunks : Optional[list[RAGChunk]]
   referenced_documents : Optional[list[ReferencedDocument]]
   token_usage : Optional[TokenCounter]

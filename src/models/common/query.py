@@ -2,7 +2,7 @@
 
 import base64
 import binascii
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -14,6 +14,29 @@ from constants import (
 from log import get_logger
 
 logger = get_logger(__name__)
+
+_IMAGE_SIGNATURES: dict[str, bytes] = {
+    "image/png": b"\x89PNG",
+    "image/jpeg": b"\xff\xd8\xff",
+}
+
+
+def _validate_image_magic_bytes(data: bytes, content_type: str) -> None:
+    """Verify that decoded image data starts with the expected magic bytes.
+
+    Parameters:
+        data: Raw decoded image bytes.
+        content_type: Declared MIME content type.
+
+    Raises:
+        ValueError: If the data does not match the expected image format.
+    """
+    expected = _IMAGE_SIGNATURES.get(content_type)
+    if expected and not data.startswith(expected):
+        raise ValueError(
+            f"Image content does not match declared content_type "
+            f"'{content_type}': invalid image data"
+        )
 
 
 class Attachment(BaseModel):
@@ -41,27 +64,25 @@ class Attachment(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_image_attachment(self) -> "Attachment":
+    def validate_image_attachment(self) -> Self:
         """Validate consistency between attachment_type and content_type for images.
 
+        Returns:
+            Self: The validated Attachment instance.
+
         Raises:
-            ValueError: If image content_type is used without attachment_type='image',
-                if attachment_type='image' is used without an image content_type,
+            ValueError: If attachment_type and content_type are inconsistent
+                (one indicates an image while the other does not),
                 if image content is not valid base64, or if decoded size exceeds the limit.
         """
         is_image_content_type = self.content_type in IMAGE_CONTENT_TYPES
         is_image_attachment_type = self.attachment_type == "image"
 
-        if is_image_content_type and not is_image_attachment_type:
+        if is_image_content_type != is_image_attachment_type:
             raise ValueError(
-                f"attachment_type must be 'image' when content_type is "
-                f"'{self.content_type}'"
-            )
-
-        if is_image_attachment_type and not is_image_content_type:
-            raise ValueError(
-                f"content_type must be 'image/jpeg' or 'image/png' when "
-                f"attachment_type is 'image', got '{self.content_type}'"
+                f"attachment_type and content_type are inconsistent: "
+                f"attachment_type='{self.attachment_type}', "
+                f"content_type='{self.content_type}'"
             )
 
         if is_image_content_type:
@@ -76,6 +97,7 @@ class Attachment(BaseModel):
                     f"Image attachment ({len(decoded)} bytes) exceeds maximum "
                     f"allowed size ({DEFAULT_MAX_FILE_UPLOAD_SIZE} bytes)"
                 )
+            _validate_image_magic_bytes(decoded, self.content_type)
 
         return self
 
@@ -113,7 +135,7 @@ class SolrVectorSearchRequest(BaseModel):
     """LCORE Solr inline RAG options for vector_io.query (mode and provider filters).
 
     Attributes:
-        mode: Solr vector_io search mode. When omitted, the server default (hybrid) is used.
+        mode: Solr vector_io search mode. When omitted, the configured OKP default is used.
         filters: Solr provider filter payload passed through as params['solr'].
 
     Legacy clients may send a plain JSON object with filter keys only;
@@ -122,13 +144,14 @@ class SolrVectorSearchRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    mode: Optional[Literal["semantic", "hybrid", "lexical"]] = Field(
+    mode: Optional[Literal["semantic", "hybrid", "lexical", "keyword"]] = Field(
         None,
         description=(
-            "Solr vector_io search mode. When omitted, the server default "
-            f"({SOLR_VECTOR_SEARCH_DEFAULT_MODE!r}) is used."
+            "Solr vector_io search mode. When omitted, the configured OKP default "
+            f"is used; otherwise {SOLR_VECTOR_SEARCH_DEFAULT_MODE!r} applies. "
+            "'keyword' and 'lexical' both use BM25 text search."
         ),
-        examples=["hybrid", "semantic", "lexical"],
+        examples=["hybrid", "semantic", "keyword", "lexical"],
     )
     filters: Optional[dict[str, Any]] = Field(
         None,
@@ -184,6 +207,6 @@ class SolrVectorSearchRequest(BaseModel):
         logger.warning(
             "Solr inline RAG: sending filter fields at the top level of `solr` without "
             "`mode` or `filters` is deprecated and will be removed; use "
-            '`{"mode": "<semantic|hybrid|lexical>", "filters": {...}}` instead.'
+            '`{"mode": "<semantic|hybrid|lexical|keyword>", "filters": {...}}` instead.'
         )
         return {"mode": None, "filters": data}
