@@ -50,7 +50,7 @@ def check_status_code_one_of(context: Context, first: int, second: int) -> None:
     if actual not in allowed:
         try:
             error_body = context.response.json()
-        except Exception:
+        except JSONDecodeError:
             error_body = context.response.text
         assert False, (
             f"Status code is {actual}, expected one of {sorted(allowed)}. "
