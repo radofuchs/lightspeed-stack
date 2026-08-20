@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-from io import BytesIO
 from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -487,13 +486,20 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
     try:
         client = AsyncLlamaStackClientHolder().get_client()
 
-        # Read file content once
-        content = await file.read()
+        # Determine the size WITHOUT reading the file into memory: seek to the
+        # end of the spooled temp file, record the position, then rewind so the
+        # upload reads from the start. Starlette backs UploadFile with a
+        # SpooledTemporaryFile that rolls over to disk past its threshold, so
+        # this stays memory-safe even for large uploads.
+        upload = file.file
+        upload.seek(0, os.SEEK_END)
+        file_size = upload.tell()
+        upload.seek(0)
 
-        # Verify actual size after reading
-        if len(content) > DEFAULT_MAX_FILE_UPLOAD_SIZE:
+        # Verify actual size
+        if file_size > DEFAULT_MAX_FILE_UPLOAD_SIZE:
             response = FileTooLargeResponse.exceeds_local_limit(
-                file_size=len(content),
+                file_size=file_size,
                 max_size=DEFAULT_MAX_FILE_UPLOAD_SIZE,
             )
             raise HTTPException(**response.model_dump())
@@ -508,21 +514,21 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
         logger.info(
             "Uploading file - filename: %s, size: %d bytes",
             filename,
-            len(content),
+            file_size,
         )
 
-        file_bytes = BytesIO(content)
-        file_bytes.name = filename
-
+        # Pass the disk-backed spooled file object directly so
+        # llama-stack-client / httpx stream it to the backend in chunks
+        # instead of buffering the whole file in memory.
         file_obj = await client.files.create(
-            file=file_bytes,
+            file=(filename, upload),
             purpose="assistants",
         )
 
         return FileResponse(
             id=file_obj.id,
             filename=file_obj.filename or filename,
-            bytes=file_obj.bytes or len(content),
+            bytes=file_obj.bytes or file_size,
             created_at=file_obj.created_at,
             purpose=file_obj.purpose or "assistants",
             object=file_obj.object or "file",

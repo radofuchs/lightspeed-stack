@@ -2,6 +2,7 @@
 
 # pylint: disable=too-many-lines
 
+import io
 from typing import Any
 
 import pytest
@@ -404,7 +405,7 @@ async def test_create_file_success(mocker: MockerFixture) -> None:
     mock_file = mocker.AsyncMock()
     mock_file.filename = "test.txt"
     mock_file.size = 12  # Size of "test content"
-    mock_file.read.return_value = b"test content"
+    mock_file.file = io.BytesIO(b"test content")
 
     response = await create_file(request=request, auth=auth, file=mock_file)
     assert response is not None
@@ -830,7 +831,7 @@ async def test_create_file_connection_error(mocker: MockerFixture) -> None:
     mock_file = mocker.AsyncMock()
     mock_file.filename = "test.txt"
     mock_file.size = 12  # Size of "test content"
-    mock_file.read.return_value = b"test content"
+    mock_file.file = io.BytesIO(b"test content")
 
     with pytest.raises(HTTPException) as e:
         await create_file(request=request, auth=auth, file=mock_file)
@@ -864,7 +865,7 @@ async def test_create_file_bad_request(mocker: MockerFixture) -> None:
     mock_file = mocker.AsyncMock()
     mock_file.filename = "test.txt"
     mock_file.size = 12  # Size of "test content"
-    mock_file.read.return_value = b"test content"
+    mock_file.file = io.BytesIO(b"test content")
 
     with pytest.raises(HTTPException) as e:
         await create_file(request=request, auth=auth, file=mock_file)
@@ -1235,14 +1236,15 @@ async def test_create_file_adds_txt_extension_when_missing(
     mock_file = mocker.AsyncMock()
     mock_file.filename = "uploaded_file"
     mock_file.size = 12
-    mock_file.read.return_value = b"test content"
+    mock_file.file = io.BytesIO(b"test content")
 
     response = await create_file(request=request, auth=auth, file=mock_file)
     assert response is not None
     assert response.filename == "uploaded_file.txt"
 
     file_arg = mock_client.files.create.call_args.kwargs["file"]
-    assert file_arg.name == "uploaded_file.txt"
+    # file is passed as a (filename, fileobj) tuple so httpx streams it
+    assert file_arg[0] == "uploaded_file.txt"
 
 
 @pytest.mark.asyncio
@@ -1274,7 +1276,7 @@ async def test_create_file_non_size_bad_request_returns_400(
     mock_file = mocker.AsyncMock()
     mock_file.filename = "test.txt"
     mock_file.size = 12
-    mock_file.read.return_value = b"test content"
+    mock_file.file = io.BytesIO(b"test content")
 
     with pytest.raises(HTTPException) as e:
         await create_file(request=request, auth=auth, file=mock_file)
