@@ -38,11 +38,13 @@ class SpanAttributes(StrEnum):
     TOOL_CALLS_COUNT = "tool.calls.count"
     TOOL_CALLS_NAMES = "tool.calls.names"
     SKILL_ACTIVATIONS = "skill.activations"
+    RLS_TEMPLATE_OK = "rls.template.ok"
 
 
 class SpanEvents(StrEnum):
     """OpenTelemetry span event names for LCS instrumentation."""
 
+    RLS_TEMPLATE_RENDERED = "rls.template.rendered"
     VALIDATION_COMPLETED = "validation.completed"
     SHIELD_REJECTED = "shield.rejected"
     PII_DETECTED = "pii.detected"
