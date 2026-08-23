@@ -132,7 +132,7 @@ class TestAnonymizeValue:
         assert match is not None
         assert len(match.group(1)) == 16  # 16 hex chars = 64 bits
 
-    def test_missing_secret_raises_error(self, monkeypatch):
+    def test_missing_secret_raises_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that missing OTEL_ANONYMIZATION_SECRET raises a clear error."""
         # Remove the secret that was set by the autouse fixture
         monkeypatch.delenv("OTEL_ANONYMIZATION_SECRET", raising=False)
