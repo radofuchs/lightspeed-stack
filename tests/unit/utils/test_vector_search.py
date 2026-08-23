@@ -1429,6 +1429,8 @@ class TestRerankChunksWithCrossEncoder:
         # Content 1: 0.3 * 0.75 + 0.7 * 0.4 = 0.505 (approximately)
         # Content 2: 0.3 * 0.0 + 0.7 * 0.0 = 0.0
         assert result[0].score == 1.0
+        # score is optional: make sure it is set
+        assert result[1].score is not None
         assert abs(result[1].score - 0.505) < 0.01  # Allow small floating point errors
         assert result[2].score == 0.0
 
@@ -1664,6 +1666,8 @@ class TestApplyByokRerankBoost:
         assert len(result) == 1
         assert result[0].content == "Test content"
         assert result[0].source == "byok_store"
+        # score is optional: make sure it is set
+        assert result[0].score is not None
         assert abs(result[0].score - 1.2) < 1e-10  # 0.8 * 1.5
         assert result[0].attributes == {
             "title": "Test Doc",
