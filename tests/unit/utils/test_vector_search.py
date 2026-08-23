@@ -192,7 +192,7 @@ class TestBuildQueryParams:
 
     def test_custom_mode(self) -> None:
         """Request mode overrides the default Solr vector_io mode."""
-        solr = SolrVectorSearchRequest(mode="lexical")
+        solr = SolrVectorSearchRequest(mode="lexical", filters=None)
         params = _build_query_params(solr=solr)
 
         # "lexical" is translated to "keyword" for Llama Stack dispatch
@@ -201,7 +201,7 @@ class TestBuildQueryParams:
 
     def test_keyword_mode_direct(self) -> None:
         """Request mode 'keyword' is passed through unchanged."""
-        solr = SolrVectorSearchRequest(mode="keyword")
+        solr = SolrVectorSearchRequest(mode="keyword", filters=None)
         params = _build_query_params(solr=solr)
 
         assert params["mode"] == "keyword"
@@ -222,7 +222,7 @@ class TestBuildQueryParams:
         """Mode is set to default value when only filters are provided."""
         solr = SolrVectorSearchRequest(
             filters={"fq": ["product:*openshift*"]},
-        )
+        )  # pyright: ignore[reportCallIssue]
         params = _build_query_params(solr=solr)
 
         assert params["mode"] == constants.SOLR_VECTOR_SEARCH_DEFAULT_MODE
@@ -254,7 +254,7 @@ class TestBuildQueryParams:
         config_mock.okp.search_mode = "keyword"
         mocker.patch("utils.vector_search.configuration", config_mock)
 
-        solr = SolrVectorSearchRequest(mode="semantic")
+        solr = SolrVectorSearchRequest(mode="semantic", filters={})
         params = _build_query_params(solr=solr)
 
         assert params["mode"] == "semantic"
@@ -277,7 +277,7 @@ class TestBuildQueryParams:
         config_mock.okp.search_mode = "hybrid"
         mocker.patch("utils.vector_search.configuration", config_mock)
 
-        solr = SolrVectorSearchRequest(mode="lexical")
+        solr = SolrVectorSearchRequest(mode="lexical", filters={})
         params = _build_query_params(solr=solr)
 
         assert params["mode"] == "keyword"
