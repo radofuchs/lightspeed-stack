@@ -144,7 +144,9 @@ class TestAnonymizeValue:
         ):
             anonymize_value("test-value")
 
-    def test_missing_secret_with_otel_disabled_returns_placeholder(self, monkeypatch):
+    def test_missing_secret_with_otel_disabled_returns_placeholder(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that missing secret with OTEL_SDK_DISABLED returns placeholder."""
         monkeypatch.delenv("OTEL_ANONYMIZATION_SECRET", raising=False)
         monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
