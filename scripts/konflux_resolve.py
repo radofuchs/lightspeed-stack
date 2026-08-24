@@ -1274,15 +1274,20 @@ def main() -> None:
                 for name in sorted(sdist_names):
                     info = buckets["pypi_sdist"][name]
                     f.write(f"{name}=={info['version']}\n")
-            subprocess.run(
-                [
-                    "pybuild-deps",
-                    "compile",
-                    f"--output-file={build_output}",
-                    tmp_sdist_file,
-                ],
-                check=True,
-            )
+            try:
+                subprocess.run(
+                    [
+                        "pybuild-deps",
+                        "compile",
+                        f"--output-file={build_output}",
+                        tmp_sdist_file,
+                    ],
+                    check=True,
+                )
+            except subprocess.CalledProcessError as e:
+                print("Failed:")
+                print(e.stderr)
+                sys.exit(1)
         finally:
             if os.path.exists(tmp_sdist_file):
                 os.remove(tmp_sdist_file)
