@@ -158,7 +158,7 @@ class TestAnonymizeValue:
 class TestSetSpanAttributes:
     """Tests for set_span_attributes function."""
 
-    def test_set_single_attribute(self, otel):
+    def test_set_single_attribute(self, otel: Generator[Any, Any, Any]) -> None:
         """Test setting a single attribute on a span."""
         tracer, exporter = otel
         with tracer.start_as_current_span("test_span") as span:
