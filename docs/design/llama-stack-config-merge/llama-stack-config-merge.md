@@ -36,8 +36,7 @@ Key shape:
 - `llama_stack.config.baseline: default | byo-llm | empty` — pick
   LCORE's built-in baseline (includes a conditional OpenAI provider),
   the same baseline without that OpenAI row, or an empty dict (used by
-  the migration tool for exact round-trip). `default` emits a deprecation
-  WARN naming `byo-llm`.
+  the migration tool for exact round-trip).
 - Legacy two-file mode (`llama_stack.library_client_config_path` +
   external `run.yaml`) is preserved during a deprecation window;
   mutually exclusive with the unified *synthesis inputs* (a non-empty
@@ -459,8 +458,7 @@ September 2026.
    Else if `unified` and `unified.baseline == "empty"` → `{}`. Else →
    `default_baseline` arg or `load_default_baseline()`. If the selector
    is `byo-llm`, strip the built-in conditional OpenAI inference row.
-   If the selector is `default` or omitted, emit a deprecation WARN
-   naming `byo-llm`. `empty` and `profile:` are unchanged.
+   `empty` and `profile:` are unchanged.
 3. Run `dedupe_providers_vector_io` on the baseline.
 4. Apply existing enrichment: `enrich_byok_rag`, `enrich_solr` (Azure
    Entra ID intentionally stays separate because it's a `.env`
@@ -558,7 +556,7 @@ reference.
 |---|---|---|
 | 2026-04-23 | Initial version | Spike completion |
 | 2026-08-20 | Default baseline openai provider is conditional on `OPENAI_API_KEY` | LCORE-3607: `baseline: default` must load when the key is unset |
-| 2026-08-21 | Add `baseline: byo-llm` (default_run.yaml minus the OpenAI row); WARN on `default`/omitted | LCORE-3654: opt-in openai-free baseline |
+| 2026-08-21 | Add `baseline: byo-llm` (default_run.yaml minus the OpenAI row) | LCORE-3654: opt-in openai-free baseline |
 
 ## Appendix A — Worked example: legacy → unified migration
 

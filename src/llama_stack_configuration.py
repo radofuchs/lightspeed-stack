@@ -1252,19 +1252,9 @@ def synthesize_configuration(  # pylint: disable=too-many-locals
     ls_config: dict[str, Any] = copy.deepcopy(baseline)
 
     # Profile and empty are unchanged. The shipped file either keeps OpenAI
-    # (default/omitted, with a deprecation WARN) or drops it (byo-llm).
-    if loaded_shipped_baseline:
-        if unified and unified.get("baseline") == "byo-llm":
-            _strip_default_openai_inference(ls_config)
-        else:
-            logger.warning(
-                "DEPRECATED: llama_stack.config.baseline 'default' includes a "
-                "built-in conditional OpenAI inference provider (%s). Set "
-                "baseline to 'byo-llm' to start without that provider and "
-                "declare LLMs under inference.providers. 'byo-llm' will "
-                "become the default in a future release.",
-                CONDITIONAL_OPENAI_PROVIDER_ID,
-            )
+    # (default/omitted) or drops it (byo-llm).
+    if loaded_shipped_baseline and unified and unified.get("baseline") == "byo-llm":
+        _strip_default_openai_inference(ls_config)
 
     # 3. Normalize duplicated vector_io providers in the baseline.
     dedupe_providers_vector_io(ls_config)
