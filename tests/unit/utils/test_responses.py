@@ -53,6 +53,9 @@ from ogx_api.openai_responses import (
 from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
 from ogx_client.types import ListModelsResponse
 from ogx_client.types.model import Model
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
 from pydantic import AnyUrl, BaseModel
 from pytest_mock import MockerFixture
 
@@ -62,13 +65,15 @@ from models.common.query import Attachment
 from models.common.responses.types import InputTool, InputToolMCP
 from models.config import (
     ApprovalFilter,
-    ByokRag,
     InferenceConfiguration,
     ModelContextProtocolServer,
+    RagStore,
 )
+from utils.otel_tracing import SpanAttributes, SpanEvents
 from utils.query import normalize_vertex_ai_model_id
 from utils.responses import (
     _build_chunk_attributes,
+    _build_okp_doc_url,
     _merge_tools,
     build_mcp_tool_call_from_arguments_done,
     build_tool_call_summary,
@@ -83,6 +88,7 @@ from utils.responses import (
     get_rag_tools,
     get_topic_summary,
     is_server_deployed_output,
+    maybe_get_topic_summary,
     parse_arguments_string,
     parse_referenced_documents,
     prepare_responses_params,
@@ -1013,6 +1019,81 @@ class TestGetTopicSummary:
             await get_topic_summary("test question", mock_client, "model1")
 
 
+class TestMaybeGetTopicSummaryOtel:
+    """OpenTelemetry events/attributes for maybe_get_topic_summary."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("success", "expect_attr"),
+        [(True, True), (False, False)],
+    )
+    async def test_emits_started_success_and_finished(
+        self,
+        success: bool,
+        expect_attr: bool,
+        mocker: MockerFixture,
+        otel: tuple[Any, InMemorySpanExporter],
+    ) -> None:
+        """Topic summary span records success attr and started/finished events."""
+        tracer, exporter = otel
+        mocker.patch("utils.responses.tracer", tracer)
+        if success:
+            mocker.patch(
+                "utils.responses.get_topic_summary",
+                new=mocker.AsyncMock(return_value="Topic"),
+            )
+            result = await maybe_get_topic_summary(
+                True, "hello", mocker.AsyncMock(), "provider/model"
+            )
+            assert result == "Topic"
+        else:
+            mocker.patch(
+                "utils.responses.get_topic_summary",
+                new=mocker.AsyncMock(side_effect=RuntimeError("boom")),
+            )
+            with pytest.raises(RuntimeError, match="boom"):
+                await maybe_get_topic_summary(
+                    True, "hello", mocker.AsyncMock(), "provider/model"
+                )
+
+        span = next(
+            span
+            for span in exporter.get_finished_spans()
+            if span.name == "topic.summary"
+        )
+        assert span.attributes is not None
+        assert span.attributes[SpanAttributes.TOPIC_SUMMARY_SUCCESS] is expect_attr
+        event_names = [event.name for event in span.events]
+        assert SpanEvents.TOPIC_SUMMARY_TASK_STARTED in event_names
+        assert SpanEvents.TOPIC_SUMMARY_TASK_FINISHED in event_names
+        if success:
+            assert event_names == [
+                SpanEvents.TOPIC_SUMMARY_TASK_STARTED,
+                SpanEvents.TOPIC_SUMMARY_TASK_FINISHED,
+            ]
+        else:
+            assert event_names.index(
+                SpanEvents.TOPIC_SUMMARY_TASK_STARTED
+            ) < event_names.index(SpanEvents.TOPIC_SUMMARY_TASK_FINISHED)
+
+    @pytest.mark.asyncio
+    async def test_disabled_emits_no_span(
+        self,
+        mocker: MockerFixture,
+        otel: tuple[Any, InMemorySpanExporter],
+    ) -> None:
+        """Disabled topic summary does not create a span."""
+        tracer, exporter = otel
+        mocker.patch("utils.responses.tracer", tracer)
+        result = await maybe_get_topic_summary(
+            False, "hello", mocker.AsyncMock(), "provider/model"
+        )
+        assert result is None
+        assert not [
+            s for s in exporter.get_finished_spans() if s.name == "topic.summary"
+        ]
+
+
 class TestResolveToolChoice:
     """Tests for resolve_tool_choice (ToolChoiceMode, AllowedTools, explicit/implicit tools)."""
 
@@ -1644,13 +1725,13 @@ class TestResolveVectorStoreIds:
     """Tests for resolve_vector_store_ids function."""
 
     @staticmethod
-    def _make_byok_rag(rag_id: str, vector_db_id: str) -> ByokRag:
-        """Create a ByokRag instance for testing."""
-        return ByokRag(
+    def _make_byok_rag(rag_id: str, vector_db_id: str) -> RagStore:
+        """Create a RagStore instance for testing."""
+        return RagStore(
             rag_id=rag_id,
             vector_db_id=vector_db_id,
             db_path="tests/configuration/rag.txt",
-            rag_type="rag",
+            backend="faiss",
             embedding_model="model",
             embedding_dimension=768,
             score_multiplier=1.0,
@@ -1713,9 +1794,12 @@ class TestPrepareToolsTranslatesVectorStoreIds:
         mock_byok_rag.rag_id = "ocp_docs"
         mock_byok_rag.vector_db_id = "vs-001"
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = [mock_byok_rag]
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = [mock_byok_rag]
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
         result = await prepare_tools(["ocp_docs"], False, "token")
@@ -1733,9 +1817,12 @@ class TestPrepareToolsTranslatesVectorStoreIds:
 
         # Configure empty BYOK RAG
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
         result = await prepare_tools(["raw-internal-id"], False, "token")
@@ -1755,9 +1842,15 @@ class TestPrepareToolsVectorStoreResolution:
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = ["rag-tool-id-1", "rag-tool-id-2"]
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = [
+            "rag-tool-id-1",
+            "rag-tool-id-2",
+        ]
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
         result = await prepare_tools(None, False, "token")
@@ -1778,9 +1871,12 @@ class TestPrepareToolsVectorStoreResolution:
         mock_byok_rag.rag_id = "ocp_docs"
         mock_byok_rag.vector_db_id = "vs-001"
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = [mock_byok_rag]
-        mock_config.configuration.rag.tool = ["ocp_docs"]
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = [mock_byok_rag]
+        mock_config.configuration.rag.retrieval.tool.sources = ["ocp_docs"]
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
         result = await prepare_tools(None, False, "token")
@@ -1797,9 +1893,9 @@ class TestPrepareToolsVectorStoreResolution:
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = []
-        mock_config.configuration.rag.inline = [
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.configuration.rag.retrieval.inline.sources = [
             "inline-store-id"
         ]  # inline is configured
         mocker.patch("utils.responses.configuration", mock_config)
@@ -1816,9 +1912,12 @@ class TestPrepareToolsVectorStoreResolution:
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = ["config-id-1"]
-        mock_config.configuration.rag.inline = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = ["config-id-1"]
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
         result = await prepare_tools(["request-id-1"], False, "token")
@@ -1835,8 +1934,12 @@ class TestPrepareToolsVectorStoreResolution:
         mocker.patch("utils.responses.get_mcp_tools", return_value=None)
 
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
-        mock_config.configuration.rag.tool = []
+        mock_config.configuration.rag.byok.stores = []
+        mock_config.configuration.rag.retrieval.tool.sources = []
+        mock_config.rag.retrieval.tool.max_chunks = (
+            constants.DEFAULT_TOOL_RAG_MAX_CHUNKS
+        )
+        mock_config.configuration.rag.retrieval.inline.sources = []
         mocker.patch("utils.responses.configuration", mock_config)
 
         result = await prepare_tools(None, False, "token")
@@ -3146,6 +3249,237 @@ class TestParseReferencedDocumentsWithSource:
         assert docs[0].source is None
 
 
+class TestBuildOkpDocUrl:
+    """Tests for _build_okp_doc_url OKP URL construction."""
+
+    def test_online_mode_uses_reference_url(self, mocker: MockerFixture) -> None:
+        """Test that online mode (offline=False) uses reference_url."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url(
+            {
+                "reference_url": "/docs/pipelines/config.html",
+                "source_path": "pipelines/config.html",
+            }
+        )
+        assert url == "https://docs.openshift.com/docs/pipelines/config.html"
+
+    def test_offline_mode_uses_source_path(self, mocker: MockerFixture) -> None:
+        """Test that offline mode (offline=True) uses source_path."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = True
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url(
+            {
+                "reference_url": "/docs/pipelines/config.html",
+                "source_path": "pipelines/config.html",
+            }
+        )
+        assert url == "https://docs.openshift.com/pipelines/config.html"
+
+    def test_online_falls_back_to_doc_id(self, mocker: MockerFixture) -> None:
+        """Test online mode falls back to doc_id when reference_url is absent."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url({"doc_id": "some-doc-id"})
+        assert url == "https://docs.openshift.com/some-doc-id"
+
+    def test_offline_falls_back_to_doc_id(self, mocker: MockerFixture) -> None:
+        """Test offline mode falls back to doc_id when source_path is absent."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = True
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url({"doc_id": "some-doc-id"})
+        assert url == "https://docs.openshift.com/some-doc-id"
+
+    def test_returns_none_when_no_reference(self, mocker: MockerFixture) -> None:
+        """Test returns None when no reference_url, source_path, or doc_id."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url({"title": "Some Doc"})
+        assert url is None
+
+    def test_uses_default_url_when_rhokp_url_is_none(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test uses RH_SERVER_OKP_DEFAULT_URL when rhokp_url is not configured."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = None
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        url = _build_okp_doc_url({"reference_url": "/docs/page.html"})
+        assert url == "http://localhost:8081/docs/page.html"
+
+
+class TestParseReferencedDocumentsOkp:
+    """Tests for parse_referenced_documents with OKP/Solr file_search results."""
+
+    def test_okp_online_builds_full_url(self, mocker: MockerFixture) -> None:
+        """Test OKP result builds full URL from reference_url in online mode."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "reference_url": "/docs/pipelines/config.html",
+            "source_path": "pipelines/config.html",
+            "title": "Pipeline Config",
+            "doc_id": "doc-001",
+            "source": "okp",
+        }
+
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
+        mock_response = mocker.Mock()
+        mock_response.output = [mock_output]
+
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["portal-rag"],
+            rag_id_mapping={"portal-rag": "okp"},
+        )
+
+        assert len(docs) == 1
+        assert (
+            str(docs[0].doc_url)
+            == "https://docs.openshift.com/docs/pipelines/config.html"
+        )
+        assert docs[0].doc_title == "Pipeline Config"
+        assert docs[0].source == "okp"
+
+    def test_okp_offline_builds_url_from_source_path(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test OKP result builds URL from source_path in offline mode."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = True
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "reference_url": "/docs/pipelines/config.html",
+            "source_path": "pipelines/config.html",
+            "title": "Pipeline Config",
+            "doc_id": "doc-001",
+            "source": "okp",
+        }
+
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
+        mock_response = mocker.Mock()
+        mock_response.output = [mock_output]
+
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["portal-rag"],
+            rag_id_mapping={"portal-rag": "okp"},
+        )
+
+        assert len(docs) == 1
+        assert (
+            str(docs[0].doc_url) == "https://docs.openshift.com/pipelines/config.html"
+        )
+        assert docs[0].source == "okp"
+
+    def test_okp_multistore_detected_via_source_attribute(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test OKP detected in multi-store scenario via source attribute."""
+        mock_okp = mocker.Mock()
+        mock_okp.offline = False
+        mock_okp.rhokp_url = "https://docs.openshift.com"
+        mock_config = mocker.Mock()
+        mock_config.okp = mock_okp
+        mocker.patch("utils.responses.configuration", mock_config)
+
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "reference_url": "/docs/builds.html",
+            "title": "Builds",
+            "source": "okp",
+        }
+
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
+        mock_response = mocker.Mock()
+        mock_response.output = [mock_output]
+
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["portal-rag", "byok-store"],
+            rag_id_mapping={"portal-rag": "okp", "byok-store": "my-docs"},
+        )
+
+        assert len(docs) == 1
+        assert str(docs[0].doc_url) == "https://docs.openshift.com/docs/builds.html"
+        assert docs[0].source == "okp"
+
+    def test_non_okp_result_unaffected(self, mocker: MockerFixture) -> None:
+        """Test non-OKP results still use existing doc_url/url attribute lookup."""
+        mock_result = mocker.Mock()
+        mock_result.attributes = {
+            "url": "https://example.com/byok-doc",
+            "title": "BYOK Doc",
+            "document_id": "byok-001",
+        }
+
+        mock_output = mocker.Mock()
+        mock_output.type = "file_search_call"
+        mock_output.results = [mock_result]
+
+        mock_response = mocker.Mock()
+        mock_response.output = [mock_output]
+
+        docs = parse_referenced_documents(
+            mock_response,
+            vector_store_ids=["byok-store"],
+            rag_id_mapping={"byok-store": "my-docs"},
+        )
+
+        assert len(docs) == 1
+        assert str(docs[0].doc_url) == "https://example.com/byok-doc"
+        assert docs[0].source == "my-docs"
+
+
 class TestGetRAGToolsWithConfig:
     """Tests for get_rag_tools with configuration checks."""
 
@@ -3337,7 +3671,7 @@ class TestResolveToolChoiceMerge:
     ) -> None:
         """Test client tools used as-is without merge header."""
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
 
@@ -3355,7 +3689,7 @@ class TestResolveToolChoiceMerge:
     async def test_client_tools_with_merge_header(self, mocker: MockerFixture) -> None:
         """Test client tools merged with server tools when header is set."""
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
 
@@ -3385,7 +3719,7 @@ class TestResolveToolChoiceMerge:
     ) -> None:
         """Test 409 when merge header is set and tools conflict."""
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
 
@@ -3430,7 +3764,7 @@ class TestResolveToolChoiceMerge:
     ) -> None:
         """Test merge header with no server tools returns client tools unchanged."""
         mock_config = mocker.Mock()
-        mock_config.configuration.byok_rag = []
+        mock_config.configuration.rag.byok.stores = []
         mock_config.mcp_servers = []
         mocker.patch("utils.responses.configuration", mock_config)
         mocker.patch(

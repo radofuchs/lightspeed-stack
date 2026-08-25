@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 import pytest
 from ogx_client import AsyncOgxClient
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
 from pytest_mock import AsyncMockType, MockerFixture
 
 from configuration import AppConfig
@@ -25,6 +31,39 @@ type AgentFixtures = Generator[
     None,
     None,
 ]
+
+
+@pytest.fixture(autouse=True)
+def otel_anonymization_secret() -> Generator[None, None, None]:
+    """Set OTEL_ANONYMIZATION_SECRET for all unit tests.
+
+    This fixture ensures that the OTEL anonymization secret is available
+    for any code that uses OpenTelemetry tracing during unit tests.
+    """
+    original_value = os.environ.get("OTEL_ANONYMIZATION_SECRET")
+    os.environ["OTEL_ANONYMIZATION_SECRET"] = (
+        "unit-test-secret-do-not-use-in-production"
+    )
+
+    yield
+
+    # Restore original value or remove if it wasn't set
+    if original_value is None:
+        os.environ.pop("OTEL_ANONYMIZATION_SECRET", None)
+    else:
+        os.environ["OTEL_ANONYMIZATION_SECRET"] = original_value
+
+
+@pytest.fixture(name="otel")
+def otel_fixture() -> Generator[tuple[Any, InMemorySpanExporter], None, None]:
+    """Provide an isolated tracer and exporter for OTEL tests."""
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("unit-test-tracer")
+    yield tracer, exporter
+    exporter.clear()
+    provider.shutdown()
 
 
 @pytest.fixture(autouse=True)

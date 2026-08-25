@@ -33,9 +33,10 @@ Key shape:
   high-level sections don't express.
 - `llama_stack.config.profile` — path to a user-authored YAML that serves
   as the synthesis baseline.
-- `llama_stack.config.baseline: default | empty` — pick between LCORE's
-  built-in baseline and an empty dict (used by the migration tool for
-  exact round-trip).
+- `llama_stack.config.baseline: default | byo-llm | empty` — pick
+  LCORE's built-in baseline (includes a conditional OpenAI provider),
+  the same baseline without that OpenAI row, or an empty dict (used by
+  the migration tool for exact round-trip).
 - Legacy two-file mode (`llama_stack.library_client_config_path` +
   external `run.yaml`) is preserved during a deprecation window;
   mutually exclusive with the unified *synthesis inputs* (a non-empty
@@ -151,7 +152,7 @@ files — authors read it to write Gherkin scenarios.
 | R4 | `--migrate-config` on a legacy pair yields a unified file driving byte-identical LS behavior; migrate→synthesize round-trips to the original `run.yaml` | e2e + unit (round-trip) |
 | R5 | `native_override` overlapping a baseline/high-level key deep-merges: maps merge, lists replace wholesale, scalars replace | unit (parametric) + e2e (one scalar + one list key) |
 | R6 | Synthesized `run.yaml` on disk carries `${env.FOO}` refs for LCORE-emitted secrets, never resolved values | e2e (inspect file) + unit |
-| R7 | Enrichment (Azure Entra ID, BYOK RAG, Solr/OKP) yields the same synthesized result in unified mode as legacy for equivalent inputs | unit + integration |
+| R7 | Enrichment (Azure Entra ID, BYOK RAG, Solr/OKP) yields the same synthesized result in unified mode as legacy for equivalent inputs | unit + integration (integration coverage tracked by LCORE-2747) |
 | R8 | A relative `profile:` path resolves against the loaded `lightspeed-stack.yaml` directory; absolute paths always resolve | e2e + unit |
 | R9 | Unknown fields rejected (`extra="forbid"`); root validator enforces synthesis-input ⊕ legacy mutual exclusion | unit |
 | R10 | Synthesized file written to the persistent known path with mode `0600`, path logged at startup; `--synthesized-config-output` overrides the location | e2e (perms + path) + unit |
@@ -231,7 +232,14 @@ defaults), so the unified signal is `inference.providers` being
 No persistent storage is added. The synthesized `run.yaml` is written
 once per boot to a deterministic path; not a database. `src/data/
 default_run.yaml` is a new package-shipped file, the built-in baseline
-Llama Stack configuration.
+Llama Stack configuration. Its `remote::openai` inference provider uses
+Llama Stack's `${env.OPENAI_API_KEY:+openai}` / `${env.OPENAI_API_KEY:=}`
+conditional-provider idiom, so the built-in baseline contributes openai
+only when `OPENAI_API_KEY` is set. Synthesis leaves those refs
+unevaluated (R6); Llama Stack resolves them at boot. With the key unset
+or empty the provider is disabled (`provider_id` becomes `None`) and
+the stack loads without `EnvVarError`. With the key set, the resolved
+config matches the previous unconditional openai provider.
 
 ### Configuration
 
@@ -258,7 +266,7 @@ llama_stack:
   # with `library_client_config_path` is a validation error.
   config:
     # Baseline selection (backend-specific knobs stay here)
-    baseline: default              # default | empty; ignored if `profile` is set
+    baseline: default              # default | byo-llm | empty; ignored if `profile` is set
     profile: ./my-profile.yaml     # optional; resolves relative to lightspeed-stack.yaml
 
     # Escape hatch — raw Llama Stack schema, deep-merged with list replacement
@@ -292,7 +300,7 @@ class InferenceConfiguration(ConfigurationBase):
 class UnifiedLlamaStackConfig(ConfigurationBase):
     # Backend-specific knobs only. Per Decision S5, the backend-agnostic
     # high-level sections (inference, ...) live at the root, NOT here.
-    baseline: Literal["default", "empty"] = "default"
+    baseline: Literal["default", "empty", "byo-llm"] = "default"
     profile: Optional[str] = None
     native_override: dict[str, Any] = Field(default_factory=dict)
 
@@ -431,7 +439,7 @@ September 2026.
 |---|---|
 | `src/models/config.py` | Add `UnifiedInferenceProvider`. Extend the existing `InferenceConfiguration` with `providers: list[UnifiedInferenceProvider]`. Add `UnifiedLlamaStackConfig` (`baseline`/`profile`/`native_override`) and a `config` field on `LlamaStackConfiguration`. Put the unified-vs-legacy `model_validator` on the **root** `Configuration` model (spans `inference.providers` + `llama_stack.*`). |
 | `src/llama_stack_configuration.py` | Add `synthesize_configuration`, `deep_merge_list_replace`, `apply_high_level_inference`, `load_default_baseline`, `synthesize_to_file`, `migrate_config_dumb`, `PROVIDER_TYPE_MAP`, `DEFAULT_BASELINE_RESOURCE`. Update `main()` to auto-detect unified vs legacy. |
-| `src/data/default_run.yaml` | New file — a thinner baseline than today's repo-root `run.yaml`. Notably do **not** reference `${env.EXTERNAL_PROVIDERS_DIR}` without a default (see "Findings discovered during PoC" in the spike doc). |
+| `src/data/default_run.yaml` | New file — a thinner baseline than today's repo-root `run.yaml`. Notably do **not** reference `${env.EXTERNAL_PROVIDERS_DIR}` without a default (see "Findings discovered during PoC" in the spike doc). OpenAI is conditional on `OPENAI_API_KEY` (`${env.OPENAI_API_KEY:+openai}` / `${env.OPENAI_API_KEY:=}`). |
 | `src/client.py` | In `_load_library_client`: branch on `config.config` presence. Add `_synthesize_library_config()` that calls the synthesizer and writes to the deterministic path (R10). Keep `_enrich_library_config` for legacy. |
 | `src/lightspeed_stack.py` | Add `--migrate-config`, `--run-yaml`, `--migrate-output`, `--synthesized-config-output` flags. Add an early-exit branch in `main()` that dispatches to `migrate_config_dumb` when `--migrate-config` is set. Clean up stale docstring. |
 | `scripts/llama-stack-entrypoint.sh` | No functional change — the Python CLI already auto-detects. Update the comment to document both modes. |
@@ -448,7 +456,9 @@ September 2026.
    defaults to `default`, no profile, no `native_override`).
 2. Baseline: if `unified` and `unified.profile` set → load that file.
    Else if `unified` and `unified.baseline == "empty"` → `{}`. Else →
-   `default_baseline` arg or `load_default_baseline()`.
+   `default_baseline` arg or `load_default_baseline()`. If the selector
+   is `byo-llm`, strip the built-in conditional OpenAI inference row.
+   `empty` and `profile:` are unchanged.
 3. Run `dedupe_providers_vector_io` on the baseline.
 4. Apply existing enrichment: `enrich_byok_rag`, `enrich_solr` (Azure
    Entra ID intentionally stays separate because it's a `.env`
@@ -545,6 +555,8 @@ reference.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-04-23 | Initial version | Spike completion |
+| 2026-08-20 | Default baseline openai provider is conditional on `OPENAI_API_KEY` | LCORE-3607: `baseline: default` must load when the key is unset |
+| 2026-08-21 | Add `baseline: byo-llm` (default_run.yaml minus the OpenAI row) | LCORE-3654: opt-in openai-free baseline |
 
 ## Appendix A — Worked example: legacy → unified migration
 

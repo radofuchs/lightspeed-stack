@@ -61,6 +61,31 @@
                 "title": "APIKeyTokenConfiguration",
                 "type": "object"
             },
+            "AbstractDeleteResponse": {
+                "description": "Base model for successful delete responses.",
+                "properties": {
+                    "deleted": {
+                        "description": "Whether the deletion was successful.",
+                        "examples": [
+                            true,
+                            false
+                        ],
+                        "title": "Deleted",
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "deleted"
+                ],
+                "title": "AbstractDeleteResponse",
+                "type": "object"
+            },
+            "AbstractSuccessfulResponse": {
+                "description": "Base class for all successful response models.",
+                "properties": {},
+                "title": "AbstractSuccessfulResponse",
+                "type": "object"
+            },
             "AccessRule": {
                 "additionalProperties": false,
                 "description": "Rule defining what actions a role can perform.",
@@ -104,6 +129,7 @@
                     "feedback",
                     "get_models",
                     "get_tools",
+                    "get_skills",
                     "get_shields",
                     "list_providers",
                     "get_provider",
@@ -374,98 +400,27 @@
                 "title": "AzureEntraIdConfiguration",
                 "type": "object"
             },
-            "ByokRag": {
+            "ByokConfiguration": {
                 "additionalProperties": false,
-                "description": "BYOK (Bring Your Own Knowledge) RAG configuration.",
+                "description": "BYOK (Bring Your Own Knowledge) configuration.",
                 "properties": {
-                    "rag_id": {
-                        "description": "Unique RAG ID",
-                        "minLength": 1,
-                        "title": "RAG ID",
-                        "type": "string"
-                    },
-                    "rag_type": {
-                        "default": "inline::faiss",
-                        "description": "Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
-                        "minLength": 1,
-                        "title": "RAG type",
-                        "type": "string"
-                    },
-                    "embedding_model": {
-                        "default": "sentence-transformers/all-mpnet-base-v2",
-                        "description": "Embedding model identification",
-                        "minLength": 1,
-                        "title": "Embedding model",
-                        "type": "string"
-                    },
-                    "embedding_dimension": {
-                        "default": 768,
-                        "description": "Dimensionality of embedding vectors.",
+                    "max_chunks": {
+                        "default": 10,
+                        "description": "Maximum total number of chunks returned across all BYOK stores.",
                         "minimum": 0,
-                        "title": "Embedding dimension",
+                        "title": "Max BYOK chunks",
                         "type": "integer"
                     },
-                    "vector_db_id": {
-                        "description": "Vector database identification.",
-                        "minLength": 1,
-                        "title": "Vector DB ID",
-                        "type": "string"
-                    },
-                    "db_path": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "Path to RAG database. Required for inline::faiss.",
-                        "title": "DB path"
-                    },
-                    "score_multiplier": {
-                        "default": 1.0,
-                        "description": "Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them.",
-                        "minimum": 0,
-                        "title": "Score multiplier",
-                        "type": "number"
-                    },
-                    "host": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
-                        "title": "PostgreSQL host"
-                    },
-                    "port": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
-                        "title": "PostgreSQL port"
-                    },
-                    "db": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.",
-                        "title": "PostgreSQL database"
-                    },
-                    "user": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.",
-                        "title": "PostgreSQL user"
-                    },
-                    "password": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.",
-                        "title": "PostgreSQL password"
+                    "stores": {
+                        "description": "List of BYOK RAG store configurations.",
+                        "items": {
+                            "$ref": "`#/components/schemas/`RagStore"
+                        },
+                        "title": "BYOK RAG stores",
+                        "type": "array"
                     }
                 },
-                "required": [
-                    "rag_id",
-                    "vector_db_id"
-                ],
-                "title": "ByokRag",
+                "title": "ByokConfiguration",
                 "type": "object"
             },
             "CORSConfiguration": {
@@ -740,6 +695,13 @@
                         "title": "Service name",
                         "type": "string"
                     },
+                    "config_format_version": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or a llama_stack.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11).",
+                        "title": "Configuration format version"
+                    },
                     "service": {
                         "$ref": "`#/components/schemas/`ServiceConfiguration",
                         "description": "This section contains Lightspeed Core Stack service configuration.",
@@ -818,17 +780,9 @@
                         "description": "Settings for human-in-the-loop approval of MCP tool invocations",
                         "title": "Approvals configuration"
                     },
-                    "byok_rag": {
-                        "description": "BYOK RAG configuration. This configuration can be used to reconfigure Llama Stack through its run.yaml configuration file",
-                        "items": {
-                            "$ref": "`#/components/schemas/`ByokRag"
-                        },
-                        "title": "BYOK RAG configuration",
-                        "type": "array"
-                    },
                     "vector_store": {
                         "$ref": "`#/components/schemas/`VectorStoreConfiguration",
-                        "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora). When providers is non-empty, default_provider is required and must match one of providers[].id. Applied in unified synthesis only.",
+                        "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as rag.byok.stores (static registered corpora). When providers is non-empty, default_provider is required and must match one of providers[].id. Applied in unified synthesis only.",
                         "title": "Vector store configuration"
                     },
                     "a2a_state": {
@@ -883,18 +837,8 @@
                     },
                     "rag": {
                         "$ref": "`#/components/schemas/`RagConfiguration",
-                        "description": "Configuration for all RAG strategies (inline and tool-based).",
+                        "description": "Unified RAG configuration: BYOK stores, OKP provider, and retrieval strategies (inline and tool-based).",
                         "title": "RAG configuration"
-                    },
-                    "okp": {
-                        "$ref": "`#/components/schemas/`OkpConfiguration",
-                        "description": "OKP provider settings. Only used when 'okp' is listed in rag.inline or rag.tool.",
-                        "title": "OKP configuration"
-                    },
-                    "reranker": {
-                        "$ref": "`#/components/schemas/`RerankerConfiguration",
-                        "description": "Configuration for neural reranking of RAG chunks using cross-encoder.",
-                        "title": "Reranker configuration"
                     },
                     "skills": {
                         "anyOf": [
@@ -958,7 +902,6 @@
                             "authorization": {
                                 "access_rules": []
                             },
-                            "byok_rag": [],
                             "conversation_cache": {
                                 "memory": null,
                                 "postgres": null,
@@ -1007,6 +950,33 @@
                                     "period": 1
                                 },
                                 "sqlite": null
+                            },
+                            "rag": {
+                                "byok": {
+                                    "max_chunks": 10,
+                                    "stores": []
+                                },
+                                "okp": {
+                                    "chunk_filter_query": null,
+                                    "max_chunks": 5,
+                                    "offline": true,
+                                    "rhokp_url": null
+                                },
+                                "retrieval": {
+                                    "inline": {
+                                        "max_chunks": 10,
+                                        "reranker": {
+                                            "enabled": false,
+                                            "model": "cross-encoder/ms-marco-MiniLM-L6-v2"
+                                        },
+                                        "sources": []
+                                    },
+                                    "tool": {
+                                        "max_chunks": 10,
+                                        "reranker": null,
+                                        "sources": []
+                                    }
+                                }
                             },
                             "service": {
                                 "access_log": true,
@@ -2082,8 +2052,8 @@
                         "type": "string",
                         "nullable": true,
                         "default": null,
-                        "description": "Path to configuration file used when Llama Stack is run in library mode",
-                        "title": "Llama Stack configuration path"
+                        "description": "Path to configuration file used when Llama Stack is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.7 \u2014 use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config.",
+                        "title": "Llama Stack configuration path (legacy, deprecated)"
                     },
                     "timeout": {
                         "default": 180,
@@ -2533,7 +2503,7 @@
             },
             "OkpConfiguration": {
                 "additionalProperties": false,
-                "description": "OKP (Offline Knowledge Portal) provider configuration.\n\nControls provider-specific behaviour for the OKP vector store.\nOnly relevant when ``\"okp\"`` is listed in ``rag.inline`` or ``rag.tool``.",
+                "description": "OKP (Offline Knowledge Portal) provider configuration.\n\nControls provider-specific behaviour for the OKP vector store.\nOnly relevant when ``\"okp\"`` is listed in ``rag.retrieval.inline.sources``\nor ``rag.retrieval.tool.sources``.",
                 "properties": {
                     "rhokp_url": {
                         "type": "string",
@@ -2554,6 +2524,20 @@
                         "default": null,
                         "description": "Additional OKP filter query applied to every OKP search request. Use Solr boolean syntax, e.g. 'product:ansible AND product:*openshift*'.",
                         "title": "OKP chunk filter query"
+                    },
+                    "search_mode": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Default Solr search mode for OKP queries. 'keyword' uses BM25 text search (no embedding model needed). 'hybrid' combines vector + keyword search. 'semantic' uses pure vector search. When unset, falls back to the global default ('hybrid').",
+                        "title": "OKP search mode"
+                    },
+                    "max_chunks": {
+                        "default": 5,
+                        "description": "Maximum number of chunks fetched from OKP.",
+                        "minimum": 0,
+                        "title": "Max OKP chunks",
+                        "type": "integer"
                     }
                 },
                 "title": "OkpConfiguration",
@@ -3933,10 +3917,19 @@
                         "title": "PostgreSQL host"
                     },
                     "port": {
-                        "type": "string",
-                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
                         "default": null,
-                        "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}.",
+                        "description": "PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. Accepts string placeholders and integer values.",
                         "title": "PostgreSQL port"
                     },
                     "db": {
@@ -4835,26 +4828,135 @@
             },
             "RagConfiguration": {
                 "additionalProperties": false,
-                "description": "RAG strategy configuration.\n\nControls which RAG sources are used for inline and tool-based retrieval.\n\nEach strategy lists RAG IDs to include. The special ID ``\"okp\"`` defined in constants,\nactivates the OKP provider; all other IDs refer to entries in ``byok_rag``.\n\nBoth ``inline`` and ``tool`` default to ``[]`` (disabled).\nEach must be explicitly configured to activate its respective RAG strategy.",
+                "description": "Unified RAG configuration.\n\nGroups all RAG-related settings: BYOK stores, OKP provider, and\nretrieval strategies (inline and tool).",
                 "properties": {
-                    "inline": {
-                        "description": "RAG IDs whose sources are injected as context before the LLM call. Use 'okp' to enable OKP inline RAG. Empty by default (no inline RAG).",
-                        "items": {
-                            "type": "string"
-                        },
-                        "title": "Inline RAG IDs",
-                        "type": "array"
+                    "byok": {
+                        "$ref": "`#/components/schemas/`ByokConfiguration",
+                        "description": "Bring Your Own Knowledge store configurations and settings.",
+                        "title": "BYOK configuration"
                     },
-                    "tool": {
-                        "description": "RAG IDs made available to the LLM as a file_search tool. Use 'okp' to include the OKP vector store. When omitted, tool RAG is disabled.",
-                        "items": {
-                            "type": "string"
-                        },
-                        "title": "Tool RAG IDs",
-                        "type": "array"
+                    "okp": {
+                        "$ref": "`#/components/schemas/`OkpConfiguration",
+                        "description": "OKP provider settings. Only used when 'okp' is listed in retrieval.inline.sources or retrieval.tool.sources.",
+                        "title": "OKP configuration"
+                    },
+                    "retrieval": {
+                        "$ref": "`#/components/schemas/`RetrievalConfiguration",
+                        "description": "Inline and tool retrieval strategy settings.",
+                        "title": "Retrieval configuration"
                     }
                 },
                 "title": "RagConfiguration",
+                "type": "object"
+            },
+            "RagStore": {
+                "additionalProperties": false,
+                "description": "BYOK (Bring Your Own Knowledge) RAG store configuration.",
+                "properties": {
+                    "rag_id": {
+                        "description": "Unique RAG ID",
+                        "minLength": 1,
+                        "title": "RAG ID",
+                        "type": "string"
+                    },
+                    "backend": {
+                        "default": "faiss",
+                        "description": "Type of RAG database (e.g. 'faiss', 'pgvector').",
+                        "minLength": 1,
+                        "title": "RAG backend",
+                        "type": "string"
+                    },
+                    "embedding_model": {
+                        "default": "sentence-transformers/all-mpnet-base-v2",
+                        "description": "Embedding model identification",
+                        "minLength": 1,
+                        "title": "Embedding model",
+                        "type": "string"
+                    },
+                    "embedding_dimension": {
+                        "default": 768,
+                        "description": "Dimensionality of embedding vectors.",
+                        "minimum": 0,
+                        "title": "Embedding dimension",
+                        "type": "integer"
+                    },
+                    "vector_db_id": {
+                        "description": "Vector database identification.",
+                        "minLength": 1,
+                        "title": "Vector DB ID",
+                        "type": "string"
+                    },
+                    "db_path": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Path to RAG database. Required for faiss backend.",
+                        "title": "DB path"
+                    },
+                    "score_multiplier": {
+                        "default": 1.0,
+                        "description": "Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them.",
+                        "minimum": 0,
+                        "title": "Score multiplier",
+                        "type": "number"
+                    },
+                    "relevance_cutoff_score": {
+                        "default": 0.3,
+                        "description": "Minimum raw similarity score to consider a result relevant. Results with a similarity score below this threshold are not returned.",
+                        "minimum": 0,
+                        "title": "Relevance cutoff score",
+                        "type": "number"
+                    },
+                    "host": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "PostgreSQL host for pgvector backend. Defaults to ${env.POSTGRES_HOST} when backend is pgvector.",
+                        "title": "PostgreSQL host"
+                    },
+                    "port": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "PostgreSQL port for pgvector backend. Defaults to ${env.POSTGRES_PORT} when backend is pgvector.",
+                        "title": "PostgreSQL port"
+                    },
+                    "db": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "PostgreSQL database name for pgvector backend. Defaults to ${env.POSTGRES_DATABASE} when backend is pgvector.",
+                        "title": "PostgreSQL database"
+                    },
+                    "user": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "PostgreSQL user for pgvector backend. Defaults to ${env.POSTGRES_USER} when backend is pgvector.",
+                        "title": "PostgreSQL user"
+                    },
+                    "password": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "PostgreSQL password for pgvector backend. Defaults to ${env.POSTGRES_PASSWORD} when backend is pgvector.",
+                        "title": "PostgreSQL password"
+                    }
+                },
+                "required": [
+                    "rag_id",
+                    "vector_db_id"
+                ],
+                "title": "RagStore",
                 "type": "object"
             },
             "ReadinessResponse": {
@@ -5403,6 +5505,60 @@
                 "title": "ResponsesResponse",
                 "type": "object"
             },
+            "RetrievalConfiguration": {
+                "additionalProperties": false,
+                "description": "Configuration for inline and tool retrieval strategies.",
+                "properties": {
+                    "inline": {
+                        "$ref": "`#/components/schemas/`RetrievalStrategyConfiguration",
+                        "description": "Inline RAG: context injected before the LLM request.",
+                        "title": "Inline retrieval"
+                    },
+                    "tool": {
+                        "$ref": "`#/components/schemas/`RetrievalStrategyConfiguration",
+                        "description": "Tool RAG: LLM can call file_search on demand.",
+                        "title": "Tool retrieval"
+                    }
+                },
+                "title": "RetrievalConfiguration",
+                "type": "object"
+            },
+            "RetrievalStrategyConfiguration": {
+                "additionalProperties": false,
+                "description": "Configuration for a single retrieval strategy (inline or tool).",
+                "properties": {
+                    "sources": {
+                        "description": "RAG IDs to use for this retrieval strategy. Use 'okp' to include the OKP vector store.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "RAG source IDs",
+                        "type": "array"
+                    },
+                    "max_chunks": {
+                        "default": 10,
+                        "description": "Maximum number of chunks returned by this retrieval strategy.",
+                        "minimum": 0,
+                        "title": "Max chunks",
+                        "type": "integer"
+                    },
+                    "reranker": {
+                        "anyOf": [
+                            {
+                                "$ref": "`#/components/schemas/`RerankerConfiguration"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "Neural reranking of RAG chunks using cross-encoder. Only applicable to inline retrieval.",
+                        "title": "Reranker configuration"
+                    }
+                },
+                "title": "RetrievalStrategyConfiguration",
+                "type": "object"
+            },
             "RlsapiV1Configuration": {
                 "additionalProperties": false,
                 "description": "Configuration for the rlsapi v1 /infer endpoint.\n\nSettings specific to the RHEL Lightspeed Command Line Assistant (CLA)\nstateless inference endpoint. Kept separate from shared configuration\nsections so that CLA-specific options do not affect other endpoints.",
@@ -5646,6 +5802,50 @@
                 "title": "SavedPromptResponse",
                 "type": "object"
             },
+            "SavedPromptsConfigResponse": {
+                "additionalProperties": false,
+                "description": "Saved prompts configuration limits returned to consuming services.\n\nAttributes:\n    max_prompts_per_user: Maximum number of saved prompts allowed per user.\n    max_display_name_length: Maximum character length for prompt display name.\n    max_content_length: Maximum character length for prompt content body.",
+                "examples": [
+                    {
+                        "max_content_length": 10000,
+                        "max_display_name_length": 255,
+                        "max_prompts_per_user": 50
+                    }
+                ],
+                "properties": {
+                    "max_prompts_per_user": {
+                        "description": "Maximum number of saved prompts allowed per user",
+                        "examples": [
+                            50
+                        ],
+                        "title": "Max Prompts Per User",
+                        "type": "integer"
+                    },
+                    "max_display_name_length": {
+                        "description": "Maximum character length for prompt display name",
+                        "examples": [
+                            255
+                        ],
+                        "title": "Max Display Name Length",
+                        "type": "integer"
+                    },
+                    "max_content_length": {
+                        "description": "Maximum character length for prompt content body",
+                        "examples": [
+                            10000
+                        ],
+                        "title": "Max Content Length",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "max_prompts_per_user",
+                    "max_display_name_length",
+                    "max_content_length"
+                ],
+                "title": "SavedPromptsConfigResponse",
+                "type": "object"
+            },
             "SavedPromptsConfiguration": {
                 "additionalProperties": false,
                 "description": "Configuration for saved prompts feature limits.\n\nControls the maximum number of prompts a user can save, the maximum\ndisplay name (title) length, and the maximum prompt content length.\nOmitted fields use the defaults defined in constants.\n\nAttributes:\n    max_prompts_per_user: Maximum number of saved prompts allowed per user.\n    max_display_name_length: Maximum character length for the prompt display name.\n    max_content_length: Maximum character length for the prompt content body.",
@@ -5878,6 +6078,27 @@
                 "title": "ShieldsResponse",
                 "type": "object"
             },
+            "SkillMetadata": {
+                "description": "Metadata describing a single loaded agent skill.\n\nAttributes:\n    name: Unique name of the skill.\n    description: Human readable description of what the skill does.",
+                "properties": {
+                    "name": {
+                        "description": "Unique name of the skill",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "description": {
+                        "description": "Human readable description of what the skill does",
+                        "title": "Description",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "description"
+                ],
+                "title": "SkillMetadata",
+                "type": "object"
+            },
             "SkillsConfiguration": {
                 "additionalProperties": false,
                 "description": "Agent skills configuration.\n\nSpecifies paths to skill directories. Skill metadata (name, description)\nis read from SKILL.md frontmatter at startup.\n\nEach path can point to either:\n- A directory containing a SKILL.md file (single skill)\n- A directory containing subdirectories with SKILL.md files (multiple skills)\n\nPaths are validated at startup to ensure they exist and contain valid SKILL.md files.",
@@ -5893,6 +6114,38 @@
                     }
                 },
                 "title": "SkillsConfiguration",
+                "type": "object"
+            },
+            "SkillsResponse": {
+                "description": "Model representing a response to skills request.\n\nAttributes:\n    skills: List of loaded skills with metadata (name and description).",
+                "examples": [
+                    {
+                        "skills": [
+                            {
+                                "description": "Review code for quality and security",
+                                "name": "code-review"
+                            },
+                            {
+                                "description": "Troubleshoot OpenShift cluster issues",
+                                "name": "openshift-troubleshooting"
+                            }
+                        ]
+                    }
+                ],
+                "properties": {
+                    "skills": {
+                        "description": "List of loaded skills with metadata",
+                        "items": {
+                            "$ref": "`#/components/schemas/`SkillMetadata"
+                        },
+                        "title": "Skills",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "skills"
+                ],
+                "title": "SkillsResponse",
                 "type": "object"
             },
             "SplunkConfiguration": {
@@ -6280,14 +6533,15 @@
             },
             "UnifiedLlamaStackConfig": {
                 "additionalProperties": false,
-                "description": "Backend-specific knobs for unified-mode Llama Stack synthesis.\n\nPer Decision S5 of the design spike, backend-agnostic high-level sections\n(inference, ...) live at the configuration root, not here. This block holds\nonly the Llama-Stack-specific synthesis controls: which baseline to start\nfrom, an optional profile file, and a raw native_override escape hatch.\n\nAttributes:\n    baseline: Synthesis starting point. \"default\" begins from LCORE's\n        built-in baseline (src/data/default_run.yaml); \"empty\" begins from\n        an empty dict (used by the migration tool for an exact round-trip).\n        Ignored when `profile` is set.\n    profile: Optional path to a user-authored run.yaml-shaped file used as\n        the synthesis baseline. Relative paths resolve against the directory\n        of the loaded lightspeed-stack.yaml.\n    native_override: Raw Llama Stack schema deep-merged last (maps merge\n        recursively, lists and scalars replace). The escape hatch for\n        anything the high-level sections do not express.",
+                "description": "Backend-specific knobs for unified-mode Llama Stack synthesis.\n\nPer Decision S5 of the design spike, backend-agnostic high-level sections\n(inference, ...) live at the configuration root, not here. This block holds\nonly the Llama-Stack-specific synthesis controls: which baseline to start\nfrom, an optional profile file, and a raw native_override escape hatch.\n\nAttributes:\n    baseline: Synthesis starting point. \"default\" begins from LCORE's\n        built-in baseline (src/data/default_run.yaml) including the\n        conditional OpenAI inference provider. \"byo-llm\" begins from the\n        same file with that OpenAI row removed. \"empty\" begins from an\n        empty dict (used by the migration tool for an exact round-trip).\n        Ignored when `profile` is set.\n    profile: Optional path to a user-authored run.yaml-shaped file used as\n        the synthesis baseline. Relative paths resolve against the directory\n        of the loaded lightspeed-stack.yaml.\n    native_override: Raw Llama Stack schema deep-merged last (maps merge\n        recursively, lists and scalars replace). The escape hatch for\n        anything the high-level sections do not express.",
                 "properties": {
                     "baseline": {
                         "default": "default",
-                        "description": "Synthesis starting point: 'default' uses LCORE's built-in baseline, 'empty' starts from {}. Ignored when 'profile' is set.",
+                        "description": "Synthesis starting point: 'default' uses LCORE's built-in baseline including the conditional OpenAI provider, 'byo-llm' uses the same baseline without that OpenAI row, 'empty' starts from {}. Ignored when 'profile' is set.",
                         "enum": [
                             "default",
-                            "empty"
+                            "empty",
+                            "byo-llm"
                         ],
                         "title": "Baseline selector",
                         "type": "string"
@@ -6345,7 +6599,7 @@
             },
             "VectorStoreConfiguration": {
                 "additionalProperties": false,
-                "description": "Configuration for dynamic vector-store providers.\n\nMirrors ``InferenceConfiguration``: a providers list plus a sibling\n``default_provider`` pointer, rather than a per-entry default flag.\n\nAttributes:\n    default_provider: Provider id used for vector_stores.default_* in the\n        synthesized Llama Stack config. Required when providers is\n        non-empty; must match one of providers[].id. Must be omitted when\n        providers is empty.\n    providers: Dynamic vector-store provider capacity for runtime\n        POST /v1/vector-stores creates. Not the same as byok_rag (static\n        registered corpora).",
+                "description": "Configuration for dynamic vector-store providers.\n\nMirrors ``InferenceConfiguration``: a providers list plus a sibling\n``default_provider`` pointer, rather than a per-entry default flag.\n\nAttributes:\n    default_provider: Provider id used for vector_stores.default_* in the\n        synthesized Llama Stack config. Required when providers is\n        non-empty; must match one of providers[].id. Must be omitted when\n        providers is empty.\n    providers: Dynamic vector-store provider capacity for runtime\n        POST /v1/vector-stores creates. Not the same as rag.byok.stores (static\n        registered corpora).",
                 "properties": {
                     "default_provider": {
                         "type": "string",
@@ -6355,7 +6609,7 @@
                         "title": "Default provider"
                     },
                     "providers": {
-                        "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora).",
+                        "description": "Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as rag.byok.stores (static registered corpora).",
                         "items": {
                             "discriminator": {
                                 "mapping": {

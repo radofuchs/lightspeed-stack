@@ -52,6 +52,25 @@ API Key Token configuration.
 | api_key | string |  |
 
 
+## AbstractDeleteResponse
+
+
+Base model for successful delete responses.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| deleted | boolean | Whether the deletion was successful. |
+
+
+## AbstractSuccessfulResponse
+
+
+Base class for all successful response models.
+
+
+
+
 ## AccessRule
 
 
@@ -184,26 +203,16 @@ Microsoft Entra ID authentication attributes for Azure.
 | scope | string | Azure Cognitive Services scope for token requests. Override only if using a different Azure service. |
 
 
-## ByokRag
+## ByokConfiguration
 
 
-BYOK (Bring Your Own Knowledge) RAG configuration.
+BYOK (Bring Your Own Knowledge) configuration.
 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| rag_id | string | Unique RAG ID |
-| rag_type | string | Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector'). |
-| embedding_model | string | Embedding model identification |
-| embedding_dimension | integer | Dimensionality of embedding vectors. |
-| vector_db_id | string | Vector database identification. |
-| db_path | string | Path to RAG database. Required for inline::faiss. |
-| score_multiplier | number | Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them. |
-| host | string | PostgreSQL host for remote::pgvector. Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector. |
-| port | string | PostgreSQL port for remote::pgvector. Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector. |
-| db | string | PostgreSQL database name for remote::pgvector. Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector. |
-| user | string | PostgreSQL user for remote::pgvector. Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector. |
-| password | string | PostgreSQL password for remote::pgvector. Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector. |
+| max_chunks | integer | Maximum total number of chunks returned across all BYOK stores. |
+| stores | array | List of BYOK RAG store configurations. |
 
 
 ## CORSConfiguration
@@ -349,6 +358,7 @@ Global service configuration.
 | Field | Type | Description |
 |-------|------|-------------|
 | name | string | Name of the service. That value will be used in REST API endpoints. |
+| config_format_version | string | Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or a llama_stack.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11). |
 | service |  | This section contains Lightspeed Core Stack service configuration. |
 | llama_stack |  | This section contains Llama Stack configuration. Lightspeed Core Stack service can call Llama Stack in library mode or in server mode. |
 | user_data_collection |  | This section contains configuration for subsystem that collects user data(transcription history and feedbacks). |
@@ -361,8 +371,7 @@ Global service configuration.
 | conversation_cache |  |  |
 | compaction |  | Controls when conversation history is summarized to keep the model's input below the context window limit. Disabled by default — when disabled, requests that exceed the window continue to surface as HTTP 413. |
 | approvals |  | Settings for human-in-the-loop approval of MCP tool invocations |
-| byok_rag | array | BYOK RAG configuration. This configuration can be used to reconfigure Llama Stack through its run.yaml configuration file |
-| vector_store |  | Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora). When providers is non-empty, default_provider is required and must match one of providers[].id. Applied in unified synthesis only. |
+| vector_store |  | Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as rag.byok.stores (static registered corpora). When providers is non-empty, default_provider is required and must match one of providers[].id. Applied in unified synthesis only. |
 | a2a_state |  | Configuration for A2A protocol persistent state storage. |
 | quota_handlers |  | Quota handlers configuration |
 | azure_entra_id |  |  |
@@ -370,9 +379,7 @@ Global service configuration.
 | splunk |  | Splunk HEC configuration for sending telemetry events. |
 | observability |  | OpenTelemetry and observability configuration collected from OTEL_* environment variables. |
 | deployment_environment | string | Deployment environment name (e.g., 'development', 'staging', 'production'). Used in telemetry events. |
-| rag |  | Configuration for all RAG strategies (inline and tool-based). |
-| okp |  | OKP provider settings. Only used when 'okp' is listed in rag.inline or rag.tool. |
-| reranker |  | Configuration for neural reranking of RAG chunks using cross-encoder. |
+| rag |  | Unified RAG configuration: BYOK stores, OKP provider, and retrieval strategies (inline and tool-based). |
 | skills |  | Agent skills configuration. Specifies paths to skill directories. |
 | saved_prompts |  | Configuration for saved prompts feature limits including maximum prompts per user, display name length, and content length. |
 | shields | array | List of pydantic-ai-lightspeed agent guardrail shields (question validity and PII redaction). Each entry has a unique 'name', a 'provider_id' ('question_validity' or 'redaction'), and a type-specific 'config'. |
@@ -857,7 +864,7 @@ Useful resources:
 | url | string | URL to Llama Stack service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL. |
 | api_key | string | API key to access Llama Stack service |
 | use_as_library_client | boolean | When set to true Llama Stack will be used in library mode, not in server mode (default) |
-| library_client_config_path | string | Path to configuration file used when Llama Stack is run in library mode |
+| library_client_config_path | string | Path to configuration file used when Llama Stack is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.7 — use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config. |
 | timeout | integer | Timeout in seconds for requests to Llama Stack service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
 | max_retries | integer | Maximum number of connection attempts before giving up. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod). |
 | retry_delay | integer | Delay in seconds between retry attempts. Used on startup to connect to Llama Stack and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where Llama Stack is still starting up (e.g., when running as a sidecar in the same pod). |
@@ -1060,7 +1067,8 @@ Attributes:
 OKP (Offline Knowledge Portal) provider configuration.
 
 Controls provider-specific behaviour for the OKP vector store.
-Only relevant when ``"okp"`` is listed in ``rag.inline`` or ``rag.tool``.
+Only relevant when ``"okp"`` is listed in ``rag.retrieval.inline.sources``
+or ``rag.retrieval.tool.sources``.
 
 
 | Field | Type | Description |
@@ -1068,6 +1076,8 @@ Only relevant when ``"okp"`` is listed in ``rag.inline`` or ``rag.tool``.
 | rhokp_url | string | Base URL for the OKP server (http or https). Set to `${env.RH_SERVER_OKP}` in YAML to use the environment variable. When unset, the default from constants is used. |
 | offline | boolean | When True, use parent_id for OKP chunk source URLs. When False, use reference_url for chunk source URLs. |
 | chunk_filter_query | string | Additional OKP filter query applied to every OKP search request. Use Solr boolean syntax, e.g. 'product:ansible AND product:*openshift*'. |
+| search_mode | string | Default Solr search mode for OKP queries. 'keyword' uses BM25 text search (no embedding model needed). 'hybrid' combines vector + keyword search. 'semantic' uses pure vector search. When unset, falls back to the global default ('hybrid'). |
+| max_chunks | integer | Maximum number of chunks fetched from OKP. |
 
 
 ## OpenAIResponseAnnotationCitation
@@ -1777,7 +1787,7 @@ Storage config for a pgvector dynamic vector-store provider.
 | Field | Type | Description |
 |-------|------|-------------|
 | host | string | PostgreSQL host. Defaults to ${env.POSTGRES_HOST}. |
-| port | string | PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. |
+| port |  | PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. Accepts string placeholders and integer values. |
 | db | string | PostgreSQL database name. Defaults to ${env.POSTGRES_DATABASE}. |
 | user | string | PostgreSQL user. Defaults to ${env.POSTGRES_USER}. |
 | password | string | PostgreSQL password. Defaults to ${env.POSTGRES_PASSWORD}. |
@@ -2097,21 +2107,40 @@ Red Hat Identity authentication configuration.
 ## RagConfiguration
 
 
-RAG strategy configuration.
+Unified RAG configuration.
 
-Controls which RAG sources are used for inline and tool-based retrieval.
-
-Each strategy lists RAG IDs to include. The special ID ``"okp"`` defined in constants,
-activates the OKP provider; all other IDs refer to entries in ``byok_rag``.
-
-Both ``inline`` and ``tool`` default to ``[]`` (disabled).
-Each must be explicitly configured to activate its respective RAG strategy.
+Groups all RAG-related settings: BYOK stores, OKP provider, and
+retrieval strategies (inline and tool).
 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| inline | array | RAG IDs whose sources are injected as context before the LLM call. Use 'okp' to enable OKP inline RAG. Empty by default (no inline RAG). |
-| tool | array | RAG IDs made available to the LLM as a file_search tool. Use 'okp' to include the OKP vector store. When omitted, tool RAG is disabled. |
+| byok |  | Bring Your Own Knowledge store configurations and settings. |
+| okp |  | OKP provider settings. Only used when 'okp' is listed in retrieval.inline.sources or retrieval.tool.sources. |
+| retrieval |  | Inline and tool retrieval strategy settings. |
+
+
+## RagStore
+
+
+BYOK (Bring Your Own Knowledge) RAG store configuration.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| rag_id | string | Unique RAG ID |
+| backend | string | Type of RAG database (e.g. 'faiss', 'pgvector'). |
+| embedding_model | string | Embedding model identification |
+| embedding_dimension | integer | Dimensionality of embedding vectors. |
+| vector_db_id | string | Vector database identification. |
+| db_path | string | Path to RAG database. Required for faiss backend. |
+| score_multiplier | number | Multiplier applied to relevance scores from this vector store. Used to weight results when querying multiple knowledge sources. Values > 1 boost this store's results; values < 1 reduce them. |
+| relevance_cutoff_score | number | Minimum raw similarity score to consider a result relevant. Results with a similarity score below this threshold are not returned. |
+| host | string | PostgreSQL host for pgvector backend. Defaults to ${env.POSTGRES_HOST} when backend is pgvector. |
+| port |  | PostgreSQL port for pgvector backend. Defaults to ${env.POSTGRES_PORT} when backend is pgvector. |
+| db | string | PostgreSQL database name for pgvector backend. Defaults to ${env.POSTGRES_DATABASE} when backend is pgvector. |
+| user | string | PostgreSQL user for pgvector backend. Defaults to ${env.POSTGRES_USER} when backend is pgvector. |
+| password | string | PostgreSQL password for pgvector backend. Defaults to ${env.POSTGRES_PASSWORD} when backend is pgvector. |
 
 
 ## ReadinessResponse
@@ -2299,6 +2328,31 @@ Attributes:
 | output_text | string |  |
 
 
+## RetrievalConfiguration
+
+
+Configuration for inline and tool retrieval strategies.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| inline |  | Inline RAG: context injected before the LLM request. |
+| tool |  | Tool RAG: LLM can call file_search on demand. |
+
+
+## RetrievalStrategyConfiguration
+
+
+Configuration for a single retrieval strategy (inline or tool).
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| sources | array | RAG IDs to use for this retrieval strategy. Use 'okp' to include the OKP vector store. |
+| max_chunks | integer | Maximum number of chunks returned by this retrieval strategy. |
+| reranker |  | Neural reranking of RAG chunks using cross-encoder. Only applicable to inline retrieval. |
+
+
 ## RlsapiV1Configuration
 
 
@@ -2405,6 +2459,24 @@ Attributes:
 | content | string | Prompt body text |
 | created_at | string | When the prompt was created |
 | updated_at | string | When the prompt was last updated |
+
+
+## SavedPromptsConfigResponse
+
+
+Saved prompts configuration limits returned to consuming services.
+
+Attributes:
+    max_prompts_per_user: Maximum number of saved prompts allowed per user.
+    max_display_name_length: Maximum character length for prompt display name.
+    max_content_length: Maximum character length for prompt content body.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| max_prompts_per_user | integer | Maximum number of saved prompts allowed per user |
+| max_display_name_length | integer | Maximum character length for prompt display name |
+| max_content_length | integer | Maximum character length for prompt content body |
 
 
 ## SavedPromptsConfiguration
@@ -2535,6 +2607,22 @@ Model representing a response to shields request.
 | shields | array | List of shields configured in Lightspeed Core Stack |
 
 
+## SkillMetadata
+
+
+Metadata describing a single loaded agent skill.
+
+Attributes:
+    name: Unique name of the skill.
+    description: Human readable description of what the skill does.
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Unique name of the skill |
+| description | string | Human readable description of what the skill does |
+
+
 ## SkillsConfiguration
 
 
@@ -2553,6 +2641,20 @@ Paths are validated at startup to ensure they exist and contain valid SKILL.md f
 | Field | Type | Description |
 |-------|------|-------------|
 | paths | array | Paths to skill directories or directories containing skill subdirectories. |
+
+
+## SkillsResponse
+
+
+Model representing a response to skills request.
+
+Attributes:
+    skills: List of loaded skills with metadata (name and description).
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| skills | array | List of loaded skills with metadata |
 
 
 ## SplunkConfiguration
@@ -2762,8 +2864,10 @@ from, an optional profile file, and a raw native_override escape hatch.
 
 Attributes:
     baseline: Synthesis starting point. "default" begins from LCORE's
-        built-in baseline (src/data/default_run.yaml); "empty" begins from
-        an empty dict (used by the migration tool for an exact round-trip).
+        built-in baseline (src/data/default_run.yaml) including the
+        conditional OpenAI inference provider. "byo-llm" begins from the
+        same file with that OpenAI row removed. "empty" begins from an
+        empty dict (used by the migration tool for an exact round-trip).
         Ignored when `profile` is set.
     profile: Optional path to a user-authored run.yaml-shaped file used as
         the synthesis baseline. Relative paths resolve against the directory
@@ -2775,7 +2879,7 @@ Attributes:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| baseline | string | Synthesis starting point: 'default' uses LCORE's built-in baseline, 'empty' starts from {}. Ignored when 'profile' is set. |
+| baseline | string | Synthesis starting point: 'default' uses LCORE's built-in baseline including the conditional OpenAI provider, 'byo-llm' uses the same baseline without that OpenAI row, 'empty' starts from {}. Ignored when 'profile' is set. |
 | profile | string | Path to a run.yaml-shaped baseline file. Relative paths resolve against the directory of the loaded lightspeed-stack.yaml. |
 | native_override | object | Raw Llama Stack schema deep-merged last (maps merge recursively; lists and scalars replace). |
 
@@ -2808,14 +2912,14 @@ Attributes:
         non-empty; must match one of providers[].id. Must be omitted when
         providers is empty.
     providers: Dynamic vector-store provider capacity for runtime
-        POST /v1/vector-stores creates. Not the same as byok_rag (static
+        POST /v1/vector-stores creates. Not the same as rag.byok.stores (static
         registered corpora).
 
 
 | Field | Type | Description |
 |-------|------|-------------|
 | default_provider | string | Provider id used for vector_stores.default_* in the synthesized Llama Stack config. Required when providers is non-empty; must match one of providers[].id. |
-| providers | array | Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as byok_rag (static registered corpora). |
+| providers | array | Dynamic vector-store provider capacity for runtime POST /v1/vector-stores creates. Not the same as rag.byok.stores (static registered corpora). |
 
 
 ## VectorStoreDeleteResponse

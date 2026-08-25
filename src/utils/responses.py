@@ -5,6 +5,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional, cast
+from urllib.parse import urljoin
 
 from fastapi import HTTPException
 from ogx_api import OpenAIResponseObject
@@ -79,6 +80,7 @@ from ogx_api.openai_responses import (
     OpenAIResponseUsageOutputTokensDetails as UsageOutputTokensDetails,
 )
 from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
+from opentelemetry import trace
 
 import constants
 from configuration import configuration
@@ -106,7 +108,7 @@ from models.common.turn_summary import (
     ToolResultSummary,
     TurnSummary,
 )
-from models.config import ByokRag
+from models.config import RagStore
 from models.database.conversations import UserConversation
 from utils.mcp_headers import (
     McpHeaders,
@@ -114,6 +116,12 @@ from utils.mcp_headers import (
     find_unresolved_auth_headers,
 )
 from utils.model_list import parse_model_list_response
+from utils.otel_tracing import (
+    SpanAttributes,
+    SpanEvents,
+    add_span_event,
+    set_span_attributes,
+)
 from utils.prompts import get_system_prompt, get_topic_summary_system_prompt
 from utils.query import (
     extract_provider_and_model_from_model_id,
@@ -125,6 +133,7 @@ from utils.suid import to_llama_stack_conversation_id
 from utils.token_counter import TokenCounter
 
 logger = get_logger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 async def get_vector_store_ids(
@@ -225,7 +234,19 @@ async def maybe_get_topic_summary(
     if not generate_topic_summary:
         return None
     logger.debug("Generating topic summary for new conversation")
-    return await get_topic_summary(input_text, client, model_id)
+    with tracer.start_as_current_span("topic.summary") as span:
+        add_span_event(span, SpanEvents.TOPIC_SUMMARY_TASK_STARTED)
+        success = False
+        try:
+            summary = await get_topic_summary(input_text, client, model_id)
+            success = True
+            return summary
+        finally:
+            set_span_attributes(
+                span,
+                {SpanAttributes.TOPIC_SUMMARY_SUCCESS: success},
+            )
+            add_span_event(span, SpanEvents.TOPIC_SUMMARY_TASK_FINISHED)
 
 
 async def prepare_tools(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -257,15 +278,16 @@ async def prepare_tools(  # pylint: disable=too-many-arguments,too-many-position
     # Vector store ID resolution priority:
     #   1. Per-request IDs: highest prio; customer-facing rag_ids are translated to vector_db_ids.
     #   2. rag.tool config IDs: used when no per-request IDs provided, and rag.tool is configured.
-    byok_rags = configuration.configuration.byok_rag
+    byok_stores = configuration.configuration.rag.byok.stores
 
-    is_tool_rag_enabled = len(configuration.configuration.rag.tool) > 0
-
+    is_tool_rag_enabled = (
+        len(configuration.configuration.rag.retrieval.tool.sources) > 0
+    )
     if vector_store_ids is not None:
-        effective_ids = resolve_vector_store_ids(vector_store_ids, byok_rags)
+        effective_ids = resolve_vector_store_ids(vector_store_ids, byok_stores)
     elif is_tool_rag_enabled:
         effective_ids = resolve_vector_store_ids(
-            configuration.configuration.rag.tool, byok_rags
+            configuration.configuration.rag.retrieval.tool.sources, byok_stores
         )
 
     # Add RAG tools if vector stores are available
@@ -636,7 +658,7 @@ def filter_tools_by_allowed_entries(
 
 
 def resolve_vector_store_ids(
-    vector_store_ids: list[str], byok_rags: list[ByokRag]
+    vector_store_ids: list[str], byok_rags: list[RagStore]
 ) -> list[str]:
     """Translate customer-facing rag_ids to llama-stack vector_db_ids.
 
@@ -664,7 +686,7 @@ def resolve_vector_store_ids(
 
 
 def translate_tools_vector_store_ids(
-    tools: list[InputTool], byok_rags: list[ByokRag]
+    tools: list[InputTool], byok_rags: list[RagStore]
 ) -> list[InputTool]:
     """Translate user-facing vector_store_ids to llama-stack IDs in each file_search tool.
 
@@ -704,7 +726,7 @@ def get_rag_tools(vector_store_ids: list[str]) -> Optional[list[InputToolFileSea
         InputToolFileSearch(
             type="file_search",
             vector_store_ids=vector_store_ids,
-            max_num_results=constants.TOOL_RAG_MAX_CHUNKS,
+            max_num_results=configuration.rag.retrieval.tool.max_chunks,
         )
     ]
 
@@ -850,6 +872,33 @@ def apply_mcp_headers_to_explicit_tools(
     return out
 
 
+def _build_okp_doc_url(attributes: dict[str, Any]) -> Optional[str]:
+    """Build a full OKP document URL from file_search result attributes.
+
+    Uses the ``offline`` flag from OKP configuration to choose between
+    ``source_path`` (disconnected clusters) and ``reference_url`` (online).
+    The chosen relative path is joined with the OKP base URL.
+
+    Parameters:
+        attributes: Metadata dict from a file_search result chunk.
+
+    Returns:
+        Fully-qualified document URL, or None if no usable path is found.
+    """
+    offline = configuration.okp.offline
+    if offline:
+        reference = attributes.get("source_path") or attributes.get("doc_id")
+    else:
+        reference = attributes.get("reference_url") or attributes.get("doc_id")
+
+    if not reference:
+        return None
+
+    rhokp = configuration.okp.rhokp_url
+    base_url = str(rhokp) if rhokp is not None else constants.RH_SERVER_OKP_DEFAULT_URL
+    return urljoin(base_url, str(reference))
+
+
 def parse_referenced_documents(  # pylint: disable=too-many-locals
     response: Optional[ResponseObject],
     vector_store_ids: Optional[list[str]] = None,
@@ -899,9 +948,12 @@ def parse_referenced_documents(  # pylint: disable=too-many-locals
                 doc_title = attributes.get("title")
                 doc_id = attributes.get("document_id") or attributes.get("doc_id")
 
+                # OKP/Solr chunks use reference_url/source_path instead
+                if not doc_url and resolved_source == constants.OKP_RAG_ID:
+                    doc_url = _build_okp_doc_url(attributes)
+
                 if doc_title or doc_url:
-                    # Treat empty string as None for URL to satisfy Optional[AnyUrl]
-                    final_url = doc_url or None
+                    final_url: Any = doc_url or None
                     if (final_url, doc_title) not in seen_docs:
                         documents.append(
                             ReferencedDocument(
@@ -1730,8 +1782,8 @@ async def _resolve_client_tools(
     # Per-request override of vector stores (user-facing rag_ids)
     vector_store_ids = extract_vector_store_ids_from_tools(tools) or None
     # Translate user-facing rag_ids to llama-stack vector_store_ids in each file_search tool
-    byok_rags = configuration.configuration.byok_rag
-    prepared_tools = translate_tools_vector_store_ids(tools, byok_rags)
+    byok_stores = configuration.configuration.rag.byok.stores
+    prepared_tools = translate_tools_vector_store_ids(tools, byok_stores)
     prepared_tools = apply_mcp_headers_to_explicit_tools(
         prepared_tools, token, mcp_headers, request_headers
     )
@@ -1819,7 +1871,7 @@ async def resolve_tool_choice(
         )
     else:
         # Pass tools explicitly configured for this request
-        byok_rags = configuration.configuration.byok_rag
+        byok_rags = configuration.configuration.rag.byok.stores
         prepared_tools = translate_tools_vector_store_ids(tools, byok_rags)
         prepared_tools = apply_mcp_headers_to_explicit_tools(
             prepared_tools, token, mcp_headers, request_headers

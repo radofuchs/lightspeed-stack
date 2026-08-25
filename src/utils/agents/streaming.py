@@ -8,10 +8,11 @@ import asyncio
 import datetime
 from collections.abc import AsyncIterator
 from functools import singledispatch
-from typing import Any, Final, Optional, TypeAlias, cast
+from typing import Any, Final, Optional, cast
 
 from fastapi import HTTPException
 from ogx_client import APIConnectionError, APIStatusError
+from opentelemetry import trace
 from pydantic_ai import Agent, AgentRunError, AgentRunResultEvent, ToolReturnPart
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -60,6 +61,13 @@ from utils.agents.tool_processor import (
     process_native_tool_result,
 )
 from utils.conversations import append_turn_items_to_conversation
+from utils.otel_tracing import (
+    SpanAttributes,
+    SpanEvents,
+    add_span_event,
+    anonymize_value,
+    set_span_attributes,
+)
 from utils.pydantic_ai_helpers import build_agent
 from utils.query import (
     build_multimodal_input,
@@ -79,7 +87,7 @@ from utils.stream_interrupts import (
 )
 from utils.streaming_sse import shield_violation_generator
 
-AgentDispatchEvent: TypeAlias = AgentStreamEvent | AgentRunResultEvent
+type AgentDispatchEvent = AgentStreamEvent | AgentRunResultEvent
 
 logger = get_logger(__name__)
 
@@ -153,7 +161,7 @@ async def retrieve_agent_response_generator(
         raise HTTPException(**response.model_dump()) from exc
 
 
-async def generate_agent_response(
+async def generate_agent_response(  # pylint: disable=too-many-statements
     generator: AsyncIterator[str],
     context: ResponseGeneratorContext,
     responses_params: ResponsesApiParams,
@@ -161,6 +169,7 @@ async def generate_agent_response(
     background_topic_summary_tasks: list[asyncio.Task[None]],
     emit_start: bool = True,
     original_input: Optional[ResponseInput] = None,
+    root_span: Optional[trace.Span] = None,
 ) -> AsyncIterator[str]:
     """Wrap an agent SSE generator with cleanup logic.
 
@@ -179,6 +188,8 @@ async def generate_agent_response(
         original_input: In compacted mode, the original user input before the
             explicit-input rewrite. Used to persist the completed turn with its
             structured input (preserving attachments); ``None`` otherwise.
+        root_span: OpenTelemetry root span for this request.
+
     Yields:
         SSE-formatted strings from the wrapped generator.
     """
@@ -241,6 +252,8 @@ async def generate_agent_response(
         deregister_stream(context.request_id)
 
     if not stream_completed:
+        if root_span is not None:
+            root_span.end()
         return
 
     should_generate_topic_summary = (
@@ -269,6 +282,8 @@ async def generate_agent_response(
             ),
             media_type,
         )
+        if root_span is not None:
+            root_span.end()
         return
     logger.info("Consuming tokens")
     consume_query_tokens(
@@ -302,6 +317,40 @@ async def generate_agent_response(
         skip_userid_check=context.skip_userid_check,
         topic_summary=topic_summary,
     )
+
+    # Set final OTEL span attributes
+    if root_span is not None:
+        add_span_event(root_span, SpanEvents.TURN_PERSISTED)
+        if turn_summary.tool_calls:
+            tool_names = [tc.name for tc in turn_summary.tool_calls]
+            set_span_attributes(
+                root_span,
+                {
+                    SpanAttributes.TOOL_CALLS_COUNT: len(tool_names),
+                    SpanAttributes.TOOL_CALLS_NAMES: tool_names,
+                },
+            )
+            add_span_event(
+                root_span,
+                SpanEvents.TOOL_EXECUTION_COMPLETED,
+                {"tool.calls": ", ".join(tool_names)},
+            )
+        set_span_attributes(
+            root_span,
+            {
+                SpanAttributes.SESSION_ID: context.conversation_id,
+                SpanAttributes.LLM_USAGE_INPUT_TOKENS: (
+                    turn_summary.token_usage.input_tokens
+                ),
+                SpanAttributes.LLM_USAGE_OUTPUT_TOKENS: (
+                    turn_summary.token_usage.output_tokens
+                ),
+                SpanAttributes.OUTPUT: anonymize_value(turn_summary.llm_response),
+            },
+        )
+        add_span_event(root_span, SpanEvents.LLM_RESPONSE_COMPLETED)
+        root_span.end()
+
     logger.info("Agent streaming complete")
 
 

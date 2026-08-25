@@ -1,3 +1,7 @@
+# @cfg_authorized
+# Safe merge: auth-noop-token + shields. No MCP (see library twin comment).
+# Based on auth-noop-token. Intentionally NO mcp_servers / pii-redaction shields
+# (see library twin: streaming token vs turn_complete comparison).
 name: Lightspeed Core Service (LCS)
 service:
   host: 0.0.0.0
@@ -33,15 +37,17 @@ inference:
   default_provider: openai
   default_model: gpt-4o-mini
 
-byok_rag:
-  - rag_id: e2e-test-docs
-    rag_type: inline::faiss
-    embedding_model: sentence-transformers/all-mpnet-base-v2
-    embedding_dimension: 768
-    vector_db_id: ${env.FAISS_VECTOR_STORE_ID}
-    db_path: ${env.KV_RAG_PATH:=~/.llama/storage/rag/kv_store.db}
-    score_multiplier: 1.0
-
 rag:
-  tool:
-    - e2e-test-docs
+  byok:
+    stores:
+      - rag_id: e2e-test-docs
+        backend: faiss
+        embedding_model: sentence-transformers/all-mpnet-base-v2
+        embedding_dimension: 768
+        vector_db_id: ${env.FAISS_VECTOR_STORE_ID}
+        db_path: ${env.KV_RAG_PATH:=~/.llama/storage/rag/kv_store.db}
+        score_multiplier: 1.0
+  retrieval:
+    tool:
+      sources:
+        - e2e-test-docs

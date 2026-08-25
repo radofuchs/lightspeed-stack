@@ -1010,7 +1010,7 @@ async def _handle_a2a_jsonrpc(  # pylint: disable=too-many-locals,too-many-state
                     # Get chunk from queue with timeout to prevent hanging
                     try:
                         chunk = await asyncio.wait_for(chunk_queue.get(), timeout=300.0)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         logger.error("Timeout waiting for chunk from A2A app")
                         break
 

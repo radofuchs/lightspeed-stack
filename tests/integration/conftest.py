@@ -1,5 +1,6 @@
 """Shared fixtures for integration tests."""
 
+import importlib
 import os
 from collections.abc import AsyncIterator, Generator
 from pathlib import Path
@@ -11,6 +12,12 @@ from fastapi.testclient import TestClient
 from ogx_api.openai_responses import OpenAIResponseObject
 from ogx_client.types import ListModelsResponse, VersionInfo
 from ogx_client.types.model import Model
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
 from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.messages import (
     ModelMessage,
@@ -441,9 +448,76 @@ def set_streaming_query_agent_run(
     )
 
 
+OTEL_INSTRUMENTED_MODULES = (
+    "app.endpoints.query",
+    "app.endpoints.responses",
+    "utils.quota_utils",
+    "utils.responses",
+    "utils.shields",
+    "utils.vector_search",
+)
+
+
+def install_integration_otel_provider(
+    exporter: InMemorySpanExporter,
+) -> TracerProvider:
+    """Install a global TracerProvider and refresh cached module tracers."""
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+    trace._TRACER_PROVIDER_SET_ONCE._done = False  # pylint: disable=protected-access
+    trace._TRACER_PROVIDER = None  # pylint: disable=protected-access
+    trace.set_tracer_provider(provider)
+
+    for module_name in OTEL_INSTRUMENTED_MODULES:
+        module = importlib.import_module(module_name)
+        module.tracer = provider.get_tracer(module_name)
+
+    return provider
+
+
+def shutdown_integration_otel_provider(provider: TracerProvider) -> None:
+    """Shut down the integration OTEL provider and clear global state."""
+    provider.shutdown()
+    trace._TRACER_PROVIDER_SET_ONCE._done = False  # pylint: disable=protected-access
+    trace._TRACER_PROVIDER = None  # pylint: disable=protected-access
+
+
 # ==========================================
 # Fixtures
 # ==========================================
+
+
+@pytest.fixture(name="otel_collector", scope="module")
+def otel_collector_fixture() -> Generator[InMemorySpanExporter, None, None]:
+    """Module-scoped OTEL exporter for integration tests that opt in via fixture."""
+    exporter = InMemorySpanExporter()
+    provider = install_integration_otel_provider(exporter)
+
+    yield exporter
+
+    shutdown_integration_otel_provider(provider)
+
+
+@pytest.fixture(autouse=True)
+def otel_anonymization_secret() -> Generator[None, None, None]:
+    """Set OTEL_ANONYMIZATION_SECRET for all integration tests.
+
+    This fixture ensures that the OTEL anonymization secret is available
+    for any code that uses OpenTelemetry tracing during integration tests.
+    """
+    original_value = os.environ.get("OTEL_ANONYMIZATION_SECRET")
+    os.environ["OTEL_ANONYMIZATION_SECRET"] = (
+        "integration-test-secret-do-not-use-in-production"
+    )
+
+    yield
+
+    # Restore original value or remove if it wasn't set
+    if original_value is None:
+        os.environ.pop("OTEL_ANONYMIZATION_SECRET", None)
+    else:
+        os.environ["OTEL_ANONYMIZATION_SECRET"] = original_value
 
 
 @pytest.fixture(autouse=True)

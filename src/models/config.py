@@ -771,8 +771,10 @@ class UnifiedLlamaStackConfig(ConfigurationBase):
 
     Attributes:
         baseline: Synthesis starting point. "default" begins from LCORE's
-            built-in baseline (src/data/default_run.yaml); "empty" begins from
-            an empty dict (used by the migration tool for an exact round-trip).
+            built-in baseline (src/data/default_run.yaml) including the
+            conditional OpenAI inference provider. "byo-llm" begins from the
+            same file with that OpenAI row removed. "empty" begins from an
+            empty dict (used by the migration tool for an exact round-trip).
             Ignored when `profile` is set.
         profile: Optional path to a user-authored run.yaml-shaped file used as
             the synthesis baseline. Relative paths resolve against the directory
@@ -782,11 +784,13 @@ class UnifiedLlamaStackConfig(ConfigurationBase):
             anything the high-level sections do not express.
     """
 
-    baseline: Literal["default", "empty"] = Field(
+    baseline: Literal["default", "empty", "byo-llm"] = Field(
         "default",
         title="Baseline selector",
         description="Synthesis starting point: 'default' uses LCORE's built-in "
-        "baseline, 'empty' starts from {}. Ignored when 'profile' is set.",
+        "baseline including the conditional OpenAI provider, 'byo-llm' uses "
+        "the same baseline without that OpenAI row, 'empty' starts from {}. "
+        "Ignored when 'profile' is set.",
     )
 
     profile: Optional[str] = Field(
@@ -841,8 +845,12 @@ class LlamaStackConfiguration(ConfigurationBase):
 
     library_client_config_path: Optional[str] = Field(
         None,
-        title="Llama Stack configuration path",
-        description="Path to configuration file used when Llama Stack is run in library mode",
+        title="Llama Stack configuration path (legacy, deprecated)",
+        description="Path to configuration file used when Llama Stack is run "
+        "in library mode. DEPRECATED legacy two-file setup: logs a startup "
+        "warning since 0.6 and is removed in 0.7 — use unified mode instead "
+        "(the config block below, and/or the root-level inference.providers "
+        "section); migrate with lightspeed-stack --migrate-config.",
     )
 
     timeout: PositiveInt = Field(
@@ -1274,6 +1282,7 @@ class Action(str, Enum):
     FEEDBACK = "feedback"
     GET_MODELS = "get_models"
     GET_TOOLS = "get_tools"
+    GET_SKILLS = "get_skills"
     GET_SHIELDS = "get_shields"
     LIST_PROVIDERS = "list_providers"
     GET_PROVIDER = "get_provider"
@@ -2026,8 +2035,8 @@ class A2AStateConfiguration(ConfigurationBase):
         return None
 
 
-class ByokRag(ConfigurationBase):
-    """BYOK (Bring Your Own Knowledge) RAG configuration."""
+class RagStore(ConfigurationBase):
+    """BYOK (Bring Your Own Knowledge) RAG store configuration."""
 
     rag_id: str = Field(
         ...,
@@ -2036,12 +2045,23 @@ class ByokRag(ConfigurationBase):
         description="Unique RAG ID",
     )
 
-    rag_type: str = Field(
-        constants.DEFAULT_RAG_TYPE,
+    backend: str = Field(
+        constants.DEFAULT_RAG_BACKEND,
         min_length=1,
-        title="RAG type",
-        description="Type of RAG database (e.g. 'inline::faiss', 'remote::pgvector').",
+        title="RAG backend",
+        description="Type of RAG database (e.g. 'faiss', 'pgvector').",
     )
+
+    @field_validator("backend")
+    @classmethod
+    def validate_backend(cls, value: str) -> str:
+        """Reject unsupported backend values at config load time."""
+        if value not in constants.SUPPORTED_RAG_BACKENDS:
+            raise ValueError(
+                f"Unsupported RAG backend '{value}'. "
+                f"Supported backends: {sorted(constants.SUPPORTED_RAG_BACKENDS)}"
+            )
+        return value
 
     embedding_model: str = Field(
         constants.DEFAULT_EMBEDDING_MODEL,
@@ -2066,7 +2086,7 @@ class ByokRag(ConfigurationBase):
     db_path: Optional[str] = Field(
         default=None,
         title="DB path",
-        description="Path to RAG database. Required for inline::faiss.",
+        description="Path to RAG database. Required for faiss backend.",
     )
 
     score_multiplier: float = Field(
@@ -2078,48 +2098,56 @@ class ByokRag(ConfigurationBase):
         "Values > 1 boost this store's results; values < 1 reduce them.",
     )
 
+    relevance_cutoff_score: float = Field(
+        constants.DEFAULT_BYOK_RAG_RELEVANCE_CUTOFF_SCORE,
+        gt=0,
+        title="Relevance cutoff score",
+        description="Minimum raw similarity score to consider a result relevant. "
+        "Results with a similarity score below this threshold are not returned.",
+    )
+
     host: Optional[str] = Field(
         default=None,
         title="PostgreSQL host",
-        description="PostgreSQL host for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_HOST} when rag_type is remote::pgvector.",
+        description="PostgreSQL host for pgvector backend. "
+        "Defaults to ${env.POSTGRES_HOST} when backend is pgvector.",
     )
 
-    port: Optional[str] = Field(
+    port: Optional[str | int] = Field(
         default=None,
         title="PostgreSQL port",
-        description="PostgreSQL port for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_PORT} when rag_type is remote::pgvector.",
+        description="PostgreSQL port for pgvector backend. "
+        "Defaults to ${env.POSTGRES_PORT} when backend is pgvector.",
     )
 
     db: Optional[str] = Field(
         default=None,
         title="PostgreSQL database",
-        description="PostgreSQL database name for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_DATABASE} when rag_type is remote::pgvector.",
+        description="PostgreSQL database name for pgvector backend. "
+        "Defaults to ${env.POSTGRES_DATABASE} when backend is pgvector.",
     )
 
     user: Optional[str] = Field(
         default=None,
         title="PostgreSQL user",
-        description="PostgreSQL user for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_USER} when rag_type is remote::pgvector.",
+        description="PostgreSQL user for pgvector backend. "
+        "Defaults to ${env.POSTGRES_USER} when backend is pgvector.",
     )
 
     password: Optional[SecretStr] = Field(
         default=None,
         title="PostgreSQL password",
-        description="PostgreSQL password for remote::pgvector. "
-        "Defaults to ${env.POSTGRES_PASSWORD} when rag_type is remote::pgvector.",
+        description="PostgreSQL password for pgvector backend. "
+        "Defaults to ${env.POSTGRES_PASSWORD} when backend is pgvector.",
     )
 
     @model_validator(mode="after")
-    def validate_rag_type_fields(self) -> Self:
-        """Validate and populate fields based on rag_type."""
-        if self.rag_type == "inline::faiss":
+    def validate_backend_fields(self) -> Self:
+        """Validate and populate fields based on backend."""
+        if self.backend == "faiss":
             if not self.db_path:
-                raise ValueError("db_path is required when rag_type is 'inline::faiss'")
-        elif self.rag_type == "remote::pgvector":
+                raise ValueError("db_path is required when backend is 'faiss'")
+        elif self.backend == "pgvector":
             pgvector_defaults: dict[str, str | SecretStr] = {
                 "host": "${env.POSTGRES_HOST}",
                 "port": "${env.POSTGRES_PORT}",
@@ -2153,10 +2181,11 @@ class PgvectorVectorStoreProviderConfig(ConfigurationBase):
         description="PostgreSQL host. Defaults to ${env.POSTGRES_HOST}.",
     )
 
-    port: Optional[str] = Field(
+    port: Optional[str | int] = Field(
         default=None,
         title="PostgreSQL port",
-        description="PostgreSQL port. Defaults to ${env.POSTGRES_PORT}.",
+        description="PostgreSQL port. Defaults to ${env.POSTGRES_PORT}. "
+        "Accepts string placeholders and integer values.",
     )
 
     db: Optional[str] = Field(
@@ -2303,7 +2332,7 @@ class VectorStoreConfiguration(ConfigurationBase):
             non-empty; must match one of providers[].id. Must be omitted when
             providers is empty.
         providers: Dynamic vector-store provider capacity for runtime
-            POST /v1/vector-stores creates. Not the same as byok_rag (static
+            POST /v1/vector-stores creates. Not the same as rag.byok.stores (static
             registered corpora).
     """
 
@@ -2323,7 +2352,7 @@ class VectorStoreConfiguration(ConfigurationBase):
         description=(
             "Dynamic vector-store provider capacity for runtime "
             "POST /v1/vector-stores creates. "
-            "Not the same as byok_rag (static registered corpora)."
+            "Not the same as rag.byok.stores (static registered corpora)."
         ),
     )
 
@@ -2498,39 +2527,113 @@ class QuotaHandlersConfiguration(ConfigurationBase):
     )
 
 
-class RagConfiguration(ConfigurationBase):
-    """RAG strategy configuration.
+class RerankerConfiguration(ConfigurationBase):
+    """Reranker configuration for RAG chunk reranking."""
 
-    Controls which RAG sources are used for inline and tool-based retrieval.
-
-    Each strategy lists RAG IDs to include. The special ID ``"okp"`` defined in constants,
-    activates the OKP provider; all other IDs refer to entries in ``byok_rag``.
-
-    Both ``inline`` and ``tool`` default to ``[]`` (disabled).
-    Each must be explicitly configured to activate its respective RAG strategy.
-    """
-
-    inline: list[str] = Field(
-        default_factory=list,
-        title="Inline RAG IDs",
-        description="RAG IDs whose sources are injected as context before the LLM call. "
-        f"Use '{constants.OKP_RAG_ID}' to enable OKP inline RAG. Empty by default (no inline RAG).",
+    enabled: bool = Field(
+        default=False,
+        title="Reranker enabled",
+        description="When True, reranking applied to RAG chunks. "
+        "When False, reranking is disabled and original scoring used.",
+    )
+    model: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L6-v2",
+        title="Reranker model",
+        description="Cross-encoder model name for reranking RAG chunks. "
+        "Defaults to 'cross-encoder/ms-marco-MiniLM-L6-v2' from sentence-transformers.",
     )
 
-    tool: list[str] = Field(
+    _explicitly_configured: bool = PrivateAttr(default=False)
+
+    @model_validator(mode="after")
+    def mark_as_explicitly_configured(self) -> Self:
+        """Mark this configuration as explicitly set when instantiated from user input."""
+        if self.model_fields_set:
+            self._explicitly_configured = True
+
+        return self
+
+
+class RetrievalStrategyConfiguration(ConfigurationBase):
+    """Configuration for a single retrieval strategy (inline or tool)."""
+
+    sources: list[str] = Field(
         default_factory=list,
-        title="Tool RAG IDs",
-        description="RAG IDs made available to the LLM as a file_search tool. "
-        f"Use '{constants.OKP_RAG_ID}' to include the OKP vector store. "
-        "When omitted, tool RAG is disabled.",
+        title="RAG source IDs",
+        description="RAG IDs to use for this retrieval strategy. "
+        f"Use '{constants.OKP_RAG_ID}' to include the OKP vector store.",
     )
+
+    max_chunks: PositiveInt = Field(
+        default=constants.DEFAULT_INLINE_RAG_MAX_CHUNKS,
+        title="Max chunks",
+        description="Maximum number of chunks returned by this retrieval strategy.",
+    )
+
+    reranker: Optional[RerankerConfiguration] = Field(
+        default=None,
+        title="Reranker configuration",
+        description="Neural reranking of RAG chunks using cross-encoder. "
+        "Only applicable to inline retrieval.",
+    )
+
+
+class RetrievalConfiguration(ConfigurationBase):
+    """Configuration for inline and tool retrieval strategies."""
+
+    inline: RetrievalStrategyConfiguration = Field(
+        default_factory=lambda: RetrievalStrategyConfiguration(
+            max_chunks=constants.DEFAULT_INLINE_RAG_MAX_CHUNKS,
+            reranker=RerankerConfiguration(),
+        ),
+        title="Inline retrieval",
+        description="Inline RAG: context injected before the LLM request.",
+    )
+
+    tool: RetrievalStrategyConfiguration = Field(
+        default_factory=lambda: RetrievalStrategyConfiguration(
+            max_chunks=constants.DEFAULT_TOOL_RAG_MAX_CHUNKS,
+        ),
+        title="Tool retrieval",
+        description="Tool RAG: LLM can call file_search on demand.",
+    )
+
+
+class ByokConfiguration(ConfigurationBase):
+    """BYOK (Bring Your Own Knowledge) configuration."""
+
+    max_chunks: PositiveInt = Field(
+        default=constants.DEFAULT_BYOK_RAG_MAX_CHUNKS,
+        title="Max BYOK chunks",
+        description="Maximum total number of chunks returned across all BYOK stores.",
+    )
+
+    stores: list[RagStore] = Field(
+        default_factory=list,
+        title="BYOK RAG stores",
+        description="List of BYOK RAG store configurations.",
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_rag_ids(self) -> Self:
+        """Reject duplicate rag_id values across stores."""
+        seen: set[str] = set()
+        for store in self.stores:
+            if store.rag_id in seen:
+                raise ValueError(
+                    f"Duplicate rag_id '{store.rag_id}' in rag.byok.stores. "
+                    "Each store must have a unique rag_id."
+                )
+            seen.add(store.rag_id)
+        return self
 
 
 class OkpConfiguration(ConfigurationBase):
     """OKP (Offline Knowledge Portal) provider configuration.
 
     Controls provider-specific behaviour for the OKP vector store.
-    Only relevant when ``"okp"`` is listed in ``rag.inline`` or ``rag.tool``.
+    Only relevant when ``"okp"`` is listed in ``rag.retrieval.inline.sources``
+    or ``rag.retrieval.tool.sources``.
     """
 
     rhokp_url: Optional[AnyHttpUrl] = Field(
@@ -2555,31 +2658,90 @@ class OkpConfiguration(ConfigurationBase):
         "Use Solr boolean syntax, e.g. 'product:ansible AND product:*openshift*'.",
     )
 
-
-class RerankerConfiguration(ConfigurationBase):
-    """Reranker configuration for RAG chunk reranking."""
-
-    enabled: bool = Field(
-        default=False,
-        title="Reranker enabled",
-        description="When True, reranking applied to RAG chunks. "
-        "When False, reranking is disabled and original scoring used.",
-    )
-    model: str = Field(
-        default="cross-encoder/ms-marco-MiniLM-L6-v2",
-        title="Reranker model",
-        description="Cross-encoder model name for reranking RAG chunks. "
-        "Defaults to 'cross-encoder/ms-marco-MiniLM-L6-v2' from sentence-transformers.",
+    search_mode: Optional[Literal["semantic", "hybrid", "keyword"]] = Field(
+        default=None,
+        title="OKP search mode",
+        description="Default Solr search mode for OKP queries. "
+        "'keyword' uses BM25 text search (no embedding model needed). "
+        "'hybrid' combines vector + keyword search. "
+        "'semantic' uses pure vector search. "
+        "When unset, falls back to the global default ('hybrid').",
     )
 
-    # Private attribute to track if this was explicitly configured
-    _explicitly_configured: bool = PrivateAttr(default=False)
+    max_chunks: PositiveInt = Field(
+        default=constants.DEFAULT_OKP_RAG_MAX_CHUNKS,
+        title="Max OKP chunks",
+        description="Maximum number of chunks fetched from OKP.",
+    )
+
+
+class RagConfiguration(ConfigurationBase):
+    """Unified RAG configuration.
+
+    Groups all RAG-related settings: BYOK stores, OKP provider, and
+    retrieval strategies (inline and tool).
+    """
+
+    byok: ByokConfiguration = Field(
+        default_factory=ByokConfiguration,
+        title="BYOK configuration",
+        description="Bring Your Own Knowledge store configurations and settings.",
+    )
+
+    okp: OkpConfiguration = Field(
+        default_factory=OkpConfiguration,
+        title="OKP configuration",
+        description=f"OKP provider settings. Only used when '{constants.OKP_RAG_ID}' "
+        "is listed in retrieval.inline.sources or retrieval.tool.sources.",
+    )
+
+    retrieval: RetrievalConfiguration = Field(
+        default_factory=RetrievalConfiguration,
+        title="Retrieval configuration",
+        description="Inline and tool retrieval strategy settings.",
+    )
 
     @model_validator(mode="after")
-    def mark_as_explicitly_configured(self) -> Self:
-        """Mark this configuration as explicitly set when instantiated from user input."""
-        if self.model_fields_set:
-            self._explicitly_configured = True
+    def validate_retrieval_sources(self) -> Self:
+        """Reject retrieval source IDs not declared in byok.stores or OKP."""
+        # pylint: disable=no-member
+        known_ids = {store.rag_id for store in self.byok.stores}
+        known_ids.add(constants.OKP_RAG_ID)
+
+        for strategy_name in ("inline", "tool"):
+            strategy = getattr(self.retrieval, strategy_name)
+            unknown = set(strategy.sources) - known_ids
+            if unknown:
+                raise ValueError(
+                    f"retrieval.{strategy_name}.sources contains unknown RAG IDs: "
+                    f"{sorted(unknown)}. "
+                    f"Declared IDs: {sorted(known_ids)}"
+                )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_reranker_auto_enable(self) -> Self:
+        """Automatically enable reranker when both BYOK and OKP RAG are configured."""
+        # pylint: disable=no-member
+        has_byok = len(self.byok.stores) > 0
+        has_okp = constants.OKP_RAG_ID in self.retrieval.inline.sources
+        reranker = self.retrieval.inline.reranker
+
+        if (
+            has_byok
+            and has_okp
+            and reranker is not None
+            and not reranker._explicitly_configured  # pylint: disable=protected-access
+            and not reranker.enabled
+        ):
+            logger.info(
+                "Automatically enabling reranker: Both BYOK RAG (%d stores) and "
+                "OKP are configured. Reranking improves result quality when "
+                "multiple knowledge sources are available.",
+                len(self.byok.stores),
+            )
+            reranker.enabled = True
 
         return self
 
@@ -2962,6 +3124,18 @@ class Configuration(ConfigurationBase):
         description="Name of the service. That value will be used in REST API endpoints.",
     )
 
+    config_format_version: Optional[Literal["legacy", "unified"]] = Field(
+        None,
+        title="Configuration format version",
+        description="Optional explicit marker of the configuration format. "
+        "When set, it must agree with the shape detected from the "
+        "configuration body: 'unified' requires a synthesis input (a "
+        "non-empty inference.providers, a non-empty vector_store.providers, "
+        "or a llama_stack.config block), 'legacy' requires no synthesis "
+        "input. Reserved as the lever for a future breaking change of the "
+        "unified schema (R11).",
+    )
+
     service: ServiceConfiguration = Field(
         ...,
         title="Service configuration",
@@ -3064,13 +3238,6 @@ class Configuration(ConfigurationBase):
         description="Settings for human-in-the-loop approval of MCP tool invocations",
     )
 
-    byok_rag: list[ByokRag] = Field(
-        default_factory=list,
-        title="BYOK RAG configuration",
-        description="BYOK RAG configuration. This configuration can be used to "
-        "reconfigure Llama Stack through its run.yaml configuration file",
-    )
-
     vector_store: VectorStoreConfiguration = Field(
         default_factory=lambda: VectorStoreConfiguration(
             default_provider=None, providers=[]
@@ -3079,7 +3246,7 @@ class Configuration(ConfigurationBase):
         description=(
             "Dynamic vector-store provider capacity for runtime "
             "POST /v1/vector-stores creates. "
-            "Not the same as byok_rag (static registered corpora). "
+            "Not the same as rag.byok.stores (static registered corpora). "
             "When providers is non-empty, default_provider is required and "
             "must match one of providers[].id. Applied in unified synthesis "
             "only."
@@ -3131,20 +3298,8 @@ class Configuration(ConfigurationBase):
     rag: RagConfiguration = Field(
         default_factory=RagConfiguration,
         title="RAG configuration",
-        description="Configuration for all RAG strategies (inline and tool-based).",
-    )
-
-    okp: OkpConfiguration = Field(
-        default_factory=OkpConfiguration,
-        title="OKP configuration",
-        description=f"OKP provider settings. Only used when '{constants.OKP_RAG_ID}' is listed "
-        "in rag.inline or rag.tool.",
-    )
-
-    reranker: RerankerConfiguration = Field(
-        default_factory=RerankerConfiguration,
-        title="Reranker configuration",
-        description="Configuration for neural reranking of RAG chunks using cross-encoder.",
+        description="Unified RAG configuration: BYOK stores, OKP provider, "
+        "and retrieval strategies (inline and tool-based).",
     )
 
     skills: Optional[SkillsConfiguration] = Field(
@@ -3290,43 +3445,6 @@ class Configuration(ConfigurationBase):
         return self
 
     @model_validator(mode="after")
-    def validate_reranker_auto_enable(self) -> Self:
-        """Automatically enable reranker when both BYOK and OKP RAG are configured.
-
-        When users have both BYOK entries in byok_rag and OKP
-        configured in the RAG strategies, automatically
-        enable the reranker if it's not explicitly disabled. This improves result
-        quality when multiple knowledge sources are available.
-
-        Returns:
-            Self: The validated configuration instance with reranker potentially enabled.
-        """
-        # Check if BYOK RAG entries are configured
-        has_byok = len(self.byok_rag) > 0
-
-        # Check if OKP is configured in either inline or tool RAG strategies
-        # pylint: disable=no-member
-        has_okp = constants.OKP_RAG_ID in self.rag.inline
-
-        # If both BYOK and OKP are present and reranker is using default settings,
-        # ensure it's enabled for optimal results
-        if (
-            has_byok
-            and has_okp
-            and not self.reranker._explicitly_configured  # pylint: disable=protected-access
-            and not self.reranker.enabled
-        ):
-            logger.info(
-                "Automatically enabling reranker: Both BYOK RAG (%d entries) or "
-                "other inline RAG and OKP are configured. Reranking improves result "
-                "quality when multiple knowledge sources are available.",
-                len(self.byok_rag),
-            )
-            self.reranker.enabled = True
-
-        return self
-
-    @model_validator(mode="after")
     def check_unified_vs_legacy(self) -> Self:
         """Reconcile unified synthesis inputs, legacy mode, and library-mode needs.
 
@@ -3343,14 +3461,19 @@ class Configuration(ConfigurationBase):
         - Library mode needs *some* run source — a synthesis input or the
           legacy path. ``inference.providers`` or ``vector_store.providers``
           alone is sufficient; no ``llama_stack.config`` block is required.
+        - An explicit ``config_format_version``, when set, must agree with
+          the detected shape (R11): ``unified`` requires a synthesis input,
+          ``legacy`` requires its absence (remote-only configs count as
+          legacy-compatible).
 
         Returns:
             Self: The validated configuration instance.
 
         Raises:
             ValueError: If a synthesis input and the legacy
-                ``library_client_config_path`` are set together, or if library
-                mode has no run source at all.
+                ``library_client_config_path`` are set together, if library
+                mode has no run source at all, or if ``config_format_version``
+                contradicts the detected shape.
         """
         # pylint: disable=no-member
         synthesis_input = (
@@ -3380,6 +3503,18 @@ class Configuration(ConfigurationBase):
                 "vector_store.providers, a llama_stack.config block, or "
                 "library_client_config_path."
             )
+        if self.config_format_version is not None:
+            detected = "unified" if synthesis_input else "legacy"
+            if self.config_format_version != detected:
+                raise ValueError(
+                    f"config_format_version is '{self.config_format_version}' "
+                    f"but the configuration body is {detected}-shaped: a "
+                    "unified configuration carries a synthesis input (a "
+                    "non-empty inference.providers, a non-empty "
+                    "vector_store.providers, or a llama_stack.config block), "
+                    "a legacy one does not. Fix config_format_version or the "
+                    "configuration body."
+                )
         return self
 
     def dump(self, filename: str | Path = "configuration.json") -> None:

@@ -19,6 +19,8 @@ The service includes comprehensive user data collection capabilities for various
 * [Architecture](#architecture)
 * [Prerequisites](#prerequisites)
 * [Installation](#installation)
+    * [Clone the Repository](#clone-the-repository)
+    * [System-Specific Installation](#system-specific-installation)
 * [Run LCS locally](#run-lcs-locally)
     * [Container Runtime Requirements](#container-runtime-requirements)
 * [Configuration](#configuration)
@@ -683,13 +685,24 @@ service:
   access_log: true
 llama_stack:
   use_as_library_client: true
-  library_client_config_path: <path-to-llama-stack-run.yaml-file>
+  # Unified mode (recommended): LCORE synthesizes the Llama Stack run.yaml.
+  # Point profile at a run.yaml-shaped file you author, or omit the config
+  # block and drive everything from the top-level inference.providers
+  # section over the built-in default baseline.
+  config:
+    profile: <path-to-llama-stack-run.yaml-file>
 user_data_collection:
   feedback_enabled: true
   feedback_storage: "/tmp/data/feedback"
   transcripts_enabled: true
   transcripts_storage: "/tmp/data/transcripts"
 ```
+
+> [!WARNING]
+> The legacy two-file setup (`library_client_config_path:` pointing at an
+> externally maintained `run.yaml`) is deprecated — it logs a startup
+> warning since 0.6 and is removed in 0.7. See the
+> [migration guide](docs/user_doc/deployment_guide.md#migrating-from-the-legacy-two-file-configuration).
 
 ## Llama Stack version check
 
@@ -918,7 +931,7 @@ test-unit                         Run the unit tests
 test-integration                  Run integration tests tests
 test-e2e                          Run end to end tests for the service
 test-e2e-local                    Run end to end tests for the service (no script wrapper)
-test-e2e-tagged                   Run e2e tests with E2E_BEHAVE_TAG_EXPR (default: all @e2e_group_*)
+test-e2e-tagged                   Run e2e tests with E2E_BEHAVE_TAG_EXPR (default: all @cfg_*)
 test-e2e-tagged-local             Same as test-e2e-tagged without script wrapper
 benchmarks                        Run benchmarks
 check-types-src                   Check type hints in sources only
@@ -960,9 +973,9 @@ lint-openapi                      Lint docs/openapi.json (Spectral OAS ruleset; 
 verify                            Run all linters
 distribution-archives             Generate distribution archives to be uploaded into Python registry
 upload-distribution-archives      Upload distribution archives into Python registry
-konflux-requirements              Generate hermetic requirements.*.txt file for konflux build
-konflux-rpm-lock                  Generate rpm.lock.yaml file for konflux build
-konflux-artifacts-lock            Regenerate artifacts.lock.yaml file for konflux build
+konflux-requirements              Generate hermetic requirements.*.txt file for Konflux build
+konflux-rpm-lock                  Generate rpm.lock.yaml file for Konflux build
+konflux-artifacts-lock            Regenerate artifacts.lock.yaml file for Konflux build
 help                              Show this help screen
 ```
 
@@ -1046,7 +1059,11 @@ When embedding llama-stack directly in the container, use the existing `deploy/l
 ```yaml
 llama_stack:
   use_as_library_client: true
-  library_client_config_path: /app-root/run.yaml
+  # Unified mode: the mounted run.yaml is the synthesis profile. (The
+  # legacy library_client_config_path equivalent is deprecated, removed
+  # in 0.7.)
+  config:
+    profile: /app-root/run.yaml
 ```
 
 **Build and run**:
@@ -1262,6 +1279,57 @@ will be returned.
 }
 ```
 
+## Skills endpoint
+
+**Endpoint:** `GET /v1/skills`
+
+Process GET requests and return the list of agent skills loaded from the
+directories configured under `skills.paths` in the service configuration
+(see [Agent Skills](#agent-skills) and the [Agent Skills Guide](docs/user_doc/skills_guide.md)
+for configuration and authoring instructions). Each skill's name and
+description are read from its `SKILL.md` frontmatter.
+
+This endpoint reads the configured skill directories directly and does not
+invoke an LLM or agent — it is intended for clients (e.g. the RHDH UI or
+other tooling) that need a deterministic way to introspect configured
+skills without the cost, latency, or non-determinism of an LLM tool call.
+This is distinct from the `list_skills` tool that the agent itself may
+invoke during a `/v1/query` or `/v1/streaming_query` turn.
+
+If [authentication](#authentication) is enabled, include the appropriate
+credentials; otherwise the request returns `401`/`403`.
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8080/v1/skills
+```
+
+**Response Body:**
+
+```json
+{
+  "skills": [
+    {
+      "name": "code-review",
+      "description": "Review code for quality and security"
+    },
+    {
+      "name": "openshift-troubleshooting",
+      "description": "Troubleshoot OpenShift cluster issues"
+    }
+  ]
+}
+```
+
+If no skills are configured (or `skills.paths` is empty), the endpoint
+returns an empty list:
+
+```json
+{
+  "skills": []
+}
+```
+
 
 # Database structure
 
@@ -1451,9 +1519,9 @@ make konflux-requirements
 This compiles Python dependencies from `pyproject.toml` using `uv`, splits packages by their source index (PyPI vs Red Hat's internal registry), and generates hermetic requirements files with pinned versions and hashes for Konflux builds.
 
 **Files produced:**
-- `requirements.hashes.source.txt` – PyPI packages with hashes
-- `requirements.hashes.wheel.txt` – Red Hat registry packages with hashes
-- `requirements-build.txt` – Build-time dependencies for source packages
+- `.konflux/requirements.hashes.source.txt` – PyPI packages with hashes
+- `.konflux/requirements.hashes.wheel.txt` – Red Hat registry packages with hashes
+- `.konflux/requirements-build.txt` – Build-time dependencies for source packages
 
 The script also updates the Tekton pipeline configurations (`.tekton/lightspeed-stack-*.yaml`) with the list of pre-built wheel packages.
 

@@ -33,6 +33,7 @@ requests_models: list[type[BaseModel]] = [
     r.RlsapiV1InferRequest,
     r.RlsapiV1SystemInfo,
     r.RlsapiV1Terminal,
+    r.SavedPromptCreateRequest,
     r.StreamingInterruptRequest,
     r.VectorStoreCreateRequest,
     r.VectorStoreFileCreateRequest,
@@ -40,6 +41,9 @@ requests_models: list[type[BaseModel]] = [
 ]
 
 successful_responses_models: list[type[BaseModel]] = [
+    s.AbstractDeleteResponse,
+    s.AbstractSuccessfulResponse,
+    s.SavedPromptsConfigResponse,
     s.AuthorizedResponse,
     s.ConfigurationResponse,
     s.ConversationDeleteResponse,
@@ -73,6 +77,7 @@ successful_responses_models: list[type[BaseModel]] = [
     s.SavedPromptResponse,
     s.SavedPromptsListResponse,
     s.ShieldsResponse,
+    s.SkillsResponse,
     s.StatusResponse,
     s.StreamingInterruptResponse,
     s.StreamingQueryResponse,
@@ -103,6 +108,8 @@ error_responses_models: list[type[BaseModel]] = [
 
 common_models: list[type[BaseModel]] = [
     c.Attachment,
+    c.CatalogModel,
+    c.CatalogShield,
     c.ConversationData,
     c.ConversationDetails,
     c.ConversationTurn,
@@ -116,6 +123,7 @@ common_models: list[type[BaseModel]] = [
     c.ReferencedDocument,
     c.ShieldModerationBlocked,
     c.ShieldModerationPassed,
+    c.SkillMetadata,
     c.SolrVectorSearchRequest,
     c.ToolCallSummary,
     c.ToolInfoSummary,
@@ -123,6 +131,9 @@ common_models: list[type[BaseModel]] = [
     c.Transcript,
     c.TranscriptMetadata,
     c.TurnSummary,
+    c.CatalogTool,
+    c.CatalogToolParameter,
+    c.ListedMcpTool,
 ]
 
 agents_models: list[type[BaseModel]] = [

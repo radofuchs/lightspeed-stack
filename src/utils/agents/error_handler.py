@@ -1,7 +1,5 @@
 """Error mapping for agent inference failures to structured API error responses."""
 
-from typing import TypeAlias
-
 from ogx_client import APIConnectionError, APIStatusError
 from pydantic_ai.exceptions import (
     AgentRunError,
@@ -24,9 +22,10 @@ from models.api.responses.error import (
 from utils.query import (
     handle_known_apistatus_errors,
     is_context_length_error,
+    is_resource_exhausted_error,
 )
 
-AgentInferenceError: TypeAlias = (
+type AgentInferenceError = (
     AgentRunError | APIStatusError | APIConnectionError | RuntimeError
 )
 
@@ -91,6 +90,13 @@ def map_pydantic_agent_run_error(  # pylint: disable=too-many-return-statements
         case ModelHTTPError() as http_exc if is_context_length_error(str(http_exc)):
             return PromptTooLongResponse(model=model_id)
         case ModelHTTPError(status_code=429):
+            return QuotaExceededResponse.model(model_id)
+        case ModelHTTPError() as http_exc if is_resource_exhausted_error(str(http_exc)):
+            logger.warning(
+                "Detected RESOURCE_EXHAUSTED in ModelHTTPError with status %d; "
+                "treating as 429 (llama-stack wraps Vertex AI 429 as 500)",
+                http_exc.status_code,
+            )
             return QuotaExceededResponse.model(model_id)
         case ModelHTTPError():
             return InternalServerErrorResponse.generic()
