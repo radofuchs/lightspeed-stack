@@ -326,7 +326,7 @@ def after_scenario(context: Context, scenario: Scenario) -> None:
                     provider_shield_id=provider_shield_id,
                 )
                 print("Re-registered shield llama-guard")
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except (TypeError, ValueError, RuntimeError, KeyboardInterrupt) as e:
                 print(f"Warning: Could not re-register shield: {e}")
 
 
