@@ -3,6 +3,10 @@ features/health.feature
 features/info.feature
 features/models.feature
 features/rest_api.feature
+features/shields.feature
+features/shields_question_validity.feature
+features/shields_redaction.feature
+features/shields_overrides.feature
 features/smoketests.feature
 features/inline_rag.feature
 features/proxy.feature
