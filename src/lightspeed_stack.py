@@ -185,11 +185,11 @@ def main() -> None:
 
     configuration.load_configuration(args.config_file)
     logger.info("Configuration: %s", configuration.configuration)
-    logger.info("OGX configuration: %s", configuration.llama_stack_configuration)
+    logger.info("OGX configuration: %s", configuration.ogx_configuration)
 
     # Deprecation schedule (Decision S2): the legacy two-file path keeps
     # working through 0.6 with this single startup WARN and is removed in 0.7.
-    if configuration.llama_stack_configuration.library_client_config_path is not None:
+    if configuration.ogx_configuration.library_client_config_path is not None:
         logger.warning(
             "DEPRECATED: the two-file configuration "
             "(llama_stack.library_client_config_path + external run.yaml) is "
