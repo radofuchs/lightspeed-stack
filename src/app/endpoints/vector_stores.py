@@ -692,14 +692,17 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
             vs_file.last_error or "None",
         )
 
-        # The vector store now holds its own chunked/embedded copy of the
-        # content; nothing downstream (citations, retrieval, this API
-        # surface) ever re-reads the original file after a successful
-        # attach. Deleting it here prevents unbounded disk growth, since
-        # the Files provider's TTL is metadata-only and nothing actively
-        # reaps expired files. Skip on failure so a caller can retry the
-        # attach with the same file_id.
-        if vs_file.status == "completed":
+        # Deleting the file here prevents unbounded disk growth (the Files
+        # provider's TTL is metadata-only, nothing actively reaps expired
+        # files), but it also makes the file single-use: OpenAI's Files API
+        # keeps a file reusable across multiple vector stores until the
+        # caller explicitly deletes it, so this is opt-in and off by
+        # default. Skip on failure so a caller can retry the attach with
+        # the same file_id.
+        if (
+            configuration.service_configuration.delete_file_after_vector_store_attach
+            and vs_file.status == "completed"
+        ):
             try:
                 await client.files.delete(body.file_id)
             except Exception as delete_error:  # pylint: disable=broad-exception-caught

@@ -493,9 +493,22 @@ frees up. Size these against available memory: each concurrent upload or
 attachment can hold up to the maximum upload size (100MB by default) in
 memory.
 
-Once a file is successfully attached to a vector store, it is deleted
-automatically — the vector store keeps its own chunked/embedded copy, and the
-original is no longer needed.
+By default, files remain reusable across multiple vector stores, matching the
+OpenAI Files API — a file stays available until you explicitly delete it,
+even after being attached. Since nothing actively reaps unused files, they
+will otherwise accumulate on disk indefinitely. If your deployment always
+uploads a file for exactly one vector store, you can opt into automatic
+cleanup instead:
+
+```yaml
+service:
+  delete_file_after_vector_store_attach: false  # default: false
+```
+
+When enabled, a file is deleted once it's successfully attached to a vector
+store, since the vector store keeps its own chunked/embedded copy. Enabling
+this makes attached files single-use: re-attaching the same `file_id` to
+another vector store will fail once it has been deleted.
 
 ---
 

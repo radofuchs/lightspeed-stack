@@ -410,6 +410,19 @@ class ServiceConfiguration(ConfigurationBase):
         "with 429 until a slot frees up.",
     )
 
+    delete_file_after_vector_store_attach: bool = Field(
+        False,
+        title="Delete file after vector store attach",
+        description="When true, deletes a file (POST /v1/files) once it has "
+        "been successfully attached to a vector store, since the vector "
+        "store keeps its own chunked/embedded copy of the content. "
+        "Defaults to false to match the OpenAI Files API, where a file "
+        "remains reusable across multiple vector stores until the caller "
+        "explicitly deletes it - enabling this makes attached files "
+        "single-use: re-attaching the same file_id to another vector store "
+        "will fail once it has been deleted.",
+    )
+
     color_log: bool = Field(
         True,
         title="Color log",

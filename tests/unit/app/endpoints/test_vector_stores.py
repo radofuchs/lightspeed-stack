@@ -651,10 +651,11 @@ async def test_add_file_to_vector_store_rejects_when_semaphore_saturated(
 async def test_add_file_to_vector_store_deletes_file_on_success(
     mocker: MockerFixture,
 ) -> None:
-    """Test the source file is deleted after a completed attach."""
+    """Test the source file is deleted after a completed attach when enabled."""
     mock_authorization_resolvers(mocker)
 
     config_dict = get_test_config()
+    config_dict["service"]["delete_file_after_vector_store_attach"] = True
     cfg = AppConfig()
     cfg.init_from_dict(config_dict)
 
@@ -680,6 +681,42 @@ async def test_add_file_to_vector_store_deletes_file_on_success(
 
 
 @pytest.mark.asyncio
+async def test_add_file_to_vector_store_keeps_file_reusable_by_default(
+    mocker: MockerFixture,
+) -> None:
+    """Test the source file is kept by default, so it can be attached elsewhere.
+
+    Matches the OpenAI Files API, where a file stays reusable across
+    multiple vector stores until the caller explicitly deletes it.
+    """
+    mock_authorization_resolvers(mocker)
+
+    config_dict = get_test_config()
+    cfg = AppConfig()
+    cfg.init_from_dict(config_dict)
+
+    mock_client = mocker.AsyncMock()
+    mock_client.vector_stores.files.create.return_value = VectorStoreFile(
+        "file_123", "vs_123", file_status="completed"
+    )
+    mock_lsc = mocker.patch(
+        "app.endpoints.vector_stores.AsyncOgxClientHolder.get_client"
+    )
+    mock_lsc.return_value = mock_client
+    mocker.patch("app.endpoints.vector_stores.configuration", cfg)
+
+    request = get_test_request()
+    auth = get_test_auth()
+    body = VectorStoreFileCreateRequest(file_id="file_123")
+
+    response = await add_file_to_vector_store(
+        request=request, vector_store_id="vs_123", auth=auth, body=body
+    )
+    assert response.status == "completed"
+    mock_client.files.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_add_file_to_vector_store_does_not_delete_file_on_failure(
     mocker: MockerFixture,
 ) -> None:
@@ -687,6 +724,7 @@ async def test_add_file_to_vector_store_does_not_delete_file_on_failure(
     mock_authorization_resolvers(mocker)
 
     config_dict = get_test_config()
+    config_dict["service"]["delete_file_after_vector_store_attach"] = True
     cfg = AppConfig()
     cfg.init_from_dict(config_dict)
 
@@ -719,6 +757,7 @@ async def test_add_file_to_vector_store_delete_failure_is_non_fatal(
     mock_authorization_resolvers(mocker)
 
     config_dict = get_test_config()
+    config_dict["service"]["delete_file_after_vector_store_attach"] = True
     cfg = AppConfig()
     cfg.init_from_dict(config_dict)
 
