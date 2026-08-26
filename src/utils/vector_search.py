@@ -562,7 +562,9 @@ async def _fetch_byok_rag(  # pylint: disable=too-many-locals
         # Extract referenced documents from BYOK RAG chunks (now with resolved sources)
         referenced_documents = _process_byok_rag_chunks_for_documents(top_results)
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (
+        Exception  # pylint: disable=broad-exception-caught
+    ) as e:  # noqa: BLE001 RUF100
         logger.warning("Failed to perform BYOK RAG search: %s", e)
         logger.debug("BYOK RAG error details: %s", traceback.format_exc())
 
