@@ -1206,15 +1206,19 @@ def test_main_legacy_config_enriches_input_file(
     run_path.write_text(yaml.dump(run_yaml), encoding="utf-8")
     lcs = {
         "llama_stack": {"library_client_config_path": str(run_path)},
-        "byok_rag": [
-            {
-                "rag_id": "kb1",
-                "vector_db_id": "kb1",
-                "db_path": "/var/lib/kb1/faiss.db",
-                "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
-                "embedding_dimension": 768,
+        "rag": {
+            "byok": {
+                "stores": [
+                    {
+                        "rag_id": "kb1",
+                        "vector_db_id": "kb1",
+                        "db_path": "/var/lib/kb1/faiss.db",
+                        "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
+                        "embedding_dimension": 768,
+                    }
+                ]
             }
-        ],
+        },
     }
     cfg_path = tmp_path / "lightspeed-stack.yaml"
     cfg_path.write_text(yaml.dump(lcs), encoding="utf-8")
