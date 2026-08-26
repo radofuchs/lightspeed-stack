@@ -289,7 +289,9 @@ async def _query_store_for_byok_rag(  # pylint: disable=too-many-arguments,too-m
             },
         )
         return _extract_byok_rag_chunks(search_response, vector_store_id, weight)
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (
+        Exception  # pylint: disable=broad-exception-caught
+    ) as e:  # noqa: BLE001 RUF100
         logger.warning("Failed to search '%s': %s", vector_store_id, e)
         return []
 
