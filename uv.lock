@@ -1876,7 +1876,7 @@ dev = [
     { name = "types-pyyaml" },
     { name = "types-requests" },
 ]
-llslibdev = [
+ogxlibdev = [
     { name = "aiosqlite" },
     { name = "autoevals" },
     { name = "azure-identity" },
@@ -1988,7 +1988,7 @@ dev = [
     { name = "types-pyyaml", specifier = ">=6.0.2" },
     { name = "types-requests", specifier = ">=2.28.0" },
 ]
-llslibdev = [
+ogxlibdev = [
     { name = "aiosqlite", specifier = ">=0.21.0" },
     { name = "autoevals", specifier = ">=0.0.129" },
     { name = "azure-identity", specifier = ">=1.21.0" },
@@ -2017,7 +2017,7 @@ llslibdev = [
     { name = "pythainlp", specifier = ">=3.0.10" },
     { name = "requests", specifier = ">=2.33.0" },
     { name = "sentence-transformers", specifier = ">=5.0.0" },
-    { name = "torch", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "lightspeed-stack", group = "llslibdev" } },
+    { name = "torch", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "lightspeed-stack", group = "ogxlibdev" } },
     { name = "transformers", specifier = ">=4.34.0" },
     { name = "tree-sitter", specifier = ">=0.24.0" },
     { name = "trl", specifier = ">=0.18.2" },
