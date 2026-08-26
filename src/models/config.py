@@ -389,6 +389,27 @@ class ServiceConfiguration(ConfigurationBase):
         description="Number of Uvicorn worker processes to start",
     )
 
+    max_concurrent_file_uploads: PositiveInt = Field(
+        5,
+        title="Maximum concurrent file uploads",
+        description="Maximum number of file uploads (POST /v1/files) processed "
+        "concurrently per worker. Each in-flight upload can hold up to the "
+        "configured maximum file size in memory, so this bounds worst-case "
+        "memory usage from concurrent uploads. Additional uploads are "
+        "rejected with 429 until a slot frees up.",
+    )
+
+    max_concurrent_vector_store_attaches: PositiveInt = Field(
+        5,
+        title="Maximum concurrent vector store file attachments",
+        description="Maximum number of vector store file attachments "
+        "(POST /v1/vector-stores/{id}/files) processed concurrently per "
+        "worker. Each in-flight attachment re-reads and chunks the source "
+        "file, so this bounds worst-case memory usage independently of "
+        "max_concurrent_file_uploads. Additional attachments are rejected "
+        "with 429 until a slot frees up.",
+    )
+
     color_log: bool = Field(
         True,
         title="Color log",

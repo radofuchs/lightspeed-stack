@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+from functools import lru_cache
 from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -33,6 +34,7 @@ from models.api.responses.error import (
     InternalServerErrorResponse,
     NotFoundResponse,
     ServiceUnavailableResponse,
+    TooManyConcurrentRequestsResponse,
     UnauthorizedResponse,
 )
 from models.api.responses.successful import (
@@ -50,6 +52,27 @@ from utils.query import handle_known_apistatus_errors
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["vector-stores"])
+
+# Each upload/attach holds up to DEFAULT_MAX_FILE_UPLOAD_SIZE bytes in memory,
+# so unbounded concurrency multiplies memory usage linearly - these semaphores
+# bound how many run at once. Built lazily (via lru_cache) on first request,
+# once configuration is guaranteed loaded, sized from configuration.
+
+
+@lru_cache(maxsize=1)
+def _get_file_upload_semaphore() -> asyncio.Semaphore:
+    """Build the file upload concurrency semaphore, sized from configuration."""
+    return asyncio.Semaphore(
+        configuration.service_configuration.max_concurrent_file_uploads
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_vector_store_attach_semaphore() -> asyncio.Semaphore:
+    """Build the vector store attach concurrency semaphore, sized from configuration."""
+    return asyncio.Semaphore(
+        configuration.service_configuration.max_concurrent_vector_store_attaches
+    )
 
 
 # Response schemas for OpenAPI documentation
@@ -79,6 +102,7 @@ file_responses: dict[int | str, dict[str, Any]] = {
     413: FileTooLargeResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
+    429: TooManyConcurrentRequestsResponse.openapi_response(examples=["file upload"]),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
         examples=["ogx", "kubernetes api"]
@@ -90,6 +114,9 @@ vector_store_file_responses: dict[int | str, dict[str, Any]] = {
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
     404: NotFoundResponse.openapi_response(examples=["file"]),
+    429: TooManyConcurrentRequestsResponse.openapi_response(
+        examples=["vector store attach"]
+    ),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
         examples=["ogx", "kubernetes api"]
@@ -452,6 +479,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
             - 400: Bad request (e.g., file too large, invalid format)
             - 401: Authentication failed
             - 403: Authorization failed
+            - 429: Too many concurrent file uploads
             - 500: Lightspeed Stack configuration not loaded
             - 503: Unable to connect to OGX
     """
@@ -483,14 +511,24 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
             )
             raise HTTPException(**response.model_dump())
 
-    try:
-        client = AsyncOgxClientHolder().get_client()
+    file_upload_semaphore = _get_file_upload_semaphore()
+    if file_upload_semaphore.locked():
+        logger.warning(
+            "Rejecting file upload - concurrency limit of %d concurrent "
+            "uploads reached",
+            configuration.service_configuration.max_concurrent_file_uploads,
+        )
+        response = TooManyConcurrentRequestsResponse.file_upload()
+        raise HTTPException(**response.model_dump())
 
-        # Determine the size WITHOUT reading the file into memory: seek to the
-        # end of the spooled temp file, record the position, then rewind so the
-        # upload reads from the start. Starlette backs UploadFile with a
-        # SpooledTemporaryFile that rolls over to disk past its threshold, so
-        # this stays memory-safe even for large uploads.
+    try:
+        holder = AsyncOgxClientHolder()
+
+        # Determine the size cheaply first: seek to the end of the spooled temp
+        # file, record the position, then rewind. Starlette backs UploadFile
+        # with a SpooledTemporaryFile that rolls over to disk past its
+        # threshold, so this avoids a full read just to measure the size and
+        # lets us reject oversized uploads before buffering them.
         upload = file.file
         upload.seek(0, os.SEEK_END)
         file_size = upload.tell()
@@ -517,13 +555,8 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
             file_size,
         )
 
-        # Pass the disk-backed spooled file object directly so
-        # llama-stack-client / httpx stream it to the backend in chunks
-        # instead of buffering the whole file in memory.
-        file_obj = await client.files.create(
-            file=(filename, upload),
-            purpose="assistants",
-        )
+        async with file_upload_semaphore:
+            file_obj = await holder.upload_file(file, filename, purpose="assistants")
 
         return FileResponse(
             id=file_obj.id,
@@ -583,6 +616,7 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
             - 401: Authentication failed
             - 403: Authorization failed
             - 404: Vector store or file not found
+            - 429: Too many concurrent vector store file attachments
             - 500: Lightspeed Stack configuration not loaded
             - 503: Unable to connect to OGX
     """
@@ -590,6 +624,16 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
     _ = request
 
     check_configuration_loaded(configuration)
+
+    vector_store_attach_semaphore = _get_vector_store_attach_semaphore()
+    if vector_store_attach_semaphore.locked():
+        logger.warning(
+            "Rejecting vector store file attach - concurrency limit of %d "
+            "concurrent attaches reached",
+            configuration.service_configuration.max_concurrent_vector_store_attaches,
+        )
+        response = TooManyConcurrentRequestsResponse.vector_store_attach()
+        raise HTTPException(**response.model_dump())
 
     try:
         client = AsyncOgxClientHolder().get_client()
@@ -600,35 +644,38 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
         vs_file = None
         last_lock_error: Optional[Exception] = None
 
-        for attempt in range(max_retries):
-            try:
-                vs_file = await client.vector_stores.files.create(
-                    vector_store_id=vector_store_id,
-                    **body.model_dump(exclude_none=True),
-                )
-                break  # Success, exit retry loop
-            except Exception as retry_error:  # pylint: disable=broad-exception-caught
-                error_msg = str(retry_error).lower()
-                is_lock_error = (
-                    "database is locked" in error_msg or "locked" in error_msg
-                )
-                is_last_attempt = attempt == max_retries - 1
+        async with vector_store_attach_semaphore:
+            for attempt in range(max_retries):
+                try:
+                    vs_file = await client.vector_stores.files.create(
+                        vector_store_id=vector_store_id,
+                        **body.model_dump(exclude_none=True),
+                    )
+                    break  # Success, exit retry loop
+                except (
+                    Exception  # pylint: disable=broad-exception-caught
+                ) as retry_error:
+                    error_msg = str(retry_error).lower()
+                    is_lock_error = (
+                        "database is locked" in error_msg or "locked" in error_msg
+                    )
+                    is_last_attempt = attempt == max_retries - 1
 
-                if is_lock_error:
-                    last_lock_error = retry_error
-                    if not is_last_attempt:
-                        logger.warning(
-                            "Database locked while adding file to vector store, "
-                            "retrying in %s seconds (attempt %d/%d)",
-                            retry_delay,
-                            attempt + 1,
-                            max_retries,
-                        )
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
-                        continue
-                    break
-                raise  # Re-raise if not a lock error
+                    if is_lock_error:
+                        last_lock_error = retry_error
+                        if not is_last_attempt:
+                            logger.warning(
+                                "Database locked while adding file to vector store, "
+                                "retrying in %s seconds (attempt %d/%d)",
+                                retry_delay,
+                                attempt + 1,
+                                max_retries,
+                            )
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        break
+                    raise  # Re-raise if not a lock error
         if vs_file is None:
             if last_lock_error is not None:
                 # Use standard error response model for consistency
@@ -644,6 +691,23 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
             vs_file.status,
             vs_file.last_error or "None",
         )
+
+        # The vector store now holds its own chunked/embedded copy of the
+        # content; nothing downstream (citations, retrieval, this API
+        # surface) ever re-reads the original file after a successful
+        # attach. Deleting it here prevents unbounded disk growth, since
+        # the Files provider's TTL is metadata-only and nothing actively
+        # reaps expired files. Skip on failure so a caller can retry the
+        # attach with the same file_id.
+        if vs_file.status == "completed":
+            try:
+                await client.files.delete(body.file_id)
+            except Exception as delete_error:  # pylint: disable=broad-exception-caught
+                logger.warning(
+                    "Failed to delete file %s after vector store attach: %s",
+                    body.file_id,
+                    delete_error,
+                )
 
         return VectorStoreFileResponse(
             id=vs_file.id,

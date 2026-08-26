@@ -4725,7 +4725,7 @@
                     "vector-stores"
                 ],
                 "summary": "Create File",
-                "description": "Upload a file.\n\nParameters:\n    request: The incoming HTTP request.\n    auth: Authentication tuple from the auth dependency.\n    file: The file to upload.\n\nReturns:\n    FileResponse: The uploaded file object.\n\nRaises:\n    HTTPException:\n        - 400: Bad request (e.g., file too large, invalid format)\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
+                "description": "Upload a file.\n\nParameters:\n    request: The incoming HTTP request.\n    auth: Authentication tuple from the auth dependency.\n    file: The file to upload.\n\nReturns:\n    FileResponse: The uploaded file object.\n\nRaises:\n    HTTPException:\n        - 400: Bad request (e.g., file too large, invalid format)\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 429: Too many concurrent file uploads\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
                 "operationId": "create_file_v1_files_post",
                 "requestBody": {
                     "content": {
@@ -4880,6 +4880,26 @@
                             }
                         }
                     },
+                    "429": {
+                        "description": "Too many concurrent requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyConcurrentRequestsResponse"
+                                },
+                                "examples": {
+                                    "file upload": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "The maximum number of concurrent file uploads has been reached.",
+                                                "response": "Too many concurrent file uploads"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {
@@ -4947,7 +4967,7 @@
                     "vector-stores"
                 ],
                 "summary": "Add File To Vector Store",
-                "description": "Add a file to a vector store.\n\nParameters:\n    request: The incoming HTTP request.\n    vector_store_id: ID of the vector store.\n    auth: Authentication tuple from the auth dependency.\n    body: File addition parameters.\n\nReturns:\n    VectorStoreFileResponse: The vector store file object.\n\nRaises:\n    HTTPException:\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 404: Vector store or file not found\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
+                "description": "Add a file to a vector store.\n\nParameters:\n    request: The incoming HTTP request.\n    vector_store_id: ID of the vector store.\n    auth: Authentication tuple from the auth dependency.\n    body: File addition parameters.\n\nReturns:\n    VectorStoreFileResponse: The vector store file object.\n\nRaises:\n    HTTPException:\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 404: Vector store or file not found\n        - 429: Too many concurrent vector store file attachments\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
                 "operationId": "add_file_to_vector_store_v1_vector_stores__vector_store_id__files_post",
                 "parameters": [
                     {
@@ -5103,6 +5123,26 @@
                                 },
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many concurrent requests",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "vector store attach": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "The maximum number of concurrent vector store file attachments has been reached.",
+                                                "response": "Too many concurrent vector store file attachments"
+                                            }
+                                        }
+                                    }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyConcurrentRequestsResponse"
                                 }
                             }
                         }
@@ -5554,6 +5594,26 @@
                                 },
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many concurrent requests",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "vector store attach": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "The maximum number of concurrent vector store file attachments has been reached.",
+                                                "response": "Too many concurrent vector store file attachments"
+                                            }
+                                        }
+                                    }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyConcurrentRequestsResponse"
                                 }
                             }
                         }
@@ -21440,6 +21500,20 @@
                         "description": "Number of Uvicorn worker processes to start",
                         "default": 1
                     },
+                    "max_concurrent_file_uploads": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Maximum concurrent file uploads",
+                        "description": "Maximum number of file uploads (POST /v1/files) processed concurrently per worker. Each in-flight upload can hold up to the configured maximum file size in memory, so this bounds worst-case memory usage from concurrent uploads. Additional uploads are rejected with 429 until a slot frees up.",
+                        "default": 5
+                    },
+                    "max_concurrent_vector_store_attaches": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Maximum concurrent vector store file attachments",
+                        "description": "Maximum number of vector store file attachments (POST /v1/vector-stores/{id}/files) processed concurrently per worker. Each in-flight attachment re-reads and chunks the source file, so this bounds worst-case memory usage independently of max_concurrent_file_uploads. Additional attachments are rejected with 429 until a slot frees up.",
+                        "default": 5
+                    },
                     "color_log": {
                         "type": "boolean",
                         "title": "Color log",
@@ -21929,6 +22003,42 @@
                 "type": "object",
                 "title": "TLSConfiguration",
                 "description": "TLS configuration.\n\nTransport Layer Security (TLS) is a cryptographic protocol designed to\nprovide communications security over a computer network, such as the\nInternet. The protocol is widely used in applications such as email,\ninstant messaging, and voice over IP, but its use in securing HTTPS remains\nthe most publicly visible.\n\nUseful resources:\n\n  - [FastAPI HTTPS Deployment](https://fastapi.tiangolo.com/deployment/https/)\n  - [Transport Layer Security Overview](https://en.wikipedia.org/wiki/Transport_Layer_Security)\n  - [What is TLS](https://www.ssltrust.eu/learning/ssl/transport-layer-security-tls)"
+            },
+            "TooManyConcurrentRequestsResponse": {
+                "properties": {
+                    "status_code": {
+                        "type": "integer",
+                        "title": "Status Code",
+                        "description": "HTTP status code for the errors response"
+                    },
+                    "detail": {
+                        "$ref": "#/components/schemas/DetailModel",
+                        "description": "The detail model containing error summary and cause"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status_code",
+                    "detail"
+                ],
+                "title": "TooManyConcurrentRequestsResponse",
+                "description": "429 Too Many Requests - concurrency limit exceeded.",
+                "examples": [
+                    {
+                        "detail": {
+                            "cause": "The maximum number of concurrent file uploads has been reached.",
+                            "response": "Too many concurrent file uploads"
+                        },
+                        "label": "file upload"
+                    },
+                    {
+                        "detail": {
+                            "cause": "The maximum number of concurrent vector store file attachments has been reached.",
+                            "response": "Too many concurrent vector store file attachments"
+                        },
+                        "label": "vector store attach"
+                    }
+                ]
             },
             "ToolCallSummary": {
                 "properties": {
