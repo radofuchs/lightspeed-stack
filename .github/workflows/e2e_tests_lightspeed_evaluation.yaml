@@ -1,9 +1,7 @@
 name: E2E Tests for Lightspeed Evaluation
 
 on:
-  push:
-  pull_request_target:
-    types: [opened, synchronize, reopened, labeled]
+  []
 
 jobs:
   # Own job so repository secrets are never sent to a runner unless this passes.
