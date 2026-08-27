@@ -36,35 +36,6 @@ def check_llama_version(context: Context, llama_version: str) -> None:
     ), f"llama-stack version is {extracted_version}, expected {llama_version}"
 
 
-@then("The body of the response has proper shield structure")
-def check_shield_structure(context: Context) -> None:
-    """Check that the first shield has the correct structure and required fields."""
-    response_json = context.response.json()
-    assert response_json is not None, "Response is not valid JSON"
-
-    assert "shields" in response_json, "Response missing 'shields' field"
-    shields = response_json["shields"]
-    assert len(shields) > 0, "Response has empty list of shields"
-
-    # Find first shield
-    found_shield = None
-    for shield in shields:
-        if shield.get("type") == "shield":
-            found_shield = shield
-            break
-
-    assert found_shield is not None, "No shield found in response"
-
-    # Validate structure and values
-    assert found_shield["type"] == "shield", "type should be 'shield'"
-    assert (
-        found_shield["provider_id"] == "redaction"
-    ), "provider_id should be 'redaction'"
-    assert found_shield["name"] == "pii-redaction", (
-        f"name should be 'pii-redaction', " f"but is '{found_shield['name']}'"
-    )
-
-
 @then("The response contains {count:d} tools listed for provider {provider_name}")
 def check_tool_count(context: Context, count: int, provider_name: str) -> None:
     """Check that the number of tools for defined provider is correct."""

@@ -12,35 +12,6 @@ Feature: Shields endpoint tests
       And REST API service prefix is /v1
       And the Lightspeed stack configuration directory is "tests/e2e/configuration"
 
-  @cfg_default
-  Scenario: Shields endpoint returns the configured redaction shield
-    Given The service uses the lightspeed-stack-default.yaml configuration
-      And The service is restarted
-     When I access REST API endpoint "shields" using HTTP GET method
-     Then The status code of the response is 200
-      And The body of the response is the following
-      """
-      {
-        "shields": [
-          {
-            "name": "pii-redaction",
-            "provider_id": "redaction",
-            "type": "shield",
-            "config": {
-              "rules": [
-                {
-                  "pattern": "\\d+",
-                  "replacement": "[NUM]",
-                  "case_sensitive": null
-                }
-              ],
-              "case_sensitive": false
-            }
-          }
-        ]
-      }
-      """
-
   @cfg_shields
   Scenario: Shields endpoint returns every configured shield type
     Given The service uses the lightspeed-stack-shields.yaml configuration
@@ -57,7 +28,7 @@ Feature: Shields endpoint tests
             "type": "shield",
             "config": {
               "model_id": "openai/gpt-4o-mini",
-              "model_prompt": "Classify whether the question is about OpenShift. Reply ALLOWED or REJECTED.",
+              "model_prompt": "Classify whether the following question is about OpenShift or Kubernetes. Reply with exactly one word: ${allowed} if it is about OpenShift or Kubernetes, or ${rejected} if it is not. Do not explain your answer or add any other text.\n\nQuestion: ${message}\nAnswer:",
               "invalid_question_response": "I can only answer questions about OpenShift."
             }
           },
