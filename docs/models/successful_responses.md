@@ -399,6 +399,12 @@ Attributes:
 | configuration |  |  |
 
 
+## ContextStatus
+
+
+
+
+
 ## ConversationData
 
 
@@ -1933,6 +1939,8 @@ Attributes:
     tool_calls: List of tool calls made during response generation.
     tool_results: List of tool results.
     truncated: Whether conversation history was truncated.
+    context_status: Whether the conversation context was sent in full
+        ("full") or older turns were replaced by a summary ("summarized").
     input_tokens: Number of tokens sent to LLM.
     output_tokens: Number of tokens received from LLM.
     available_quotas: Quota available as measured by all configured quota limiters.
@@ -1945,6 +1953,7 @@ Attributes:
 | rag_chunks | array | Deprecated: List of RAG chunks used to generate the response. |
 | referenced_documents | array | List of documents referenced in generating the response |
 | truncated | boolean | Deprecated: whether conversation history was truncated |
+| context_status |  | Context status: "full" (no compaction) or "summarized" (older turns replaced by a summary) |
 | input_tokens | integer | Number of tokens sent to LLM |
 | output_tokens | integer | Number of tokens received from LLM |
 | available_quotas | object | Quota available as measured by all configured quota limiters |
@@ -2821,8 +2830,8 @@ A high-level inference provider entry for unified-mode synthesis.
 
 Operators describe inference providers at this high level (backend-agnostic
 vocabulary) instead of authoring raw OGX provider blocks. The
-synthesizer (`apply_high_level_inference`) expands each entry into a Llama
-Stack `providers.inference` entry, mapping `type` to a `provider_type` and
+synthesizer (`apply_high_level_inference`) expands each entry into an OGX
+`providers.inference` entry, mapping `type` to a `provider_type` and
 emitting `${env.<VAR>}` references for secrets (never literal values).
 
 Attributes:
