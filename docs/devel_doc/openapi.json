@@ -183,8 +183,8 @@
                                     "$ref": "#/components/schemas/InfoResponse"
                                 },
                                 "example": {
-                                    "llama_stack_version": "1.0.0",
                                     "name": "Lightspeed Stack",
+                                    "ogx_version": "1.0.0",
                                     "service_version": "1.0.0"
                                 }
                             }
@@ -14867,9 +14867,9 @@
                             "1.0.0"
                         ]
                     },
-                    "llama_stack_version": {
+                    "ogx_version": {
                         "type": "string",
-                        "title": "Llama Stack Version",
+                        "title": "Ogx Version",
                         "description": "OGX version",
                         "examples": [
                             "0.2.1",
@@ -14884,14 +14884,14 @@
                 "required": [
                     "name",
                     "service_version",
-                    "llama_stack_version"
+                    "ogx_version"
                 ],
                 "title": "InfoResponse",
-                "description": "Model representing a response to an info request.\n\nAttributes:\n    name: Service name.\n    service_version: Service version.\n    llama_stack_version: OGX version.",
+                "description": "Model representing a response to an info request.\n\nAttributes:\n    name: Service name.\n    service_version: Service version.\n    ogx_version: OGX version.",
                 "examples": [
                     {
-                        "llama_stack_version": "1.0.0",
                         "name": "Lightspeed Stack",
+                        "ogx_version": "1.0.0",
                         "service_version": "1.0.0"
                     }
                 ]

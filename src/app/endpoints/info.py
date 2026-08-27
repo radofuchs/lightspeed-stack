@@ -76,11 +76,11 @@ async def info_endpoint_handler(
             # try to get OGX client
             client = AsyncOgxClientHolder().get_client()
             # retrieve version
-            llama_stack_version_object = await client.inspect.version()
-            llama_stack_version = llama_stack_version_object.version
+            ogx_version_object = await client.inspect.version()
+            ogx_version = ogx_version_object.version
             logger.debug("Service name: %s", configuration.configuration.name)
             logger.debug("Service version: %s", __version__)
-            logger.debug("OGX version: %s", llama_stack_version)
+            logger.debug("OGX version: %s", ogx_version)
             set_span_attributes(
                 span,
                 {
@@ -91,7 +91,7 @@ async def info_endpoint_handler(
             return InfoResponse(
                 name=configuration.configuration.name,
                 service_version=__version__,
-                llama_stack_version=llama_stack_version,
+                ogx_version=ogx_version,
             )
         # connection to OGX server
         except APIConnectionError as e:

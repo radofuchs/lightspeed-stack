@@ -2504,10 +2504,10 @@ def test_dump_models(tmpdir: Path) -> None:
                     "type": "object"
                 },
                 "InfoResponse": {
-                    "description": "Model representing a response to an info request.\n\nAttributes:\n    name: Service name.\n    service_version: Service version.\n    llama_stack_version: OGX version.",
+                    "description": "Model representing a response to an info request.\n\nAttributes:\n    name: Service name.\n    service_version: Service version.\n    ogx_version: OGX version.",
                     "examples": [
                         {
-                            "llama_stack_version": "1.0.0",
+                            "ogx_version": "1.0.0",
                             "name": "Lightspeed Stack",
                             "service_version": "1.0.0"
                         }
@@ -2531,7 +2531,7 @@ def test_dump_models(tmpdir: Path) -> None:
                             "title": "Service Version",
                             "type": "string"
                         },
-                        "llama_stack_version": {
+                        "ogx_version": {
                             "description": "OGX version",
                             "examples": [
                                 "0.2.1",
@@ -2547,7 +2547,7 @@ def test_dump_models(tmpdir: Path) -> None:
                     "required": [
                         "name",
                         "service_version",
-                        "llama_stack_version"
+                        "ogx_version"
                     ],
                     "title": "InfoResponse",
                     "type": "object"
