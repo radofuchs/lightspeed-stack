@@ -53,11 +53,14 @@ ATTACHMENT_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
         "application/xml",
         "image/jpeg",
         "image/png",
+        "image/webp",
     }
 )
 
 # Image content types (subset of ATTACHMENT_CONTENT_TYPES)
-IMAGE_CONTENT_TYPES: Final[frozenset[str]] = frozenset({"image/jpeg", "image/png"})
+IMAGE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
+    {"image/jpeg", "image/png", "image/webp"}
+)
 
 # Default system prompt used only when no other system prompt is specified in
 # configuration file nor in the query request

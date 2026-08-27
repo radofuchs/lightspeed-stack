@@ -15,14 +15,16 @@ from log import get_logger
 
 logger = get_logger(__name__)
 
-_IMAGE_SIGNATURES: dict[str, bytes] = {
-    "image/png": b"\x89PNG",
-    "image/jpeg": b"\xff\xd8\xff",
+_IMAGE_SIGNATURES: dict[str, tuple[tuple[int, bytes], ...]] = {
+    "image/png": ((0, b"\x89PNG"),),
+    "image/jpeg": ((0, b"\xff\xd8\xff"),),
+    # WebP is a RIFF container: 4-byte "RIFF", 4-byte size, then "WEBP".
+    "image/webp": ((0, b"RIFF"), (8, b"WEBP")),
 }
 
 
 def _validate_image_magic_bytes(data: bytes, content_type: str) -> None:
-    """Verify that decoded image data starts with the expected magic bytes.
+    """Verify that decoded image data matches the expected magic bytes.
 
     Parameters:
         data: Raw decoded image bytes.
@@ -31,8 +33,11 @@ def _validate_image_magic_bytes(data: bytes, content_type: str) -> None:
     Raises:
         ValueError: If the data does not match the expected image format.
     """
-    expected = _IMAGE_SIGNATURES.get(content_type)
-    if expected and not data.startswith(expected):
+    signatures = _IMAGE_SIGNATURES.get(content_type)
+    if signatures and any(
+        data[offset : offset + len(expected)] != expected
+        for offset, expected in signatures
+    ):
         raise ValueError(
             f"Image content does not match declared content_type "
             f"'{content_type}': invalid image data"
@@ -56,7 +61,7 @@ class Attachment(BaseModel):
     )
     content_type: str = Field(
         description="The content type as defined in MIME standard",
-        examples=["text/plain", "image/jpeg", "image/png"],
+        examples=["text/plain", "image/jpeg", "image/png", "image/webp"],
     )
     content: str = Field(
         description="The actual attachment content (text or base64-encoded image data)",
