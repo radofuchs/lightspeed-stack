@@ -121,7 +121,7 @@ def get_test_config() -> dict[str, Any]:
             "color_log": True,
             "access_log": True,
         },
-        "llama_stack": {
+        "ogx": {
             "api_key": "xyzzy",
             "url": "http://x.y.com:1234",
             "use_as_library_client": False,

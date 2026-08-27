@@ -508,7 +508,7 @@ def after_feature(context: Context, feature: Feature) -> None:
     """
     # Restore OGX FIRST (before any lightspeed-stack restart).
     # Read from module-level state — Behave clears custom context attributes
-    # between scenarios, so context.llama_stack_was_running is unreliable here.
+    # between scenarios, so context.ogx_was_running is unreliable here.
     if get_llama_stack_was_running():
         _restore_llama_stack()
         reset_llama_stack_was_running()

@@ -96,7 +96,7 @@ jobs:
           echo "Models: $(grep -c "model_id:" run.yaml)"
           echo ""
           echo "=== lightspeed-stack.yaml ==="
-          grep -A 3 "llama_stack:" lightspeed-stack.yaml
+          grep -A 3 "ogx:" lightspeed-stack.yaml
 
       - name: Run services (Library Mode)
         env: 

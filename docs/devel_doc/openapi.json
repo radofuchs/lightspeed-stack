@@ -6895,11 +6895,6 @@
                                             "default_model": "gpt-4-turbo",
                                             "default_provider": "openai"
                                         },
-                                        "llama_stack": {
-                                            "api_key": "*****",
-                                            "url": "http://localhost:8321",
-                                            "use_as_library_client": false
-                                        },
                                         "mcp_servers": [
                                             {
                                                 "name": "server1",
@@ -6916,6 +6911,11 @@
                                                 "OTEL_SDK_DISABLED": "true",
                                                 "OTEL_SERVICE_NAME": ""
                                             }
+                                        },
+                                        "ogx": {
+                                            "api_key": "*****",
+                                            "url": "http://localhost:8321",
+                                            "use_as_library_client": false
                                         },
                                         "quota_handlers": {
                                             "enable_token_history": false,
@@ -13134,14 +13134,14 @@
                             }
                         ],
                         "title": "Configuration format version",
-                        "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or a llama_stack.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11)."
+                        "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or an ogx.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11)."
                     },
                     "service": {
                         "$ref": "#/components/schemas/ServiceConfiguration",
                         "title": "Service configuration",
                         "description": "This section contains Lightspeed Core Stack service configuration."
                     },
-                    "llama_stack": {
+                    "ogx": {
                         "$ref": "#/components/schemas/OgxConfiguration",
                         "title": "OGX configuration",
                         "description": "This section contains OGX configuration. Lightspeed Core Stack service can call OGX in library mode or in server mode."
@@ -13315,7 +13315,7 @@
                 "required": [
                     "name",
                     "service",
-                    "llama_stack",
+                    "ogx",
                     "user_data_collection"
                 ],
                 "title": "Configuration",
@@ -13353,11 +13353,6 @@
                                 "default_model": "gpt-4-turbo",
                                 "default_provider": "openai"
                             },
-                            "llama_stack": {
-                                "api_key": "*****",
-                                "url": "http://localhost:8321",
-                                "use_as_library_client": false
-                            },
                             "mcp_servers": [
                                 {
                                     "name": "server1",
@@ -13374,6 +13369,11 @@
                                     "OTEL_SDK_DISABLED": "true",
                                     "OTEL_SERVICE_NAME": ""
                                 }
+                            },
+                            "ogx": {
+                                "api_key": "*****",
+                                "url": "http://localhost:8321",
+                                "use_as_library_client": false
                             },
                             "quota_handlers": {
                                 "enable_token_history": false,

@@ -83,7 +83,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     initialize_sentry()
 
-    ogx_config = configuration.configuration.llama_stack
+    ogx_config = configuration.configuration.ogx
     await AsyncOgxClientHolder().load(ogx_config)
     client: AsyncOgxClient = AsyncOgxClientHolder().get_client()
     logger.debug("OGX client initialized, trying to connect to OGX")
@@ -105,7 +105,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         ogx_url = ogx_config.url
         logger.error(
             "Failed to connect to OGX at '%s'. "
-            "Please verify that the 'llama_stack.url' configuration is correct "
+            "Please verify that the 'ogx.url' configuration is correct "
             "and that the OGX service is running and accessible. "
             "Original error: %s",
             ogx_url,
