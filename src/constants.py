@@ -5,9 +5,9 @@ from typing import Final, Literal
 # Use Final[type] as type hint for all constants to ensure that type checkers (Mypy etc.)
 # will be able to detect assignements to such constants.
 
-# Minimal and maximal supported Llama Stack version
-MINIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "0.2.17"
-MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "1.0.2"
+# Minimal and maximal supported OGX version
+MINIMAL_SUPPORTED_OGX_VERSION: Final[str] = "0.2.17"
+MAXIMAL_SUPPORTED_OGX_VERSION: Final[str] = "1.0.2"
 
 # Path to the lightspeed-stack.yaml, exported so uvicorn workers (separate
 # processes) can reload the configuration that the parent process selected.
@@ -18,7 +18,7 @@ CONFIG_PATH_ENV_VAR: Final[str] = "LIGHTSPEED_STACK_CONFIG_PATH"
 # unified-mode library synthesis. Unset means use DEFAULT_SYNTHESIZED_CONFIG_PATH.
 SYNTHESIZED_CONFIG_PATH_ENV_VAR: Final[str] = "LIGHTSPEED_STACK_SYNTHESIZED_CONFIG_PATH"
 
-# Default persistent path for the synthesized Llama Stack run.yaml in unified
+# Default persistent path for the synthesized OGX run.yaml in unified
 # library mode. Overwritten on each boot and written with mode 0600 (R10).
 DEFAULT_SYNTHESIZED_CONFIG_PATH: Final[str] = "./.generated/run.yaml"
 
@@ -83,7 +83,7 @@ For Output Constraints:
 - Capitalize only significant words (e.g., nouns, verbs, adjectives, adverbs).
 - Do **NOT** use all uppercase - capitalize only the first letter of significant words
 - Exclude articles and prepositions (e.g., "a," "the," "of," "on," "in")
-- Exclude all punctuation and interpunction marks (e.g., . , : ; ! ? | "")
+- Exclude all punctuation and interpunctuation marks (e.g., . , : ; ! ? | "")
 - Retain original abbreviations. Do not expand an abbreviation if its specific meaning in the
   context is unknown or ambiguous.
 - Neutral objective language
@@ -171,7 +171,7 @@ MCP_AUTH_KUBERNETES: Final[str] = "kubernetes"
 MCP_AUTH_CLIENT: Final[str] = "client"
 MCP_AUTH_OAUTH: Final[str] = "oauth"
 
-# MCP tool_runtime provider (Llama Stack run.yaml / unified synthesis)
+# MCP tool_runtime provider (OGX run.yaml / unified synthesis)
 MCP_TOOL_RUNTIME_PROVIDER_ID: Final[str] = "model-context-protocol"
 MCP_TOOL_RUNTIME_PROVIDER_TYPE: Final[str] = "remote::model-context-protocol"
 
@@ -206,7 +206,7 @@ SUPPORTED_RAG_BACKENDS: Final[frozenset[str]] = frozenset({"faiss", "pgvector"})
 DEFAULT_RAG_BACKEND: Final[str] = "faiss"
 
 # Default sentence transformer model for embedding generation, that type needs
-# to be supported by Llama Stack and configured properly in providers and
+# to be supported by OGX and configured properly in providers and
 # models sections
 DEFAULT_EMBEDDING_MODEL: Final[str] = "sentence-transformers/all-mpnet-base-v2"
 
@@ -240,7 +240,7 @@ DEFAULT_BYOK_RAG_RELEVANCE_CUTOFF_SCORE: Final[float] = 0.3
 SOLR_VECTOR_SEARCH_DEFAULT_K: Final[int] = 5
 SOLR_VECTOR_SEARCH_DEFAULT_SCORE_THRESHOLD: Final[float] = 0.3
 SOLR_VECTOR_SEARCH_DEFAULT_MODE: Final[str] = "hybrid"
-# LCORE exposes "lexical" but Llama Stack dispatch recognizes "keyword"
+# LCORE exposes "lexical" but OGX dispatch recognizes "keyword"
 SOLR_SEARCH_MODE_MAP: Final[dict[str, str]] = {"lexical": "keyword"}
 
 # Internal Solr filter always applied to restrict results to chunk documents
@@ -295,9 +295,9 @@ DEFAULT_VIOLATION_MESSAGE: Final[str] = (
 DEFAULT_MODEL_PROMPT: Final[str] = """
 Instructions:
 - You are a question classifying tool
-- You are an expert in kubernetes and openshift
-- Your job is to determine where or a user's question is related to kubernetes and/or openshift technologies and to provide a one-word response.
-- If a question appears to be related to kubernetes or openshift technologies, answer with the word ${allowed}, otherwise answer with the word ${rejected}.
+- You are an expert in Kubernetes and OpenShift
+- Your job is to determine where or a user's question is related to Kubernetes and/or OpenShift technologies and to provide a one-word response.
+- If a question appears to be related to Kubernetes or OpenShift technologies, answer with the word ${allowed}, otherwise answer with the word ${rejected}.
 - Do not explain your answer, just provide the one-word response. Do not give any other response.
 - If the given question is an empty string, answer with the word ${rejected}
 
@@ -372,9 +372,9 @@ SENTRY_EXCLUDED_ROUTES: Final[tuple[str, ...]] = (
 # connecting to a Sentry instance that uses a private or internal CA.
 SENTRY_CA_CERTS_ENV_VAR: Final[str] = "SENTRY_CA_CERTS"
 
-# Retry settings for waiting on Llama Stack readiness during startup.
-# When LCS runs as a sidecar alongside Llama Stack, both containers start
-# concurrently and Llama Stack may not be ready when LCS attempts its
+# Retry settings for waiting on OGX readiness during startup.
+# When LCS runs as a sidecar alongside OGX, both containers start
+# concurrently and OGX may not be ready when LCS attempts its
 # first version check.
 DEFAULT_MAX_RETRIES: Final[int] = 5
 DEFAULT_RETRY_DELAY: Final[int] = 2

@@ -1,4 +1,4 @@
-"""Llama Stack configuration enrichment and synthesis.
+"""OGX configuration enrichment and synthesis.
 
 This module can be used in two ways:
 1. As a script: `python llama_stack_configuration.py -c config.yaml`
@@ -10,7 +10,7 @@ Two related responsibilities live here:
   layers dynamic values (BYOK RAG, Solr/OKP, Azure Entra ID) on top of it.
 - **Synthesis** (unified mode, LCORE-2336): builds a complete ``run.yaml`` from
   high-level operator inputs in ``lightspeed-stack.yaml`` — a baseline (built-in
-  default, a profile file, or empty), the same enrichment, the high-level
+  default, byo-llm, a profile file, or empty), the same enrichment, the high-level
   ``inference.providers`` section, and a raw ``native_override`` deep-merged
   last. ``run.yaml`` becomes an implementation detail LCORE owns rather than an
   operator-facing artifact.
@@ -22,7 +22,7 @@ import copy
 import os
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Final, Optional
 from urllib.parse import urljoin
 
 import yaml
@@ -35,7 +35,7 @@ from log import get_logger
 logger = get_logger(__name__)
 
 # Maps a UnifiedInferenceProvider.type (canonical, backend-agnostic vocabulary)
-# to the Llama Stack provider_type emitted by apply_high_level_inference. The
+# to the OGX provider_type emitted by apply_high_level_inference. The
 # completeness of this map against UnifiedInferenceProvider.type is asserted by
 # a unit test so a new Literal value cannot be added without a mapping.
 PROVIDER_TYPE_MAP: dict[str, str] = {
@@ -50,15 +50,21 @@ PROVIDER_TYPE_MAP: dict[str, str] = {
     "vllm_rhel_ai": "remote::vllm",
 }
 
-# Maps Llama Stack provider_type -> config field name for the auth token.
+# Maps OGX provider_type -> config field name for the auth token.
 # Providers not listed default to "api_key".
 API_KEY_FIELD_MAP: dict[str, str] = {
     "remote::vllm": "api_token",
 }
 
 # Package-relative path to the built-in default baseline run.yaml shipped with
-# LCORE, used when unified mode selects baseline "default" without a profile.
+# LCORE, used when unified mode selects baseline "default" or "byo-llm" without
+# a profile. "byo-llm" loads this file then strips the conditional OpenAI row.
 DEFAULT_BASELINE_RESOURCE: Path = Path(__file__).parent / "data" / "default_run.yaml"
+
+# Unevaluated provider_id of the built-in OpenAI row in default_run.yaml
+# (LCORE-3607). Matched as "openai" during high-level replace, and stripped
+# when baseline is byo-llm (LCORE-3654).
+CONDITIONAL_OPENAI_PROVIDER_ID: Final[str] = "${env.OPENAI_API_KEY:+openai}"
 
 VECTOR_IO_TEMPLATES: dict[str, dict[str, Any]] = {
     "inline::faiss": {
@@ -88,14 +94,14 @@ BACKEND_TO_PROVIDER_TYPE: dict[str, str] = {
 
 
 def _resolve_rag_type(brag: dict[str, Any]) -> str:
-    """Resolve the full Llama Stack provider type from a BYOK RAG dict.
+    """Resolve the full OGX provider type from a BYOK RAG dict.
 
     Parameters:
         brag (dict[str, Any]): A single BYOK RAG entry dict, expected to
             contain a ``backend`` key (e.g. ``"faiss"``, ``"pgvector"``).
 
     Returns:
-        str: The fully-qualified Llama Stack provider type
+        str: The fully-qualified OGX provider type
             (e.g. ``"inline::faiss"``, ``"remote::pgvector"``).
     """
     backend = brag.get("backend", constants.DEFAULT_RAG_BACKEND)
@@ -137,7 +143,7 @@ def enrich_azure_entra_id_inference(
     with model_validation=false to defer model validation to runtime.
 
     Parameters:
-        ls_config (dict[str, Any]): Mutable Llama Stack configuration dictionary to update.
+        ls_config (dict[str, Any]): Mutable OGX configuration dictionary to update.
         azure_entra_id (Optional[dict[str, Any]]): Lightspeed azure_entra_id block,
             or None.
 
@@ -201,14 +207,14 @@ def dedupe_providers_vector_io(ls_config: dict[str, Any]) -> None:
 def construct_storage_backends_section(
     ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Construct storage.backends section in Llama Stack configuration file.
+    """Construct storage.backends section in OGX configuration file.
 
-    Builds the storage.backends section for a Llama Stack configuration by
+    Builds the storage.backends section for an OGX configuration by
     preserving existing backends and adding new ones for each BYOK RAG.
 
     Parameters:
     ----------
-        ls_config (dict[str, Any]): Existing Llama Stack configuration mapping.
+        ls_config (dict[str, Any]): Existing OGX configuration mapping.
         byok_rag (list[dict[str, Any]]): List of BYOK RAG definitions.
 
     Returns:
@@ -248,13 +254,13 @@ def construct_storage_backends_section(
 def construct_vector_stores_section(
     ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Construct registered_resources.vector_stores section in Llama Stack config.
+    """Construct registered_resources.vector_stores section in OGX config.
 
-    Builds the vector_stores section for a Llama Stack configuration.
+    Builds the vector_stores section for an OGX configuration.
 
     Parameters:
     ----------
-        ls_config (dict[str, Any]): Existing Llama Stack configuration mapping
+        ls_config (dict[str, Any]): Existing OGX configuration mapping
         used as the base; existing `registered_resources.vector_stores` entries
         are preserved if present.
         byok_rag (list[dict[str, Any]]): List of BYOK RAG definitions to be added to
@@ -263,7 +269,7 @@ def construct_vector_stores_section(
     Returns:
     -------
         list[dict[str, Any]]: The `vector_stores` list where each entry is a mapping with keys:
-            - `vector_store_id`: identifier of the vector store (for Llama Stack config)
+            - `vector_store_id`: identifier of the vector store (for OGX config)
             - `provider_id`: provider identifier prefixed with `"byok_"`
             - `embedding_model`: registered OGX model id
               (``sentence-transformers/byok_<rag_id>_embedding``), not the load path
@@ -323,7 +329,7 @@ def construct_models_section(
 
     Parameters:
     ----------
-        ls_config (dict[str, Any]): Existing Llama Stack configuration mapping.
+        ls_config (dict[str, Any]): Existing OGX configuration mapping.
         byok_rag (list[dict[str, Any]]): List of BYOK RAG definitions.
 
     Returns:
@@ -384,7 +390,7 @@ def _build_vector_io_config(
     """Build the provider config dict from VECTOR_IO_TEMPLATES.
 
     Parameters:
-        rag_type: Llama Stack provider type (e.g. 'inline::faiss', 'remote::pgvector').
+        rag_type: OGX provider type (e.g. 'inline::faiss', 'remote::pgvector').
         backend_name: Storage backend name (used when template has '{backend_name}').
         extra_fields: Source values for template ``extra_fields`` (e.g. db_path,
             host/port/db/user/password). Used by BYOK and vector_store.providers.
@@ -423,15 +429,15 @@ def _build_vector_io_config(
 def construct_vector_io_providers_section(
     ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Construct providers/vector_io section in Llama Stack configuration file.
+    """Construct providers/vector_io section in OGX configuration file.
 
-    Builds the providers/vector_io list for a Llama Stack configuration by
+    Builds the providers/vector_io list for an OGX configuration by
     preserving existing entries and appending providers derived from BYOK RAG
     entries.
 
     Parameters:
     ----------
-        ls_config (dict[str, Any]): Existing Llama Stack configuration
+        ls_config (dict[str, Any]): Existing OGX configuration
         dictionary; if it contains providers.vector_io, those entries are used
         as the starting list.
         byok_rag (list[dict[str, Any]]): List of BYOK RAG specifications to convert
@@ -489,10 +495,10 @@ def construct_vector_io_providers_section(
 
 
 def enrich_byok_rag(ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]) -> None:
-    """Enrich Llama Stack config with BYOK RAG settings.
+    """Enrich OGX config with BYOK RAG settings.
 
     Args:
-        ls_config: Llama Stack configuration dict (modified in place)
+        ls_config: OGX configuration dict (modified in place)
         byok_rag: List of BYOK RAG configurations
     """
     if len(byok_rag) == 0:
@@ -500,7 +506,7 @@ def enrich_byok_rag(ls_config: dict[str, Any], byok_rag: list[dict[str, Any]]) -
         dedupe_providers_vector_io(ls_config)
         return
 
-    logger.info("Enriching Llama Stack config with BYOK RAG")
+    logger.info("Enriching OGX config with BYOK RAG")
 
     # Add storage backends
     if "storage" not in ls_config:
@@ -571,7 +577,7 @@ def _upsert_vsprov_embedding_model(
     ``model_id`` already exists.
 
     Parameters:
-        ls_config: Llama Stack configuration modified in place.
+        ls_config: OGX configuration modified in place.
         provider_id: Dynamic provider id used to name the model row.
         embedding_model: Configured embedding model path or id.
         embedding_dimension: Embedding vector dimensionality (required on
@@ -671,7 +677,7 @@ def _apply_vector_stores_defaults(
     """Write vector_stores.default_* from the designated provider entry.
 
     Parameters:
-        ls_config: Llama Stack configuration modified in place.
+        ls_config: OGX configuration modified in place.
         designated: Provider entry selected by ``vector_store.default_provider``.
     """
     vector_stores = ls_config.get("vector_stores")
@@ -703,7 +709,7 @@ def _enrich_one_vector_store_provider(
         backends: ``storage.backends`` map (modified in place for faiss).
         vector_io: ``providers.vector_io`` list (modified in place).
         existing_ids: Known ``provider_id`` values already in ``vector_io``.
-        ls_config: Full Llama Stack config (for embedding model registration).
+        ls_config: Full OGX config (for embedding model registration).
     """
     provider_id = str(entry["id"]).strip()
     product_type = entry["type"]
@@ -748,7 +754,7 @@ def enrich_vector_store(
     ``registered_resources.vector_stores``.
 
     Parameters:
-        ls_config: Llama Stack configuration dictionary (modified in place).
+        ls_config: OGX configuration dictionary (modified in place).
         vector_store: High-level ``vector_store`` section
             (``default_provider`` + ``providers``) as a dict.
     """
@@ -797,10 +803,10 @@ def enrich_solr(  # pylint: disable=too-many-locals,too-many-statements
     rag_config: dict[str, Any],
     okp_config: dict[str, Any],
 ) -> None:
-    """Enrich Llama Stack config with Solr settings.
+    """Enrich OGX config with Solr settings.
 
     Parameters:
-        ls_config: Llama Stack configuration dict (modified in place)
+        ls_config: OGX configuration dict (modified in place)
         rag_config: RAG configuration dict. Used keys:
             - inline (list[str]): inline RAG IDs
             - tool (list[str]): tool RAG IDs
@@ -831,7 +837,7 @@ def enrich_solr(  # pylint: disable=too-many-locals,too-many-statements
     base_url = replace_env_vars(base_url_raw)
     solr_url = urljoin(base_url, "/solr")
 
-    logger.info("Enriching Llama Stack config with OKP")
+    logger.info("Enriching OGX config with OKP")
 
     # Add vector_io provider for Solr
     if "providers" not in ls_config:
@@ -972,12 +978,12 @@ def enrich_solr(  # pylint: disable=too-many-locals,too-many-statements
 
 
 def load_default_baseline() -> dict[str, Any]:
-    """Load LCORE's built-in default baseline Llama Stack configuration.
+    """Load LCORE's built-in default baseline OGX configuration.
 
     Returns:
         dict[str, Any]: The parsed contents of ``src/data/default_run.yaml``,
-        the baseline used when unified mode selects ``baseline: default``
-        without a profile.
+        the baseline used when unified mode selects ``baseline: default`` or
+        ``baseline: byo-llm`` without a profile.
 
     Raises:
         OSError: If the shipped baseline file cannot be read.
@@ -1027,17 +1033,43 @@ def _matchable_provider_id(provider_id: Any) -> Any:
         ``openai`` when ``provider_id`` is the baseline conditional openai
         ref, otherwise ``provider_id`` unchanged.
     """
-    if provider_id == "${env.OPENAI_API_KEY:+openai}":
+    if provider_id == CONDITIONAL_OPENAI_PROVIDER_ID:
         return "openai"
     return provider_id
+
+
+def _strip_default_openai_inference(ls_config: dict[str, Any]) -> None:
+    """Remove the OpenAI inference provider from the default baseline.
+
+    Parameters:
+        ls_config: The Llama Stack configuration being synthesized (modified
+            in place).
+
+    Returns:
+        None: ``ls_config`` is modified in place.
+    """
+    providers = ls_config.get("providers")
+    if not isinstance(providers, dict):
+        return
+    inference = providers.get("inference")
+    if not isinstance(inference, list):
+        return
+    providers["inference"] = [
+        entry
+        for entry in inference
+        if not (
+            isinstance(entry, dict)
+            and entry.get("provider_id") == CONDITIONAL_OPENAI_PROVIDER_ID
+        )
+    ]
 
 
 def apply_high_level_inference(
     ls_config: dict[str, Any], inference: dict[str, Any]
 ) -> None:
-    """Expand high-level ``inference.providers`` into Llama Stack provider entries.
+    """Expand high-level ``inference.providers`` into OGX provider entries.
 
-    Each high-level provider is mapped to a Llama Stack ``providers.inference``
+    Each high-level provider is mapped to an OGX ``providers.inference``
     entry via :data:`PROVIDER_TYPE_MAP`. The emitted ``provider_id`` is the
     optional explicit high-level ``id`` when set; otherwise the provider ``type``
     with underscores hyphenated, so an inline embedder declared as
@@ -1051,7 +1083,7 @@ def apply_high_level_inference(
     values (R6).
 
     Parameters:
-        ls_config: The Llama Stack configuration being synthesized (modified in
+        ls_config: The OGX configuration being synthesized (modified in
             place).
         inference: The root ``inference`` section as a dict; only its
             ``providers`` list is consumed here.
@@ -1118,7 +1150,7 @@ def ensure_mcp_tool_runtime(ls_config: dict[str, Any]) -> None:
     (including ``rag-runtime``) are left untouched.
 
     Parameters:
-        ls_config: The Llama Stack configuration being synthesized (modified
+        ls_config: The OGX configuration being synthesized (modified
             in place).
 
     Returns:
@@ -1175,10 +1207,10 @@ def synthesize_configuration(  # pylint: disable=too-many-locals
     config_file_dir: Optional[str] = None,
     default_baseline: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    """Synthesize a full Llama Stack ``run.yaml`` dict from a unified config.
+    """Synthesize a full OGX ``run.yaml`` dict from a unified config.
 
     Implements the unified-mode synthesis pipeline: select a baseline (profile
-    file, empty, or the built-in default), apply the existing enrichment
+    file, empty, byo-llm, or the built-in default), apply the existing enrichment
     (Azure Entra ID, BYOK RAG, Solr/OKP) for parity with legacy mode (R7),
     expand the high-level ``inference.providers`` section, ensure the default
     MCP tool_runtime provider when the baseline was not empty, and deep-merge
@@ -1192,12 +1224,13 @@ def synthesize_configuration(  # pylint: disable=too-many-locals
             default baseline is needed, :func:`load_default_baseline` is used.
 
     Returns:
-        dict[str, Any]: The synthesized Llama Stack configuration.
+        dict[str, Any]: The synthesized OGX configuration.
     """
     unified = (lcs_config.get("llama_stack") or {}).get("config")
 
     # 1-2. Select the baseline.
     baseline_was_empty = False
+    loaded_shipped_baseline = False
     if unified and unified.get("profile"):
         profile_path = _resolve_profile_path(unified["profile"], config_file_dir)
         logger.info("Loading synthesis baseline from profile %s", profile_path)
@@ -1208,6 +1241,8 @@ def synthesize_configuration(  # pylint: disable=too-many-locals
         baseline_was_empty = True
         baseline = {}
     else:
+        # default, omitted, or byo-llm: start from default_run.yaml.
+        loaded_shipped_baseline = True
         baseline = (
             default_baseline
             if default_baseline is not None
@@ -1215,6 +1250,27 @@ def synthesize_configuration(  # pylint: disable=too-many-locals
         )
 
     ls_config: dict[str, Any] = copy.deepcopy(baseline)
+
+    # Profile and empty are unchanged. The shipped file either keeps OpenAI
+    # (default/omitted, with a deprecation WARN) or drops it (byo-llm).
+    #
+    # Deprecation schedule (confirmed by @sbunciak 2026-08-25): the built-in
+    # OpenAI row in baseline "default" is deprecated in 0.7 with this single
+    # startup WARN and removed in 0.8. "default" shipped in 0.6.0 GA, so the
+    # Engineering Support Agreement's one-minor deprecation phase applies.
+    if loaded_shipped_baseline:
+        if unified and unified.get("baseline") == "byo-llm":
+            _strip_default_openai_inference(ls_config)
+        else:
+            logger.warning(
+                "DEPRECATED: the built-in OpenAI inference provider in "
+                "llama_stack.config.baseline 'default' is deprecated and will "
+                "be removed in release 0.8. Set baseline to 'byo-llm' and "
+                "declare your LLM providers under inference.providers: "
+                "https://lightspeed-core.github.io/lightspeed-stack/design"
+                "/llama-stack-config-merge/llama-stack-config-merge.html"
+                "#configuration"
+            )
 
     # 3. Normalize duplicated vector_io providers in the baseline.
     dedupe_providers_vector_io(ls_config)
@@ -1290,7 +1346,7 @@ def synthesize_to_file(
         yaml.dump(ls_config, file, Dumper=YamlDumper, default_flow_style=False)
     os.chmod(str(path), 0o600)
 
-    logger.info("Wrote synthesized Llama Stack configuration to %s (mode 0600)", path)
+    logger.info("Wrote synthesized OGX configuration to %s (mode 0600)", path)
 
 
 # =============================================================================
@@ -1320,7 +1376,7 @@ def migrate_config_dumb(
     mode exactly as it did in legacy mode.
 
     Parameters:
-        run_yaml_path: Path to the legacy Llama Stack ``run.yaml``.
+        run_yaml_path: Path to the legacy OGX ``run.yaml``.
         lightspeed_yaml_path: Path to the legacy ``lightspeed-stack.yaml``.
         output_path: Path to write the unified ``lightspeed-stack.yaml``.
 
@@ -1383,14 +1439,14 @@ def generate_configuration(
     output_file: str,
     config: dict[str, Any],
 ) -> None:
-    """Generate enriched Llama Stack configuration for service/container mode.
+    """Generate enriched OGX configuration for service/container mode.
 
     Args:
-        input_file: Path to input Llama Stack config
+        input_file: Path to input OGX config
         output_file: Path to write enriched config
         config: Lightspeed config dict (from YAML)
     """
-    logger.info("Reading Llama Stack configuration from file %s", input_file)
+    logger.info("Reading OGX configuration from file %s", input_file)
 
     with open(input_file, "r", encoding="utf-8") as file:
         ls_config = yaml.safe_load(file)
@@ -1416,7 +1472,7 @@ def generate_configuration(
 
     dedupe_providers_vector_io(ls_config)
 
-    logger.info("Writing Llama Stack configuration into file %s", output_file)
+    logger.info("Writing OGX configuration into file %s", output_file)
 
     with open(output_file, "w", encoding="utf-8") as file:
         yaml.dump(ls_config, file, Dumper=YamlDumper, default_flow_style=False)
@@ -1430,7 +1486,7 @@ def generate_configuration(
 def main() -> None:
     """CLI entry point."""
     parser = ArgumentParser(
-        description="Enrich Llama Stack config with Lightspeed values",
+        description="Enrich OGX config with Lightspeed values",
     )
     parser.add_argument(
         "-c",
@@ -1442,7 +1498,7 @@ def main() -> None:
         "-i",
         "--input",
         default="run.yaml",
-        help="Input Llama Stack config (default: run.yaml)",
+        help="Input OGX config (default: run.yaml)",
     )
     parser.add_argument(
         "-o",
