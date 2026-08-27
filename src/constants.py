@@ -6,8 +6,8 @@ from typing import Final, Literal
 # will be able to detect assignements to such constants.
 
 # Minimal and maximal supported OGX version
-MINIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "0.2.17"
-MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "1.0.2"
+MINIMAL_SUPPORTED_OGX_VERSION: Final[str] = "0.2.17"
+MAXIMAL_SUPPORTED_OGX_VERSION: Final[str] = "1.0.2"
 
 # Path to the lightspeed-stack.yaml, exported so uvicorn workers (separate
 # processes) can reload the configuration that the parent process selected.
