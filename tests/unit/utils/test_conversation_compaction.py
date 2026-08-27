@@ -21,7 +21,7 @@ CONV = "conv_abc123"
 
 
 def _msg(role: str, text: str) -> OpenAIResponseMessage:
-    """Build a typed Llama Stack message item for tests."""
+    """Build a typed OGX message item for tests."""
     return OpenAIResponseMessage(role=cast(Any, role), content=text)
 
 
@@ -119,6 +119,13 @@ def test_should_compact() -> None:
     assert not cc._should_compact(
         90, 100, _compaction(threshold_ratio=0.5, token_floor=100)
     )
+
+
+def test_compaction_result_context_status() -> None:
+    """The compacted flag maps to the API context_status value (LCORE-1573)."""
+    params = _params()
+    assert cc.CompactionResult(params, compacted=False).context_status == "full"
+    assert cc.CompactionResult(params, compacted=True).context_status == "summarized"
 
 
 # --- apply_compaction ---

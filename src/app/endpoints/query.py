@@ -83,7 +83,7 @@ query_response: dict[int | str, dict[str, Any]] = {
     429: QuotaExceededResponse.openapi_response(),
     500: InternalServerErrorResponse.openapi_response(examples=["configuration"]),
     503: ServiceUnavailableResponse.openapi_response(
-        examples=["ogx", "kubernetes api"]
+        examples=["OGX", "kubernetes api"]
     ),
 }
 
@@ -100,7 +100,7 @@ async def query_endpoint_handler(
     Handle request to the /query endpoint using Responses API.
 
     Processes a POST request to a query endpoint, forwarding the
-    user's query to a selected Llama Stack LLM and returning the generated response.
+    user's query to a selected OGX LLM and returning the generated response.
 
     ### Parameters:
     - request: The incoming HTTP request (used by middleware).
@@ -356,6 +356,7 @@ async def _handle_query_with_tracing(
         rag_chunks=turn_summary.rag_chunks,
         referenced_documents=turn_summary.referenced_documents,
         truncated=False,
+        context_status=compaction.context_status,
         input_tokens=turn_summary.token_usage.input_tokens,
         output_tokens=turn_summary.token_usage.output_tokens,
         available_quotas=available_quotas,
