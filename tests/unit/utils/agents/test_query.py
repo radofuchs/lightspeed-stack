@@ -498,11 +498,51 @@ class TestRetrieveAgentResponse:
         patch_recording_metrics: None,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Test mapped agent inference errors are logged before raising."""
+        """Test an upstream connection failure logs a warning, not an error.
+
+        APIConnectionError maps to 503: the backend is down, which is not a
+        service fault of ours, so it must not be logged at error level with a
+        traceback — that noise would bury the genuine 500s this logging exists
+        to surface (LCORE-3582).
+        """
         mock_agent = mocker.AsyncMock()
         mock_agent.run = mocker.AsyncMock(
             side_effect=APIConnectionError(request=mocker.Mock())
         )
+        mocker.patch("utils.agents.query.build_agent", return_value=mock_agent)
+
+        with caplog.at_level("WARNING"):
+            with pytest.raises(HTTPException):
+                await retrieve_agent_response(
+                    client=mocker.AsyncMock(),
+                    responses_params=make_responses_params(),
+                    moderation_result=ShieldModerationPassed(),
+                    endpoint_path=ENDPOINT_PATH_QUERY,
+                )
+
+        assert any(
+            record.levelname == "WARNING"
+            and "Agent inference returned 503" in record.message
+            for record in caplog.records
+        )
+        assert not any(record.levelname == "ERROR" for record in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_unclassified_inference_error_is_logged_with_traceback(
+        self,
+        mocker: MockerFixture,
+        make_responses_params: Callable[..., ResponsesApiParams],
+        patch_recording_metrics: None,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test an unclassified failure is logged at error level with the traceback.
+
+        This is the case the logging was added for: it maps to a generic 500,
+        the mapped HTTPException discards the original exception, and callers
+        raise without logging, so without this the failure left nothing behind.
+        """
+        mock_agent = mocker.AsyncMock()
+        mock_agent.run = mocker.AsyncMock(side_effect=RuntimeError("kaboom"))
         mocker.patch("utils.agents.query.build_agent", return_value=mock_agent)
 
         with caplog.at_level("ERROR"):
@@ -514,10 +554,14 @@ class TestRetrieveAgentResponse:
                     endpoint_path=ENDPOINT_PATH_QUERY,
                 )
 
-        assert any(
-            record.levelname == "ERROR" and "Agent inference failed" in record.message
+        matching = [
+            record
             for record in caplog.records
-        )
+            if record.levelname == "ERROR"
+            and "Agent inference failed" in record.message
+        ]
+        assert matching, "unclassified failure was not logged at error level"
+        assert matching[0].exc_info is not None, "traceback was not attached"
 
     @pytest.mark.asyncio
     async def test_success_with_image_attachments_sends_multimodal_prompt(
