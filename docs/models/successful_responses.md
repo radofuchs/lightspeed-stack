@@ -848,36 +848,6 @@ Attributes:
 | alive | boolean | Flag indicating that the app is alive |
 
 
-## LlamaStackConfiguration
-
-
-OGX configuration.
-
-OGX is a comprehensive system that provides a uniform set of tools
-for building, scaling, and deploying generative AI applications, enabling
-developers to create, integrate, and orchestrate multiple AI services and
-capabilities into an adaptable setup.
-
-Useful resources:
-
-  - [OGX](https://www.llama.com/products/llama-stack/)
-  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)
-  - [Build AI Applications with OGX](https://llamastack.github.io/)
-
-
-| Field | Type | Description |
-|-------|------|-------------|
-| url | string | URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL. |
-| api_key | string | API key to access OGX service |
-| use_as_library_client | boolean | When set to true OGX will be used in library mode, not in server mode (default) |
-| library_client_config_path | string | Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.7 — use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config. |
-| timeout | integer | Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
-| max_retries | integer | Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
-| retry_delay | integer | Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
-| allow_degraded_mode | boolean | If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only) |
-| config |  | Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required. |
-
-
 ## MCPClientAuthOptionsResponse
 
 
@@ -1065,6 +1035,36 @@ Attributes:
 | Field | Type | Description |
 |-------|------|-------------|
 | otel | object | Active OpenTelemetry configuration from OTEL_* environment variables |
+
+
+## OgxConfiguration
+
+
+OGX configuration.
+
+OGX is a comprehensive system that provides a uniform set of tools
+for building, scaling, and deploying generative AI applications, enabling
+developers to create, integrate, and orchestrate multiple AI services and
+capabilities into an adaptable setup.
+
+Useful resources:
+
+  - [OGX](https://www.llama.com/products/llama-stack/)
+  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)
+  - [Build AI Applications with OGX](https://llamastack.github.io/)
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| url | string | URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL. |
+| api_key | string | API key to access OGX service |
+| use_as_library_client | boolean | When set to true OGX will be used in library mode, not in server mode (default) |
+| library_client_config_path | string | Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.8 — use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config. |
+| timeout | integer | Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
+| max_retries | integer | Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
+| retry_delay | integer | Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
+| allow_degraded_mode | boolean | If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only) |
+| config |  | Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required. |
 
 
 ## OkpConfiguration
@@ -2861,7 +2861,7 @@ Attributes:
 | extra | object | Additional provider-config keys merged verbatim into the synthesized provider's config block. |
 
 
-## UnifiedLlamaStackConfig
+## UnifiedOgxConfig
 
 
 Backend-specific knobs for unified-mode OGX synthesis.

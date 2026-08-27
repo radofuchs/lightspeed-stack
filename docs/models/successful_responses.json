@@ -708,7 +708,7 @@
                         "title": "Service configuration"
                     },
                     "llama_stack": {
-                        "$ref": "`#/components/schemas/`LlamaStackConfiguration",
+                        "$ref": "`#/components/schemas/`OgxConfiguration",
                         "description": "This section contains OGX configuration. Lightspeed Core Stack service can call OGX in library mode or in server mode.",
                         "title": "OGX configuration"
                     },
@@ -2030,83 +2030,6 @@
                 "title": "LivenessResponse",
                 "type": "object"
             },
-            "LlamaStackConfiguration": {
-                "additionalProperties": false,
-                "description": "OGX configuration.\n\nOGX is a comprehensive system that provides a uniform set of tools\nfor building, scaling, and deploying generative AI applications, enabling\ndevelopers to create, integrate, and orchestrate multiple AI services and\ncapabilities into an adaptable setup.\n\nUseful resources:\n\n  - [OGX](https://www.llama.com/products/llama-stack/)\n  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)\n  - [Build AI Applications with OGX](https://llamastack.github.io/)",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL.",
-                        "title": "OGX URL"
-                    },
-                    "api_key": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "API key to access OGX service",
-                        "title": "API key"
-                    },
-                    "use_as_library_client": {
-                        "type": "boolean",
-                        "nullable": true,
-                        "default": null,
-                        "description": "When set to true OGX will be used in library mode, not in server mode (default)",
-                        "title": "Use as library"
-                    },
-                    "library_client_config_path": {
-                        "type": "string",
-                        "nullable": true,
-                        "default": null,
-                        "description": "Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.7 \u2014 use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config.",
-                        "title": "OGX configuration path (legacy, deprecated)"
-                    },
-                    "timeout": {
-                        "default": 180,
-                        "description": "Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
-                        "minimum": 0,
-                        "title": "Request timeout",
-                        "type": "integer"
-                    },
-                    "max_retries": {
-                        "default": 5,
-                        "description": "Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
-                        "minimum": 0,
-                        "title": "Maximum number of connection attempts before giving up",
-                        "type": "integer"
-                    },
-                    "retry_delay": {
-                        "default": 2,
-                        "description": "Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
-                        "minimum": 0,
-                        "title": "Delay in seconds between retry attempts",
-                        "type": "integer"
-                    },
-                    "allow_degraded_mode": {
-                        "type": "boolean",
-                        "nullable": true,
-                        "default": false,
-                        "description": "If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only)",
-                        "title": "Allow degraded mode"
-                    },
-                    "config": {
-                        "anyOf": [
-                            {
-                                "$ref": "`#/components/schemas/`UnifiedLlamaStackConfig"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "default": null,
-                        "description": "Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required.",
-                        "title": "Unified OGX configuration"
-                    }
-                },
-                "title": "LlamaStackConfiguration",
-                "type": "object"
-            },
             "MCPClientAuthOptionsResponse": {
                 "description": "Response containing MCP servers that accept client-provided authorization.\n\nAttributes:\n    servers: MCP servers that declare client authentication headers.",
                 "examples": [
@@ -2506,6 +2429,83 @@
                     }
                 },
                 "title": "ObservabilityConfiguration",
+                "type": "object"
+            },
+            "OgxConfiguration": {
+                "additionalProperties": false,
+                "description": "OGX configuration.\n\nOGX is a comprehensive system that provides a uniform set of tools\nfor building, scaling, and deploying generative AI applications, enabling\ndevelopers to create, integrate, and orchestrate multiple AI services and\ncapabilities into an adaptable setup.\n\nUseful resources:\n\n  - [OGX](https://www.llama.com/products/llama-stack/)\n  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)\n  - [Build AI Applications with OGX](https://llamastack.github.io/)",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL.",
+                        "title": "OGX URL"
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "API key to access OGX service",
+                        "title": "API key"
+                    },
+                    "use_as_library_client": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "default": null,
+                        "description": "When set to true OGX will be used in library mode, not in server mode (default)",
+                        "title": "Use as library"
+                    },
+                    "library_client_config_path": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "description": "Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.8 \u2014 use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config.",
+                        "title": "OGX configuration path (legacy, deprecated)"
+                    },
+                    "timeout": {
+                        "default": 180,
+                        "description": "Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
+                        "minimum": 0,
+                        "title": "Request timeout",
+                        "type": "integer"
+                    },
+                    "max_retries": {
+                        "default": 5,
+                        "description": "Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
+                        "minimum": 0,
+                        "title": "Maximum number of connection attempts before giving up",
+                        "type": "integer"
+                    },
+                    "retry_delay": {
+                        "default": 2,
+                        "description": "Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
+                        "minimum": 0,
+                        "title": "Delay in seconds between retry attempts",
+                        "type": "integer"
+                    },
+                    "allow_degraded_mode": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "default": false,
+                        "description": "If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only)",
+                        "title": "Allow degraded mode"
+                    },
+                    "config": {
+                        "anyOf": [
+                            {
+                                "$ref": "`#/components/schemas/`UnifiedOgxConfig"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": null,
+                        "description": "Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required.",
+                        "title": "Unified OGX configuration"
+                    }
+                },
+                "title": "OgxConfiguration",
                 "type": "object"
             },
             "OkpConfiguration": {
@@ -6548,7 +6548,7 @@
                 "title": "UnifiedInferenceProvider",
                 "type": "object"
             },
-            "UnifiedLlamaStackConfig": {
+            "UnifiedOgxConfig": {
                 "additionalProperties": false,
                 "description": "Backend-specific knobs for unified-mode OGX synthesis.\n\nPer Decision S5 of the design spike, backend-agnostic high-level sections\n(inference, ...) live at the configuration root, not here. This block holds\nonly the OGX-specific synthesis controls: which baseline to start\nfrom, an optional profile file, and a raw native_override escape hatch.\n\nAttributes:\n    baseline: Synthesis starting point. \"default\" begins from LCORE's\n        built-in baseline (src/data/default_run.yaml) including the\n        conditional OpenAI inference provider. \"byo-llm\" begins from the\n        same file with that OpenAI row removed. \"empty\" begins from an\n        empty dict (used by the migration tool for an exact round-trip).\n        Ignored when `profile` is set.\n    profile: Optional path to a user-authored run.yaml-shaped file used as\n        the synthesis baseline. Relative paths resolve against the directory\n        of the loaded lightspeed-stack.yaml.\n    native_override: Raw OGX schema deep-merged last (maps merge\n        recursively, lists and scalars replace). The escape hatch for\n        anything the high-level sections do not express.",
                 "properties": {
@@ -6577,7 +6577,7 @@
                         "type": "object"
                     }
                 },
-                "title": "UnifiedLlamaStackConfig",
+                "title": "UnifiedOgxConfig",
                 "type": "object"
             },
             "UserDataCollection": {

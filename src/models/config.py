@@ -848,7 +848,7 @@ class OgxConfiguration(ConfigurationBase):
         title="OGX configuration path (legacy, deprecated)",
         description="Path to configuration file used when OGX is run "
         "in library mode. DEPRECATED legacy two-file setup: logs a "
-        "startup warning since 0.6 and is removed in 0.7 "
+        "startup warning since 0.6 and is removed in 0.8 "
         "— use unified mode instead (the config block below, "
         "and/or the root-level inference.providers section); "
         "migrate with lightspeed-stack --migrate-config.",
