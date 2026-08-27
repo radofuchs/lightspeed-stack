@@ -47,6 +47,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Optional, cast
 
+from fastapi import HTTPException
 from ogx_api.openai_responses import OpenAIResponseMessage
 from ogx_client import AsyncOgxClient
 from ogx_client.types.conversations.item_create_params import Item
@@ -55,6 +56,7 @@ from cache.cache import Cache
 from cache.cache_error import CacheError
 from configuration import configuration
 from log import get_logger
+from models.api.responses.error import UnprocessableEntityResponse
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.common.responses.types import ResponseInput
 from models.common.turn_summary import ContextStatus
@@ -284,6 +286,48 @@ def agent_prompt_text(params: ResponsesApiParams) -> str:
         "agent prompt falls back to an empty string"
     )
     return ""
+
+
+def reject_image_attachments_in_compacted_mode(
+    params: ResponsesApiParams,
+    image_attachments: Optional[Sequence[Any]],
+) -> None:
+    """Reject a compacted turn that carries image attachments (LCORE-3582).
+
+    In compacted mode the wire ``input`` is overridden with the explicit item
+    list built by :func:`_build_explicit_input`, which is text-only: image
+    attachments are converted to pydantic-ai ``ImageUrl`` parts on the prompt,
+    and the override replaces the prompt-derived input wholesale, so those
+    parts never reach the request body.
+
+    Answering anyway would return a confident response that never saw the
+    image, with nothing to tell the caller their attachment was ignored. Fail
+    explicitly instead until the explicit input can carry ``input_image``
+    content parts of its own (LCORE-3789).
+
+    Args:
+        params: Prepared (possibly compaction-rewritten) request parameters.
+        image_attachments: Image attachments for this turn, if any.
+
+    Raises:
+        HTTPException: 422 when the turn is compacted and carries images.
+    """
+    if not image_attachments or not params.omit_conversation:
+        return
+    logger.warning(
+        "Rejecting compacted turn with %d image attachment(s): the explicit "
+        "input override cannot carry image content parts (LCORE-3789)",
+        len(image_attachments),
+    )
+    response = UnprocessableEntityResponse(
+        response="Image attachments are not supported on this conversation",
+        cause=(
+            "This conversation has been compacted to fit the model's context "
+            "window, and compacted turns cannot carry image attachments yet. "
+            "Send the image in a new conversation, or retry without it."
+        ),
+    )
+    raise HTTPException(**response.model_dump())
 
 
 def _query_input_message(original_input: ResponseInput) -> list[Any]:
