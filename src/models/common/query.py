@@ -2,6 +2,7 @@
 
 import base64
 import binascii
+import re
 from typing import Any, Literal, Optional, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -15,11 +16,11 @@ from log import get_logger
 
 logger = get_logger(__name__)
 
-_IMAGE_SIGNATURES: dict[str, tuple[tuple[int, bytes], ...]] = {
-    "image/png": ((0, b"\x89PNG"),),
-    "image/jpeg": ((0, b"\xff\xd8\xff"),),
-    # WebP is a RIFF container: 4-byte "RIFF", 4-byte size, then "WEBP".
-    "image/webp": ((0, b"RIFF"), (8, b"WEBP")),
+_IMAGE_SIGNATURES: dict[str, re.Pattern[bytes]] = {
+    "image/png": re.compile(rb"^\x89PNG"),
+    "image/jpeg": re.compile(rb"^\xff\xd8\xff"),
+    # WebP is a RIFF container: "RIFF", a 4-byte size, then "WEBP".
+    "image/webp": re.compile(rb"^RIFF.{4}WEBP", re.DOTALL),
 }
 
 
@@ -33,11 +34,8 @@ def _validate_image_magic_bytes(data: bytes, content_type: str) -> None:
     Raises:
         ValueError: If the data does not match the expected image format.
     """
-    signatures = _IMAGE_SIGNATURES.get(content_type)
-    if signatures and any(
-        data[offset : offset + len(expected)] != expected
-        for offset, expected in signatures
-    ):
+    pattern = _IMAGE_SIGNATURES.get(content_type)
+    if pattern and not pattern.match(data):
         raise ValueError(
             f"Image content does not match declared content_type "
             f"'{content_type}': invalid image data"
