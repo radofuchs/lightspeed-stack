@@ -389,6 +389,40 @@ class ServiceConfiguration(ConfigurationBase):
         description="Number of Uvicorn worker processes to start",
     )
 
+    max_concurrent_file_uploads: PositiveInt = Field(
+        5,
+        title="Maximum concurrent file uploads",
+        description="Maximum number of file uploads (POST /v1/files) processed "
+        "concurrently per worker. Each in-flight upload can hold up to the "
+        "configured maximum file size in memory, so this bounds worst-case "
+        "memory usage from concurrent uploads. Additional uploads are "
+        "rejected with 429 until a slot frees up.",
+    )
+
+    max_concurrent_vector_store_attaches: PositiveInt = Field(
+        5,
+        title="Maximum concurrent vector store file attachments",
+        description="Maximum number of vector store file attachments "
+        "(POST /v1/vector-stores/{id}/files) processed concurrently per "
+        "worker. Each in-flight attachment re-reads and chunks the source "
+        "file, so this bounds worst-case memory usage independently of "
+        "max_concurrent_file_uploads. Additional attachments are rejected "
+        "with 429 until a slot frees up.",
+    )
+
+    delete_file_after_vector_store_attach: bool = Field(
+        False,
+        title="Delete file after vector store attach",
+        description="When true, deletes a file (POST /v1/files) once it has "
+        "been successfully attached to a vector store, since the vector "
+        "store keeps its own chunked/embedded copy of the content. "
+        "Defaults to false to match the OpenAI Files API, where a file "
+        "remains reusable across multiple vector stores until the caller "
+        "explicitly deletes it - enabling this makes attached files "
+        "single-use: re-attaching the same file_id to another vector store "
+        "will fail once it has been deleted.",
+    )
+
     color_log: bool = Field(
         True,
         title="Color log",
