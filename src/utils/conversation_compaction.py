@@ -274,6 +274,15 @@ def agent_prompt_text(params: ResponsesApiParams) -> str:
             text = extract_message_text(item)
             if text:
                 return text
+    # The wire input still carries the explicit list via the extra_body
+    # override, so the request itself is well-formed — but capabilities and
+    # multimodal construction operate on this prompt, and an explicit input
+    # with no textual message item means compaction produced something
+    # unexpected. Surface it rather than degrading silently.
+    logger.warning(
+        "Explicit compacted input carries no textual message item; "
+        "agent prompt falls back to an empty string"
+    )
     return ""
 
 
