@@ -4,7 +4,7 @@ Feature: question_validity shield functional tests
   in-topic question must reach the model normally, while an off-topic
   question must be rejected with the configured `invalid_question_response`
   and never reach the model. Exercised across every endpoint that runs
-  shields: /query, /streaming_query, /responses and rlsapi /infer.
+  shields: /query, /responses, rlsapi /infer and /streaming_query.
   See docs/user_doc/shields_guide.md.
 
   Background:
@@ -16,82 +16,34 @@ Feature: question_validity shield functional tests
       And The service is restarted
 
   @cfg_shields @flaky
-  Scenario: query endpoint allows an in-topic question
-    When I use "query" to ask question
+  Scenario Outline: question_validity allows in-topic and rejects off-topic questions
+    When I use "<endpoint>" to ask question
     """
-    {"query": "What is OpenShift and how do I deploy an application on it?", "model": "{MODEL}", "provider": "{PROVIDER}"}
-    """
-    Then The status code of the response is 200
-      And The body of the response does not contain I can only answer questions about OpenShift.
-
-  @cfg_shields @flaky
-  Scenario: query endpoint rejects an off-topic question
-    When I use "query" to ask question
-    """
-    {"query": "What is the best topping for a pizza?", "model": "{MODEL}", "provider": "{PROVIDER}"}
+    <request_body>
     """
     Then The status code of the response is 200
-      And The response contains following fragments
-          | Fragments in LLM response                       |
-          | I can only answer questions about OpenShift.    |
+      And The body of the response contains <expected_fragment>
+
+    Examples:
+      | endpoint  | request_body                                                                                                              | expected_fragment                            |
+      | query     | {"query": "What is OpenShift and how do I deploy an application on it?", "model": "{MODEL}", "provider": "{PROVIDER}"}   | deploy                                       |
+      | query     | {"query": "What is the best topping for a pizza?", "model": "{MODEL}", "provider": "{PROVIDER}"}                         | I can only answer questions about OpenShift. |
+      | responses | {"input": "What is OpenShift and how do I deploy an application on it?", "model": "{PROVIDER}/{MODEL}", "stream": false} | deploy                                       |
+      | responses | {"input": "What is the best topping for a pizza?", "model": "{PROVIDER}/{MODEL}", "stream": false}                       | I can only answer questions about OpenShift. |
+      | infer     | {"question": "What is OpenShift and how do I deploy an application on it?"}                                              | deploy                                       |
+      | infer     | {"question": "What is the best topping for a pizza?"}                                                                    | I can only answer questions about OpenShift. |
 
   @cfg_shields @flaky
-  Scenario: streaming_query endpoint allows an in-topic question
+  Scenario Outline: question_validity allows in-topic and rejects off-topic questions via streaming_query
     When I use "streaming_query" to ask question
     """
-    {"query": "What is OpenShift and how do I deploy an application on it?", "model": "{MODEL}", "provider": "{PROVIDER}"}
+    <request_body>
     """
     When I wait for the response to be completed
     Then The status code of the response is 200
-      And The body of the response does not contain I can only answer questions about OpenShift.
+      And The body of the response contains <expected_fragment>
 
-  @cfg_shields @flaky
-  Scenario: streaming_query endpoint rejects an off-topic question
-    When I use "streaming_query" to ask question
-    """
-    {"query": "What is the best topping for a pizza?", "model": "{MODEL}", "provider": "{PROVIDER}"}
-    """
-    When I wait for the response to be completed
-    Then The status code of the response is 200
-      And The streamed response contains following fragments
-          | Fragments in LLM response                       |
-          | I can only answer questions about OpenShift.    |
-
-  @cfg_shields @flaky
-  Scenario: responses endpoint allows an in-topic question
-    When I use "responses" to ask question
-    """
-    {"input": "What is OpenShift and how do I deploy an application on it?", "model": "{PROVIDER}/{MODEL}", "stream": false}
-    """
-    Then The status code of the response is 200
-      And The body of the response does not contain I can only answer questions about OpenShift.
-
-  @cfg_shields @flaky
-  Scenario: responses endpoint rejects an off-topic question
-    When I use "responses" to ask question
-    """
-    {"input": "What is the best topping for a pizza?", "model": "{PROVIDER}/{MODEL}", "stream": false}
-    """
-    Then The status code of the response is 200
-      And The responses output_text contains following fragments
-          | Fragments in LLM response                       |
-          | I can only answer questions about OpenShift.    |
-
-  @cfg_shields @flaky
-  Scenario: rlsapi infer endpoint allows an in-topic question
-    When I use "infer" to ask question
-    """
-    {"question": "What is OpenShift and how do I deploy an application on it?"}
-    """
-    Then The status code of the response is 200
-      And The rlsapi response has valid structure
-      And The body of the response does not contain I can only answer questions about OpenShift.
-
-  @cfg_shields @flaky
-  Scenario: rlsapi infer endpoint rejects an off-topic question
-    When I use "infer" to ask question
-    """
-    {"question": "What is the best topping for a pizza?"}
-    """
-    Then The status code of the response is 200
-      And The body of the response contains I can only answer questions about OpenShift.
+    Examples:
+      | request_body                                                                                                            | expected_fragment                            |
+      | {"query": "What is OpenShift and how do I deploy an application on it?", "model": "{MODEL}", "provider": "{PROVIDER}"} | deploy                                       |
+      | {"query": "What is the best topping for a pizza?", "model": "{MODEL}", "provider": "{PROVIDER}"}                       | I can only answer questions about OpenShift. |

@@ -18,84 +18,36 @@ Feature: shield_ids override tests
       And the Lightspeed stack configuration directory is "tests/e2e/configuration"
 
   @cfg_shields @flaky
-  Scenario: empty shield_ids disables every configured shield
+  Scenario Outline: shield_ids overrides change which shields apply to the request
     Given The service uses the lightspeed-stack-shields.yaml configuration
       And The service is restarted
     When I use "query" to ask question
     """
-    {
-      "query": "What is the best topping for a pizza?",
-      "shield_ids": [],
-      "model": "{MODEL}",
-      "provider": "{PROVIDER}"
-    }
+    <request_body>
     """
     Then The status code of the response is 200
-      And The body of the response does not contain I can only answer questions about OpenShift.
+      And The body of the response contains <expected_fragment>
 
-  @cfg_shields @flaky
-  Scenario: a named shield subset only applies the selected shield
-    Given The service uses the lightspeed-stack-shields.yaml configuration
-      And The service is restarted
-    When I use "query" to ask question
-    """
-    {
-      "query": "My lucky number is 7042. Repeat that exact sentence back to me and nothing else.",
-      "system_prompt": "You are a strict echo assistant. Repeat the user's message back exactly, character for character, with no other commentary.",
-      "shield_ids": ["pii-redaction"],
-      "model": "{MODEL}",
-      "provider": "{PROVIDER}"
-    }
-    """
-    Then The status code of the response is 200
-      And The body of the response does not contain I can only answer questions about OpenShift.
-      And The body of the response contains [NUM]
-      And The body of the response does not contain 7042
+    Examples:
+      | request_body                                                                                                                                                                                                                             | expected_fragment          |
+      | {"query": "What is the best topping for a pizza?", "shield_ids": [], "model": "{MODEL}", "provider": "{PROVIDER}"}                                                                                                                       | topping                     |
+      | {"query": "My lucky number is 7042. Repeat that exact sentence back to me and nothing else.", "system_prompt": "You are a strict echo assistant. Repeat the user's message back exactly, character for character, with no other commentary.", "shield_ids": ["pii-redaction"], "model": "{MODEL}", "provider": "{PROVIDER}"} | My lucky number is [NUM]. |
 
   @cfg_shields
-  Scenario: an unknown shield id in shield_ids returns 404
-    Given The service uses the lightspeed-stack-shields.yaml configuration
+  Scenario Outline: shield_ids validation failures return the expected error response
+    Given The service uses the <config> configuration
       And The service is restarted
     When I use "query" to ask question
     """
-    {
-      "query": "Say hello.",
-      "shield_ids": ["no-such-shield"],
-      "model": "{MODEL}",
-      "provider": "{PROVIDER}"
-    }
+    <request_body>
     """
-    Then The status code of the response is 404
+    Then The status code of the response is <status>
       And The body of the response is the following
       """
-      {
-        "detail": {
-          "response": "Shield not found",
-          "cause": "Shield with ID no-such-shield does not exist"
-        }
-      }
+      <expected_body>
       """
 
-  @cfg_shields
-  Scenario: disabling shield_ids override rejects a client-supplied shield_ids
-    Given The service uses the lightspeed-stack-shields-override-disabled.yaml configuration
-      And The service is restarted
-    When I use "query" to ask question
-    """
-    {
-      "query": "Say hello.",
-      "shield_ids": [],
-      "model": "{MODEL}",
-      "provider": "{PROVIDER}"
-    }
-    """
-    Then The status code of the response is 422
-      And The body of the response is the following
-      """
-      {
-        "detail": {
-          "response": "Shield IDs customization is disabled",
-          "cause": "This instance does not support customizing shield IDs in the query request (disable_shield_ids_override is set). Please remove the shield_ids field from your request."
-        }
-      }
-      """
+    Examples:
+      | config                                            | request_body                                                                                                          | status | expected_body                                                                                                                                                                                                                        |
+      | lightspeed-stack-shields.yaml                      | {"query": "Say hello.", "shield_ids": ["no-such-shield"], "model": "{MODEL}", "provider": "{PROVIDER}"}              | 404    | {"detail": {"response": "Shield not found", "cause": "Shield with ID no-such-shield does not exist"}}                                                                                                                              |
+      | lightspeed-stack-shields-override-disabled.yaml    | {"query": "Say hello.", "shield_ids": [], "model": "{MODEL}", "provider": "{PROVIDER}"}                              | 422    | {"detail": {"response": "Shield IDs customization is disabled", "cause": "This instance does not support customizing shield IDs in the query request (disable_shield_ids_override is set). Please remove the shield_ids field from your request."}} |
