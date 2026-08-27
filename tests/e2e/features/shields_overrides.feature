@@ -1,15 +1,7 @@
 Feature: shield_ids override tests
 
   Functional tests for the `shield_ids` request field that lets a client
-  override which configured shields run for a single request: omitting it
-  applies every configured shield (see shields_question_validity.feature
-  and shields_redaction.feature, which all omit shield_ids), an empty list
-  disables every shield, a named subset applies only those shields, and an
-  unknown shield name is rejected with 404. A separate configuration with
-  customization.disable_shield_ids_override enabled rejects any
-  client-supplied shield_ids with 422. Exercised on /query; the same
-  get_shields_for_request/validate_shield_ids_override helpers back
-  /streaming_query too. See docs/user_doc/shields_guide.md.
+  override which configured shields run for a single request
 
   Background:
     Given The service is started locally

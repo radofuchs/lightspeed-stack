@@ -1,11 +1,6 @@
 Feature: question_validity shield functional tests
 
-  Functional tests for the LCORE-owned `question_validity` shield: an
-  in-topic question must reach the model normally, while an off-topic
-  question must be rejected with the configured `invalid_question_response`
-  and never reach the model. Exercised across every endpoint that runs
-  shields: /query, /responses, rlsapi /infer and /streaming_query.
-  See docs/user_doc/shields_guide.md.
+  Functional tests for the LCORE-owned `question_validity` shield
 
   Background:
     Given The service is started locally
