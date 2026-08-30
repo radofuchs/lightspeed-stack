@@ -25,7 +25,7 @@ from log import get_logger
 from metrics import recording
 from metrics.utils import setup_model_metrics
 from models.api.responses.error import InternalServerErrorResponse
-from sentry import initialize_sentry
+from observability.sentry import initialize_sentry
 from utils.degraded_mode import DegradedModeTracker
 from utils.llama_stack_version import check_ogx_version
 

@@ -8,3 +8,7 @@ Observability module for telemetry and event collection.
 
 Async Splunk HEC client for sending telemetry events.
 
+## [sentry.py](sentry.py)
+
+Sentry error tracking initialization and configuration.
+

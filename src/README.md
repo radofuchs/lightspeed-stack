@@ -28,10 +28,6 @@ OGX configuration enrichment and synthesis.
 
 Log utilities.
 
-## [sentry.py](sentry.py)
-
-Sentry error tracking initialization and configuration.
-
 ## [version.py](version.py)
 
 Service version that is read by project manager tools.
