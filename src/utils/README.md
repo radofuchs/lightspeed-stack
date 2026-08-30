@@ -20,10 +20,6 @@ Common utilities for the project.
 
 Conversation compaction — partitioning, summarization, additive fold-up.
 
-## [config_dumper.py](config_dumper.py)
-
-Function to dump the configuration schema into OpenAPI-compatible format.
-
 ## [connection_decorator.py](connection_decorator.py)
 
 Decorator that makes sure the object is 'connected' according to it's connected predicate.
