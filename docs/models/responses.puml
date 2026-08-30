@@ -318,6 +318,12 @@ class "StreamingQueryResponse" as src.models.api.responses.successful.query.Stre
   model_config : dict
   openapi_response() -> dict[str, Any]
 }
+class "TooManyConcurrentRequestsResponse" as src.models.api.responses.error.too_many_requests.TooManyConcurrentRequestsResponse {
+  description : ClassVar[str]
+  model_config : dict
+  file_upload() -> Self
+  vector_store_attach() -> Self
+}
 class "ToolsResponse" as src.models.api.responses.successful.catalog.ToolsResponse {
   model_config : dict
   tools : Optional[list[CatalogTool]]
