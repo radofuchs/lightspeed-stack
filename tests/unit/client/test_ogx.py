@@ -18,7 +18,7 @@ from pydantic import AnyHttpUrl, SecretStr
 from pytest_mock import MockerFixture
 
 from authorization.azure_token_manager import AzureEntraIDManager
-from client import AsyncOgxClientHolder
+from client.ogx import AsyncOgxClientHolder
 from configuration import AppConfig, AzureEntraIdConfiguration
 from models.config import OgxConfiguration
 from utils.types import Singleton
