@@ -14,8 +14,7 @@ from llama_stack_configuration import migrate_config_dumb
 from log import get_logger, setup_logging
 from runners.quota_scheduler import start_quota_scheduler
 from runners.uvicorn import start_uvicorn
-from utils import models_dumper
-from utils.dumpers import config_dumper
+from utils.dumpers import config_dumper, models_dumper
 
 setup_logging()
 logger = get_logger(__name__)

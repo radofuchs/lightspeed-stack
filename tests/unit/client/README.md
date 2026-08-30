@@ -1,5 +1,6 @@
-# List of source files stored in `tests/unit` directory
+# List of source files stored in `tests/unit/client` directory
 
-## [test_client.py](test_client.py)
+## [test_ogx.py](test_ogx.py)
 
-Unit tests for functions defined in src/client/ogx.py.
+Unit tests for functions defined in src/client.py.
+

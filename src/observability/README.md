@@ -8,11 +8,11 @@ Observability module for telemetry and event collection.
 
 Splunk telemetry helpers for the Responses API endpoint.
 
-## [splunk.py](splunk.py)
-
-Async Splunk HEC client for sending telemetry events.
-
 ## [sentry.py](sentry.py)
 
 Sentry error tracking initialization and configuration.
+
+## [splunk.py](splunk.py)
+
+Async Splunk HEC client for sending telemetry events.
 

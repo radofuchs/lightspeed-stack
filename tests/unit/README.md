@@ -36,7 +36,3 @@ Unit tests for unified-mode OGX configuration synthesis (LCORE-2336).
 
 Unit tests for functions defined in src/log.py.
 
-## [test_sentry.py](test_sentry.py)
-
-Unit tests for functions defined in src/sentry.py.
-
