@@ -8,10 +8,6 @@ Unit tests.
 
 Shared pytest fixtures for unit tests.
 
-## [test_client.py](test_client.py)
-
-Unit tests for functions defined in src/client.py.
-
 ## [test_configuration.py](test_configuration.py)
 
 Unit tests for functions defined in src/configuration.py.

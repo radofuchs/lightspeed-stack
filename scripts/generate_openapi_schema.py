@@ -7,7 +7,7 @@ import sys
 
 from fastapi.openapi.utils import get_openapi
 
-from client import AsyncOgxClientHolder
+from ogx.client import AsyncOgxClientHolder
 
 # it is needed to read proper configuration in order to start the app to generate schema
 from configuration import configuration
