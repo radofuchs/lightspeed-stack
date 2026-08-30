@@ -20,10 +20,6 @@ Unit tests for functions defined in utils/checks module.
 
 Unit tests for utils/compaction — partitioning, prompt, summarization.
 
-## [test_config_dumper.py](test_config_dumper.py)
-
-Unit tests for utils/config_dumper module.
-
 ## [test_connection_decorator.py](test_connection_decorator.py)
 
 Unit tests for the connection decorator.
