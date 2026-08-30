@@ -4,6 +4,10 @@
 
 Observability module for telemetry and event collection.
 
+## [responses_telemetry.py](responses_telemetry.py)
+
+Splunk telemetry helpers for the Responses API endpoint.
+
 ## [splunk.py](splunk.py)
 
 Async Splunk HEC client for sending telemetry events.

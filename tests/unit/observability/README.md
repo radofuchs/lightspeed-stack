@@ -4,6 +4,14 @@
 
 Unit tests for observability module.
 
+## [conftest.py](conftest.py)
+
+Shared pytest fixtures for obesrvability unit tests.
+
+## [test_responses_splunk.py](test_responses_splunk.py)
+
+Unit tests for Splunk telemetry in the /responses endpoint.
+
 ## [test_splunk.py](test_splunk.py)
 
 Unit tests for Splunk HEC client.
