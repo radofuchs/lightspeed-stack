@@ -68,10 +68,6 @@ Unit tests for MCP tool discovery utilities.
 
 Unit tests for utils/model_list.py helpers.
 
-## [test_models_dumper.py](test_models_dumper.py)
-
-Unit tests for utils/models_dumper module.
-
 ## [test_otel_tracing.py](test_otel_tracing.py)
 
 Unit tests for utils/otel_tracing.py functions.

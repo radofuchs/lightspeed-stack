@@ -76,10 +76,6 @@ Utilities for discovering tools from remote MCP servers without OGX.
 
 Helpers for normalizing OGX ``models.list()`` union responses.
 
-## [models_dumper.py](models_dumper.py)
-
-Function to dump the schema of all data models into OpenAPI-compatible format.
-
 ## [openapi_schema_dumper.py](openapi_schema_dumper.py)
 
 Utility function to dump schema with list of models into OpenAPI-compatible JSON format.

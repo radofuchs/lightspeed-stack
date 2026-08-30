@@ -12,6 +12,10 @@ Shared pytest fixtures for obesrvability unit tests.
 
 Unit tests for Splunk telemetry in the /responses endpoint.
 
+## [test_sentry.py](test_sentry.py)
+
+Unit tests for functions defined in src/observability/sentry.py.
+
 ## [test_splunk.py](test_splunk.py)
 
 Unit tests for Splunk HEC client.
