@@ -34,7 +34,7 @@ async def test_info_endpoint(mocker: MockerFixture) -> None:
             "color_log": True,
             "access_log": True,
         },
-        "llama_stack": {
+        "ogx": {
             "api_key": "xyzzy",
             "url": "http://x.y.com:1234",
             "use_as_library_client": False,
@@ -106,7 +106,7 @@ async def test_info_endpoint_connection_error(mocker: MockerFixture) -> None:
             "color_log": True,
             "access_log": True,
         },
-        "llama_stack": {
+        "ogx": {
             "api_key": "xyzzy",
             "url": "http://x.y.com:1234",
             "use_as_library_client": False,
@@ -170,7 +170,7 @@ class TestInfoEndpointOtel:
             {
                 "name": "test-service",
                 "service": {"host": "localhost", "port": 8080},
-                "llama_stack": {
+                "ogx": {
                     "api_key": "k",
                     "url": "http://x:1234",
                     "use_as_library_client": False,
@@ -217,7 +217,7 @@ class TestInfoEndpointOtel:
             {
                 "name": "test-service",
                 "service": {"host": "localhost", "port": 8080},
-                "llama_stack": {
+                "ogx": {
                     "api_key": "k",
                     "url": "http://x:1234",
                     "use_as_library_client": False,

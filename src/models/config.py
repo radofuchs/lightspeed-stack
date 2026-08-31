@@ -3157,6 +3157,33 @@ and validates ``config`` against the matching model.
 class Configuration(ConfigurationBase):
     """Global service configuration."""
 
+    @model_validator(mode="before")
+    @classmethod
+    def accept_llama_stack_section_alias(cls, data: Any) -> Any:
+        """Map deprecated ``llama_stack`` YAML key to ``ogx``.
+
+        Parameters:
+            data: Raw configuration mapping from YAML/JSON.
+
+        Returns:
+            Normalized mapping with the OGX section under ``ogx``.
+        """
+        if not isinstance(data, dict):
+            return data
+        if data.get("ogx") is not None:
+            return data
+        llama_stack = data.get("llama_stack")
+        if llama_stack is None:
+            return data
+        logger.warning(
+            "The 'llama_stack' configuration key is deprecated and will be "
+            "removed in a future release; use 'ogx' instead."
+        )
+        data = dict(data)
+        data["ogx"] = llama_stack
+        data.pop("llama_stack")
+        return data
+
     name: str = Field(
         ...,
         title="Service name",
@@ -3170,7 +3197,7 @@ class Configuration(ConfigurationBase):
         "When set, it must agree with the shape detected from the "
         "configuration body: 'unified' requires a synthesis input (a "
         "non-empty inference.providers, a non-empty vector_store.providers, "
-        "or a llama_stack.config block), 'legacy' requires no synthesis "
+        "or an ogx.config block), 'legacy' requires no synthesis "
         "input. Reserved as the lever for a future breaking change of the "
         "unified schema (R11).",
     )
@@ -3181,7 +3208,7 @@ class Configuration(ConfigurationBase):
         description="This section contains Lightspeed Core Stack service configuration.",
     )
 
-    llama_stack: OgxConfiguration = Field(
+    ogx: OgxConfiguration = Field(
         ...,
         title="OGX configuration",
         description="This section contains OGX configuration. Lightspeed Core Stack service can "
@@ -3489,8 +3516,8 @@ class Configuration(ConfigurationBase):
 
         Unified-mode *synthesis inputs* span the configuration root: a non-empty
         top-level ``inference.providers`` (Decision S5), a non-empty
-        ``vector_store.providers``, and/or a ``llama_stack.config`` block. The
-        legacy path is ``llama_stack.library_client_config_path`` pointing at an
+        ``vector_store.providers``, and/or an ``ogx.config`` block. The
+        legacy path is ``ogx.library_client_config_path`` pointing at an
         external run.yaml. Both checks live here on the root model rather than
         on ``OgxConfiguration`` (which cannot see root-level provider
         lists):
@@ -3499,7 +3526,7 @@ class Configuration(ConfigurationBase):
           single file must pick one shape.
         - Library mode needs *some* run source — a synthesis input or the
           legacy path. ``inference.providers`` or ``vector_store.providers``
-          alone is sufficient; no ``llama_stack.config`` block is required.
+          alone is sufficient; no ``ogx.config`` block is required.
         - An explicit ``config_format_version``, when set, must agree with
           the detected shape (R11): ``unified`` requires a synthesis input,
           ``legacy`` requires its absence (remote-only configs count as
@@ -3518,28 +3545,24 @@ class Configuration(ConfigurationBase):
         synthesis_input = (
             bool(self.inference.providers)
             or bool(self.vector_store.providers)
-            or self.llama_stack.config is not None
+            or self.ogx.config is not None
         )
-        legacy_input = self.llama_stack.library_client_config_path is not None
+        legacy_input = self.ogx.library_client_config_path is not None
         if synthesis_input and legacy_input:
             raise ValueError(
                 "OGX configuration is ambiguous: unified synthesis "
                 "inputs (a non-empty inference.providers, a non-empty "
-                "vector_store.providers, or a llama_stack.config block) are "
+                "vector_store.providers, or an ogx.config block) are "
                 "mutually exclusive with the legacy "
-                "llama_stack.library_client_config_path. Use one or the other. "
+                "ogx.library_client_config_path. Use one or the other. "
                 "To convert a legacy two-file setup to unified mode, run "
                 "`lightspeed-stack --migrate-config`."
             )
-        if (
-            self.llama_stack.use_as_library_client
-            and not synthesis_input
-            and not legacy_input
-        ):
+        if self.ogx.use_as_library_client and not synthesis_input and not legacy_input:
             raise ValueError(
                 "OGX library mode requires a run-configuration source: "
                 "set a non-empty inference.providers, a non-empty "
-                "vector_store.providers, a llama_stack.config block, or "
+                "vector_store.providers, an ogx.config block, or "
                 "library_client_config_path."
             )
         if self.config_format_version is not None:
@@ -3550,7 +3573,7 @@ class Configuration(ConfigurationBase):
                     f"but the configuration body is {detected}-shaped: a "
                     "unified configuration carries a synthesis input (a "
                     "non-empty inference.providers, a non-empty "
-                    "vector_store.providers, or a llama_stack.config block), "
+                    "vector_store.providers, or an ogx.config block), "
                     "a legacy one does not. Fix config_format_version or the "
                     "configuration body."
                 )
