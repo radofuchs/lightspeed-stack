@@ -150,6 +150,8 @@ dev = [
     "pybuild-deps>=0.5.0",
     "pip==26.1",
     "pytest-benchmark>=5.2.3",
+    "pyroscope-io>=0.8.7",
+    "memray>=1.13.0",
 ]
 ogxlibdev = [
     # To check OGX API provider dependecies:
