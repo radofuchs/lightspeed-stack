@@ -76,7 +76,7 @@ async def test_info_endpoint(mocker: MockerFixture) -> None:
     assert response is not None
     assert response.name is not None
     assert response.service_version is not None
-    assert response.llama_stack_version == "0.1.2"
+    assert response.ogx_version == "0.1.2"
 
 
 @pytest.mark.asyncio
