@@ -31,7 +31,7 @@ def initialize_pyroscope() -> None:
             application_name="lightspeed-stack",
             server_address=server_address,
         )
-        logger.info("Pyroscope CPU profiling enabled, pushing to %s", server_address)
+        logger.info("Pyroscope CPU profiling enabled")
     except ImportError:
         logger.warning(
             "pyroscope-io is not installed; install dev dependencies to enable CPU profiling"
