@@ -18,11 +18,14 @@ def initialize_pyroscope() -> None:
     """
     server_address = os.environ.get(PYROSCOPE_SERVER_ADDRESS_ENV_VAR)
     if not server_address:
-        logger.debug("Pyroscope profiling disabled (%s not set)", PYROSCOPE_SERVER_ADDRESS_ENV_VAR)
+        logger.debug(
+            "Pyroscope profiling disabled (%s not set)",
+            PYROSCOPE_SERVER_ADDRESS_ENV_VAR,
+        )
         return
 
     try:
-        import pyroscope  # pyright: ignore[reportMissingImports]
+        import pyroscope  # pyright: ignore[reportMissingImports]  # pylint: disable=import-outside-toplevel
 
         pyroscope.configure(
             application_name="lightspeed-stack",
