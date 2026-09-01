@@ -25,6 +25,7 @@ from log import get_logger
 from metrics import recording
 from metrics.utils import setup_model_metrics
 from models.api.responses.error import InternalServerErrorResponse
+from observability.profiling import initialize_pyroscope
 from observability.sentry import initialize_sentry
 from utils.degraded_mode import DegradedModeTracker
 from utils.ogx_version import check_ogx_version
@@ -82,6 +83,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configuration.load_configuration(os.environ["LIGHTSPEED_STACK_CONFIG_PATH"])
 
     initialize_sentry()
+    initialize_pyroscope()
 
     ogx_config = configuration.configuration.ogx
     await AsyncOgxClientHolder().load(ogx_config)
