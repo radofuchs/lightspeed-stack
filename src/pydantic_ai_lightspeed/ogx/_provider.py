@@ -34,7 +34,7 @@ class OgxProvider(Provider[AsyncOpenAI]):
     @property
     def name(self) -> str:
         """The provider name."""
-        return "llama-stack"
+        return "ogx"
 
     @property
     def base_url(self) -> str:
@@ -124,12 +124,12 @@ class OgxProvider(Provider[AsyncOpenAI]):
             transport = OgxLibraryTransport(library_client)
             lib_http_client = httpx.AsyncClient(
                 transport=transport,
-                base_url="http://llama-stack-library",
+                base_url="http://ogx-library",
                 timeout=httpx.Timeout(None),
             )
             self._client = AsyncOpenAI(
                 http_client=lib_http_client,
-                base_url="http://llama-stack-library/v1",
+                base_url="http://ogx-library/v1",
                 api_key="not-needed",
             )
         else:
