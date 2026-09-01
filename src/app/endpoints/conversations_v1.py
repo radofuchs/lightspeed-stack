@@ -398,27 +398,27 @@ async def delete_conversation_endpoint_handler(
                 normalized_conv_id,
                 delete_response.deleted,
             )
-
-            span.set_attribute("conversations.deleted", local_deleted)
-            return ConversationDeleteResponse(
-                conversation_id=normalized_conv_id,
-                deleted=local_deleted,
-            )
         except ApiException as e:
             if not e.status:
                 response = ServiceUnavailableResponse(backend_name="OGX")
                 raise HTTPException(**response.model_dump()) from e
             # In library mode, ConversationNotFoundError is raised instead of ApiException
             logger.warning(
-                "Conversation %s in LlamaStack not found. Treating as already deleted.",
+                "Conversation %s in OGX not found. Treating as already deleted.",
                 normalized_conv_id,
             )
         except (ConversationNotFoundError, InvalidParameterError):
             # In library mode, ConversationNotFoundError is raised instead of ApiException
             logger.warning(
-                "Conversation %s in LlamaStack not found. Treating as already deleted.",
+                "Conversation %s in OGX not found. Treating as already deleted.",
                 normalized_conv_id,
             )
+
+        span.set_attribute("conversations.deleted", local_deleted)
+        return ConversationDeleteResponse(
+            conversation_id=normalized_conv_id,
+            deleted=local_deleted,
+        )
 
 
 @router.put(
