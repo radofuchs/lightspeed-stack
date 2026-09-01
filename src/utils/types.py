@@ -3,8 +3,6 @@
 from re import Pattern
 from typing import Any
 
-from ogx_api import ImageContentItem, TextContentItem
-
 type SingletonInstances = dict[type, Any]
 
 CompiledPatterns = list[tuple[Pattern[str], str]]
