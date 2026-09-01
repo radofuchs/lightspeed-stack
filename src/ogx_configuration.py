@@ -1291,7 +1291,7 @@ def synthesize_configuration(  # pylint: disable=too-many-locals
                 "be removed in release 0.8. Set baseline to 'byo-llm' and "
                 "declare your LLM providers under inference.providers: "
                 "https://lightspeed-core.github.io/lightspeed-stack/design"
-                "/llama-stack-config-merge/llama-stack-config-merge.html"
+                "/ogx-config-merge/ogx-config-merge.html"
                 "#configuration"
             )
 
