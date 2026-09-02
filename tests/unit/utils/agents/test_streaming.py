@@ -11,7 +11,7 @@ from typing import Any, Optional
 import pytest
 from fastapi import HTTPException
 from ogx_api.openai_responses import OpenAIResponseMessage
-from ogx_client import APIStatusError
+from ogx_client import ApiException
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
@@ -804,11 +804,7 @@ class TestGenerateAgentResponse:
                 TokenStreamPayload.create(chunk_id=0, token="partial"),
                 MEDIA_TYPE_JSON,
             )
-            raise APIStatusError(
-                message="quota exceeded",
-                response=mocker.Mock(),
-                body=None,
-            )
+            raise ApiException(status=500, reason="quota exceeded")
 
         mock_error = mocker.Mock()
         mock_error.status_code = 429

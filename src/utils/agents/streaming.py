@@ -11,7 +11,7 @@ from functools import singledispatch
 from typing import Any, Final, Optional
 
 from fastapi import HTTPException
-from ogx_client import APIConnectionError, APIStatusError
+from ogx_client import ApiException
 from opentelemetry import trace
 from pydantic_ai import Agent, AgentRunError, AgentRunResultEvent, ToolReturnPart
 from pydantic_ai.messages import (
@@ -160,7 +160,7 @@ async def retrieve_agent_response_generator(
             ),
             turn_summary,
         )
-    except (AgentRunError, APIStatusError, APIConnectionError, RuntimeError) as exc:
+    except (AgentRunError, ApiException, RuntimeError) as exc:
         response = map_agent_inference_error(exc, responses_params.model)
         raise HTTPException(**response.model_dump()) from exc
 
@@ -224,7 +224,7 @@ async def generate_agent_response(  # pylint: disable=too-many-statements
 
         stream_completed = True
 
-    except (AgentRunError, APIStatusError, APIConnectionError, RuntimeError) as exc:
+    except (AgentRunError, ApiException, RuntimeError) as exc:
         error_response = map_agent_inference_error(exc, responses_params.model)
         yield serialize_event(
             ErrorStreamPayload.from_error_response(error_response),
