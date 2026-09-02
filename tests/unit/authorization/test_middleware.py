@@ -147,7 +147,7 @@ class TestGetAuthorizationResolvers:
                 ]
             case "access_rules":
                 jwt_config = (
-                    mock_configuration.authentication_configuration.jwk_configuration.jwt_configuration
+                    mock_configuration.authentication_configuration.jwk_configuration.jwt_configuration  # pylint: disable=line-too-long
                 )
                 jwt_config.role_rules = [sample_role_rule]
             case "both_rules":
