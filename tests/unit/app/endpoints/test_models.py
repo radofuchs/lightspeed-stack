@@ -9,8 +9,6 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import StatusCode
-from ogx_client.models.list_models_response import ListModelsResponse
-from ogx_client.models.model import Model
 from pytest_mock import MockerFixture
 from pytest_subtests import SubTests
 
@@ -480,11 +478,9 @@ class TestModelsEndpointOtel:
         mock_authorization_resolvers(mocker)
 
         mock_client = mocker.AsyncMock()
-        mock_client.models.list.return_value = ListModelsResponse.model_construct(
-            data=[
-                _make_model("m1", "p1", "llm"),
-                _make_model("m2", "p2", "embedding"),
-            ]
+        mock_client.openai.list.return_value = make_openai_models_list_response(
+            make_openai_model(model_id="m1", provider_id="p1"),
+            make_openai_model(model_id="m2", provider_id="p2"),
         )
         mocker.patch(
             "app.endpoints.models.AsyncOgxClientHolder"
@@ -518,7 +514,7 @@ class TestModelsEndpointOtel:
         mock_authorization_resolvers(mocker)
 
         mock_client = mocker.AsyncMock()
-        mock_client.models.list.side_effect = ApiException(status=None)
+        mock_client.openai.list.side_effect = ApiException(status=None)
         mocker.patch(
             "app.endpoints.models.AsyncOgxClientHolder"
         ).return_value.get_client.return_value = mock_client

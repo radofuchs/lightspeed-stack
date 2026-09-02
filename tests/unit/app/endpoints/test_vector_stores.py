@@ -4,7 +4,8 @@
 
 import asyncio
 import io
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from fastapi import HTTPException, Request, status
@@ -676,7 +677,7 @@ async def test_add_file_to_vector_store_deletes_file_on_success(
     cfg.init_from_dict(config_dict)
 
     mock_client = mocker.AsyncMock()
-    mock_client.vector_stores.files.create.return_value = VectorStoreFile(
+    mock_client.vector_stores_files.create.return_value = VectorStoreFile(
         "file_123", "vs_123", file_status="completed"
     )
     mock_lsc = mocker.patch(
@@ -712,7 +713,7 @@ async def test_add_file_to_vector_store_keeps_file_reusable_by_default(
     cfg.init_from_dict(config_dict)
 
     mock_client = mocker.AsyncMock()
-    mock_client.vector_stores.files.create.return_value = VectorStoreFile(
+    mock_client.vector_stores_files.create.return_value = VectorStoreFile(
         "file_123", "vs_123", file_status="completed"
     )
     mock_lsc = mocker.patch(
@@ -745,7 +746,7 @@ async def test_add_file_to_vector_store_does_not_delete_file_on_failure(
     cfg.init_from_dict(config_dict)
 
     mock_client = mocker.AsyncMock()
-    mock_client.vector_stores.files.create.return_value = VectorStoreFile(
+    mock_client.vector_stores_files.create.return_value = VectorStoreFile(
         "file_123", "vs_123", file_status="failed"
     )
     mock_lsc = mocker.patch(
@@ -778,7 +779,7 @@ async def test_add_file_to_vector_store_delete_failure_is_non_fatal(
     cfg.init_from_dict(config_dict)
 
     mock_client = mocker.AsyncMock()
-    mock_client.vector_stores.files.create.return_value = VectorStoreFile(
+    mock_client.vector_stores_files.create.return_value = VectorStoreFile(
         "file_123", "vs_123", file_status="completed"
     )
     mock_client.files.delete.side_effect = Exception("disk unavailable")

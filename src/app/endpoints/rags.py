@@ -112,7 +112,7 @@ async def rags_endpoint_handler(
         except ApiException as e:
             if not e.status:
                 logger.error("Unable to connect to OGX: %s", e)
-                response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+                response = ServiceUnavailableResponse(backend_name="OGX")
                 raise HTTPException(**response.model_dump()) from e
             raise
 
@@ -216,6 +216,6 @@ async def get_rag_endpoint_handler(
         except ApiException as e:
             if not e.status:
                 logger.error("Unable to connect to OGX: %s", e)
-                response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+                response = ServiceUnavailableResponse(backend_name="OGX")
                 raise HTTPException(**response.model_dump()) from e
             raise

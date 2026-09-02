@@ -4,8 +4,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from ogx_api import ConversationNotFoundError, InvalidParameterError
-from opentelemetry import trace
 from ogx_client import ApiException
+from opentelemetry import trace
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import get_session
@@ -427,7 +427,7 @@ async def delete_conversation_endpoint_handler(
     summary="Conversation Update Endpoint Handler V1",
 )
 @authorize(Action.UPDATE_CONVERSATION)
-async def update_conversation_endpoint_handler(
+async def update_conversation_endpoint_handler(  # pylint: disable=too-many-statements
     request: Request,
     conversation_id: str,
     update_request: ConversationUpdateRequest,

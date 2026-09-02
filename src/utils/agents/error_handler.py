@@ -1,8 +1,6 @@
 """Error mapping for agent inference failures to structured API error responses."""
 
 from fastapi import status
-from typing import TypeAlias
-
 from ogx_client import ApiException
 from pydantic_ai.exceptions import (
     AgentRunError,
@@ -28,7 +26,7 @@ from utils.query import (
     is_resource_exhausted_error,
 )
 
-AgentInferenceError: TypeAlias = AgentRunError | ApiException | RuntimeError
+type AgentInferenceError = AgentRunError | ApiException | RuntimeError
 
 logger = get_logger(__name__)
 
@@ -52,13 +50,13 @@ def map_agent_inference_error(
     """
     match exc:
         case AgentRunError() as agent_exc:
-            return map_pydantic_agent_run_error(agent_exc, model_id)
+            response = map_pydantic_agent_run_error(agent_exc, model_id)
         case ApiException() as connection_exc if not connection_exc.status:
-            return ServiceUnavailableResponse(
+            response = ServiceUnavailableResponse(
                 backend_name="OGX",
             )
         case ApiException() as status_exc:
-            return handle_known_apistatus_errors(status_exc, model_id)
+            response = handle_known_apistatus_errors(status_exc, model_id)
         case RuntimeError() as runtime_exc if is_context_length_error(str(runtime_exc)):
             response = PromptTooLongResponse(model=model_id)
         case _:

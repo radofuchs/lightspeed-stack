@@ -434,7 +434,6 @@ async def test_config_error_503_matches_llm_error_503_shape(
     # Build an LLM connection error 503 using the same response model
     llm_response = ServiceUnavailableResponse(
         backend_name="OGX",
-        cause="Unable to connect to the inference backend",
     )
     llm_detail = llm_response.model_dump()["detail"]
 

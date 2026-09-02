@@ -440,6 +440,14 @@ class TestRagsEndpointOtel:
                 """Initialize with mock data."""
                 self.data = [RagInfo("vs_1"), RagInfo("vs_2")]
 
+            def __iter__(self) -> Iterator[Any]:
+                """Iterate over RAG entries (matches VectorStoreListResponse)."""
+                return iter(self.data)
+
+            def __len__(self) -> int:
+                """Return number of RAG entries."""
+                return len(self.data)
+
         mock_client = mocker.AsyncMock()
         mock_client.vector_stores.list.return_value = RagList()
         mocker.patch(
@@ -546,11 +554,7 @@ class TestRagsEndpointOtel:
 
         mock_client = mocker.AsyncMock()
         mock_client.vector_stores.retrieve = mocker.AsyncMock(
-            side_effect=BadRequestError(
-                message="RAG not found",
-                response=mocker.Mock(request=None),
-                body=None,
-            )
+            side_effect=BadRequestError(status=400, reason="RAG not found")
         )  # type: ignore
         mocker.patch(
             "app.endpoints.rags.AsyncOgxClientHolder"

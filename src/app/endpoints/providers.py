@@ -4,9 +4,9 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.params import Depends
-from opentelemetry import trace
 from ogx_client import ApiException, BadRequestError
 from ogx_client.models.list_providers_response import ListProvidersResponse
+from opentelemetry import trace
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple

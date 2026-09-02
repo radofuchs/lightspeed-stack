@@ -506,9 +506,7 @@ class TestRetrieveAgentResponse:
         to surface (LCORE-3582).
         """
         mock_agent = mocker.AsyncMock()
-        mock_agent.run = mocker.AsyncMock(
-            side_effect=ApiException(status=None)
-        )
+        mock_agent.run = mocker.AsyncMock(side_effect=ApiException(status=None))
         mocker.patch("utils.agents.query.build_agent", return_value=mock_agent)
 
         with caplog.at_level("WARNING"):

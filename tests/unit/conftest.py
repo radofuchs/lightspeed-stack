@@ -11,16 +11,16 @@ from typing import Any, Optional
 import httpx
 import pytest
 from ogx_client import AsyncOgxClient
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
 from ogx_client.models.list_models_v1_models_get200_response import (
     ListModelsV1ModelsGet200Response,
 )
 from ogx_client.models.open_ai_list_models_response import OpenAIListModelsResponse
 from ogx_client.models.open_ai_model import OpenAIModel
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
 from pytest_mock import AsyncMockType, MockerFixture
 
 from configuration import AppConfig

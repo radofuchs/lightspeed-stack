@@ -5,11 +5,11 @@ from typing import Any
 import pytest
 from fastapi import HTTPException, Request, status
 from ogx_client import ApiException, BadRequestError
+from ogx_client.models.provider_info import ProviderInfo
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace import StatusCode
-from ogx_client.models.provider_info import ProviderInfo
 from pytest_mock import MockerFixture
 
 from app.endpoints.providers import (
@@ -324,11 +324,7 @@ class TestProvidersEndpointOtel:
 
         mock_client = mocker.AsyncMock()
         mock_client.providers.retrieve = mocker.AsyncMock(
-            side_effect=BadRequestError(
-                message="not found",
-                response=mocker.Mock(request=None),
-                body=None,
-            )
+            side_effect=BadRequestError(status=400, reason="not found")
         )  # type: ignore
         mocker.patch(
             "app.endpoints.providers.AsyncOgxClientHolder"

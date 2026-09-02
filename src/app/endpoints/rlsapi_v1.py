@@ -632,7 +632,6 @@ def _map_inference_error_to_http_exception(  # pylint: disable=too-many-return-s
         )
         error_response = ServiceUnavailableResponse(
             backend_name="OGX",
-            cause="Unable to connect to the inference backend",
         )
         return HTTPException(**error_response.model_dump())
 

@@ -22,10 +22,10 @@ from a2a.types import (
 from a2a.utils import new_agent_text_message
 from fastapi import HTTPException, Request
 from ogx_client import ApiException
+from ogx_client.models.list_models_response import ListModelsResponse
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
-from ogx_client.models.list_models_response import ListModelsResponse
 from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.exceptions import AgentRunError
 from pydantic_ai.messages import (
@@ -722,7 +722,7 @@ class TestA2AAgentExecutor:
 
         # Mock the client to raise ApiException on openai.list()
         mock_client = mocker.AsyncMock()
-        mock_client.models.list.side_effect = ApiException(
+        mock_client.openai.list.side_effect = ApiException(
             status=None, reason="Connection refused: unable to reach OGX"
         )
         mocker.patch(

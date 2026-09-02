@@ -215,7 +215,7 @@ async def create_vector_store(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while creating vector store: %s", e)
@@ -276,7 +276,7 @@ async def list_vector_stores(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while listing vector stores: %s", e)
@@ -341,7 +341,7 @@ async def get_vector_store(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while getting vector store: %s", e)
@@ -410,7 +410,7 @@ async def update_vector_store(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while updating vector store: %s", e)
@@ -464,7 +464,7 @@ async def delete_vector_store(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while deleting vector store: %s", e)
@@ -602,7 +602,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while uploading file: %s", e)
@@ -618,7 +618,7 @@ async def create_file(  # pylint: disable=too-many-branches,too-many-statements
     "/vector-stores/{vector_store_id}/files", responses=vector_store_file_responses
 )
 @authorize(Action.MANAGE_VECTOR_STORES)
-async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-statements
+async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
     request: Request,
     vector_store_id: str,
     auth: Annotated[AuthTuple, Depends(get_auth_dependency())],
@@ -676,7 +676,9 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
                         **body.model_dump(exclude_none=True),
                     )
                     break  # Success, exit retry loop
-                except Exception as retry_error:  # pylint: disable=broad-exception-caught
+                except (
+                    Exception
+                ) as retry_error:  # pylint: disable=broad-exception-caught
                     error_msg = str(retry_error).lower()
                     is_lock_error = (
                         "database is locked" in error_msg or "locked" in error_msg
@@ -755,7 +757,7 @@ async def add_file_to_vector_store(  # pylint: disable=too-many-locals,too-many-
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while adding file to vector store: %s", e)
@@ -825,7 +827,7 @@ async def list_vector_store_files(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while listing vector store files: %s", e)
@@ -896,7 +898,7 @@ async def get_vector_store_file(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while getting vector store file: %s", e)
@@ -955,7 +957,7 @@ async def delete_vector_store_file(
     except ApiException as e:
         if not e.status:
             logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
+            response = ServiceUnavailableResponse(backend_name="OGX")
             raise HTTPException(**response.model_dump()) from e
 
         logger.error("API status error while deleting vector store file: %s", e)

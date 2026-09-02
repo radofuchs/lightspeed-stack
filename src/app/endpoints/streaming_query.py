@@ -466,7 +466,7 @@ async def generate_response_with_compaction(
         except ApiException as e:
             if not e.status:
                 yield stream_http_error_event(
-                    ServiceUnavailableResponse(backend_name="OGX", cause=str(e)),
+                    ServiceUnavailableResponse(backend_name="OGX"),
                     media_type,
                 )
                 return

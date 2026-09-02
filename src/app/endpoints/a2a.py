@@ -33,8 +33,8 @@ from a2a.types import (
 )
 from a2a.utils import new_agent_text_message, new_task
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from opentelemetry import trace
 from ogx_client import ApiException
+from opentelemetry import trace
 from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.exceptions import AgentRunError
 from pydantic_ai.messages import (

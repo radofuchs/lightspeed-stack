@@ -11,8 +11,8 @@ from functools import singledispatch
 from typing import Any, Final, Optional
 
 from fastapi import HTTPException
-from opentelemetry import trace
 from ogx_client import ApiException
+from opentelemetry import trace
 from pydantic_ai import Agent, AgentRunError, AgentRunResultEvent, ToolReturnPart
 from pydantic_ai.messages import (
     AgentStreamEvent,

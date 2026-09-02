@@ -21,12 +21,11 @@ from ogx_api import (
 from ogx_api import (
     OpenAIResponseObjectStreamResponseOutputItemDone as OutputItemDoneChunk,
 )
+from ogx_client import ApiException
 from openai._exceptions import (
     APIStatusError as OpenAIAPIStatusError,
 )
 from opentelemetry import trace
-from ogx_client import ApiException
-from openai._exceptions import APIStatusError as OpenAIAPIStatusError
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple

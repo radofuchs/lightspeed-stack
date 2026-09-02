@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, TypeAlias
+from typing import Optional
 
 from fastapi import HTTPException
 from ogx_client import ApiException, AsyncOgxClient
@@ -57,8 +57,6 @@ from utils.token_counter import TokenCounter
 
 logger = get_logger(__name__)
 tracer = trace.get_tracer(__name__)
-
-AgentInferenceError: TypeAlias = AgentRunError | ApiException | RuntimeError
 
 
 class AgentFinishReason(str, Enum):

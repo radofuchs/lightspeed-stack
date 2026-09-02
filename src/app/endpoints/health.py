@@ -8,8 +8,8 @@ methods. For HEAD HTTP method, just the HTTP response code is used.
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Response, status
-from opentelemetry import trace
 from ogx_client import ApiException
+from opentelemetry import trace
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple

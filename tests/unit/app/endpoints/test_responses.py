@@ -16,7 +16,7 @@ from ogx_api.openai_responses import (
 from ogx_api.openai_responses import (
     OpenAIResponseMessage,
 )
-from ogx_client import ApiException, AsyncOgxClient
+from ogx_client import ApiException
 from opentelemetry import trace
 from pytest_mock import MockerFixture
 

@@ -4,8 +4,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.params import Depends
-from opentelemetry import trace
 from ogx_client import ApiException
+from opentelemetry import trace
 
 from authentication import get_auth_dependency
 from authentication.interface import AuthTuple

@@ -50,7 +50,7 @@ from ogx_api.openai_responses import (
 from ogx_api.openai_responses import (
     OpenAIResponseOutputMessageWebSearchToolCall as WebSearchCall,
 )
-from ogx_client import ApiException, AsyncOgxClient
+from ogx_client import ApiException
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )

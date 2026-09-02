@@ -79,9 +79,8 @@ from ogx_api.openai_responses import (
 from ogx_api.openai_responses import (
     OpenAIResponseUsageOutputTokensDetails as UsageOutputTokensDetails,
 )
-from ogx_client import AsyncOgxClient
-from opentelemetry import trace
 from ogx_client import ApiException, AsyncOgxClient
+from opentelemetry import trace
 
 import constants
 from configuration import configuration

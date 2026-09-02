@@ -13,11 +13,11 @@ from pydantic_ai.models import create_async_http_client
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers import Provider
 
+from client.ogx import read_provider_data
 from pydantic_ai_lightspeed.ogx._transport import (
     OgxLibraryTransport,
     wrap_http_client_with_provider_data,
 )
-from client.ogx import read_provider_data
 
 DEFAULT_BASE_URL = "http://localhost:8321/v1"
 
