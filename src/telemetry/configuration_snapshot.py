@@ -100,17 +100,17 @@ LIGHTSPEED_STACK_FIELDS: tuple[FieldSpec | ListFieldSpec, ...] = (
     FieldSpec("service.cors.allow_methods", MaskingType.PASSTHROUGH),
     FieldSpec("service.cors.allow_headers", MaskingType.PASSTHROUGH),
     # LLM Integration Architecture
-    FieldSpec("llama_stack.use_as_library_client", MaskingType.PASSTHROUGH),
-    FieldSpec("llama_stack.url", MaskingType.SENSITIVE),
-    FieldSpec("llama_stack.api_key", MaskingType.SENSITIVE),
-    FieldSpec("llama_stack.library_client_config_path", MaskingType.SENSITIVE),
-    FieldSpec("llama_stack.timeout", MaskingType.PASSTHROUGH),
-    FieldSpec("llama_stack.max_retries", MaskingType.PASSTHROUGH),
-    FieldSpec("llama_stack.retry_delay", MaskingType.PASSTHROUGH),
-    FieldSpec("llama_stack.allow_degraded_mode", MaskingType.PASSTHROUGH),
-    FieldSpec("llama_stack.config.baseline", MaskingType.PASSTHROUGH),
-    FieldSpec("llama_stack.config.profile", MaskingType.SENSITIVE),
-    FieldSpec("llama_stack.config.native_override", MaskingType.SENSITIVE),
+    FieldSpec("ogx.use_as_library_client", MaskingType.PASSTHROUGH),
+    FieldSpec("ogx.url", MaskingType.SENSITIVE),
+    FieldSpec("ogx.api_key", MaskingType.SENSITIVE),
+    FieldSpec("ogx.library_client_config_path", MaskingType.SENSITIVE),
+    FieldSpec("ogx.timeout", MaskingType.PASSTHROUGH),
+    FieldSpec("ogx.max_retries", MaskingType.PASSTHROUGH),
+    FieldSpec("ogx.retry_delay", MaskingType.PASSTHROUGH),
+    FieldSpec("ogx.allow_degraded_mode", MaskingType.PASSTHROUGH),
+    FieldSpec("ogx.config.baseline", MaskingType.PASSTHROUGH),
+    FieldSpec("ogx.config.profile", MaskingType.SENSITIVE),
+    FieldSpec("ogx.config.native_override", MaskingType.SENSITIVE),
     FieldSpec("inference.default_model", MaskingType.PASSTHROUGH),
     FieldSpec("inference.default_provider", MaskingType.PASSTHROUGH),
     FieldSpec("inference.context_windows", MaskingType.PASSTHROUGH),
@@ -367,7 +367,7 @@ LIGHTSPEED_STACK_FIELDS: tuple[FieldSpec | ListFieldSpec, ...] = (
     ),
 )
 
-LLAMA_STACK_FIELDS: tuple[FieldSpec | ListFieldSpec, ...] = (
+OGX_FIELDS: tuple[FieldSpec | ListFieldSpec, ...] = (
     # Operational Configuration
     FieldSpec("version", MaskingType.PASSTHROUGH),
     FieldSpec("image_name", MaskingType.PASSTHROUGH),
@@ -728,7 +728,7 @@ def _read_yaml_file(config_path: str) -> Any:
         return None
 
 
-async def build_llama_stack_snapshot(
+async def build_ogx_snapshot(
     config_path: Optional[str] = None,
 ) -> dict[str, Any]:
     """Build snapshot of OGX configuration with PII masking.
@@ -756,7 +756,7 @@ async def build_llama_stack_snapshot(
         logger.warning("OGX config is not a dict, skipping snapshot")
         return {"status": NOT_AVAILABLE}
 
-    snapshot = _extract_snapshot_fields(ls_config, LLAMA_STACK_FIELDS)
+    snapshot = _extract_snapshot_fields(ls_config, OGX_FIELDS)
     snapshot["inference_store"] = _extract_store_info(ls_config, "inference")
     snapshot["metadata_store"] = _extract_store_info(ls_config, "metadata")
     return snapshot
@@ -764,7 +764,7 @@ async def build_llama_stack_snapshot(
 
 async def build_configuration_snapshot(
     config: Configuration,
-    llama_stack_config_path: Optional[str] = None,
+    ogx_config_path: Optional[str] = None,
 ) -> dict[str, Any]:
     """Build a complete configuration snapshot with PII masking.
 
@@ -776,15 +776,15 @@ async def build_configuration_snapshot(
     Parameters:
     ----------
         config: The lightspeed-stack Configuration object.
-        llama_stack_config_path: Path to the OGX YAML config file.
+        ogx_config_path: Path to the OGX YAML config file.
             If None (service mode), OGX section is marked not available.
 
     Returns:
     -------
-        A dict with 'lightspeed_stack' and 'llama_stack' keys containing
+        A dict with 'lightspeed_stack' and 'ogx' keys containing
         the respective masked snapshots, ready for JSON serialization.
     """
     return {
         "lightspeed_stack": build_lightspeed_stack_snapshot(config),
-        "llama_stack": await build_llama_stack_snapshot(llama_stack_config_path),
+        "ogx": await build_ogx_snapshot(ogx_config_path),
     }

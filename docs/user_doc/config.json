@@ -440,7 +440,7 @@
             "type": "string",
             "nullable": true,
             "default": null,
-            "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or a llama_stack.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11).",
+            "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or an ogx.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11).",
             "title": "Configuration format version"
           },
           "service": {
@@ -448,7 +448,7 @@
             "description": "This section contains Lightspeed Core Stack service configuration.",
             "title": "Service configuration"
           },
-          "llama_stack": {
+          "ogx": {
             "$ref": "`#/components/schemas/`LlamaStackConfiguration",
             "description": "This section contains OGX configuration. Lightspeed Core Stack service can call OGX in library mode or in server mode.",
             "title": "OGX configuration"
@@ -625,7 +625,7 @@
         "required": [
           "name",
           "service",
-          "llama_stack",
+          "ogx",
           "user_data_collection"
         ],
         "title": "Configuration",
@@ -1039,7 +1039,7 @@
       },
       "LlamaStackConfiguration": {
         "additionalProperties": false,
-        "description": "OGX configuration.\n\nOGX is a comprehensive system that provides a uniform set of tools\nfor building, scaling, and deploying generative AI applications, enabling\ndevelopers to create, integrate, and orchestrate multiple AI services and\ncapabilities into an adaptable setup.\n\nUseful resources:\n\n  - [OGX](https://www.llama.com/products/llama-stack/)\n  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)\n  - [Build AI Applications with OGX](https://llamastack.github.io/)",
+        "description": "OGX configuration.\n\nOGX is a comprehensive system that provides a uniform set of tools\nfor building, scaling, and deploying generative AI applications, enabling\ndevelopers to create, integrate, and orchestrate multiple AI services and\ncapabilities into an adaptable setup.\n\nUseful resources:\n\n  - [OGX](https://ogx-ai.github.io/)\n  - [Python OGX client](https://github.com/ogx-ai/ogx-client-python)\n  - [Build AI Applications with OGX](https://ogx-ai.github.io/)",
         "properties": {
           "url": {
             "type": "string",
@@ -1066,7 +1066,7 @@
             "type": "string",
             "nullable": true,
             "default": null,
-            "description": "Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.7 — use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config.",
+            "description": "Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.8 — use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config.",
             "title": "OGX configuration path (legacy, deprecated)"
           },
           "timeout": {

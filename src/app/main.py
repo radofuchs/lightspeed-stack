@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import iter_route_contexts
-from ogx_client import APIConnectionError, AsyncOgxClient
+from ogx_client import ApiException, AsyncOgxClient
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import version
@@ -19,15 +19,16 @@ from app import routers
 from app.database import create_tables, initialize_database
 from app.endpoints.streaming_query import shutdown_background_topic_summary_tasks
 from authorization.azure_token_manager import AzureEntraIDManager
-from client import AsyncOgxClientHolder
+from client.ogx import AsyncOgxClientHolder
 from configuration import configuration
 from log import get_logger
 from metrics import recording
 from metrics.utils import setup_model_metrics
 from models.api.responses.error import InternalServerErrorResponse
-from sentry import initialize_sentry
+from observability.profiling import initialize_pyroscope
+from observability.sentry import initialize_sentry
 from utils.degraded_mode import DegradedModeTracker
-from utils.llama_stack_version import check_llama_stack_version
+from utils.ogx_version import check_ogx_version
 
 logger = get_logger(__name__)
 
@@ -82,36 +83,37 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configuration.load_configuration(os.environ["LIGHTSPEED_STACK_CONFIG_PATH"])
 
     initialize_sentry()
+    initialize_pyroscope()
 
-    llama_stack_config = configuration.configuration.llama_stack
-    await AsyncOgxClientHolder().load(llama_stack_config)
+    ogx_config = configuration.configuration.ogx
+    await AsyncOgxClientHolder().load(ogx_config)
     client: AsyncOgxClient = AsyncOgxClientHolder().get_client()
     logger.debug("OGX client initialized, trying to connect to OGX")
     # Check connectivity to OGX and set degraded mode if unavailable
     degraded_tracker = DegradedModeTracker()
     try:
-        llama_stack_version = await check_llama_stack_version(
-            client, llama_stack_config.max_retries, llama_stack_config.retry_delay
+        ogx_version = await check_ogx_version(
+            client, ogx_config.max_retries, ogx_config.retry_delay
         )
-        if llama_stack_version is None:
+        if ogx_version is None:
             logger.error("Cannot retrieve OGX version, check connection")
-            if llama_stack_config.allow_degraded_mode:
+            if ogx_config.allow_degraded_mode:
                 degraded_tracker.set_degraded("OGX connection check failed")
         else:
-            logger.debug("OGX version: %s", llama_stack_version)
+            logger.debug("OGX version: %s", ogx_version)
             degraded_tracker.set_healthy()
-    except APIConnectionError as e:
+    except ApiException as e:
         # if degraded mode is allowed, simply ignore the exception
-        llama_stack_url = llama_stack_config.url
+        ogx_url = ogx_config.url
         logger.error(
             "Failed to connect to OGX at '%s'. "
-            "Please verify that the 'llama_stack.url' configuration is correct "
+            "Please verify that the 'ogx.url' configuration is correct "
             "and that the OGX service is running and accessible. "
             "Original error: %s",
-            llama_stack_url,
+            ogx_url,
             e,
         )
-        if llama_stack_config.allow_degraded_mode:
+        if ogx_config.allow_degraded_mode:
             logger.info("Entering degraded mode: LCORE running w/o OGX")
             degraded_tracker.set_degraded(f"Failed to connect to OGX: {e!s}")
         else:
@@ -127,7 +129,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     if not degraded_tracker.is_degraded():
         try:
             await setup_model_metrics()
-        except APIConnectionError as e:
+        except ApiException as e:
             logger.warning("Failed to set up model metrics: %s", e, exc_info=True)
 
     logger.info("App startup complete")

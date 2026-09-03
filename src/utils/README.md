@@ -20,10 +20,6 @@ Common utilities for the project.
 
 Conversation compaction — partitioning, summarization, additive fold-up.
 
-## [config_dumper.py](config_dumper.py)
-
-Function to dump the configuration schema into OpenAPI-compatible format.
-
 ## [connection_decorator.py](connection_decorator.py)
 
 Decorator that makes sure the object is 'connected' according to it's connected predicate.
@@ -52,7 +48,7 @@ Input sanitization to detect and block obfuscated prompt injection attempts.
 
 Function to transform a JSON Schema-like dictionary into an OpenAPI-compatible schema.
 
-## [llama_stack_version.py](llama_stack_version.py)
+## [ogx_version.py](ogx_version.py)
 
 Check if the OGX version is supported by the LCS.
 
@@ -79,10 +75,6 @@ Utilities for discovering tools from remote MCP servers without OGX.
 ## [model_list.py](model_list.py)
 
 Helpers for normalizing OGX ``models.list()`` union responses.
-
-## [models_dumper.py](models_dumper.py)
-
-Function to dump the schema of all data models into OpenAPI-compatible format.
 
 ## [openapi_schema_dumper.py](openapi_schema_dumper.py)
 

@@ -170,7 +170,7 @@ and `library_client_config_path` must not be set (unified and legacy inputs
 are mutually exclusive).
 
 The reference profiles are sanity-checked by the unit suite
-(`tests/unit/test_llama_stack_synthesize.py`), so they stay loadable as the
+(`tests/unit/test_ogx_synthesize.py`), so they stay loadable as the
 synthesizer evolves.
 
 
@@ -627,7 +627,7 @@ It is possible to run Lightspeed Core Stack service with OGX "embedded" as a Pyt
 1. Clone LCS repository
 1. Add and install all required dependencies
     ```bash
-    uv sync --group llslibdev
+    uv sync --group ogxlibdev
     ```
 
 #### OGX configuration

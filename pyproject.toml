@@ -27,10 +27,10 @@ dependencies = [
     "uvicorn>=0.34.3",
     # Used by authentication/k8s integration
     "kubernetes>=30.1.0",
-    # Used to call OGX APIs
-    "ogx==1.0.2",
-    "ogx-client==1.0.2",
-    "ogx-api==1.0.2",
+    # Used to call Llama Stack APIs
+    "ogx==1.2.5",
+    "ogx-client==1.2.5",
+    "ogx-api==1.2.5",
     # Used by Logger
     "rich>=14.0.0",
     # Used by JWK token auth handler
@@ -120,7 +120,7 @@ explicit = true
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cpu", group = "llslibdev" },
+    { index = "pytorch-cpu", group = "ogxlibdev" },
 ]
 
 [dependency-groups]
@@ -150,8 +150,10 @@ dev = [
     "pybuild-deps>=0.5.0",
     "pip==26.1",
     "pytest-benchmark>=5.2.3",
+    "pyroscope-io>=0.8.7",
+    "memray>=1.13.0",
 ]
-llslibdev = [
+ogxlibdev = [
     # To check OGX API provider dependecies:
     #
     #    $ uv run ogx stack list-providers

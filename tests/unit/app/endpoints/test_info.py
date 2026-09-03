@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException, Request, status
-from ogx_client import APIConnectionError
-from ogx_client.types import VersionInfo
+from ogx_client import ApiException
+from ogx_client.models.version_info import VersionInfo
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
@@ -34,7 +34,7 @@ async def test_info_endpoint(mocker: MockerFixture) -> None:
             "color_log": True,
             "access_log": True,
         },
-        "llama_stack": {
+        "ogx": {
             "api_key": "xyzzy",
             "url": "http://x.y.com:1234",
             "use_as_library_client": False,
@@ -52,7 +52,7 @@ async def test_info_endpoint(mocker: MockerFixture) -> None:
     # Mock the OGX client
     mock_client = mocker.AsyncMock()
     mock_client.inspect.version.return_value = VersionInfo(version="0.1.2")
-    mock_lsc = mocker.patch("client.AsyncOgxClientHolder.get_client")
+    mock_lsc = mocker.patch("client.ogx.AsyncOgxClientHolder.get_client")
     mock_lsc.return_value = mock_client
     mock_config = mocker.Mock()
     mocker.patch("app.endpoints.models.configuration", mock_config)
@@ -76,7 +76,7 @@ async def test_info_endpoint(mocker: MockerFixture) -> None:
     assert response is not None
     assert response.name is not None
     assert response.service_version is not None
-    assert response.llama_stack_version == "0.1.2"
+    assert response.ogx_version == "0.1.2"
 
 
 @pytest.mark.asyncio
@@ -88,7 +88,7 @@ async def test_info_endpoint_connection_error(mocker: MockerFixture) -> None:
 
     Sets up application configuration and patches the OGX
     client so that calling its version inspection raises an
-    APIConnectionError, then asserts the raised HTTPException has
+    ApiException, then asserts the raised HTTPException has
     status code 503 and a detail payload containing a "response" of
     "Service unavailable" and a "cause" that includes "Unable to
     connect to OGX".
@@ -106,7 +106,7 @@ async def test_info_endpoint_connection_error(mocker: MockerFixture) -> None:
             "color_log": True,
             "access_log": True,
         },
-        "llama_stack": {
+        "ogx": {
             "api_key": "xyzzy",
             "url": "http://x.y.com:1234",
             "use_as_library_client": False,
@@ -123,8 +123,8 @@ async def test_info_endpoint_connection_error(mocker: MockerFixture) -> None:
 
     # Mock the OGX client
     mock_client = mocker.AsyncMock()
-    mock_client.inspect.version.side_effect = APIConnectionError(request=None)  # type: ignore
-    mock_lsc = mocker.patch("client.AsyncOgxClientHolder.get_client")
+    mock_client.inspect.version.side_effect = ApiException(status=None)  # type: ignore
+    mock_lsc = mocker.patch("client.ogx.AsyncOgxClientHolder.get_client")
     mock_lsc.return_value = mock_client
     mock_config = mocker.Mock()
     mocker.patch("app.endpoints.models.configuration", mock_config)
@@ -148,7 +148,10 @@ async def test_info_endpoint_connection_error(mocker: MockerFixture) -> None:
         await info_endpoint_handler(auth=auth, request=request)
         assert e.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert e.value.detail["response"] == "Service unavailable"  # type: ignore
-        assert "Unable to connect to OGX" in e.value.detail["cause"]  # type: ignore
+        assert (
+            "Connection error while trying to reach backend service."
+            in e.value.detail["cause"]
+        )  # type: ignore
 
 
 class TestInfoEndpointOtel:
@@ -170,7 +173,7 @@ class TestInfoEndpointOtel:
             {
                 "name": "test-service",
                 "service": {"host": "localhost", "port": 8080},
-                "llama_stack": {
+                "ogx": {
                     "api_key": "k",
                     "url": "http://x:1234",
                     "use_as_library_client": False,
@@ -184,7 +187,9 @@ class TestInfoEndpointOtel:
 
         mock_client = mocker.AsyncMock()
         mock_client.inspect.version.return_value = VersionInfo(version="0.1.2")
-        mocker.patch("client.AsyncOgxClientHolder.get_client", return_value=mock_client)
+        mocker.patch(
+            "client.ogx.AsyncOgxClientHolder.get_client", return_value=mock_client
+        )
 
         request = Request(scope={"type": "http"})
         auth: AuthTuple = ("uid", "uname", True, "tok")
@@ -215,7 +220,7 @@ class TestInfoEndpointOtel:
             {
                 "name": "test-service",
                 "service": {"host": "localhost", "port": 8080},
-                "llama_stack": {
+                "ogx": {
                     "api_key": "k",
                     "url": "http://x:1234",
                     "use_as_library_client": False,
@@ -228,10 +233,10 @@ class TestInfoEndpointOtel:
         mocker.patch("configuration.configuration", cfg)
 
         mock_client = mocker.AsyncMock()
-        mock_client.inspect.version.side_effect = APIConnectionError(
-            request=None  # type: ignore
+        mock_client.inspect.version.side_effect = ApiException(status=None)
+        mocker.patch(
+            "client.ogx.AsyncOgxClientHolder.get_client", return_value=mock_client
         )
-        mocker.patch("client.AsyncOgxClientHolder.get_client", return_value=mock_client)
 
         request = Request(scope={"type": "http"})
         auth: AuthTuple = ("uid", "uname", True, "tok")

@@ -8,10 +8,6 @@ Unit tests.
 
 Shared pytest fixtures for unit tests.
 
-## [test_client.py](test_client.py)
-
-Unit tests for functions defined in src/client.py.
-
 ## [test_configuration.py](test_configuration.py)
 
 Unit tests for functions defined in src/configuration.py.
@@ -28,19 +24,15 @@ Unit tests for the degraded mode tracker.
 
 Unit tests for functions defined in src/lightspeed_stack.py.
 
-## [test_llama_stack_configuration.py](test_llama_stack_configuration.py)
+## [test_ogx_configuration.py](test_ogx_configuration.py)
 
-Unit tests for src/llama_stack_configuration.py.
+Unit tests for src/ogx_configuration.py.
 
-## [test_llama_stack_synthesize.py](test_llama_stack_synthesize.py)
+## [test_ogx_synthesize.py](test_ogx_synthesize.py)
 
 Unit tests for unified-mode OGX configuration synthesis (LCORE-2336).
 
 ## [test_log.py](test_log.py)
 
 Unit tests for functions defined in src/log.py.
-
-## [test_sentry.py](test_sentry.py)
-
-Unit tests for functions defined in src/sentry.py.
 

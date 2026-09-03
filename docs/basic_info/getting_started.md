@@ -128,11 +128,11 @@ service:
   workers: 1
   color_log: true
   access_log: true
-llama_stack:
+ogx:
   use_as_library_client: true
   # Unified mode (recommended): the run.yaml created above is consumed as
   # the synthesis profile. The legacy library_client_config_path setup is
-  # deprecated and removed in 0.7 — see the migration guide:
+  # deprecated and removed in 0.8 — see the migration guide:
   # ../user_doc/deployment_guide.md#migrating-from-the-legacy-two-file-configuration
   config:
     profile: run.yaml

@@ -29,7 +29,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 
-from client import AsyncOgxClientHolder
+from client.ogx import AsyncOgxClientHolder
 from log import get_logger
 from models.common.moderation import (
     ShieldModerationBlocked,
@@ -40,7 +40,7 @@ from models.config import (
     QuestionValidityConfig,
 )
 from pydantic_ai_lightspeed.capabilities.base import AbstractSafetyCapability
-from pydantic_ai_lightspeed.llamastack import OgxResponsesModel
+from pydantic_ai_lightspeed.ogx import OgxResponsesModel
 from utils.conversations import append_turn_to_conversation
 
 logger = get_logger(__name__)
@@ -217,8 +217,9 @@ class QuestionValidity(AbstractSafetyCapability):
 
     async def run(self, input_text: str) -> ShieldModerationResult:
         """Run question-validity check and return a moderation result."""
+        prompt = self._build_prompt(input_text)
         result = await model_request(
-            model=self._model, messages=[ModelRequest.user_text_prompt(input_text)]
+            model=self._model, messages=[ModelRequest.user_text_prompt(prompt)]
         )
 
         if result.text is not None and result.text.strip() == SUBJECT_ALLOWED:

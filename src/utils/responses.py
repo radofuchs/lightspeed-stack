@@ -79,7 +79,7 @@ from ogx_api.openai_responses import (
 from ogx_api.openai_responses import (
     OpenAIResponseUsageOutputTokensDetails as UsageOutputTokensDetails,
 )
-from ogx_client import APIConnectionError, APIStatusError, AsyncOgxClient
+from ogx_client import ApiException, AsyncOgxClient
 from opentelemetry import trace
 
 import constants
@@ -129,7 +129,7 @@ from utils.query import (
     normalize_vertex_ai_model_id,
     prepare_input,
 )
-from utils.suid import to_llama_stack_conversation_id
+from utils.suid import to_ogx_conversation_id
 from utils.token_counter import TokenCounter
 
 logger = get_logger(__name__)
@@ -162,14 +162,14 @@ async def get_vector_store_ids(
 
     try:
         vector_stores = await client.vector_stores.list()
-        return [vector_store.id for vector_store in vector_stores.data]
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="OGX",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
-    except APIStatusError as e:
+        return [vector_store.id for vector_store in vector_stores]
+    except ApiException as e:
+        if not e.status:
+            error_response = ServiceUnavailableResponse(
+                backend_name="OGX",
+            )
+            raise HTTPException(**error_response.model_dump()) from e
+
         error_response = InternalServerErrorResponse.generic()
         raise HTTPException(**error_response.model_dump()) from e
 
@@ -201,13 +201,13 @@ async def get_topic_summary(  # pylint: disable=too-many-nested-blocks
                 store=False,  # Don't store topic summary requests
             ),
         )
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="OGX",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
-    except APIStatusError as e:
+    except ApiException as e:
+        if not e.status:
+            error_response = ServiceUnavailableResponse(
+                backend_name="OGX",
+            )
+            raise HTTPException(**error_response.model_dump()) from e
+
         error_response = handle_known_apistatus_errors(e, model_id)
         raise HTTPException(**error_response.model_dump()) from e
 
@@ -317,14 +317,14 @@ def _build_provider_data_headers(
     """Build extra HTTP headers containing MCP provider data for OGX.
 
     Extracts per-server auth headers from MCP tool definitions and encodes
-    them as a JSON ``x-llamastack-provider-data`` header that OGX
+    them as a JSON ``X-OGX-Provider-Data`` header that OGX
     uses to authenticate with downstream MCP servers.
 
     Args:
         tools: Prepared tool definitions (may include MCP and non-MCP tools).
 
     Returns:
-        Dict with a single ``x-llamastack-provider-data`` key, or None when
+        Dict with a single ``X-OGX-Provider-Data`` key, or None when
         no MCP tools carry headers.
     """
     if not tools:
@@ -339,7 +339,7 @@ def _build_provider_data_headers(
     if not mcp_headers:
         return None
 
-    return {"x-llamastack-provider-data": json.dumps({"mcp_headers": mcp_headers})}
+    return {"X-OGX-Provider-Data": json.dumps({"mcp_headers": mcp_headers})}
 
 
 async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
@@ -405,29 +405,28 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
     if conversation_id:
         # Conversation ID was provided - convert to OGX format
         logger.debug("Using existing conversation ID: %s", conversation_id)
-        llama_stack_conv_id = to_llama_stack_conversation_id(conversation_id)
+        ogx_conv_id = to_ogx_conversation_id(conversation_id)
     else:
         # No conversation_id provided - create a new conversation first
         logger.debug("No conversation_id provided, creating new conversation")
         try:
             conversation = await client.conversations.create(metadata={})
-        except APIConnectionError as e:
-            error_response = ServiceUnavailableResponse(
-                backend_name="OGX",
-                cause=str(e),
-            )
-            raise HTTPException(**error_response.model_dump()) from e
-        except APIStatusError as e:
+        except ApiException as e:
+            if not e.status:
+                error_response = ServiceUnavailableResponse(
+                    backend_name="OGX",
+                )
+                raise HTTPException(**error_response.model_dump()) from e
             error_response = InternalServerErrorResponse.generic()
             raise HTTPException(**error_response.model_dump()) from e
 
-        llama_stack_conv_id = conversation.id
+        ogx_conv_id = conversation.id
         logger.info(
             "Created new conversation with ID: %s",
-            llama_stack_conv_id,
+            ogx_conv_id,
         )
 
-    # Build x-llamastack-provider-data header from MCP tool headers
+    # Build X-OGX-Provider-Data header from MCP tool headers
     extra_headers = _build_provider_data_headers(tools)
 
     # Normalize Vertex AI model IDs to work around OGX 0.6.x bug
@@ -438,7 +437,7 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
         model=normalized_model,
         instructions=system_prompt,
         tools=tools,
-        conversation=llama_stack_conv_id,
+        conversation=ogx_conv_id,
         stream=stream,
         store=store,
         extra_headers=extra_headers,
@@ -1381,7 +1380,7 @@ async def check_model_configured(
         HTTPException: If there's a connection error or other API error
     """
     try:
-        models = parse_model_list_response(await client.models.list())
+        models = parse_model_list_response(await client.openai.list())
         for model in models:
             if model.identifier == model_id:
                 return True
@@ -1392,15 +1391,14 @@ async def check_model_configured(
             ) and model.identifier == model_id.removeprefix("watsonx/"):
                 return True
         return False
-    except APIStatusError as e:
+    except ApiException as e:
+        if not e.status:
+            error_response = ServiceUnavailableResponse(
+                backend_name="OGX",
+            )
+            raise HTTPException(**error_response.model_dump()) from e
         response = InternalServerErrorResponse.generic()
         raise HTTPException(**response.model_dump()) from e
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="OGX",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
 
 
 async def select_model_for_responses(
@@ -1422,7 +1420,7 @@ async def select_model_for_responses(
         user_conversation: The user conversation if conversation_id was provided, None otherwise
 
     Returns:
-        The llama_stack_model_id in "provider/model" format
+        The OGX model ID in "provider/model" format
 
     Raises:
         HTTPException: If models cannot be fetched or an error occurs, or if no LLM model is found
@@ -1447,14 +1445,14 @@ async def select_model_for_responses(
 
     # 3. Fetch models list and select the first LLM model (model_type="llm")
     try:
-        models = parse_model_list_response(await client.models.list())
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="OGX",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
-    except APIStatusError as e:
+        models = parse_model_list_response(await client.openai.list())
+    except ApiException as e:
+        if not e.status:
+            error_response = ServiceUnavailableResponse(
+                backend_name="OGX",
+            )
+            raise HTTPException(**error_response.model_dump()) from e
+
         error_response = InternalServerErrorResponse.generic()
         raise HTTPException(**error_response.model_dump()) from e
 
@@ -1619,18 +1617,19 @@ def _extract_text_from_content(
     text_fragments: list[str] = []
     for part in content:
         part_type = getattr(part, "type", None)
-        if part_type == "input_text":
-            input_text_part = cast(InputTextPart, part)
-            if input_text_part.text:
-                text_fragments.append(input_text_part.text.strip())
-        elif part_type == "output_text":
-            output_text_part = cast(OutputTextPart, part)
-            if output_text_part.text:
-                text_fragments.append(output_text_part.text.strip())
-        elif part_type == "refusal":
-            refusal_part = cast(ContentPartRefusal, part)
-            if refusal_part.refusal:
-                text_fragments.append(refusal_part.refusal.strip())
+        match part_type:
+            case "input_text":
+                input_text_part = cast(InputTextPart, part)
+                if input_text_part.text:
+                    text_fragments.append(input_text_part.text.strip())
+            case "output_text":
+                output_text_part = cast(OutputTextPart, part)
+                if output_text_part.text:
+                    text_fragments.append(output_text_part.text.strip())
+            case "refusal":
+                refusal_part = cast(ContentPartRefusal, part)
+                if refusal_part.refusal:
+                    text_fragments.append(refusal_part.refusal.strip())
 
     return " ".join(text_fragments)
 
@@ -1664,13 +1663,13 @@ async def create_new_conversation(
     try:
         conversation = await client.conversations.create(metadata={})
         return conversation.id
-    except APIConnectionError as e:
-        error_response = ServiceUnavailableResponse(
-            backend_name="OGX",
-            cause=str(e),
-        )
-        raise HTTPException(**error_response.model_dump()) from e
-    except APIStatusError as e:
+    except ApiException as e:
+        if not e.status:
+            error_response = ServiceUnavailableResponse(
+                backend_name="OGX",
+            )
+            raise HTTPException(**error_response.model_dump()) from e
+
         error_response = InternalServerErrorResponse.generic()
         raise HTTPException(**error_response.model_dump()) from e
 

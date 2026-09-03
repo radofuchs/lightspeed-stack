@@ -252,7 +252,7 @@ def wait_for_container_health(
     return False
 
 
-def wait_for_llama_stack_ready(
+def wait_for_ogx_ready(
     max_attempts: Optional[int] = None,
 ) -> bool:
     """Wait until the OGX container HEALTHCHECK reports healthy.
@@ -436,37 +436,6 @@ def remove_config_backup(backup_path: str) -> None:
             os.remove(backup_path)
         except OSError as e:
             print(f"Warning: Could not remove backup file {backup_path}: {e}")
-
-
-def clear_llama_stack_storage(container_name: str = "lightspeed-stack") -> None:
-    """Clear OGX storage in library mode (embedded OGX).
-
-    Removes the ~/.llama directory so embedded OGX persisted state is
-    reset. Used before MCP config scenarios in library mode.
-    Only runs when using Docker (skipped in Prow).
-
-    Parameters:
-    ----------
-        container_name (str): Docker container name (default "lightspeed-stack").
-
-    Returns:
-    -------
-        None
-    """
-    if is_prow_environment():
-        return
-
-    try:
-        subprocess.run(
-            ["docker", "exec", container_name, "sh", "-c", "rm -rf ~/.llama"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as e:
-        print(f"Failed to clear OGX storage: {e}")
-        raise
 
 
 def restart_container(container_name: str) -> None:

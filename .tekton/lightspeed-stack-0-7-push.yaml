@@ -55,7 +55,7 @@ spec:
           ],
           "requirements_build_files": ["requirements-build.txt"],
           "binary": {
-            "packages": "a2a-sdk,accelerate,aiofile,aiohappyeyeballs,aiohttp,aiosignal,aiosqlite,annotated-doc,annotated-types,anthropic,anyio,argcomplete,asgiref,asyncpg,attrs,authlib,autoevals,azure-core,azure-identity,beartype,cachetools,caio,certifi,cffi,chardet,charset-normalizer,chevron,click,cryptography,datasets,defusedxml,dill,distro,dnspython,docstring-parser,durationpy,einops,email-validator,emoji,exceptiongroup,executing,faiss-cpu,fastapi,fastmcp-slim,fastuuid,filelock,fire,frozenlist,fsspec,google-api-core,google-auth,google-cloud-core,google-cloud-storage,google-crc32c,google-genai,google-resumable-media,googleapis-common-protos,greenlet,griffelib,grpc-google-iam-v1,grpcio,grpcio-status,h11,hf-xet,httpcore,httpcore2,httpx,httpx-sse,httpx2,huggingface-hub,idna,importlib-metadata,jaraco-classes,jaraco-context,jaraco-functools,jeepney,jinja2,jiter,joblib,joserfc,jsonpath-ng,jsonschema,jsonschema-specifications,keyring,kubernetes,langdetect,litellm,logfire-api,markdown-it-py,markupsafe,maturin,mcp,mdurl,more-itertools,mpmath,msal,msal-extensions,multidict,multiprocess,narwhals,networkx,nltk,numpy,oauthlib,ogx,ogx-api,ogx-client,openai,opentelemetry-api,opentelemetry-distro,opentelemetry-exporter-otlp,opentelemetry-exporter-otlp-proto-common,opentelemetry-exporter-otlp-proto-grpc,opentelemetry-exporter-otlp-proto-http,opentelemetry-instrumentation,opentelemetry-instrumentation-asgi,opentelemetry-instrumentation-fastapi,opentelemetry-instrumentation-httpx,opentelemetry-proto,opentelemetry-sdk,opentelemetry-semantic-conventions,opentelemetry-util-http,packaging,pandas,peft,pip,platformdirs,polyleven,prometheus-client,prompt-toolkit,propcache,proto-plus,protobuf,psutil,psycopg2-binary,py-key-value-aio,pyaml,pyarrow,pyasn1,pyasn1-modules,pycparser,pydantic,pydantic-core,pydantic-settings,pygments,pyjwt,pypdf,pyperclip,python-dateutil,python-dotenv,python-multipart,pyyaml,referencing,regex,requests,requests-oauthlib,rich,rpds-py,safetensors,scikit-learn,scipy,secretstorage,semver,sentence-transformers,sentry-sdk,setuptools,shellingham,six,sniffio,sqlalchemy,sse-starlette,starlette,structlog,sympy,tenacity,termcolor,threadpoolctl,tiktoken,tokenizers,torch,tqdm,transformers,tree-sitter,triton,trl,truststore,typer,typing-extensions,typing-inspection,urllib3,uv,uv-build,uvicorn,wcwidth,websocket-client,websockets,wrapt,xxhash,yarl,zipp,zstandard",
+            "packages": "a2a-sdk,accelerate,aiofile,aiohappyeyeballs,aiohttp,aiosignal,aiosqlite,annotated-doc,annotated-types,anthropic,anyio,argcomplete,asgiref,asyncpg,attrs,authlib,autoevals,azure-core,azure-identity,beartype,cachetools,caio,certifi,cffi,chardet,charset-normalizer,chevron,click,cryptography,datasets,defusedxml,dill,distro,dnspython,docstring-parser,durationpy,einops,email-validator,emoji,exceptiongroup,executing,faiss-cpu,fastapi,fastmcp-slim,fastuuid,filelock,fire,frozenlist,fsspec,google-api-core,google-auth,google-cloud-core,google-cloud-storage,google-crc32c,google-genai,google-resumable-media,googleapis-common-protos,greenlet,griffelib,grpc-google-iam-v1,grpcio,grpcio-status,h11,hf-xet,httpcore,httpcore2,httpx,httpx-sse,httpx2,huggingface-hub,idna,importlib-metadata,jaraco-classes,jaraco-context,jaraco-functools,jeepney,jinja2,jiter,joblib,joserfc,jsonpath-ng,jsonschema,jsonschema-specifications,keyring,kubernetes,langdetect,litellm,logfire-api,markdown-it-py,markupsafe,maturin,mcp,mdurl,models-dev,more-itertools,mpmath,msal,msal-extensions,multidict,multiprocess,narwhals,networkx,nltk,numpy,oauthlib,openai,opentelemetry-api,opentelemetry-distro,opentelemetry-exporter-otlp,opentelemetry-exporter-otlp-proto-common,opentelemetry-exporter-otlp-proto-grpc,opentelemetry-exporter-otlp-proto-http,opentelemetry-exporter-prometheus,opentelemetry-instrumentation,opentelemetry-instrumentation-asgi,opentelemetry-instrumentation-fastapi,opentelemetry-instrumentation-httpx,opentelemetry-proto,opentelemetry-sdk,opentelemetry-semantic-conventions,opentelemetry-util-http,packaging,pandas,peft,pip,platformdirs,polyleven,prometheus-client,prompt-toolkit,propcache,proto-plus,protobuf,psutil,psycopg2-binary,py-key-value-aio,pyaml,pyarrow,pyasn1,pyasn1-modules,pycparser,pydantic,pydantic-core,pydantic-settings,pygments,pyjwt,pypdf,pyperclip,python-dateutil,python-dotenv,python-multipart,pyyaml,referencing,regex,requests,requests-oauthlib,rich,rpds-py,safetensors,scikit-learn,scipy,secretstorage,semver,sentence-transformers,sentry-sdk,setuptools,shellingham,six,sniffio,sqlalchemy,sse-starlette,starlette,structlog,sympy,tenacity,termcolor,threadpoolctl,tiktoken,tokenizers,torch,tqdm,transformers,tree-sitter,triton,trl,truststore,typer,typing-extensions,typing-inspection,urllib3,uv,uv-build,uvicorn,wcwidth,websocket-client,websockets,wrapt,xxhash,yarl,zipp,zstandard",
             "os": "linux",
             "arch": "x86_64,aarch64",
             "py_version": 312
@@ -384,7 +384,7 @@ spec:
         - name: image-platform
           value:
           - $(params.build-platforms)
-      name: clair-scan
+      name: roxctl-scan
       params:
       - name: image-digest
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
@@ -395,9 +395,9 @@ spec:
       taskRef:
         params:
         - name: name
-          value: clair-scan
+          value: roxctl-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-clair-scan:0.4.0@sha256:dcc6ca58d3ec03d05ce21c03b4f51b58cac9878caa932ad06a9fdf4bc422aaab
+          value: quay.io/konflux-ci/tekton-catalog/task-roxctl-scan:0.1@sha256:76ed85aa05ce42d31341269837f104c3b766508313a68439085dcf9cc89d03f4
         - name: kind
           value: task
         resolver: bundles
@@ -422,7 +422,7 @@ spec:
         - name: name
           value: ecosystem-cert-preflight-checks
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-ecosystem-cert-preflight-checks:0.2@sha256:4619769705d4999e129b779d7699d89d33c47f7ab80d73ad6e3dcd8a6a4e43a7
+          value: quay.io/konflux-ci/tekton-catalog/task-ecosystem-cert-preflight-checks:0.2@sha256:b961f8b259483fac39efc9371faca88faea528d2572ae30b79a9d3b56db8364b
         - name: kind
           value: task
         resolver: bundles
@@ -452,7 +452,7 @@ spec:
         - name: name
           value: sast-snyk-check-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-sast-snyk-check-oci-ta:0.5@sha256:b78e9c05c5126613eddee53f2f3534a9b86bfca17d903599f2fa465b7938e241
+          value: quay.io/konflux-ci/tekton-catalog/task-sast-snyk-check-oci-ta:0.5@sha256:97231d2d0fb3a54ef6f653e5a355afe965674f8386cf3c8339c6704751c146b5
         - name: kind
           value: task
         resolver: bundles
@@ -479,7 +479,7 @@ spec:
         - name: name
           value: clamav-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-clamav-scan:0.3.1@sha256:53a02326bfb930ca5ef6bfa7a33acca833d57752f34f3cb79255fe2e25e7d217
+          value: quay.io/konflux-ci/tekton-catalog/task-clamav-scan:0.3.2@sha256:90be6a6537578b35687ae3639970be0eb273dfc73dabe4039bdcb307c555c086
         - name: kind
           value: task
         resolver: bundles
@@ -575,7 +575,7 @@ spec:
         - name: name
           value: sast-shell-check-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-sast-shell-check-oci-ta:0.1@sha256:beb05ae2fad733783b3b17e05871e0eaf527a07c904cf3fb2cb551025007eec1
+          value: quay.io/konflux-ci/tekton-catalog/task-sast-shell-check-oci-ta:0.1@sha256:c06bee8d1655c153ef2b2234d44d824a5d613d54abf592b85702f81a73873bd0
         - name: kind
           value: task
         resolver: bundles
@@ -603,7 +603,7 @@ spec:
         - name: name
           value: sast-unicode-check-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-sast-unicode-check-oci-ta:0.4@sha256:d09f717cb84f0699a531773bc498745deef2c006a81918aa73b3be6d2f4778bd
+          value: quay.io/konflux-ci/tekton-catalog/task-sast-unicode-check-oci-ta:0.4@sha256:6a7fbfac7f7a9f95a2881e388d14e18e4fd9aacaa6d4ade9370fbed2c87dc989
         - name: kind
           value: task
         resolver: bundles
@@ -668,7 +668,7 @@ spec:
         - name: name
           value: rpms-signature-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2.1@sha256:538a853c4a299216c43258ccc9894215f5440dc0c70c9c99fe22fc9633a8e79d
+          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2.2@sha256:f110c53fd58cab7ac6e47d472bb801d49e2f584eb31837db9d611e11b3862a3d
         - name: kind
           value: task
         resolver: bundles

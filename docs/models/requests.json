@@ -78,7 +78,8 @@
                         "examples": [
                             "text/plain",
                             "image/jpeg",
-                            "image/png"
+                            "image/png",
+                            "image/webp"
                         ],
                         "title": "Content Type",
                         "type": "string"
@@ -1803,7 +1804,7 @@
             },
             "PromptCreateRequest": {
                 "additionalProperties": false,
-                "description": "Request body to create a stored prompt template in Llama Stack.\n\nAttributes:\n    prompt: Prompt text with variable placeholders.\n    variables: Variable names allowed in the template.",
+                "description": "Request body to create a stored prompt template in OGX.\n\nAttributes:\n    prompt: Prompt text with variable placeholders.\n    variables: Variable names allowed in the template.",
                 "examples": [
                     {
                         "prompt": "Summarize: {{text}}",

@@ -6602,14 +6602,14 @@ Model representing a response to an info request.
 Attributes:
     name: Service name.
     service_version: Service version.
-    llama_stack_version: OGX version.
+    ogx_version: OGX version.
 
 
 | Field | Type | Description |
 |-------|------|-------------|
 | name | string | Service name |
 | service_version | string | Service version |
-| llama_stack_version | string | OGX version |
+| ogx_version | string | OGX version |
 
 
 ## InputToolMCP
@@ -6740,9 +6740,9 @@ capabilities into an adaptable setup.
 
 Useful resources:
 
-  - [OGX](https://www.llama.com/products/llama-stack/)
-  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)
-  - [Build AI Applications with OGX](https://llamastack.github.io/)
+  - [OGX](https://ogx-ai.github.io/)
+  - [Python OGX client](https://github.com/ogx-ai/ogx-client-python)
+  - [Build AI Applications with OGX](https://ogx-ai.github.io/)
 
 
 | Field | Type | Description |

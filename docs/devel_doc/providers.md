@@ -290,9 +290,9 @@ Shields are owned by LCORE (configured under `shields:` block), not as OGX `prov
     ```bash
     uv run llama stack list-providers
     ```
-    Edit your `pyproject.toml` and add the required pip packages for the provider into `llslibdev` section:
+    Edit your `pyproject.toml` and add the required pip packages for the provider into `ogxlibdev` section:
    ```toml
-   llslibdev = [
+   ogxlibdev = [
      "openai>=1.0.0",
      "pymilvus>=2.4.10",
      
@@ -304,7 +304,7 @@ Shields are owned by LCORE (configured under `shields:` block), not as OGX `prov
 
     Run the following command to update project dependencies:
     ```bash
-    uv sync --group llslibdev
+    uv sync --group ogxlibdev
     ```
 1. **Update OGX configuration**
     
@@ -384,4 +384,4 @@ Shields are owned by LCORE (configured under `shields:` block), not as OGX `prov
 
 ---
 
-For a deeper understanding, see the [official OGX providers documentation](https://llamastack.github.io/docs/providers).
+For a deeper understanding, see the [official OGX providers documentation](https://ogx-ai.github.io/docs/providers).

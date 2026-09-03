@@ -16,9 +16,9 @@ from models.config import Action, JsonPathOperator
 from telemetry.configuration_snapshot import (
     CONFIGURED,
     LIGHTSPEED_STACK_FIELDS,
-    LLAMA_STACK_FIELDS,
     NOT_AVAILABLE,
     NOT_CONFIGURED,
+    OGX_FIELDS,
     FieldSpec,
     ListFieldSpec,
     MaskingType,
@@ -29,7 +29,7 @@ from telemetry.configuration_snapshot import (
     _set_nested_value,
     build_configuration_snapshot,
     build_lightspeed_stack_snapshot,
-    build_llama_stack_snapshot,
+    build_ogx_snapshot,
     get_nested_value,
     mask_value,
 )
@@ -436,9 +436,9 @@ class TestBuildLightspeedStackSnapshot:
         assert snapshot["service"]["tls_config"]["tls_key_path"] == CONFIGURED
         assert snapshot["service"]["tls_config"]["tls_key_password"] == CONFIGURED
         assert snapshot["service"]["cors"]["allow_origins"] == CONFIGURED
-        assert snapshot["llama_stack"]["url"] == CONFIGURED
-        assert snapshot["llama_stack"]["api_key"] == CONFIGURED
-        assert snapshot["llama_stack"]["library_client_config_path"] == CONFIGURED
+        assert snapshot["ogx"]["url"] == CONFIGURED
+        assert snapshot["ogx"]["api_key"] == CONFIGURED
+        assert snapshot["ogx"]["library_client_config_path"] == CONFIGURED
         assert snapshot["authentication"]["k8s_cluster_api"] == CONFIGURED
         assert snapshot["authentication"]["k8s_ca_cert_path"] == CONFIGURED
         assert snapshot["authentication"]["jwk_config"]["url"] == CONFIGURED
@@ -464,7 +464,7 @@ class TestBuildLightspeedStackSnapshot:
         assert snapshot["service"]["access_log"] is False
         assert snapshot["service"]["cors"]["allow_credentials"] is True
         assert snapshot["service"]["cors"]["allow_methods"] == ["GET", "POST"]
-        assert snapshot["llama_stack"]["use_as_library_client"] is False
+        assert snapshot["ogx"]["use_as_library_client"] is False
         assert snapshot["inference"]["default_model"] == "gpt-4o-mini"
         assert snapshot["inference"]["default_provider"] == "openai"
         assert snapshot["authentication"]["module"] == "jwk_token"
@@ -477,8 +477,8 @@ class TestBuildLightspeedStackSnapshot:
             snapshot["service"]["tls_config"]["tls_certificate_path"] == NOT_CONFIGURED
         )
         assert snapshot["service"]["tls_config"]["tls_key_path"] == NOT_CONFIGURED
-        assert snapshot["llama_stack"]["url"] == NOT_CONFIGURED
-        assert snapshot["llama_stack"]["api_key"] == NOT_CONFIGURED
+        assert snapshot["ogx"]["url"] == NOT_CONFIGURED
+        assert snapshot["ogx"]["api_key"] == NOT_CONFIGURED
         assert snapshot["authentication"]["jwk_config"]["url"] == NOT_CONFIGURED
         assert snapshot["customization"]["system_prompt"] == NOT_CONFIGURED
         assert snapshot["database"]["postgres"]["host"] == NOT_CONFIGURED
@@ -556,44 +556,44 @@ class TestBuildLightspeedStackSnapshot:
     def test_llama_stack_timeout_passthrough(self) -> None:
         """Test llama_stack timeout passes through."""
         snapshot = build_lightspeed_stack_snapshot(build_fully_populated_config())
-        assert snapshot["llama_stack"]["timeout"] == 180
+        assert snapshot["ogx"]["timeout"] == 180
 
     def test_llama_stack_max_retries_passthrough(self) -> None:
         """Test llama_stack max_retries passes through."""
         snapshot = build_lightspeed_stack_snapshot(build_fully_populated_config())
-        assert snapshot["llama_stack"]["max_retries"] == 5
+        assert snapshot["ogx"]["max_retries"] == 5
 
     def test_llama_stack_retry_delay_passthrough(self) -> None:
         """Test llama_stack retry_delay passes through."""
         snapshot = build_lightspeed_stack_snapshot(build_fully_populated_config())
-        assert snapshot["llama_stack"]["retry_delay"] == 2
+        assert snapshot["ogx"]["retry_delay"] == 2
 
     def test_llama_stack_allow_degraded_mode_passthrough(self) -> None:
         """Test llama_stack allow_degraded_mode passes through."""
         snapshot = build_lightspeed_stack_snapshot(build_fully_populated_config())
-        assert snapshot["llama_stack"]["allow_degraded_mode"] is True
+        assert snapshot["ogx"]["allow_degraded_mode"] is True
 
     def test_llama_stack_config_baseline_passthrough(self) -> None:
         """Test llama_stack config baseline passes through."""
         snapshot = build_lightspeed_stack_snapshot(build_fully_populated_config())
-        assert snapshot["llama_stack"]["config"]["baseline"] == "default"
+        assert snapshot["ogx"]["config"]["baseline"] == "default"
 
     def test_llama_stack_config_profile_masked(self) -> None:
         """Test llama_stack config profile is masked as sensitive."""
         snapshot = build_lightspeed_stack_snapshot(build_fully_populated_config())
-        assert snapshot["llama_stack"]["config"]["profile"] == CONFIGURED
+        assert snapshot["ogx"]["config"]["profile"] == CONFIGURED
 
     def test_llama_stack_config_native_override_masked(self) -> None:
         """Test llama_stack config native_override is masked as sensitive."""
         snapshot = build_lightspeed_stack_snapshot(build_fully_populated_config())
-        assert snapshot["llama_stack"]["config"]["native_override"] == CONFIGURED
+        assert snapshot["ogx"]["config"]["native_override"] == CONFIGURED
 
     def test_llama_stack_config_none(self) -> None:
         """Test llama_stack config fields when config is None."""
         snapshot = build_lightspeed_stack_snapshot(build_minimal_config())
-        assert snapshot["llama_stack"]["config"]["baseline"] is None
-        assert snapshot["llama_stack"]["config"]["profile"] == NOT_CONFIGURED
-        assert snapshot["llama_stack"]["config"]["native_override"] == NOT_CONFIGURED
+        assert snapshot["ogx"]["config"]["baseline"] is None
+        assert snapshot["ogx"]["config"]["profile"] == NOT_CONFIGURED
+        assert snapshot["ogx"]["config"]["native_override"] == NOT_CONFIGURED
 
     def test_inference_context_windows_passthrough(self) -> None:
         """Test inference context_windows passes through."""
@@ -1055,22 +1055,22 @@ class TestBuildLightspeedStackSnapshot:
 
 
 # =============================================================================
-# Tests: build_llama_stack_snapshot
+# Tests: build_ogx_snapshot
 # =============================================================================
 
 
-class TestBuildLlamaStackSnapshot:
-    """Tests for build_llama_stack_snapshot function."""
+class TestBuildOgxSnapshot:
+    """Tests for build_ogx_snapshot function."""
 
     @pytest.mark.asyncio
     async def test_service_mode_returns_not_available(self) -> None:
         """Test that service mode (no path) returns not_available status."""
-        assert await build_llama_stack_snapshot(None) == {"status": NOT_AVAILABLE}
+        assert await build_ogx_snapshot(None) == {"status": NOT_AVAILABLE}
 
     @pytest.mark.asyncio
     async def test_nonexistent_file(self) -> None:
         """Test that missing file returns not_available status."""
-        assert await build_llama_stack_snapshot("/nonexistent/path.yaml") == {
+        assert await build_ogx_snapshot("/nonexistent/path.yaml") == {
             "status": NOT_AVAILABLE
         }
 
@@ -1079,31 +1079,31 @@ class TestBuildLlamaStackSnapshot:
         """Test that invalid YAML returns not_available status."""
         path = tmp_path / "invalid.yaml"
         path.write_text(": invalid: yaml: [")
-        result = await build_llama_stack_snapshot(str(path))
+        result = await build_ogx_snapshot(str(path))
         assert result == {"status": NOT_AVAILABLE}
 
     @pytest.mark.asyncio
-    async def test_valid_config(self, llama_stack_config_file: str) -> None:
+    async def test_valid_config(self, ogx_config_file: str) -> None:
         """Test snapshot from valid OGX config."""
-        result = await build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_ogx_snapshot(ogx_config_file)
         assert result["version"] == 2
         assert result["image_name"] == "starter"
         assert result["apis"] == ["agents", "inference", "safety", "vector_io"]
         assert result["external_providers_dir"] == CONFIGURED
 
     @pytest.mark.asyncio
-    async def test_models_extraction(self, llama_stack_config_file: str) -> None:
+    async def test_models_extraction(self, ogx_config_file: str) -> None:
         """Test models list extraction."""
-        result = await build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_ogx_snapshot(ogx_config_file)
         models = result["registered_resources"]["models"]
         assert len(models) == 2
         assert models[0]["model_id"] == "gpt-4o-mini"
         assert models[0]["model_type"] == "llm"
 
     @pytest.mark.asyncio
-    async def test_providers_extraction(self, llama_stack_config_file: str) -> None:
+    async def test_providers_extraction(self, ogx_config_file: str) -> None:
         """Test provider lists extraction shows only id and type."""
-        result = await build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_ogx_snapshot(ogx_config_file)
         inference = result["providers"]["inference"]
         assert len(inference) == 1
         assert inference[0]["provider_id"] == "openai"
@@ -1111,9 +1111,9 @@ class TestBuildLlamaStackSnapshot:
         assert "config" not in inference[0]
 
     @pytest.mark.asyncio
-    async def test_storage_fields(self, llama_stack_config_file: str) -> None:
+    async def test_storage_fields(self, ogx_config_file: str) -> None:
         """Test storage store extraction."""
-        result = await build_llama_stack_snapshot(llama_stack_config_file)
+        result = await build_ogx_snapshot(ogx_config_file)
         assert result["inference_store"]["type"] == "sql_sqlite"
         assert result["inference_store"]["db_path"] == CONFIGURED
         assert result["metadata_store"]["type"] == "kv_sqlite"
@@ -1124,7 +1124,7 @@ class TestBuildLlamaStackSnapshot:
         """Test config without providers section."""
         path = tmp_path / "no_providers.yaml"
         path.write_text(yaml.dump({"version": 1, "apis": []}))
-        result = await build_llama_stack_snapshot(str(path))
+        result = await build_ogx_snapshot(str(path))
         assert result["providers"]["inference"] == NOT_CONFIGURED
 
     @pytest.mark.asyncio
@@ -1142,7 +1142,7 @@ class TestBuildLlamaStackSnapshot:
         }
         path = tmp_path / "server.yaml"
         path.write_text(yaml.dump(config))
-        result = await build_llama_stack_snapshot(str(path))
+        result = await build_ogx_snapshot(str(path))
         assert result["server"]["host"] == CONFIGURED
         assert result["server"]["port"] == 8321
         assert result["server"]["tls_cafile"] == CONFIGURED
@@ -1161,18 +1161,18 @@ class TestBuildConfigurationSnapshot:
         """Test that snapshot contains both lightspeed_stack and llama_stack."""
         result = await build_configuration_snapshot(build_minimal_config(), None)
         assert "lightspeed_stack" in result
-        assert "llama_stack" in result
-        assert result["llama_stack"] == {"status": NOT_AVAILABLE}
+        assert "ogx" in result
+        assert result["ogx"] == {"status": NOT_AVAILABLE}
         assert result["lightspeed_stack"]["name"] == "minimal"
 
     @pytest.mark.asyncio
-    async def test_with_llama_stack_config(self, llama_stack_config_file: str) -> None:
+    async def test_with_ogx_config(self, ogx_config_file: str) -> None:
         """Test snapshot with both config sources."""
         result = await build_configuration_snapshot(
-            build_minimal_config(), llama_stack_config_file
+            build_minimal_config(), ogx_config_file
         )
         assert result["lightspeed_stack"]["name"] == "minimal"
-        assert result["llama_stack"]["version"] == 2
+        assert result["ogx"]["version"] == 2
 
 
 # =============================================================================
@@ -1194,23 +1194,19 @@ class TestPiiLeakPrevention:
             ), f"PII leaked in lightspeed-stack snapshot: '{pii_value}'"
 
     @pytest.mark.asyncio
-    async def test_no_pii_in_llama_stack_snapshot(
-        self, llama_stack_config_file: str
-    ) -> None:
+    async def test_no_pii_in_ogx_snapshot(self, ogx_config_file: str) -> None:
         """Verify no PII leaks in OGX snapshot JSON."""
-        json_str = json.dumps(await build_llama_stack_snapshot(llama_stack_config_file))
+        json_str = json.dumps(await build_ogx_snapshot(ogx_config_file))
         for pii_value in LLAMA_STACK_PII_VALUES:
             assert (
                 pii_value not in json_str
             ), f"PII leaked in llama-stack snapshot: '{pii_value}'"
 
     @pytest.mark.asyncio
-    async def test_no_pii_in_combined_snapshot(
-        self, llama_stack_config_file: str
-    ) -> None:
+    async def test_no_pii_in_combined_snapshot(self, ogx_config_file: str) -> None:
         """Verify no PII leaks in the combined snapshot JSON."""
         snapshot = await build_configuration_snapshot(
-            build_fully_populated_config(), llama_stack_config_file
+            build_fully_populated_config(), ogx_config_file
         )
         json_str = json.dumps(snapshot)
         for pii_value in ALL_PII_VALUES + LLAMA_STACK_PII_VALUES:
@@ -1228,11 +1224,9 @@ class TestPiiLeakPrevention:
         ), f"Snapshot contains unexpected top-level keys: {unexpected}"
 
     @pytest.mark.asyncio
-    async def test_provider_config_not_leaked(
-        self, llama_stack_config_file: str
-    ) -> None:
+    async def test_provider_config_not_leaked(self, ogx_config_file: str) -> None:
         """Verify provider config sections (with secrets) are not included."""
-        json_str = json.dumps(await build_llama_stack_snapshot(llama_stack_config_file))
+        json_str = json.dumps(await build_ogx_snapshot(ogx_config_file))
         assert "api_key" not in json_str
         assert "sk-openai" not in json_str
 
@@ -1264,7 +1258,7 @@ class TestRegistryValidation:
 
     def test_all_field_specs_have_valid_masking(self) -> None:
         """Verify all field specs have a valid MaskingType."""
-        for spec in LIGHTSPEED_STACK_FIELDS + LLAMA_STACK_FIELDS:
+        for spec in LIGHTSPEED_STACK_FIELDS + OGX_FIELDS:
             if isinstance(spec, FieldSpec):
                 assert isinstance(
                     spec.masking, MaskingType
@@ -1282,9 +1276,9 @@ class TestRegistryValidation:
             set(paths)
         ), f"Duplicate paths: {set(p for p in paths if paths.count(p) > 1)}"
 
-    def test_no_duplicate_paths_in_llama_stack_registry(self) -> None:
+    def test_no_duplicate_paths_in_ogx_registry(self) -> None:
         """Verify no duplicate paths in OGX registry."""
-        paths = [s.path for s in LLAMA_STACK_FIELDS]
+        paths = [s.path for s in OGX_FIELDS]
         assert len(paths) == len(
             set(paths)
         ), f"Duplicate paths: {set(p for p in paths if paths.count(p) > 1)}"

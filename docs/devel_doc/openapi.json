@@ -183,8 +183,8 @@
                                     "$ref": "#/components/schemas/InfoResponse"
                                 },
                                 "example": {
-                                    "llama_stack_version": "1.0.0",
                                     "name": "Lightspeed Stack",
+                                    "ogx_version": "1.0.0",
                                     "service_version": "1.0.0"
                                 }
                             }
@@ -4725,7 +4725,7 @@
                     "vector-stores"
                 ],
                 "summary": "Create File",
-                "description": "Upload a file.\n\nParameters:\n    request: The incoming HTTP request.\n    auth: Authentication tuple from the auth dependency.\n    file: The file to upload.\n\nReturns:\n    FileResponse: The uploaded file object.\n\nRaises:\n    HTTPException:\n        - 400: Bad request (e.g., file too large, invalid format)\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
+                "description": "Upload a file.\n\nParameters:\n    request: The incoming HTTP request.\n    auth: Authentication tuple from the auth dependency.\n    file: The file to upload.\n\nReturns:\n    FileResponse: The uploaded file object.\n\nRaises:\n    HTTPException:\n        - 400: Bad request (e.g., file too large, invalid format)\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 429: Too many concurrent file uploads\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
                 "operationId": "create_file_v1_files_post",
                 "requestBody": {
                     "content": {
@@ -4880,6 +4880,26 @@
                             }
                         }
                     },
+                    "429": {
+                        "description": "Too many concurrent requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyConcurrentRequestsResponse"
+                                },
+                                "examples": {
+                                    "file upload": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "The maximum number of concurrent file uploads has been reached.",
+                                                "response": "Too many concurrent file uploads"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {
@@ -4947,7 +4967,7 @@
                     "vector-stores"
                 ],
                 "summary": "Add File To Vector Store",
-                "description": "Add a file to a vector store.\n\nParameters:\n    request: The incoming HTTP request.\n    vector_store_id: ID of the vector store.\n    auth: Authentication tuple from the auth dependency.\n    body: File addition parameters.\n\nReturns:\n    VectorStoreFileResponse: The vector store file object.\n\nRaises:\n    HTTPException:\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 404: Vector store or file not found\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
+                "description": "Add a file to a vector store.\n\nParameters:\n    request: The incoming HTTP request.\n    vector_store_id: ID of the vector store.\n    auth: Authentication tuple from the auth dependency.\n    body: File addition parameters.\n\nReturns:\n    VectorStoreFileResponse: The vector store file object.\n\nRaises:\n    HTTPException:\n        - 401: Authentication failed\n        - 403: Authorization failed\n        - 404: Vector store or file not found\n        - 429: Too many concurrent vector store file attachments\n        - 500: Lightspeed Stack configuration not loaded\n        - 503: Unable to connect to OGX",
                 "operationId": "add_file_to_vector_store_v1_vector_stores__vector_store_id__files_post",
                 "parameters": [
                     {
@@ -5103,6 +5123,26 @@
                                 },
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many concurrent requests",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "vector store attach": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "The maximum number of concurrent vector store file attachments has been reached.",
+                                                "response": "Too many concurrent vector store file attachments"
+                                            }
+                                        }
+                                    }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyConcurrentRequestsResponse"
                                 }
                             }
                         }
@@ -5554,6 +5594,26 @@
                                 },
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many concurrent requests",
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "vector store attach": {
+                                        "value": {
+                                            "detail": {
+                                                "cause": "The maximum number of concurrent vector store file attachments has been reached.",
+                                                "response": "Too many concurrent vector store file attachments"
+                                            }
+                                        }
+                                    }
+                                },
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyConcurrentRequestsResponse"
                                 }
                             }
                         }
@@ -6835,11 +6895,6 @@
                                             "default_model": "gpt-4-turbo",
                                             "default_provider": "openai"
                                         },
-                                        "llama_stack": {
-                                            "api_key": "*****",
-                                            "url": "http://localhost:8321",
-                                            "use_as_library_client": false
-                                        },
                                         "mcp_servers": [
                                             {
                                                 "name": "server1",
@@ -6856,6 +6911,11 @@
                                                 "OTEL_SDK_DISABLED": "true",
                                                 "OTEL_SERVICE_NAME": ""
                                             }
+                                        },
+                                        "ogx": {
+                                            "api_key": "*****",
+                                            "url": "http://localhost:8321",
+                                            "use_as_library_client": false
                                         },
                                         "quota_handlers": {
                                             "enable_token_history": false,
@@ -12402,7 +12462,8 @@
                         "examples": [
                             "text/plain",
                             "image/jpeg",
-                            "image/png"
+                            "image/png",
+                            "image/webp"
                         ]
                     },
                     "content": {
@@ -13073,15 +13134,15 @@
                             }
                         ],
                         "title": "Configuration format version",
-                        "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or a llama_stack.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11)."
+                        "description": "Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or an ogx.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11)."
                     },
                     "service": {
                         "$ref": "#/components/schemas/ServiceConfiguration",
                         "title": "Service configuration",
                         "description": "This section contains Lightspeed Core Stack service configuration."
                     },
-                    "llama_stack": {
-                        "$ref": "#/components/schemas/LlamaStackConfiguration",
+                    "ogx": {
+                        "$ref": "#/components/schemas/OgxConfiguration",
                         "title": "OGX configuration",
                         "description": "This section contains OGX configuration. Lightspeed Core Stack service can call OGX in library mode or in server mode."
                     },
@@ -13254,7 +13315,7 @@
                 "required": [
                     "name",
                     "service",
-                    "llama_stack",
+                    "ogx",
                     "user_data_collection"
                 ],
                 "title": "Configuration",
@@ -13292,11 +13353,6 @@
                                 "default_model": "gpt-4-turbo",
                                 "default_provider": "openai"
                             },
-                            "llama_stack": {
-                                "api_key": "*****",
-                                "url": "http://localhost:8321",
-                                "use_as_library_client": false
-                            },
                             "mcp_servers": [
                                 {
                                     "name": "server1",
@@ -13313,6 +13369,11 @@
                                     "OTEL_SDK_DISABLED": "true",
                                     "OTEL_SERVICE_NAME": ""
                                 }
+                            },
+                            "ogx": {
+                                "api_key": "*****",
+                                "url": "http://localhost:8321",
+                                "use_as_library_client": false
                             },
                             "quota_handlers": {
                                 "enable_token_history": false,
@@ -14806,9 +14867,9 @@
                             "1.0.0"
                         ]
                     },
-                    "llama_stack_version": {
+                    "ogx_version": {
                         "type": "string",
-                        "title": "Llama Stack Version",
+                        "title": "Ogx Version",
                         "description": "OGX version",
                         "examples": [
                             "0.2.1",
@@ -14823,14 +14884,14 @@
                 "required": [
                     "name",
                     "service_version",
-                    "llama_stack_version"
+                    "ogx_version"
                 ],
                 "title": "InfoResponse",
-                "description": "Model representing a response to an info request.\n\nAttributes:\n    name: Service name.\n    service_version: Service version.\n    llama_stack_version: OGX version.",
+                "description": "Model representing a response to an info request.\n\nAttributes:\n    name: Service name.\n    service_version: Service version.\n    ogx_version: OGX version.",
                 "examples": [
                     {
-                        "llama_stack_version": "1.0.0",
                         "name": "Lightspeed Stack",
+                        "ogx_version": "1.0.0",
                         "service_version": "1.0.0"
                     }
                 ]
@@ -15153,112 +15214,6 @@
                         "alive": true
                     }
                 ]
-            },
-            "LlamaStackConfiguration": {
-                "properties": {
-                    "url": {
-                        "anyOf": [
-                            {
-                                "type": "string",
-                                "minLength": 1,
-                                "format": "uri"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "OGX URL",
-                        "description": "URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL."
-                    },
-                    "api_key": {
-                        "anyOf": [
-                            {
-                                "type": "string",
-                                "format": "password",
-                                "writeOnly": true
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "API key",
-                        "description": "API key to access OGX service"
-                    },
-                    "use_as_library_client": {
-                        "anyOf": [
-                            {
-                                "type": "boolean"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Use as library",
-                        "description": "When set to true OGX will be used in library mode, not in server mode (default)"
-                    },
-                    "library_client_config_path": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "OGX configuration path (legacy, deprecated)",
-                        "description": "Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.7 \u2014 use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config."
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0.0,
-                        "title": "Request timeout",
-                        "description": "Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
-                        "default": 180
-                    },
-                    "max_retries": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0.0,
-                        "title": "Maximum number of connection attempts before giving up",
-                        "description": "Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
-                        "default": 5
-                    },
-                    "retry_delay": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0.0,
-                        "title": "Delay in seconds between retry attempts",
-                        "description": "Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
-                        "default": 2
-                    },
-                    "allow_degraded_mode": {
-                        "anyOf": [
-                            {
-                                "type": "boolean"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Allow degraded mode",
-                        "description": "If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only)",
-                        "default": false
-                    },
-                    "config": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/components/schemas/UnifiedLlamaStackConfig"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Unified OGX configuration",
-                        "description": "Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required."
-                    }
-                },
-                "additionalProperties": false,
-                "type": "object",
-                "title": "LlamaStackConfiguration",
-                "description": "OGX configuration.\n\nOGX is a comprehensive system that provides a uniform set of tools\nfor building, scaling, and deploying generative AI applications, enabling\ndevelopers to create, integrate, and orchestrate multiple AI services and\ncapabilities into an adaptable setup.\n\nUseful resources:\n\n  - [OGX](https://www.llama.com/products/llama-stack/)\n  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)\n  - [Build AI Applications with OGX](https://llamastack.github.io/)"
             },
             "MCPClientAuthOptionsResponse": {
                 "properties": {
@@ -16017,6 +15972,112 @@
                 "title": "ObservabilityConfiguration",
                 "description": "OpenTelemetry observability configuration.\n\nThis configuration is automatically populated from OTEL_* environment variables\nto provide visibility into the active tracing setup.\n\nAttributes:\n    otel: Dictionary of OTEL_* environment variables with secrets redacted."
             },
+            "OgxConfiguration": {
+                "properties": {
+                    "url": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "minLength": 1,
+                                "format": "uri"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "OGX URL",
+                        "description": "URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL."
+                    },
+                    "api_key": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "password",
+                                "writeOnly": true
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "API key",
+                        "description": "API key to access OGX service"
+                    },
+                    "use_as_library_client": {
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Use as library",
+                        "description": "When set to true OGX will be used in library mode, not in server mode (default)"
+                    },
+                    "library_client_config_path": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "OGX configuration path (legacy, deprecated)",
+                        "description": "Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.8 \u2014 use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config."
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Request timeout",
+                        "description": "Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries.",
+                        "default": 180
+                    },
+                    "max_retries": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Maximum number of connection attempts before giving up",
+                        "description": "Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
+                        "default": 5
+                    },
+                    "retry_delay": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Delay in seconds between retry attempts",
+                        "description": "Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod).",
+                        "default": 2
+                    },
+                    "allow_degraded_mode": {
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Allow degraded mode",
+                        "description": "If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only)",
+                        "default": false
+                    },
+                    "config": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/UnifiedOgxConfig"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Unified OGX configuration",
+                        "description": "Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required."
+                    }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "OgxConfiguration",
+                "description": "OGX configuration.\n\nOGX is a comprehensive system that provides a uniform set of tools\nfor building, scaling, and deploying generative AI applications, enabling\ndevelopers to create, integrate, and orchestrate multiple AI services and\ncapabilities into an adaptable setup.\n\nUseful resources:\n\n  - [OGX](https://ogx-ai.github.io/)\n  - [Python OGX client](https://github.com/ogx-ai/ogx-client-python)\n  - [Build AI Applications with OGX](https://ogx-ai.github.io/)"
+            },
             "OkpConfiguration": {
                 "properties": {
                     "rhokp_url": {
@@ -16755,19 +16816,42 @@
                         "anyOf": [
                             {
                                 "type": "string",
-                                "pattern": "^low|medium|high$"
+                                "enum": [
+                                    "low",
+                                    "medium",
+                                    "high"
+                                ]
                             },
                             {
                                 "type": "null"
                             }
                         ],
-                        "title": "Search Context Size",
-                        "default": "medium"
+                        "title": "Search Context Size"
+                    },
+                    "filters": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/WebSearchFilters"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "user_location": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/WebSearchUserLocation"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
                 "title": "OpenAIResponseInputToolWebSearch",
-                "description": "Web search tool configuration for OpenAI response inputs.\n\n:param type: Web search tool type variant to use\n:param search_context_size: (Optional) Size of search context, must be \"low\", \"medium\", or \"high\""
+                "description": "Web search tool configuration for OpenAI response inputs."
             },
             "OpenAIResponseMCPApprovalRequest": {
                 "properties": {
@@ -17372,6 +17456,23 @@
                         "const": "web_search_call",
                         "title": "Type",
                         "default": "web_search_call"
+                    },
+                    "action": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/WebSearchActionSearch"
+                            },
+                            {
+                                "$ref": "#/components/schemas/WebSearchActionOpenPage"
+                            },
+                            {
+                                "$ref": "#/components/schemas/WebSearchActionFind"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Action"
                     }
                 },
                 "type": "object",
@@ -17380,7 +17481,7 @@
                     "status"
                 ],
                 "title": "OpenAIResponseOutputMessageWebSearchToolCall",
-                "description": "Web search tool call output message for OpenAI responses.\n\n:param id: Unique identifier for this tool call\n:param status: Current status of the web search operation\n:param type: Tool call type identifier, always \"web_search_call\""
+                "description": "Web search tool call output message for OpenAI responses."
             },
             "OpenAIResponsePrompt": {
                 "properties": {
@@ -17460,6 +17561,24 @@
                         ],
                         "title": "Effort"
                     },
+                    "generate_summary": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "auto",
+                                    "concise",
+                                    "detailed"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Generate Summary",
+                        "description": "Deprecated: use 'summary' instead.",
+                        "deprecated": true
+                    },
                     "summary": {
                         "anyOf": [
                             {
@@ -17508,7 +17627,8 @@
                                 "type": "null"
                             }
                         ],
-                        "title": "Verbosity"
+                        "title": "Verbosity",
+                        "default": "medium"
                     }
                 },
                 "type": "object",
@@ -21396,7 +21516,7 @@
                 },
                 "type": "object",
                 "title": "SearchRankingOptions",
-                "description": "Options for ranking and filtering search results.\n\nThis class configures how search results are ranked and filtered. You can use algorithm-based\nrerankers (weighted, RRF) or neural rerankers. Defaults from VectorStoresConfig are\nused when parameters are not provided.\n\nExamples:\n    # Weighted ranker with custom alpha\n    SearchRankingOptions(ranker=\"weighted\", alpha=0.7)\n\n    # RRF ranker with custom impact factor\n    SearchRankingOptions(ranker=\"rrf\", impact_factor=50.0)\n\n    # Use config defaults (just specify ranker type)\n    SearchRankingOptions(ranker=\"weighted\")  # Uses alpha from VectorStoresConfig\n\n    # Score threshold filtering\n    SearchRankingOptions(ranker=\"weighted\", score_threshold=0.5)\n\n:param ranker: (Optional) Name of the ranking algorithm to use. Supported values:\n    - \"weighted\": Weighted combination of vector and keyword scores\n    - \"rrf\": Reciprocal Rank Fusion algorithm\n    - \"neural\": Neural reranking model (requires model parameter)\n    Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.\n:param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0\n:param alpha: (Optional) Weight factor for weighted ranker (0-1).\n    - 0.0 = keyword only\n    - 0.5 = equal weight (default)\n    - 1.0 = vector only\n    Only used when ranker=\"weighted\" and weights is not provided.\n    Falls back to VectorStoresConfig.chunk_retrieval_params.weighted_search_alpha if not provided.\n:param impact_factor: (Optional) Impact factor (k) for RRF algorithm.\n    Lower values emphasize higher-ranked results. Default: 60.0 (optimal from research).\n    Only used when ranker=\"rrf\".\n    Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.\n:param weights: (Optional) Dictionary of weights for combining different signal types.\n    Keys can be \"vector\", \"keyword\", \"neural\". Values should sum to 1.0.\n    Used when combining algorithm-based reranking with neural reranking.\n    Example: {\"vector\": 0.3, \"keyword\": 0.3, \"neural\": 0.4}\n:param model: (Optional) Model identifier for neural reranker (e.g., \"transformers/Qwen/Qwen3-Reranker-0.6B\").\n    Required when ranker=\"neural\" or when weights contains \"neural\"."
+                "description": "Options for ranking and filtering search results.\n\nThis class configures how search results are ranked and filtered. You can use algorithm-based\nrerankers (weighted, RRF) or neural rerankers. Defaults from VectorStoresConfig are\nused when parameters are not provided.\n\nExamples:\n    # Weighted ranker with custom alpha\n    SearchRankingOptions(ranker=\"weighted\", alpha=0.7)\n\n    # RRF ranker with custom impact factor\n    SearchRankingOptions(ranker=\"rrf\", impact_factor=50.0)\n\n    # Use config defaults (just specify ranker type)\n    SearchRankingOptions(ranker=\"weighted\")  # Uses alpha from VectorStoresConfig\n\n    # Score threshold filtering\n    SearchRankingOptions(ranker=\"weighted\", score_threshold=0.5)\n\n:param ranker: (Optional) Name of the ranking algorithm to use. Supported values:\n    - \"weighted\": Weighted combination of vector and keyword scores\n    - \"rrf\": Reciprocal Rank Fusion algorithm\n    - \"neural\": Neural reranking model (requires model parameter)\n    Note: For OpenAI API compatibility, any string value is accepted, but only the above values are supported.\n:param score_threshold: (Optional) Minimum relevance score threshold for results. Default: 0.0\n:param alpha: (Optional) Weight factor for weighted ranker (0-1).\n    - 0.0 = keyword only\n    - 0.5 = equal weight (default)\n    - 1.0 = vector only\n    Only used when ranker=\"weighted\" and weights is not provided.\n    Falls back to VectorStoresConfig.chunk_retrieval_params.weighted_search_alpha if not provided.\n:param impact_factor: (Optional) Impact factor (k) for RRF algorithm.\n    Lower values emphasize higher-ranked results. Default: 60.0 (optimal from research).\n    Only used when ranker=\"rrf\".\n    Falls back to VectorStoresConfig.chunk_retrieval_params.rrf_impact_factor if not provided.\n:param weights: (Optional) Dictionary of weights for combining different signal types.\n    Keys can be \"vector\", \"keyword\", \"neural\". Values should sum to 1.0.\n    Used when combining algorithm-based reranking with neural reranking.\n    Example: {\"vector\": 0.3, \"keyword\": 0.3, \"neural\": 0.4}\n:param model: (Optional) Model identifier for neural reranker\n    (e.g., \"sentence-transformers/Qwen/Qwen3-Reranker-0.6B\"). Required when ranker=\"neural\" or when\n    weights contains \"neural\"."
             },
             "SecurityScheme": {
                 "anyOf": [
@@ -21457,6 +21577,26 @@
                         "title": "Number of workers",
                         "description": "Number of Uvicorn worker processes to start",
                         "default": 1
+                    },
+                    "max_concurrent_file_uploads": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Maximum concurrent file uploads",
+                        "description": "Maximum number of file uploads (POST /v1/files) processed concurrently per worker. Each in-flight upload can hold up to the configured maximum file size in memory, so this bounds worst-case memory usage from concurrent uploads. Additional uploads are rejected with 429 until a slot frees up.",
+                        "default": 5
+                    },
+                    "max_concurrent_vector_store_attaches": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Maximum concurrent vector store file attachments",
+                        "description": "Maximum number of vector store file attachments (POST /v1/vector-stores/{id}/files) processed concurrently per worker. Each in-flight attachment re-reads and chunks the source file, so this bounds worst-case memory usage independently of max_concurrent_file_uploads. Additional attachments are rejected with 429 until a slot frees up.",
+                        "default": 5
+                    },
+                    "delete_file_after_vector_store_attach": {
+                        "type": "boolean",
+                        "title": "Delete file after vector store attach",
+                        "description": "When true, deletes a file (POST /v1/files) once it has been successfully attached to a vector store, since the vector store keeps its own chunked/embedded copy of the content. Defaults to false to match the OpenAI Files API, where a file remains reusable across multiple vector stores until the caller explicitly deletes it - enabling this makes attached files single-use: re-attaching the same file_id to another vector store will fail once it has been deleted.",
+                        "default": false
                     },
                     "color_log": {
                         "type": "boolean",
@@ -21948,6 +22088,42 @@
                 "title": "TLSConfiguration",
                 "description": "TLS configuration.\n\nTransport Layer Security (TLS) is a cryptographic protocol designed to\nprovide communications security over a computer network, such as the\nInternet. The protocol is widely used in applications such as email,\ninstant messaging, and voice over IP, but its use in securing HTTPS remains\nthe most publicly visible.\n\nUseful resources:\n\n  - [FastAPI HTTPS Deployment](https://fastapi.tiangolo.com/deployment/https/)\n  - [Transport Layer Security Overview](https://en.wikipedia.org/wiki/Transport_Layer_Security)\n  - [What is TLS](https://www.ssltrust.eu/learning/ssl/transport-layer-security-tls)"
             },
+            "TooManyConcurrentRequestsResponse": {
+                "properties": {
+                    "status_code": {
+                        "type": "integer",
+                        "title": "Status Code",
+                        "description": "HTTP status code for the errors response"
+                    },
+                    "detail": {
+                        "$ref": "#/components/schemas/DetailModel",
+                        "description": "The detail model containing error summary and cause"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status_code",
+                    "detail"
+                ],
+                "title": "TooManyConcurrentRequestsResponse",
+                "description": "429 Too Many Requests - concurrency limit exceeded.",
+                "examples": [
+                    {
+                        "detail": {
+                            "cause": "The maximum number of concurrent file uploads has been reached.",
+                            "response": "Too many concurrent file uploads"
+                        },
+                        "label": "file upload"
+                    },
+                    {
+                        "detail": {
+                            "cause": "The maximum number of concurrent vector store file attachments has been reached.",
+                            "response": "Too many concurrent vector store file attachments"
+                        },
+                        "label": "vector store attach"
+                    }
+                ]
+            },
             "ToolCallSummary": {
                 "properties": {
                     "id": {
@@ -22268,7 +22444,7 @@
                 "title": "UnifiedInferenceProvider",
                 "description": "A high-level inference provider entry for unified-mode synthesis.\n\nOperators describe inference providers at this high level (backend-agnostic\nvocabulary) instead of authoring raw OGX provider blocks. The\nsynthesizer (`apply_high_level_inference`) expands each entry into an OGX\n`providers.inference` entry, mapping `type` to a `provider_type` and\nemitting `${env.<VAR>}` references for secrets (never literal values).\n\nAttributes:\n    type: Canonical provider identifier. Vendor-neutral so it survives a\n        future backend change; each backend-specific synthesizer maps it to\n        its own provider vocabulary.\n    id: Optional identifier emitted as the OGX provider_id. When\n        omitted, synthesized as type with underscores hyphenated. If set,\n        must be non-empty after stripping whitespace and may contain only\n        lowercase letters, digits, underscores, and hyphens.\n    api_key_env: Name of the environment variable holding the provider API\n        key. Emitted verbatim as `${env.<name>}` so the secret never lands\n        on disk resolved.\n    allowed_models: Optional allow-list of model identifiers passed through\n        to the synthesized provider config.\n    extra: Additional provider-config keys merged verbatim into the\n        synthesized provider's `config` block \u2014 an escape hatch for\n        provider-specific knobs not modeled here."
             },
-            "UnifiedLlamaStackConfig": {
+            "UnifiedOgxConfig": {
                 "properties": {
                     "baseline": {
                         "type": "string",
@@ -22302,7 +22478,7 @@
                 },
                 "additionalProperties": false,
                 "type": "object",
-                "title": "UnifiedLlamaStackConfig",
+                "title": "UnifiedOgxConfig",
                 "description": "Backend-specific knobs for unified-mode OGX synthesis.\n\nPer Decision S5 of the design spike, backend-agnostic high-level sections\n(inference, ...) live at the configuration root, not here. This block holds\nonly the OGX-specific synthesis controls: which baseline to start\nfrom, an optional profile file, and a raw native_override escape hatch.\n\nAttributes:\n    baseline: Synthesis starting point. \"default\" begins from LCORE's\n        built-in baseline (src/data/default_run.yaml) including the\n        conditional OpenAI inference provider. \"byo-llm\" begins from the\n        same file with that OpenAI row removed. \"empty\" begins from an\n        empty dict (used by the migration tool for an exact round-trip).\n        Ignored when `profile` is set.\n    profile: Optional path to a user-authored run.yaml-shaped file used as\n        the synthesis baseline. Relative paths resolve against the directory\n        of the loaded lightspeed-stack.yaml.\n    native_override: Raw OGX schema deep-merged last (maps merge\n        recursively, lists and scalars replace). The escape hatch for\n        anything the high-level sections do not express."
             },
             "UnprocessableEntityResponse": {
@@ -22814,19 +22990,7 @@
                     "attributes": {
                         "anyOf": [
                             {
-                                "additionalProperties": {
-                                    "anyOf": [
-                                        {
-                                            "type": "string"
-                                        },
-                                        {
-                                            "type": "number"
-                                        },
-                                        {
-                                            "type": "boolean"
-                                        }
-                                    ]
-                                },
+                                "additionalProperties": true,
                                 "type": "object"
                             },
                             {
@@ -23140,6 +23304,201 @@
                         "object": "list"
                     }
                 ]
+            },
+            "WebSearchActionFind": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "const": "find_in_page",
+                        "title": "Type",
+                        "default": "find_in_page"
+                    },
+                    "url": {
+                        "type": "string",
+                        "title": "Url"
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "title": "Pattern"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "url",
+                    "pattern"
+                ],
+                "title": "WebSearchActionFind",
+                "description": "Web search action: searches for a pattern within a loaded page."
+            },
+            "WebSearchActionOpenPage": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "const": "open_page",
+                        "title": "Type",
+                        "default": "open_page"
+                    },
+                    "url": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Url"
+                    }
+                },
+                "type": "object",
+                "title": "WebSearchActionOpenPage",
+                "description": "Web search action: opens a specific URL from search results."
+            },
+            "WebSearchActionSearch": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "const": "search",
+                        "title": "Type",
+                        "default": "search"
+                    },
+                    "query": {
+                        "type": "string",
+                        "title": "Query"
+                    },
+                    "queries": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Queries"
+                    },
+                    "sources": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "$ref": "#/components/schemas/WebSearchSource"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Sources"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "query"
+                ],
+                "title": "WebSearchActionSearch",
+                "description": "Web search action: performs a search query."
+            },
+            "WebSearchFilters": {
+                "properties": {
+                    "allowed_domains": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Allowed Domains"
+                    }
+                },
+                "type": "object",
+                "title": "WebSearchFilters",
+                "description": "Domain filters for web search results."
+            },
+            "WebSearchSource": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "const": "url",
+                        "title": "Type",
+                        "default": "url"
+                    },
+                    "url": {
+                        "type": "string",
+                        "title": "Url"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "url"
+                ],
+                "title": "WebSearchSource",
+                "description": "A source URL returned by a web search action."
+            },
+            "WebSearchUserLocation": {
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "const": "approximate",
+                        "title": "Type",
+                        "default": "approximate"
+                    },
+                    "city": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "City"
+                    },
+                    "country": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Country"
+                    },
+                    "region": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Region"
+                    },
+                    "timezone": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Timezone"
+                    }
+                },
+                "type": "object",
+                "title": "WebSearchUserLocation",
+                "description": "Approximate user location to refine web search results."
             }
         }
     },

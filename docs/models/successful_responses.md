@@ -358,9 +358,9 @@ Global service configuration.
 | Field | Type | Description |
 |-------|------|-------------|
 | name | string | Name of the service. That value will be used in REST API endpoints. |
-| config_format_version | string | Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or a llama_stack.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11). |
+| config_format_version | string | Optional explicit marker of the configuration format. When set, it must agree with the shape detected from the configuration body: 'unified' requires a synthesis input (a non-empty inference.providers, a non-empty vector_store.providers, or an ogx.config block), 'legacy' requires no synthesis input. Reserved as the lever for a future breaking change of the unified schema (R11). |
 | service |  | This section contains Lightspeed Core Stack service configuration. |
-| llama_stack |  | This section contains OGX configuration. Lightspeed Core Stack service can call OGX in library mode or in server mode. |
+| ogx |  | This section contains OGX configuration. Lightspeed Core Stack service can call OGX in library mode or in server mode. |
 | user_data_collection |  | This section contains configuration for subsystem that collects user data(transcription history and feedbacks). |
 | database |  | Configuration for database to store conversation IDs and other runtime data |
 | mcp_servers | array | MCP (Model Context Protocol) servers provide tools and capabilities to the AI agents. These are configured in this section. Only MCP servers defined in the lightspeed-stack.yaml configuration are available to the agents. Tools configured in the OGX run.yaml are not accessible to lightspeed-core agents. |
@@ -397,6 +397,12 @@ Attributes:
 | Field | Type | Description |
 |-------|------|-------------|
 | configuration |  |  |
+
+
+## ContextStatus
+
+
+
 
 
 ## ConversationData
@@ -746,14 +752,14 @@ Model representing a response to an info request.
 Attributes:
     name: Service name.
     service_version: Service version.
-    llama_stack_version: OGX version.
+    ogx_version: OGX version.
 
 
 | Field | Type | Description |
 |-------|------|-------------|
 | name | string | Service name |
 | service_version | string | Service version |
-| llama_stack_version | string | OGX version |
+| ogx_version | string | OGX version |
 
 
 ## JsonPathOperator
@@ -840,36 +846,6 @@ Attributes:
 | Field | Type | Description |
 |-------|------|-------------|
 | alive | boolean | Flag indicating that the app is alive |
-
-
-## LlamaStackConfiguration
-
-
-OGX configuration.
-
-OGX is a comprehensive system that provides a uniform set of tools
-for building, scaling, and deploying generative AI applications, enabling
-developers to create, integrate, and orchestrate multiple AI services and
-capabilities into an adaptable setup.
-
-Useful resources:
-
-  - [OGX](https://www.llama.com/products/llama-stack/)
-  - [Python OGX client](https://github.com/llamastack/llama-stack-client-python)
-  - [Build AI Applications with OGX](https://llamastack.github.io/)
-
-
-| Field | Type | Description |
-|-------|------|-------------|
-| url | string | URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL. |
-| api_key | string | API key to access OGX service |
-| use_as_library_client | boolean | When set to true OGX will be used in library mode, not in server mode (default) |
-| library_client_config_path | string | Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.7 — use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config. |
-| timeout | integer | Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
-| max_retries | integer | Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
-| retry_delay | integer | Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
-| allow_degraded_mode | boolean | If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only) |
-| config |  | Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required. |
 
 
 ## MCPClientAuthOptionsResponse
@@ -1059,6 +1035,36 @@ Attributes:
 | Field | Type | Description |
 |-------|------|-------------|
 | otel | object | Active OpenTelemetry configuration from OTEL_* environment variables |
+
+
+## OgxConfiguration
+
+
+OGX configuration.
+
+OGX is a comprehensive system that provides a uniform set of tools
+for building, scaling, and deploying generative AI applications, enabling
+developers to create, integrate, and orchestrate multiple AI services and
+capabilities into an adaptable setup.
+
+Useful resources:
+
+  - [OGX](https://ogx-ai.github.io/)
+  - [Python OGX client](https://github.com/ogx-ai/ogx-client-python)
+  - [Build AI Applications with OGX](https://ogx-ai.github.io/)
+
+
+| Field | Type | Description |
+|-------|------|-------------|
+| url | string | URL to OGX service; used when library mode is disabled. Must be a valid HTTP or HTTPS URL. |
+| api_key | string | API key to access OGX service |
+| use_as_library_client | boolean | When set to true OGX will be used in library mode, not in server mode (default) |
+| library_client_config_path | string | Path to configuration file used when OGX is run in library mode. DEPRECATED legacy two-file setup: logs a startup warning since 0.6 and is removed in 0.8 — use unified mode instead (the config block below, and/or the root-level inference.providers section); migrate with lightspeed-stack --migrate-config. |
+| timeout | integer | Timeout in seconds for requests to OGX service. Default is 180 seconds (3 minutes) to accommodate long-running RAG queries. |
+| max_retries | integer | Maximum number of connection attempts before giving up. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
+| retry_delay | integer | Delay in seconds between retry attempts. Used on startup to connect to OGX and retrieve its version. Connection attempts are retried with a fixed delay to handle the case where OGX is still starting up (e.g., when running as a sidecar in the same pod). |
+| allow_degraded_mode | boolean | If enabled, Lightspeed Core can be started even when OGX is not accessible (valid for server mode only) |
+| config |  | Backend-specific knobs for unified mode, where LCORE synthesizes the OGX run.yaml instead of reading an external file. Holds the baseline selector, an optional profile path, and a raw native_override escape hatch. Backend-agnostic high-level sections (e.g. inference.providers) live at the configuration root, not here. Mutually exclusive with library_client_config_path; that cross-field check lives on the root Configuration model. When set in library mode, library_client_config_path is not required. |
 
 
 ## OkpConfiguration
@@ -1933,6 +1939,8 @@ Attributes:
     tool_calls: List of tool calls made during response generation.
     tool_results: List of tool results.
     truncated: Whether conversation history was truncated.
+    context_status: Whether the conversation context was sent in full
+        ("full") or older turns were replaced by a summary ("summarized").
     input_tokens: Number of tokens sent to LLM.
     output_tokens: Number of tokens received from LLM.
     available_quotas: Quota available as measured by all configured quota limiters.
@@ -1945,6 +1953,7 @@ Attributes:
 | rag_chunks | array | Deprecated: List of RAG chunks used to generate the response. |
 | referenced_documents | array | List of documents referenced in generating the response |
 | truncated | boolean | Deprecated: whether conversation history was truncated |
+| context_status |  | Context status: "full" (no compaction) or "summarized" (older turns replaced by a summary) |
 | input_tokens | integer | Number of tokens sent to LLM |
 | output_tokens | integer | Number of tokens received from LLM |
 | available_quotas | object | Quota available as measured by all configured quota limiters |
@@ -2589,6 +2598,9 @@ the service can handle requests concurrently.
 | base_url | string | Externally reachable base URL for the service; needed for A2A support. |
 | auth_enabled | boolean | Enables the authentication subsystem |
 | workers | integer | Number of Uvicorn worker processes to start |
+| max_concurrent_file_uploads | integer | Maximum number of file uploads (POST /v1/files) processed concurrently per worker. Each in-flight upload can hold up to the configured maximum file size in memory, so this bounds worst-case memory usage from concurrent uploads. Additional uploads are rejected with 429 until a slot frees up. |
+| max_concurrent_vector_store_attaches | integer | Maximum number of vector store file attachments (POST /v1/vector-stores/{id}/files) processed concurrently per worker. Each in-flight attachment re-reads and chunks the source file, so this bounds worst-case memory usage independently of max_concurrent_file_uploads. Additional attachments are rejected with 429 until a slot frees up. |
+| delete_file_after_vector_store_attach | boolean | When true, deletes a file (POST /v1/files) once it has been successfully attached to a vector store, since the vector store keeps its own chunked/embedded copy of the content. Defaults to false to match the OpenAI Files API, where a file remains reusable across multiple vector stores until the caller explicitly deletes it - enabling this makes attached files single-use: re-attaching the same file_id to another vector store will fail once it has been deleted. |
 | color_log | boolean | Enables colorized logging |
 | access_log | boolean | Enables logging of all access information |
 | tls_config |  | Transport Layer Security configuration for HTTPS support |
@@ -2821,8 +2833,8 @@ A high-level inference provider entry for unified-mode synthesis.
 
 Operators describe inference providers at this high level (backend-agnostic
 vocabulary) instead of authoring raw OGX provider blocks. The
-synthesizer (`apply_high_level_inference`) expands each entry into a Llama
-Stack `providers.inference` entry, mapping `type` to a `provider_type` and
+synthesizer (`apply_high_level_inference`) expands each entry into an OGX
+`providers.inference` entry, mapping `type` to a `provider_type` and
 emitting `${env.<VAR>}` references for secrets (never literal values).
 
 Attributes:
@@ -2852,7 +2864,7 @@ Attributes:
 | extra | object | Additional provider-config keys merged verbatim into the synthesized provider's config block. |
 
 
-## UnifiedLlamaStackConfig
+## UnifiedOgxConfig
 
 
 Backend-specific knobs for unified-mode OGX synthesis.

@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException, Request, status
-from ogx_client import APIConnectionError
-from ogx_client.types import VersionInfo
+from ogx_client import ApiException
+from ogx_client.models.version_info import VersionInfo
 from pytest_mock import AsyncMockType, MockerFixture
 
 from app.endpoints.info import info_endpoint_handler
@@ -80,7 +80,7 @@ async def test_info_endpoint_returns_service_information(
     # Verify values from real configuration
     assert response.name == "foo bar baz"  # From lightspeed-stack.yaml
     assert response.service_version == __version__
-    assert response.llama_stack_version == "0.2.22"
+    assert response.ogx_version == "0.2.22"
 
     # Verify the OGX client was called
     mock_ogx_client.inspect.version.assert_called_once()
@@ -92,7 +92,6 @@ async def test_info_endpoint_handles_connection_error(
     mock_ogx_client: AsyncMockType,
     test_request: Request,
     test_auth: AuthTuple,
-    mocker: MockerFixture,
 ) -> None:
     """Test that info endpoint properly handles OGX connection errors.
 
@@ -107,14 +106,11 @@ async def test_info_endpoint_handles_connection_error(
         mock_ogx_client: Mocked OGX client
         test_request: FastAPI request
         test_auth: noop authentication tuple
-        mocker: pytest-mock fixture for creating mocks
     """
     # test_config fixture loads configuration, which is required for the endpoint
     _ = test_config
     # Configure mock to raise connection error
-    mock_ogx_client.inspect.version.side_effect = APIConnectionError(
-        request=mocker.Mock()
-    )
+    mock_ogx_client.inspect.version.side_effect = ApiException(status=None)
 
     # Verify that HTTPException is raised
     with pytest.raises(HTTPException) as exc_info:

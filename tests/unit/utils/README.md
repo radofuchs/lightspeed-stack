@@ -20,10 +20,6 @@ Unit tests for functions defined in utils/checks module.
 
 Unit tests for utils/compaction — partitioning, prompt, summarization.
 
-## [test_config_dumper.py](test_config_dumper.py)
-
-Unit tests for utils/config_dumper module.
-
 ## [test_connection_decorator.py](test_connection_decorator.py)
 
 Unit tests for the connection decorator.
@@ -48,7 +44,7 @@ Unit tests for utils/input_sanitization.py.
 
 Unit tests for utils/json_schema_updater module.
 
-## [test_llama_stack_version.py](test_llama_stack_version.py)
+## [test_ogx_version.py](test_ogx_version.py)
 
 Unit tests for utility function to check OGX version.
 
@@ -71,10 +67,6 @@ Unit tests for MCP tool discovery utilities.
 ## [test_model_list.py](test_model_list.py)
 
 Unit tests for utils/model_list.py helpers.
-
-## [test_models_dumper.py](test_models_dumper.py)
-
-Unit tests for utils/models_dumper module.
 
 ## [test_otel_tracing.py](test_otel_tracing.py)
 

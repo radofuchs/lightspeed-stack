@@ -4,17 +4,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from ogx_api import ConversationNotFoundError, InvalidParameterError
-from ogx_client import (
-    APIConnectionError,
-    APIStatusError,
-)
+from ogx_client import ApiException
 from opentelemetry import trace
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import get_session
 from authentication import get_auth_dependency
 from authorization.middleware import authorize
-from client import AsyncOgxClientHolder
+from client.ogx import AsyncOgxClientHolder
 from configuration import configuration
 from log import get_logger
 from models.api.requests import ConversationUpdateRequest
@@ -53,7 +50,7 @@ from utils.endpoints import (
 from utils.suid import (
     check_suid,
     normalize_conversation_id,
-    to_llama_stack_conversation_id,
+    to_ogx_conversation_id,
 )
 
 logger = get_logger(__name__)
@@ -246,17 +243,17 @@ async def get_conversation_endpoint_handler(  # pylint: disable=too-many-locals,
             client = AsyncOgxClientHolder().get_client()
 
             # Convert to OGX format (add 'conv_' prefix if needed)
-            llama_stack_conv_id = to_llama_stack_conversation_id(normalized_conv_id)
+            ogx_conv_id = to_ogx_conversation_id(normalized_conv_id)
             logger.debug(
                 "Calling OGX list_items with conversation_id: %s",
-                llama_stack_conv_id,
+                ogx_conv_id,
             )
 
             # Retrieve turns metadata from database
             db_turns = retrieve_conversation_turns(normalized_conv_id)
 
             # Use Conversations API to retrieve conversation items
-            items = await get_all_conversation_items(client, llama_stack_conv_id)
+            items = await get_all_conversation_items(client, ogx_conv_id)
             if not items:
                 logger.error("No items found for conversation %s", conversation_id)
                 response = NotFoundResponse(
@@ -282,14 +279,21 @@ async def get_conversation_endpoint_handler(  # pylint: disable=too-many-locals,
                 chat_history=chat_history,
             )
 
-        except APIConnectionError as e:
-            logger.error("Unable to connect to OGX: %s", e)
-            response = ServiceUnavailableResponse(
-                backend_name="OGX", cause=str(e)
+        except ApiException as e:
+            if not e.status:
+                logger.error("Unable to connect to OGX: %s", e)
+                response = ServiceUnavailableResponse(
+                    backend_name="OGX",
+                ).model_dump()
+                raise HTTPException(**response) from e
+            # In library mode, ConversationNotFoundError is raised instead of ApiException
+            logger.error("Conversation not found: %s", e)
+            response = NotFoundResponse(
+                resource="conversation", resource_id=normalized_conv_id
             ).model_dump()
             raise HTTPException(**response) from e
-
-        except (APIStatusError, ConversationNotFoundError) as e:
+        except ConversationNotFoundError as e:
+            # In library mode, ConversationNotFoundError is raised instead of ApiException
             logger.error("Conversation not found: %s", e)
             response = NotFoundResponse(
                 resource="conversation", resource_id=normalized_conv_id
@@ -383,23 +387,28 @@ async def delete_conversation_endpoint_handler(
             client = AsyncOgxClientHolder().get_client()
 
             # Convert to OGX format (add 'conv_' prefix if needed)
-            llama_stack_conv_id = to_llama_stack_conversation_id(normalized_conv_id)
+            ogx_conv_id = to_ogx_conversation_id(normalized_conv_id)
 
             # Use Conversations API to delete the conversation
             delete_response = await client.conversations.delete(
-                conversation_id=llama_stack_conv_id
+                conversation_id=ogx_conv_id
             )
             logger.info(
                 "Remote deletion of %s: success=%s",
                 normalized_conv_id,
                 delete_response.deleted,
             )
-
-        except APIConnectionError as e:
-            response = ServiceUnavailableResponse(backend_name="OGX", cause=str(e))
-            raise HTTPException(**response.model_dump()) from e
-
-        except (APIStatusError, ConversationNotFoundError, InvalidParameterError):
+        except ApiException as e:
+            if not e.status:
+                response = ServiceUnavailableResponse(backend_name="OGX")
+                raise HTTPException(**response.model_dump()) from e
+            # In library mode, ConversationNotFoundError is raised instead of ApiException
+            logger.warning(
+                "Conversation %s in OGX not found. Treating as already deleted.",
+                normalized_conv_id,
+            )
+        except (ConversationNotFoundError, InvalidParameterError):
+            # In library mode, ConversationNotFoundError is raised instead of ApiException
             logger.warning(
                 "Conversation %s in OGX not found. Treating as already deleted.",
                 normalized_conv_id,
@@ -418,7 +427,7 @@ async def delete_conversation_endpoint_handler(
     summary="Conversation Update Endpoint Handler V1",
 )
 @authorize(Action.UPDATE_CONVERSATION)
-async def update_conversation_endpoint_handler(
+async def update_conversation_endpoint_handler(  # pylint: disable=too-many-statements
     request: Request,
     conversation_id: str,
     update_request: ConversationUpdateRequest,
@@ -497,14 +506,14 @@ async def update_conversation_endpoint_handler(
             client = AsyncOgxClientHolder().get_client()
 
             # Convert to OGX format (add 'conv_' prefix if needed)
-            llama_stack_conv_id = to_llama_stack_conversation_id(normalized_conv_id)
+            ogx_conv_id = to_ogx_conversation_id(normalized_conv_id)
 
             # Prepare metadata with topic summary
             metadata = {"topic_summary": update_request.topic_summary}
 
             # Use Conversations API to update the conversation metadata
             await client.conversations.update(
-                conversation_id=llama_stack_conv_id,
+                conversation_id=ogx_conv_id,
                 metadata=metadata,
             )
 
@@ -536,13 +545,20 @@ async def update_conversation_endpoint_handler(
                 message="Topic summary updated successfully",
             )
 
-        except APIConnectionError as e:
-            response = ServiceUnavailableResponse(
-                backend_name="OGX", cause=str(e)
+        except ApiException as e:
+            if not e.status:
+                response = ServiceUnavailableResponse(
+                    backend_name="OGX",
+                ).model_dump()
+                raise HTTPException(**response) from e
+            # In library mode, ConversationNotFoundError is raised instead of ApiException
+            logger.error("Conversation not found: %s", e)
+            response = NotFoundResponse(
+                resource="conversation", resource_id=normalized_conv_id
             ).model_dump()
             raise HTTPException(**response) from e
-
-        except (APIStatusError, ConversationNotFoundError) as e:
+        except ConversationNotFoundError as e:
+            # In library mode, ConversationNotFoundError is raised instead of ApiException
             logger.error("Conversation not found: %s", e)
             response = NotFoundResponse(
                 resource="conversation", resource_id=normalized_conv_id

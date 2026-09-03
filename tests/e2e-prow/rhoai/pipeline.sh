@@ -13,7 +13,7 @@ export NAMESPACE
 MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# RHOAI OGX image (unused when building from source via llama-stack-openai.yaml)
+# RHOAI OGX image (unused when building from source via ogx-openai.yaml)
 # LLAMA_STACK_IMAGE="${LLAMA_STACK_IMAGE:-quay.io/rhoai/odh-llama-stack-core-rhel9:rhoai-3.4-ea.2}"
 # echo "Using OGX image: $LLAMA_STACK_IMAGE"
 # export LLAMA_STACK_IMAGE
@@ -229,9 +229,9 @@ oc new-build --name=llama-stack-e2e \
   --to="llama-stack-e2e:latest" \
   -n "$NAMESPACE" 2>/dev/null || echo "BuildConfig llama-stack-e2e already exists"
 
-# Patch BuildConfig to use deploy/llama-stack/test.containerfile instead of Dockerfile
+# Patch BuildConfig to use deploy/ogx/test.containerfile instead of Dockerfile
 oc patch bc llama-stack-e2e -n "$NAMESPACE" --type=json \
-  -p '[{"op":"replace","path":"/spec/strategy/dockerStrategy/dockerfilePath","value":"deploy/llama-stack/test.containerfile"}]' 2>/dev/null || true
+  -p '[{"op":"replace","path":"/spec/strategy/dockerStrategy/dockerfilePath","value":"deploy/ogx/test.containerfile"}]' 2>/dev/null || true
 
 # Build from repo root
 oc start-build llama-stack-e2e \

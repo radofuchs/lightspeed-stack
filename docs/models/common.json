@@ -46,7 +46,8 @@
                         "examples": [
                             "text/plain",
                             "image/jpeg",
-                            "image/png"
+                            "image/png",
+                            "image/webp"
                         ],
                         "title": "Content Type",
                         "type": "string"
@@ -1912,7 +1913,7 @@
                 "type": "object"
             },
             "TurnSummary": {
-                "description": "Summary of a turn in llama stack.",
+                "description": "Summary of a turn in OGX.",
                 "properties": {
                     "id": {
                         "default": "",

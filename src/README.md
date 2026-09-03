@@ -4,10 +4,6 @@
 
 Main classes for the Lightspeed Core Stack REST API service.
 
-## [client.py](client.py)
-
-OGX client retrieval class.
-
 ## [configuration.py](configuration.py)
 
 Configuration loader.
@@ -20,17 +16,13 @@ Constants used in business logic.
 
 Entry point to the Lightspeed Core Stack REST API service.
 
-## [llama_stack_configuration.py](llama_stack_configuration.py)
+## [ogx_configuration.py](ogx_configuration.py)
 
 OGX configuration enrichment and synthesis.
 
 ## [log.py](log.py)
 
 Log utilities.
-
-## [sentry.py](sentry.py)
-
-Sentry error tracking initialization and configuration.
 
 ## [version.py](version.py)
 

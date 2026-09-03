@@ -3,7 +3,7 @@
 from typing import Any
 
 import pytest
-from ogx_client import APIConnectionError
+from ogx_client import ApiException
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
@@ -213,7 +213,7 @@ class TestGetProvidersHealthStatuses:
         - unhealthy_provider: status ERROR, message "Connection failed"
         """
         # Mock the imports
-        mock_lsc = mocker.patch("client.AsyncOgxClientHolder.get_client")
+        mock_lsc = mocker.patch("client.ogx.AsyncOgxClientHolder.get_client")
 
         # Mock the client and its methods
         mock_client = mocker.AsyncMock()
@@ -267,19 +267,18 @@ class TestGetProvidersHealthStatuses:
     ) -> None:
         """Test get_providers_health_statuses when connection fails."""
         # Mock the imports
-        mock_lsc = mocker.patch("client.AsyncOgxClientHolder.get_client")
+        mock_lsc = mocker.patch("client.ogx.AsyncOgxClientHolder.get_client")
 
         # Mock get_ogx_client to raise an exception
-        mock_lsc.side_effect = APIConnectionError(request=mocker.Mock())
+        mock_lsc.side_effect = ApiException(status=None, reason="Connection error.")
 
         result = await get_providers_health_statuses()
 
         assert len(result) == 1
         assert result[0].provider_id == "unknown"
         assert result[0].status == HealthStatus.ERROR.value
-        assert (
-            result[0].message == "Failed to initialize health check: Connection error."
-        )
+        assert result[0].message.startswith("Failed to initialize health check:")
+        assert "Connection error." in (result[0].message or "")
 
 
 class TestCheckDefaultModelAvailable:

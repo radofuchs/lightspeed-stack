@@ -6,8 +6,8 @@ from typing import Final, Literal
 # will be able to detect assignements to such constants.
 
 # Minimal and maximal supported OGX version
-MINIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "0.2.17"
-MAXIMAL_SUPPORTED_LLAMA_STACK_VERSION: Final[str] = "1.0.2"
+MINIMAL_SUPPORTED_OGX_VERSION: Final[str] = "0.2.17"
+MAXIMAL_SUPPORTED_OGX_VERSION: Final[str] = "1.2.5"
 
 # Path to the lightspeed-stack.yaml, exported so uvicorn workers (separate
 # processes) can reload the configuration that the parent process selected.
@@ -53,11 +53,14 @@ ATTACHMENT_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
         "application/xml",
         "image/jpeg",
         "image/png",
+        "image/webp",
     }
 )
 
 # Image content types (subset of ATTACHMENT_CONTENT_TYPES)
-IMAGE_CONTENT_TYPES: Final[frozenset[str]] = frozenset({"image/jpeg", "image/png"})
+IMAGE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
+    {"image/jpeg", "image/png", "image/webp"}
+)
 
 # Default system prompt used only when no other system prompt is specified in
 # configuration file nor in the query request
@@ -199,7 +202,7 @@ CACHE_TYPE_POSTGRES: Final[str] = "postgres"
 CACHE_TYPE_NOOP: Final[str] = "noop"
 
 # BYOK RAG
-# Backends that have enrichment support in llama_stack_configuration.py
+# Backends that have enrichment support in ogx_configuration.py
 SUPPORTED_RAG_BACKENDS: Final[frozenset[str]] = frozenset({"faiss", "pgvector"})
 
 # Default RAG backend for bring-your-own-knowledge RAG configurations
