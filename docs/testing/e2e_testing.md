@@ -57,8 +57,7 @@ tests/e2e/
 ├── configs/                     # OGX run configs (run-ci.yaml, etc.)
 ├── utils/
 │   ├── utils.py                 # restart_container, switch_config, wait_for_container_health, etc.
-│   ├── prow_utils.py            # Prow/OpenShift helpers (restore_ogx_pod, etc.)
-│   └── ogx_utils.py             # Toolgroups + shield unregister/register (server mode, optional)
+│   └── prow_utils.py            # Prow/OpenShift helpers (restore_ogx_pod, etc.)
 ├── mock_mcp_server/             # Mock MCP server for MCP tests
 └── rag/                         # RAG test data (e.g. for FAISS)
 ```
@@ -179,7 +178,6 @@ All tag behaviour is implemented in **`features/environment.py`**: the hooks (`b
 | `@local`                        | Skipped unless running in "local" mode (context flag).                                                                                                  |
 | `@InvalidFeedbackStorageConfig` | Before scenario: switch to invalid-feedback-storage config and restart container. After: restore feature config and restart.                            |
 | `@NoCacheConfig`                | Before scenario: switch to no-cache config and restart. After: restore and restart.                                                                     |
-| `@disable-shields`              | (If used) Before scenario: unregister shield (e.g. llama-guard) via OGX API; after: re-register. **Server mode only**; skipped in library mode. |
 | `@Authorized`                   | Feature-level: use auth-noop-token config for the whole feature; restore in after_feature.                                                              |
 | `@RBAC`                         | Feature-level: use RBAC config; restore in after_feature.                                                                                               |
 | `@RHIdentity`                   | Feature-level: use RH identity config; restore in after_feature.                                                                                        |
