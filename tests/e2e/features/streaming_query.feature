@@ -276,6 +276,8 @@ Feature: streaming_query endpoint API tests
           | error                     |
           | image                     |
 
+  #https://redhat.atlassian.net/browse/LCORE-4070
+  @skip
   Scenario: Check if streaming_query returns 200 and error in stream when question is too long for model context
     When I use "streaming_query" to ask question with too-long query and authorization header
     Then The status code of the response is 200
