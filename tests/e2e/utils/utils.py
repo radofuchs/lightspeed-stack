@@ -276,6 +276,14 @@ def validate_json_partially(actual: Any, expected: Any) -> None:
 
     Extra elements/keys are ignored. Raises AssertionError if validation fails.
 
+    Tool call/result payloads (e.g. `content`, `args`) are frequently JSON
+    embedded as a string rather than a nested object. If both `actual` and
+    `expected` are strings that parse as JSON, they are compared structurally
+    (recursing with the same partial-match semantics) instead of by raw string
+    equality, so key ordering — which some tools/toolsets don't guarantee, e.g.
+    `pydantic_ai_skills`'s filesystem-order skill discovery — doesn't cause
+    spurious mismatches.
+
     Returns:
         None
 
@@ -302,8 +310,40 @@ def validate_json_partially(actual: Any, expected: Any) -> None:
                 matched
             ), f"No matching element found in list for schema item {schema_item}, got {actual}"
 
+    elif isinstance(expected, str) and isinstance(actual, str):
+        parsed_json = _try_parse_json_pair(actual, expected)
+        if parsed_json is not None:
+            actual_json, expected_json = parsed_json
+            validate_json_partially(actual_json, expected_json)
+        else:
+            assert (
+                actual == expected
+            ), f"Value mismatch: expected {expected}, got {actual}"
+
     else:
         assert actual == expected, f"Value mismatch: expected {expected}, got {actual}"
+
+
+def _try_parse_json_pair(actual: str, expected: str) -> Optional[tuple[Any, Any]]:
+    """Parse `actual` and `expected` as JSON if both succeed, else return None.
+
+    Only container JSON (dict/list) benefits from structural comparison;
+    scalars (e.g. a quoted number) are left to plain string equality.
+
+    Returns:
+        `(actual_json, expected_json)` if both strings parse to a dict or
+        list, otherwise `None`.
+    """
+    try:
+        actual_json = json.loads(actual)
+        expected_json = json.loads(expected)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if isinstance(actual_json, (dict, list)) and isinstance(
+        expected_json, (dict, list)
+    ):
+        return actual_json, expected_json
+    return None
 
 
 RESPONSES_SSE_TERMINAL_EVENT_TYPES = frozenset(
