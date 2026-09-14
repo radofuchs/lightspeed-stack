@@ -339,14 +339,14 @@ Storage config for a FAISS dynamic vector-store provider.
 Configuration for the Granite Guardian moderation guardrail.
 
 
-| Field       | Type    | Description                                  |
-|-------------|---------|----------------------------------------------|
-| url         | string  | The model_id to use for the guard            |
-| api_key     | string  | API key for the inference                    |
-| max_retries | integer | Maximun number of retires                    |
-| timeout     | integer | Request timeout in seconds                   |
-| verify_ssl  |         | SSL certificate verification                 |
-| risks | array | Risks to be considered while applying this guradrail |
+| Field       | Type    | Description                                          |
+|-------------|---------|------------------------------------------------------|
+| url         | string  | The model_id to use for the guard                    |
+| api_key     | string  | API key for the inference                            |
+| max_retries | integer | Maximun number of retires                            |
+| timeout     | integer | Request timeout in seconds                           |
+| verify_ssl  |         | SSL certificate verification                         |
+| risks       | array   | Risks to be considered while applying this guardrail |
 
 
 ## GraniteGuardianShieldConfiguration
