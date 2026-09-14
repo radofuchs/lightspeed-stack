@@ -14661,7 +14661,7 @@
                         "minimum": 0.0,
                         "exclusiveMinimum": 0.0,
                         "title": "Max retries",
-                        "description": "Maximun number of retires",
+                        "description": "Maximun number of retries",
                         "default": 2
                     },
                     "timeout": {
