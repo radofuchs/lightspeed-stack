@@ -3,7 +3,7 @@
 import asyncio
 import os
 from functools import lru_cache
-from typing import Annotated, Any, Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from ogx_client import ApiException, BadRequestError
@@ -43,6 +43,7 @@ from models.api.responses.successful import (
 from models.config import Action
 from utils.endpoints import check_configuration_loaded
 from utils.query import handle_known_apistatus_errors
+from utils.types import Responses
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["vector-stores"])
@@ -70,7 +71,7 @@ def _get_vector_store_attach_semaphore() -> asyncio.Semaphore:
 
 
 # Response schemas for OpenAPI documentation
-vector_stores_list_responses: dict[int | str, dict[str, Any]] = {
+vector_stores_list_responses: Responses = {
     200: VectorStoresListResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
@@ -80,7 +81,7 @@ vector_stores_list_responses: dict[int | str, dict[str, Any]] = {
     ),
 }
 
-vector_store_responses: dict[int | str, dict[str, Any]] = {
+vector_store_responses: Responses = {
     200: VectorStoreResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
@@ -91,7 +92,7 @@ vector_store_responses: dict[int | str, dict[str, Any]] = {
     ),
 }
 
-file_responses: dict[int | str, dict[str, Any]] = {
+file_responses: Responses = {
     200: FileResponse.openapi_response(),
     413: FileTooLargeResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
@@ -103,7 +104,7 @@ file_responses: dict[int | str, dict[str, Any]] = {
     ),
 }
 
-vector_store_file_responses: dict[int | str, dict[str, Any]] = {
+vector_store_file_responses: Responses = {
     200: VectorStoreFileResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
@@ -117,7 +118,7 @@ vector_store_file_responses: dict[int | str, dict[str, Any]] = {
     ),
 }
 
-vector_store_files_list_responses: dict[int | str, dict[str, Any]] = {
+vector_store_files_list_responses: Responses = {
     200: VectorStoreFilesListResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
@@ -128,7 +129,7 @@ vector_store_files_list_responses: dict[int | str, dict[str, Any]] = {
     ),
 }
 
-vector_store_delete_responses: dict[int | str, dict[str, Any]] = {
+vector_store_delete_responses: Responses = {
     200: VectorStoreDeleteResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
@@ -138,7 +139,7 @@ vector_store_delete_responses: dict[int | str, dict[str, Any]] = {
     ),
 }
 
-vector_store_file_delete_responses: dict[int | str, dict[str, Any]] = {
+vector_store_file_delete_responses: Responses = {
     200: VectorStoreFileDeleteResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(examples=UNAUTHORIZED_OPENAPI_EXAMPLES),
     403: ForbiddenResponse.openapi_response(examples=["endpoint"]),
