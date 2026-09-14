@@ -93,6 +93,7 @@ from utils.query import (
 )
 from utils.quota_utils import check_tokens_available, get_available_quotas
 from utils.responses import (
+    apply_reasoning_for_resolved_tools,
     build_tool_call_summary,
     build_turn_summary,
     check_model_configured,
@@ -562,11 +563,6 @@ async def handle_responses_with_tracing(  # pylint: disable=too-many-locals
     updated_request = responses_request.model_copy(deep=True)
     _ = responses_request
 
-    # Known LLS bug: https://redhat.atlassian.net/browse/LCORE-1583
-    if original_request.reasoning is not None:
-        logger.warning("reasoning is not yet supported in LCORE and will be ignored")
-        updated_request.reasoning = None
-
     check_configuration_loaded(configuration)
     started_at = datetime.now(UTC)
     rh_identity_context = get_rh_identity_context(request)
@@ -667,6 +663,12 @@ async def handle_responses_with_tracing(  # pylint: disable=too-many-locals
         token,
         mcp_headers,
         request.headers,
+    )
+    # Known LLS bug: https://redhat.atlassian.net/browse/LCORE-1583
+    updated_request.reasoning = apply_reasoning_for_resolved_tools(
+        original_request.reasoning,
+        updated_request.tools,
+        updated_request.model,
     )
 
     # Extract vector store IDs for Inline RAG context from the original request
