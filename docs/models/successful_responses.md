@@ -712,7 +712,7 @@ Configuration for the Granite Guardian moderation guardrail.
   - True: Verify using system CA bundle (default, recommended)
   - False: Disable verification (insecure, for dev only)
   - str: Path to custom CA bundle file (for internal PKI) |
-| risks | array | Risks to be considered while applying this guradrail |
+| risks | array | Risks to be considered while applying this guardrail |
 
 
 ## GraniteGuardianShieldConfiguration
