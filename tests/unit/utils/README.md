@@ -48,18 +48,6 @@ Unit tests for utils/json_schema_updater module.
 
 Unit tests for markdown repair utilities.
 
-## [test_mcp_auth_headers.py](test_mcp_auth_headers.py)
-
-Unit tests for MCP authorization headers utilities.
-
-## [test_mcp_headers.py](test_mcp_headers.py)
-
-Unit tests for MCP headers utility functions.
-
-## [test_mcp_tools.py](test_mcp_tools.py)
-
-Unit tests for MCP tool discovery utilities.
-
 ## [test_model_list.py](test_model_list.py)
 
 Unit tests for utils/model_list.py helpers.
