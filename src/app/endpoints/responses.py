@@ -116,6 +116,7 @@ from utils.suid import (
     normalize_conversation_id,
 )
 from utils.tool_formatter import translate_vector_store_ids_to_user_facing
+from utils.types import Responses
 from utils.vector_search import (
     append_inline_rag_context_to_responses_input,
     build_rag_context,
@@ -266,7 +267,7 @@ def _get_user_agent(request: Request) -> Optional[str]:
     return sanitized or None
 
 
-responses_response: dict[int | str, dict[str, Any]] = {
+responses_response: Responses = {
     200: ResponsesResponse.openapi_response(),
     401: UnauthorizedResponse.openapi_response(
         examples=UNAUTHORIZED_OPENAPI_EXAMPLES_WITH_MCP_OAUTH
