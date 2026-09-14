@@ -913,7 +913,7 @@
             "title": "Verify SSL"
           },
           "risks": {
-            "description": "Risks to be considered while applying this guradrail",
+            "description": "Risks to be considered while applying this guardrail",
             "items": {
               "$ref": "`#/components/schemas/`RiskDefinition"
             },

@@ -346,7 +346,7 @@ Configuration for the Granite Guardian moderation guardrail.
 | max_retries | integer | Maximun number of retries                            |
 | timeout     | integer | Request timeout in seconds                           |
 | verify_ssl  |         | SSL certificate verification                         |
-| risks       | array   | Risks to be considered while applying this guradrail |
+| risks       | array   | Risks to be considered while applying this guardrail |
 
 
 ## GraniteGuardianShieldConfiguration

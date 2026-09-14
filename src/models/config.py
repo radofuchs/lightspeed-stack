@@ -3246,7 +3246,7 @@ class GraniteGuardianConfig(ConfigurationBase):
     risks: list[RiskDefinition] = Field(
         ...,
         title="Defined risks",
-        description="Risks to be considered while applying this guradrail",
+        description="Risks to be considered while applying this guardrail",
     )
 
 
