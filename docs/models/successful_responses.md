@@ -706,7 +706,7 @@ Configuration for the Granite Guardian moderation guardrail.
 |-------|------|-------------|
 | url | string | The model_id to use for the guard |
 | api_key | string | API key for the inference |
-| max_retries | integer | Maximun number of retires |
+| max_retries | integer | Maximun number of retries |
 | timeout | integer | Request timeout in seconds |
 | verify_ssl |  | SSL certificate verification. Can be:
   - True: Verify using system CA bundle (default, recommended)

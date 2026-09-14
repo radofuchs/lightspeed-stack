@@ -3225,7 +3225,7 @@ class GraniteGuardianConfig(ConfigurationBase):
     )
 
     max_retries: PositiveInt = Field(
-        2, ge=0, le=5, title="Max retries", description="Maximun number of retires"
+        2, ge=0, le=5, title="Max retries", description="Maximun number of retries"
     )
 
     timeout: PositiveInt = Field(
