@@ -14692,7 +14692,7 @@
                         },
                         "type": "array",
                         "title": "Defined risks",
-                        "description": "Risks to be considered while applying this guradrail"
+                        "description": "Risks to be considered while applying this guardrail"
                     }
                 },
                 "additionalProperties": false,
