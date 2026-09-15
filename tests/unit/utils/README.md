@@ -112,10 +112,6 @@ Unit tests for utils/token_estimator.
 
 Unit tests for tool_formatter utilities.
 
-## [test_transcripts.py](test_transcripts.py)
-
-Unit tests for functions defined in utils.transcripts module.
-
 ## [test_types.py](test_types.py)
 
 Unit tests for functions and types defined in utils/types.py.
