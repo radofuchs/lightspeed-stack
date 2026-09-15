@@ -1460,7 +1460,7 @@ async def handle_non_streaming_response(
             tools,
             configuration.rag_id_mapping,
         )
-    response = ResponsesResponse.model_validate(
+    return ResponsesResponse.model_validate(
         {
             **response_dict,
             "safety_identifier": api_params.safety_identifier,
@@ -1470,4 +1470,3 @@ async def handle_non_streaming_response(
             "output_text": output_text,
         }
     )
-    return response
