@@ -128,10 +128,6 @@ Pre-LLM-call token estimation.
 
 Utility functions for formatting and parsing MCP tool descriptions.
 
-## [transcripts.py](transcripts.py)
-
-Transcript handling.
-
 ## [types.py](types.py)
 
 Common types for the project.
