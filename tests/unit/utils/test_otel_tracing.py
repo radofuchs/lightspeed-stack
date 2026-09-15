@@ -190,7 +190,7 @@ class TestSetSpanAttributes:
         assert attrs[SpanAttributes.LLM_USAGE_INPUT_TOKENS] == 100
         assert attrs[SpanAttributes.LLM_USAGE_OUTPUT_TOKENS] == 50
 
-    def test_set_attributes_with_list(self, otel):
+    def test_set_attributes_with_list(self, otel: Generator[Any, Any, Any]) -> None:
         """Test setting attributes with list values."""
         tracer, exporter = otel
         with tracer.start_as_current_span("test_span") as span:
