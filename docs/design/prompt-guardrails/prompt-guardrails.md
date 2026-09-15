@@ -417,7 +417,7 @@ product need justifies it.
   and `rules`, a `src/guardrails/` package, a `DetectorBackend` protocol and
   a structured `ScreeningItem` payload.
 - The `openai_moderations` backend (any `/v1/moderations` service, TrustyAI
-  gateways) and a `llama_stack_shields` transitional backend.
+  gateways) and an `ogx_shields` transitional backend.
 - Selecting out-of-the-box Granite Guardian risk ids; risks are custom
   criteria text only.
 - A boolean verdict when no threshold is set; every risk has a threshold.
