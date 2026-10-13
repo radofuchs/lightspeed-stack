@@ -9,8 +9,7 @@ packages:
   ]
 upgradePackages:
   [
-    python3,
-    python3-libs,
+    openssh-clients
   ]
 contentOrigin:
   repofiles: ["./redhat.repo"]
