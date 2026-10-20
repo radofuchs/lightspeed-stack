@@ -75,11 +75,12 @@ def _first_index(events: list[dict[str, Any]], name: str) -> Optional[int]:
 def require_context_window_for_active_model(context: Context) -> None:
     """Fail the scenario when the active model has no ``context_windows`` entry.
 
-    The compaction trigger only runs for models listed under
-    ``inference.context_windows`` in the active lightspeed-stack.yaml, so a
-    missing entry means the scenario could never reach ``summarized``. That is
-    a configuration problem worth reporting, not a reason to pass quietly: the
-    fixtures list every provider/model pair the e2e workflows run against.
+    The scenarios rely on the deliberately small window the fixtures register
+    under ``inference.context_windows`` for every provider/model pair the e2e
+    workflows run against, so the third query crosses the threshold. Without
+    an entry the model gets its listed or the 128K default window and the
+    scenario could never reach ``summarized``; that is a configuration problem
+    worth reporting, not a reason to pass quietly.
 
     The one environment where no entry can exist is the vLLM matrix, whose
     model id comes from an env var while mapping keys are not env-substituted.

@@ -24,6 +24,10 @@ Conversation compaction — partitioning, summarization, additive fold-up.
 
 Decorator that makes sure the object is 'connected' according to it's connected predicate.
 
+## [context_window.py](context_window.py)
+
+Context window resolution for conversation compaction.
+
 ## [conversation_compaction.py](conversation_compaction.py)
 
 Runtime integration of conversation compaction into the request flow.

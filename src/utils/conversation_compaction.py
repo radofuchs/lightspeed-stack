@@ -68,6 +68,7 @@ from utils.compaction import (
     recursively_resummarize,
     summarize_chunk,
 )
+from utils.context_window import resolve_context_window
 from utils.conversations import (
     append_turn_items_to_conversation,
     build_add_items_request,
@@ -78,7 +79,6 @@ from utils.token_estimator import (
     estimate_conversation_tokens,
     estimate_tokens,
     extract_message_text,
-    get_context_window,
     is_message_item,
 )
 
@@ -714,10 +714,10 @@ async def apply_compaction(  # pylint: disable=too-many-arguments,too-many-posit
     single :class:`CompactionResult` as its final item.
 
     The whole evaluate-and-summarize section runs under the conversation's lock
-    (R11). When compaction is disabled, the model has no registered context
-    window, or the conversation is not yet near the limit, the result simply
-    carries the unchanged params with ``compacted`` reflecting whether any
-    prior summary marker already exists.
+    (R11). When compaction is disabled or the conversation is not yet near the
+    limit, the result simply carries the unchanged params with ``compacted``
+    reflecting whether any prior summary marker already exists. The model's
+    context window comes from :func:`utils.context_window.resolve_context_window`.
 
     Parameters:
         client: OGX client.
@@ -757,57 +757,56 @@ async def apply_compaction(  # pylint: disable=too-many-arguments,too-many-posit
             items, cache, user_id, conversation_id, skip_user_id_check
         )
 
-        context_window = get_context_window(model, inference_config)
-        if context_window is not None:
-            estimated = _estimate_total_tokens(
-                params.instructions,
-                summaries,
+        context_window = resolve_context_window(model, inference_config)
+        estimated = _estimate_total_tokens(
+            params.instructions,
+            summaries,
+            recent_items,
+            original_input,
+            encoding_name,
+        )
+        if _should_compact(estimated, context_window, compaction_config):
+            if emit_events:
+                yield CompactionStartedEvent(conversation_id=conversation_id)
+            budget = int(context_window * compaction_config.buffer_max_ratio)
+            old_items, keep_items = partition_conversation(
                 recent_items,
-                original_input,
-                encoding_name,
+                available_budget_tokens=budget,
+                buffer_turns=compaction_config.buffer_turns,
+                encoding_name=encoding_name,
             )
-            if _should_compact(estimated, context_window, compaction_config):
-                if emit_events:
-                    yield CompactionStartedEvent(conversation_id=conversation_id)
-                budget = int(context_window * compaction_config.buffer_max_ratio)
-                old_items, keep_items = partition_conversation(
-                    recent_items,
-                    available_budget_tokens=budget,
-                    buffer_turns=compaction_config.buffer_turns,
+            if old_items:
+                summary = await summarize_chunk(
+                    client,
+                    model,
+                    old_items,
+                    summarized_through_turn=_covered_item_count(items, keep_items),
                     encoding_name=encoding_name,
                 )
-                if old_items:
-                    summary = await summarize_chunk(
-                        client,
-                        model,
-                        old_items,
-                        summarized_through_turn=_covered_item_count(items, keep_items),
-                        encoding_name=encoding_name,
-                    )
-                    await _persist_new_summary_chunk(
-                        client,
-                        conversation_id,
-                        summary,
-                        cache,
-                        user_id,
-                        skip_user_id_check,
-                    )
-                    summaries.append(summary.summary_text)
-                    cached_summaries = [*cached_summaries, summary]
-                    recent_items = keep_items
-            summaries, cached_summaries = await _maybe_persist_fold(
-                client,
-                model,
-                conversation_id,
-                cache,
-                user_id,
-                skip_user_id_check,
-                cached_summaries,
-                summaries,
-                context_window,
-                compaction_config.threshold_ratio,
-                encoding_name,
-            )
+                await _persist_new_summary_chunk(
+                    client,
+                    conversation_id,
+                    summary,
+                    cache,
+                    user_id,
+                    skip_user_id_check,
+                )
+                summaries.append(summary.summary_text)
+                cached_summaries = [*cached_summaries, summary]
+                recent_items = keep_items
+        summaries, cached_summaries = await _maybe_persist_fold(
+            client,
+            model,
+            conversation_id,
+            cache,
+            user_id,
+            skip_user_id_check,
+            cached_summaries,
+            summaries,
+            context_window,
+            compaction_config.threshold_ratio,
+            encoding_name,
+        )
 
         if not summaries:
             # No compaction has ever happened for this conversation: leave the
@@ -889,9 +888,7 @@ async def needs_compaction_path(
     items = await get_all_conversation_items(client, params.conversation)
     if any(is_marker_item(item) for item in items):
         return True
-    context_window = get_context_window(params.model, inference_config)
-    if context_window is None:
-        return False
+    context_window = resolve_context_window(params.model, inference_config)
     estimated = estimate_tokens(params.instructions or "", encoding_name)
     estimated += estimate_conversation_tokens(items, encoding_name=encoding_name)
     estimated += _estimate_response_input_tokens(params.input, encoding_name)

@@ -7,13 +7,11 @@ from typing import Any
 import pytest
 import tiktoken
 
-from models.config import InferenceConfiguration
 from utils.token_estimator import (
     DEFAULT_ENCODING_NAME,
     estimate_conversation_tokens,
     estimate_tokens,
     extract_message_text,
-    get_context_window,
     is_message_item,
 )
 
@@ -215,31 +213,3 @@ class TestEstimateConversationTokens:
         messages: list[Any] = [_MessageItem("user", "hello world")]
         total = estimate_conversation_tokens(messages, system_prompt=prompt)
         assert total == estimate_tokens(prompt) + estimate_tokens("hello world")
-
-
-# ---------------------------------------------------------------------------
-# get_context_window
-# ---------------------------------------------------------------------------
-
-
-class TestGetContextWindow:
-    """Tests for get_context_window."""
-
-    def test_returns_size_for_known_model(self) -> None:
-        """A configured model returns its window size."""
-        config = InferenceConfiguration(
-            context_windows={"openai/gpt-5.6-luna": 128000},
-        )  # pyright: ignore[reportCallIssue]
-        assert get_context_window("openai/gpt-5.6-luna", config) == 128000
-
-    def test_returns_none_for_unknown_model(self) -> None:
-        """An unconfigured model returns None — caller decides fallback."""
-        config = InferenceConfiguration(
-            context_windows={"openai/gpt-5.6-luna": 128000},
-        )  # pyright: ignore[reportCallIssue]
-        assert get_context_window("anthropic/claude-3", config) is None
-
-    def test_returns_none_when_map_empty(self) -> None:
-        """An empty context_windows dict returns None for any model."""
-        config = InferenceConfiguration()  # pyright: ignore[reportCallIssue]
-        assert get_context_window("openai/gpt-5.6-luna", config) is None

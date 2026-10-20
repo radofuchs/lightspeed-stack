@@ -83,6 +83,8 @@ dependencies = [
     "python-dotenv>=1.2.2",
     # Used for token estimation before LLM calls (LCORE-1569 / conversation compaction)
     "tiktoken>=0.8.0",
+    # Used for model context windows in conversation compaction (LCORE-4765)
+    "genai-prices>=0.1.12",
     # Used for Pydantic AI
     "pydantic-ai==2.27.1",
     "pydantic-ai-skills>=0.11.0",
