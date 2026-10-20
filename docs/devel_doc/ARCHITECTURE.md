@@ -449,7 +449,7 @@ Compaction is controlled by `CompactionConfiguration` in `lightspeed-stack.yaml`
 - `buffer_turns` (default: `4`) — Recent turns kept verbatim
 - `buffer_max_ratio` (default: `0.3`) — Max fraction of window for the buffer
 
-Models must have context windows registered via `inference.context_windows` (a map of model ID to token count).
+The model's context window comes from `metadata.context_window` on its `inference.providers[].allowed_models` entry, then the deprecated `inference.context_windows` map, then the model data bundled with `genai-prices`, then a 128K default (`utils/context_window.py`).
 
 **Concurrency:** A per-conversation lock dictionary serializes concurrent compaction requests on the same conversation. Lock entries are reference-counted and cleaned up when the last waiter exits.
 

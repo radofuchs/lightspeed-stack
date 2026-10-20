@@ -201,6 +201,17 @@ def main() -> None:
             "/ogx-config-merge.html#migration--backwards-compatibility"
         )
 
+    # inference.context_windows keeps working as a fallback tier through
+    # the deprecation phase.
+    if configuration.inference.context_windows:
+        logger.warning(
+            "DEPRECATED: inference.context_windows is deprecated and will be "
+            "removed in a future release. Set metadata.context_window on the "
+            "model's inference.providers[].allowed_models entry instead: "
+            "https://lightspeed-core.github.io/lightspeed-stack/user_doc"
+            "/conversation_compaction.html#context-window"
+        )
+
     # -d or --dump-configuration CLI flags are used to dump the actual configuration
     # to a JSON file w/o doing any other operation
     if args.dump_configuration:
