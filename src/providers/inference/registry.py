@@ -13,6 +13,7 @@ from providers.inference.errors import ProviderNotFoundError
 from providers.inference.openai.provider import OpenAIInferenceProvider
 from providers.inference.types import ModelType, ProviderId, ProviderType
 from providers.inference.vertexai.provider import VertexAIInferenceProvider
+from providers.inference.watsonx.provider import WatsonxInferenceProvider
 from utils.types import Singleton
 
 PROVIDER_CLASSES: Final[dict[ProviderType, type[InferenceProvider[Any, Any]]]] = {
@@ -20,6 +21,7 @@ PROVIDER_CLASSES: Final[dict[ProviderType, type[InferenceProvider[Any, Any]]]] =
     "azure": AzureInferenceProvider,
     "vertexai": VertexAIInferenceProvider,
     "bedrock": BedrockInferenceProvider,
+    "watsonx": WatsonxInferenceProvider,
 }
 
 
