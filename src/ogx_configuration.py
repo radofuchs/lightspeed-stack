@@ -1151,10 +1151,32 @@ def _replace_or_append_inference_provider(
     inference_list.append(entry)
 
 
+def _allowed_model_ids(allowed_model: Any) -> tuple[str, str]:
+    """Return the local name and the backend id of one allowed_models entry.
+
+    A string entry is both. A dictionary entry carries ``provider_model_id``
+    and an optional ``name`` that defaults to it, as in ``AllowedModel``.
+
+    Parameters:
+        allowed_model: One raw ``allowed_models`` entry (string or dict).
+
+    Returns:
+        tuple[str, str]: ``(name, provider_model_id)``.
+
+    """
+    if isinstance(allowed_model, dict):
+        provider_model_id = allowed_model["provider_model_id"]
+        return allowed_model.get("name") or provider_model_id, provider_model_id
+    return allowed_model, allowed_model
+
+
 def _build_inference_entry(
     provider: dict[str, Any], emitted_id: str, ls_provider_type: str
-) -> tuple[dict[str, Any], list[str]]:
+) -> tuple[dict[str, Any], list[tuple[str, str]]]:
     """Build a providers.inference entry from one high-level provider.
+
+    The OGX provider's ``allowed_models`` lists backend ids
+    (``provider_model_id``), which is what OGX filters on.
 
     Parameters:
         provider: One high-level ``inference.providers`` entry.
@@ -1162,8 +1184,9 @@ def _build_inference_entry(
         ls_provider_type: Llama Stack provider_type from :data:`PROVIDER_TYPE_MAP`.
 
     Returns:
-        tuple[dict[str, Any], list[str]]: The provider entry, and its
-        ``allowed_models`` (empty list when unset).
+        tuple[dict[str, Any], list[tuple[str, str]]]: The provider entry, and
+        its ``allowed_models`` as ``(name, provider_model_id)`` pairs (empty
+        list when unset).
 
     """
     entry: dict[str, Any] = {
@@ -1177,9 +1200,13 @@ def _build_inference_entry(
     if provider.get("api_key_env"):
         key_field = API_KEY_FIELD_MAP.get(ls_provider_type, "api_key")
         provider_config[key_field] = "${env." + provider["api_key_env"] + "}"
-    allowed_models = provider.get("allowed_models") or []
+    allowed_models = [
+        _allowed_model_ids(model) for model in provider.get("allowed_models") or []
+    ]
     if allowed_models:
-        provider_config["allowed_models"] = allowed_models
+        provider_config["allowed_models"] = [
+            provider_model_id for _, provider_model_id in allowed_models
+        ]
     if provider_config:
         entry["config"] = provider_config
 
@@ -1187,7 +1214,9 @@ def _build_inference_entry(
 
 
 def _register_high_level_models(
-    existing_models: list[Any], provider_id: str, allowed_models: list[str]
+    existing_models: list[Any],
+    provider_id: str,
+    allowed_models: list[tuple[str, str]],
 ) -> list[dict[str, Any]]:
     """Build LLM resource entries for allowed_models not already registered.
 
@@ -1207,7 +1236,8 @@ def _register_high_level_models(
             (baseline, native_override, BYOK, and any registered earlier in
             this synthesis pass); read only for deduplication, never mutated.
         provider_id: Emitted provider_id the models are served by.
-        allowed_models: Model names to register.
+        allowed_models: ``(name, provider_model_id)`` pairs to register; the
+            name becomes the ``model_id``.
 
     Returns:
         New model resource dicts to append; empty when all are already known.
@@ -1219,7 +1249,7 @@ def _register_high_level_models(
         if isinstance(m, dict)
     }
     new_entries: list[dict[str, Any]] = []
-    for model_name in allowed_models:
+    for model_name, provider_model_id in allowed_models:
         key = (provider_id, model_name)
         if key in known:
             logger.debug(
@@ -1234,7 +1264,7 @@ def _register_high_level_models(
                 "model_id": model_name,
                 "model_type": "llm",
                 "provider_id": provider_id,
-                "provider_model_id": model_name,
+                "provider_model_id": provider_model_id,
             }
         )
     return new_entries
@@ -1318,7 +1348,7 @@ def apply_high_level_inference(
     inference_list = providers_section.setdefault("inference", [])
     # (emitted_id, allowed_models) pairs to register as LLM resources, collected
     # while emitting provider entries and applied after the loop.
-    to_register: list[tuple[str, list[str]]] = []
+    to_register: list[tuple[str, list[tuple[str, str]]]] = []
 
     for provider in providers:
         provider_type = provider["type"]
