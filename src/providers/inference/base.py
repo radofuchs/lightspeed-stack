@@ -125,7 +125,7 @@ class InferenceProvider(ABC, Generic[EntryT, ProviderT]):  # noqa: UP046
         self,
         provider_model_id: str,
         **kwargs: Any,
-    ) -> ModelType:
+    ) -> Optional[ModelType]:
         """Infer the type of a provider model.
 
         Args:
@@ -133,7 +133,8 @@ class InferenceProvider(ABC, Generic[EntryT, ProviderT]):  # noqa: UP046
             **kwargs: Additional provider-specific attributes used for classification.
 
         Returns:
-            The inferred model type.
+            The inferred model type, or None when the model is unsupported and
+            should be omitted from discovery.
 
         """
 
@@ -244,7 +245,8 @@ class InferenceProvider(ABC, Generic[EntryT, ProviderT]):  # noqa: UP046
                     name=allowed.name,
                     provider_model_id=allowed.provider_model_id,
                     model_type=allowed.model_type
-                    or self._infer_model_type(allowed.provider_model_id),
+                    or self._infer_model_type(allowed.provider_model_id)
+                    or "llm",
                     metadata=dict(allowed.metadata),
                 )
                 for allowed in allowed_models

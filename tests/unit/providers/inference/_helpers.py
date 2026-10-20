@@ -43,7 +43,7 @@ class FakeInferenceProvider(
         self,
         provider_model_id: str,
         **kwargs: Any,
-    ) -> ModelType:
+    ) -> Optional[ModelType]:
         """Return llm for unknown model IDs."""
         return "llm"
 

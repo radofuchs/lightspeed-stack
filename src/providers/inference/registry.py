@@ -7,6 +7,7 @@ from typing import Any, Final, Optional
 from models.config import InferenceConfiguration
 from providers.inference.azure.provider import AzureInferenceProvider
 from providers.inference.base import InferenceProvider
+from providers.inference.bedrock.provider import BedrockInferenceProvider
 from providers.inference.catalog import CatalogModel
 from providers.inference.errors import ProviderNotFoundError
 from providers.inference.openai.provider import OpenAIInferenceProvider
@@ -18,6 +19,7 @@ PROVIDER_CLASSES: Final[dict[ProviderType, type[InferenceProvider[Any, Any]]]] =
     "openai": OpenAIInferenceProvider,
     "azure": AzureInferenceProvider,
     "vertexai": VertexAIInferenceProvider,
+    "bedrock": BedrockInferenceProvider,
 }
 
 
