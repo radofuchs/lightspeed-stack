@@ -322,7 +322,7 @@ jobs:
               .provider_id == $p
               and (
                 .provider_resource_id == $m
-                or .provider_resource_id | endswith("/" + $suffix)
+                or (.provider_resource_id | endswith("/" + $suffix))
                 or .provider_resource_id == $suffix
               )
             )' >/dev/null
