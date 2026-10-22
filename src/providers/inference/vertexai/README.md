@@ -4,3 +4,7 @@
 
 Vertex AI inference provider package.
 
+## [provider.py](provider.py)
+
+Vertex AI runtime inference provider backed by Pydantic AI.
+
