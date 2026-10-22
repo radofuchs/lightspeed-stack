@@ -2,7 +2,9 @@
 name: E2E Inference Provider Tests
 
 on: 
-  push
+  schedule:
+    - cron: "0 0 * * *"  # Runs once a day at midnight UTC
+  workflow_dispatch:
 
 jobs:
   # Own job so repository secrets are never sent to a runner unless this passes.
@@ -322,7 +324,7 @@ jobs:
               .provider_id == $p
               and (
                 .provider_resource_id == $m
-                or (.provider_resource_id | endswith("/" + $suffix))
+                or .provider_resource_id | endswith("/" + $suffix)
                 or .provider_resource_id == $suffix
               )
             )' >/dev/null
