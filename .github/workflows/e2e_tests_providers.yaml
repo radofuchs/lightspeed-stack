@@ -121,6 +121,8 @@ jobs:
         if: matrix.environment == 'vertexai'
         env:
           GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+          VERTEX_AI_PROJECT_SECRET: ${{ secrets.VERTEX_AI_PROJECT }}
+          VERTEX_AI_LOCATION_SECRET: ${{ secrets.VERTEX_AI_LOCATION }}
         run: |
           echo "Setting up Google Cloud service account credentials..."
 
@@ -155,6 +157,15 @@ jobs:
           chmod 644 $GCP_KEYS_PATH/gcp-key.json
 
           echo "GOOGLE_APPLICATION_CREDENTIALS=/opt/app-root/.gcp-keys/gcp-key.json" >> $GITHUB_ENV
+
+          KEY_PROJECT=$(jq -r '.project_id' "$GCP_KEYS_PATH/gcp-key.json")
+          if [ -n "$VERTEX_AI_PROJECT_SECRET" ]; then
+            echo "VERTEX_AI_PROJECT=$VERTEX_AI_PROJECT_SECRET" >> $GITHUB_ENV
+          else
+            echo "VERTEX_AI_PROJECT=$KEY_PROJECT" >> $GITHUB_ENV
+          fi
+          echo "VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION_SECRET:-global}" >> $GITHUB_ENV
+          echo "✅ Vertex env: project set ($([ -n "$VERTEX_AI_PROJECT_SECRET" ] && echo from secret || echo from service account)), location=${VERTEX_AI_LOCATION_SECRET:-global}"
 
       - name: Select and configure run.yaml
         env:
@@ -232,8 +243,8 @@ jobs:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          VERTEX_AI_LOCATION: ${{ secrets.VERTEX_AI_LOCATION }}
-          VERTEX_AI_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
+          VERTEX_AI_LOCATION: ${{ env.VERTEX_AI_LOCATION }}
+          VERTEX_AI_PROJECT: ${{ env.VERTEX_AI_PROJECT }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
           GCP_KEYS_PATH: ${{ env.GCP_KEYS_PATH }}
           WATSONX_PROJECT_ID: ${{ secrets.WATSONX_PROJECT_ID }}
@@ -264,8 +275,8 @@ jobs:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          VERTEX_AI_LOCATION: ${{ secrets.VERTEX_AI_LOCATION }}
-          VERTEX_AI_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
+          VERTEX_AI_LOCATION: ${{ env.VERTEX_AI_LOCATION }}
+          VERTEX_AI_PROJECT: ${{ env.VERTEX_AI_PROJECT }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
           GCP_KEYS_PATH: ${{ env.GCP_KEYS_PATH }}
           WATSONX_PROJECT_ID: ${{ secrets.WATSONX_PROJECT_ID }}
@@ -330,6 +341,13 @@ jobs:
             echo "❌ Expected LLM not listed by /v1/models (provider_id + provider_resource_id must match)"
             echo "Registered LLM entries (provider_id, provider_resource_id, api_model_type):"
             echo "$MODEL_JSON" | jq -r '.models[] | "\(.provider_id)\t\(.provider_resource_id)\t\(.api_model_type)"' || true
+            if [ "${{ matrix.environment }}" = "vertexai" ]; then
+              echo "=== OGX /v1/models?model_type=llm (direct) ==="
+              curl -sS "http://localhost:8321/v1/models?model_type=llm" | head -c 4000 || true
+              echo ""
+              echo "=== OGX logs (vertex / credentials) ==="
+              show_logs 2>&1 | rg -i 'vertex|google-vertex|Failed to list provider|DefaultCredentials|gcp-key|Model refresh' | tail -50 || true
+            fi
             show_logs
             exit 1
           fi
