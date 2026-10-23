@@ -24,6 +24,10 @@ Unit tests for utils/compaction — partitioning, prompt, summarization.
 
 Unit tests for the connection decorator.
 
+## [test_context_window.py](test_context_window.py)
+
+Unit tests for utils/context_window.
+
 ## [test_conversation_compaction.py](test_conversation_compaction.py)
 
 Unit tests for runtime conversation compaction (LCORE-1572).

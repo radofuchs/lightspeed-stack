@@ -15,12 +15,14 @@ from ogx_api.openai_responses import (
 )
 from pytest_mock import MockerFixture
 
+from constants import DEFAULT_CONTEXT_WINDOW
 from models.common.responses.responses_api_params import ResponsesApiParams
 from models.compaction import ConversationSummary
 from models.config import CompactionConfiguration, InferenceConfiguration
 from utils import conversation_compaction as cc
 
 MODEL = "openai/gpt-5.6-luna"
+CATALOG_MODEL = "rhaiis/granite"
 CONV = "conv_abc123"
 
 
@@ -56,6 +58,28 @@ def _params(input_text: str = "new question") -> ResponsesApiParams:
 def _inference(window: Optional[int]) -> InferenceConfiguration:
     windows = {MODEL: window} if window is not None else {}
     return InferenceConfiguration(context_windows=windows)
+
+
+def _catalog_inference(window: Optional[int]) -> InferenceConfiguration:
+    """Build an inference configuration listing CATALOG_MODEL, with a window or not."""
+    metadata = {"context_window": window} if window is not None else {}
+    return InferenceConfiguration.model_validate(
+        {
+            "providers": [
+                {
+                    "type": "vllm",
+                    "id": "rhaiis",
+                    "allowed_models": [
+                        {
+                            "name": "granite",
+                            "provider_model_id": "granite-3.3",
+                            "metadata": metadata,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
 
 
 def _compaction(**kw: Any) -> CompactionConfiguration:
@@ -283,10 +307,10 @@ async def test_disabled_passes_through() -> None:
 
 
 @pytest.mark.asyncio
-async def test_no_context_window_no_marker_passes_through(
+async def test_unconfigured_window_no_marker_passes_through(
     mocker: MockerFixture,
 ) -> None:
-    """No registered context window and no prior summary => normal flow."""
+    """No configured window still resolves one; a short conversation stays normal."""
     mocker.patch.object(
         cc, "get_all_conversation_items", mocker.AsyncMock(return_value=[])
     )
@@ -441,23 +465,48 @@ async def test_needs_compaction_path_existing_marker(mocker: MockerFixture) -> N
 
 
 @pytest.mark.asyncio
-async def test_needs_compaction_path_over_threshold(mocker: MockerFixture) -> None:
-    """A conversation over the token threshold needs the compaction path."""
+@pytest.mark.parametrize(
+    ("model", "inference_config", "words", "expected"),
+    [
+        pytest.param(MODEL, _inference(50), 50, True, id="deprecated-map"),
+        pytest.param(
+            CATALOG_MODEL, _catalog_inference(50), 50, True, id="catalog-metadata"
+        ),
+        pytest.param(
+            CATALOG_MODEL, _catalog_inference(None), 50, False, id="default-not-reached"
+        ),
+        pytest.param(
+            CATALOG_MODEL,
+            _catalog_inference(None),
+            DEFAULT_CONTEXT_WINDOW // 10,
+            True,
+            id="default-reached",
+        ),
+    ],
+)
+async def test_needs_compaction_path_over_threshold(
+    mocker: MockerFixture,
+    model: str,
+    inference_config: InferenceConfiguration,
+    words: int,
+    expected: bool,
+) -> None:
+    """The trigger uses the resolved window: metadata, deprecated map or default."""
     mocker.patch.object(
         cc,
         "get_all_conversation_items",
         mocker.AsyncMock(
-            return_value=[_msg("user", "q " * 50), _msg("assistant", "a " * 50)]
+            return_value=[_msg("user", "q " * words), _msg("assistant", "a " * words)]
         ),
     )
     assert (
         await cc.needs_compaction_path(
             mocker.AsyncMock(),
-            _params(),
-            _inference(50),  # small window: over threshold
+            _params().model_copy(update={"model": model}),
+            inference_config,
             _compaction(threshold_ratio=0.1),
         )
-        is True
+        is expected
     )
 
 

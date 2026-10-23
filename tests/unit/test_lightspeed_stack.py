@@ -11,6 +11,14 @@ from configuration import AppConfig
 from lightspeed_stack import create_argument_parser, main
 
 LEGACY_DEPRECATION_MARKER = "DEPRECATED: the two-file configuration"
+CONTEXT_WINDOWS_DEPRECATION_MARKER = "DEPRECATED: inference.context_windows"
+
+SERVER_MODE_SECTION = """
+ogx:
+  use_as_library_client: false
+  url: http://localhost:8321
+  api_key: xyzzy
+"""
 
 COMMON_CONFIG_SECTIONS = """
 name: test
@@ -186,12 +194,40 @@ def test_main_does_not_warn_in_server_mode(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A server-mode config (url, no legacy fields) emits no deprecation WARN."""
-    config_yaml = COMMON_CONFIG_SECTIONS + """
-ogx:
-  use_as_library_client: false
-  url: http://localhost:8321
-  api_key: xyzzy
-"""
+    config_yaml = COMMON_CONFIG_SECTIONS + SERVER_MODE_SECTION
     with caplog.at_level(logging.WARNING):
         run_main_with_config(config_yaml, tmp_path, monkeypatch)
     assert not any(LEGACY_DEPRECATION_MARKER in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize(
+    ("inference_section", "expected_warnings"),
+    [
+        pytest.param(
+            "inference:\n  context_windows:\n    openai/gpt-5.6-luna: 2000\n",
+            1,
+            id="map-set",
+        ),
+        pytest.param("inference:\n  context_windows: {}\n", 0, id="map-empty"),
+        pytest.param("", 0, id="map-absent"),
+    ],
+)
+def test_main_warns_on_deprecated_context_windows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    inference_section: str,
+    expected_warnings: int,
+) -> None:
+    """A non-empty inference.context_windows map emits one deprecation WARN."""
+    config_yaml = COMMON_CONFIG_SECTIONS + SERVER_MODE_SECTION + inference_section
+    with caplog.at_level(logging.WARNING):
+        run_main_with_config(config_yaml, tmp_path, monkeypatch)
+    warnings = [
+        r.getMessage()
+        for r in caplog.records
+        if CONTEXT_WINDOWS_DEPRECATION_MARKER in r.getMessage()
+    ]
+    assert len(warnings) == expected_warnings
+    # the WARN says where the windows go now
+    assert all("metadata.context_window" in message for message in warnings)

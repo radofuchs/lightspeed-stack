@@ -27,7 +27,7 @@ inference:
   # are far larger; this only drives the local estimate, never the provider.
   # The vLLM-backed runs (rhaiis, rhelai) take the model id from an env
   # var, and context_windows keys are not env-substituted, so they are
-  # not listed and skip the token-based trigger.
+  # not listed and get the 128K default window.
   context_windows:
     openai/gpt-5.6-luna: 2000
     azure/gpt-5.6-luna: 2000

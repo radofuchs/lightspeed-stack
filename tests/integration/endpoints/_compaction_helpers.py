@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from configuration import AppConfig
 from models.compaction import ConversationSummary
-from models.config import CompactionConfiguration
+from models.config import CompactionConfiguration, VllmInferenceProviderEntry
 from models.database.conversations import UserConversation
 from tests.integration.conftest import InMemoryConversationStore
 from utils.conversation_compaction import MARKER_COVERS_PREFIX, MARKER_SENTINEL
@@ -63,6 +63,9 @@ def enable_compaction(
 ) -> None:
     """Override compaction and inference config to trigger compaction easily.
 
+    The test model's window is set as ``metadata.context_window`` on its
+    ``inference.providers`` allowed model entry.
+
     Args:
         config: The application configuration singleton.
         context_window: Context window size for the test model.
@@ -80,7 +83,20 @@ def enable_compaction(
         buffer_turns=buffer_turns,
         buffer_max_ratio=buffer_max_ratio,
     )
-    config._configuration.inference.context_windows = {TEST_MODEL: context_window}
+    provider_id, _, model_name = TEST_MODEL.partition("/")
+    config._configuration.inference.providers = [
+        VllmInferenceProviderEntry.model_validate(
+            {
+                "id": provider_id,
+                "allowed_models": [
+                    {
+                        "provider_model_id": model_name,
+                        "metadata": {"context_window": context_window},
+                    }
+                ],
+            }
+        )
+    ]
 
 
 async def collect_items(

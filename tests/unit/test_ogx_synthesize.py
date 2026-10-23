@@ -589,6 +589,55 @@ def test_apply_high_level_inference_registers_multiple_allowed_models() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("allowed_models", "ogx_allowed_models", "registered"),
+    [
+        pytest.param(
+            [
+                {
+                    "provider_model_id": "granite-3.3",
+                    "metadata": {"context_window": 8192},
+                }
+            ],
+            ["granite-3.3"],
+            [("granite-3.3", "granite-3.3")],
+            id="structured",
+        ),
+        pytest.param(
+            [{"name": "granite", "provider_model_id": "granite-3.3"}],
+            ["granite-3.3"],
+            [("granite", "granite-3.3")],
+            id="structured-alias",
+        ),
+        pytest.param(
+            ["llama", {"name": "granite", "provider_model_id": "granite-3.3"}],
+            ["llama", "granite-3.3"],
+            [("llama", "llama"), ("granite", "granite-3.3")],
+            id="mixed",
+        ),
+    ],
+)
+def test_apply_high_level_inference_structured_allowed_models(
+    allowed_models: list[Any],
+    ogx_allowed_models: list[str],
+    registered: list[tuple[str, str]],
+) -> None:
+    """Structured allowed_models entries emit backend ids and register local names."""
+    ls_config: dict[str, Any] = {"providers": {"inference": []}}
+    inference = {
+        "providers": [
+            {"type": "vllm", "id": "rhaiis", "allowed_models": allowed_models}
+        ]
+    }
+    apply_high_level_inference(ls_config, inference)
+    entry = ls_config["providers"]["inference"][0]
+    assert entry["config"]["allowed_models"] == ogx_allowed_models
+    assert [
+        (m["model_id"], m["provider_model_id"])
+        for m in ls_config["registered_resources"]["models"]
+    ] == registered
+
+
 def test_apply_high_level_inference_no_allowed_models_no_registration() -> None:
     """A provider without allowed_models leaves registered_resources untouched."""
     ls_config: dict[str, Any] = {"providers": {"inference": []}}
