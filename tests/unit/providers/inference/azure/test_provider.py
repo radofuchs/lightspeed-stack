@@ -63,9 +63,13 @@ def _patch_entra_dependencies(mocker: Any) -> tuple[Any, Any, Any]:
         "providers.inference.azure.provider.get_bearer_token_provider",
         return_value=token_provider,
     )
+    # PAI AzureProvider(openai_client=...) reads api_key and base_url at init.
+    openai_client = mocker.MagicMock(spec=AsyncAzureOpenAI)
+    openai_client.api_key = None
+    openai_client.base_url = AZURE_ENDPOINT
     client = mocker.patch(
         "providers.inference.azure.provider.AsyncAzureOpenAI",
-        return_value=mocker.MagicMock(spec=AsyncAzureOpenAI),
+        return_value=openai_client,
     )
     return credential, get_token_provider, client
 
