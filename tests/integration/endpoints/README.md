@@ -112,3 +112,7 @@ Integration tests for the /streaming_query endpoint (using Responses API).
 
 Integration tests for the /tools endpoint.
 
+## [test_turn_persistence.py](test_turn_persistence.py)
+
+Integration tests for the turns lightspeed-stack stores itself (LCORE-3908).
+

@@ -72,6 +72,10 @@ Check if the OGX version is supported by the LCS.
 
 OpenTelemetry tracing utilities for Lightspeed Core Stack.
 
+## [pending_turn.py](pending_turn.py)
+
+The owner of the turns lightspeed-stack has to store itself (LCORE-3908).
+
 ## [prompts.py](prompts.py)
 
 Utility functions for system prompts.

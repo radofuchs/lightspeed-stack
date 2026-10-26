@@ -68,6 +68,10 @@ Unit tests for utility function to check OGX version.
 
 Unit tests for utils/otel_tracing.py functions.
 
+## [test_pending_turn.py](test_pending_turn.py)
+
+Unit tests for the owner of the turns lightspeed-stack stores itself (LCORE-3908).
+
 ## [test_prompts.py](test_prompts.py)
 
 Unit tests for prompts utility functions.

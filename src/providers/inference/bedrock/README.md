@@ -7,6 +7,8 @@ Bedrock inference provider package.
 ## [provider.py](provider.py)
 
 AWS Bedrock runtime inference provider backed by Pydantic AI.
-Discovers models via a separate boto3 control-plane client
-(`ListFoundationModels`) and runs chat/embeddings through PAI's
-`BedrockProvider`.
+
+## [specs.py](specs.py)
+
+Wire models for Bedrock ListFoundationModels responses.
+
