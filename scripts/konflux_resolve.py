@@ -71,7 +71,8 @@ def parse_version(
     version_str = version_str.removesuffix(".*")
     m = _VERSION_RE.match(version_str)
     if m is None:
-        raise ValueError(f"Cannot parse version: {version_str!r}")
+        msg = f"Cannot parse version: {version_str!r}"
+        raise ValueError(msg)
 
     major = int(m.group(1))
     minor = int(m.group(2) or 0)
@@ -100,7 +101,8 @@ def _parse_specifier(spec: str) -> tuple[str, str]:
             return op, spec[len(op) :].strip()
     if spec and spec[0].isdigit():
         return "==", spec
-    raise ValueError(f"Unknown version operator in {spec!r}")
+    msg = f"Unknown version operator in {spec!r}"
+    raise ValueError(msg)
 
 
 _CMP_OPS: dict[str, Any] = {
@@ -189,7 +191,8 @@ def _parse_dep_string(dep: str) -> tuple[str, str, str]:
 
     match = re.match(r"^([A-Za-z0-9][-A-Za-z0-9_.]*)", dep)
     if match is None:
-        raise ValueError(f"Cannot parse dependency: {dep!r}")
+        msg = f"Cannot parse dependency: {dep!r}"
+        raise ValueError(msg)
 
     name = normalize_name(match.group(1))
     version_spec = dep[match.end() :].strip()
@@ -421,7 +424,8 @@ class RhoaiIndex:
                 last_exc = exc
                 logger.debug("Fetch %s attempt %d failed: %s", url, attempt + 1, exc)
                 time.sleep(2**attempt)
-        raise RuntimeError(f"Failed to fetch {url} after 3 attempts") from last_exc
+        msg = f"Failed to fetch {url} after 3 attempts"
+        raise RuntimeError(msg) from last_exc
 
     def load(self) -> None:
         """Download root page to learn which packages exist on RHOAI."""
@@ -470,7 +474,9 @@ class RhoaiIndex:
         if versions:
             self._packages[norm] = versions
 
-    def _match_arch(self, platform_tag: str, target_platforms: list[str]) -> Optional[str]:
+    def _match_arch(
+        self, platform_tag: str, target_platforms: list[str]
+    ) -> Optional[str]:
         """Determine which target arch a platform tag matches."""
         if platform_tag.lower() in ("any", "none"):
             return "any"
@@ -613,7 +619,8 @@ class PypiClient:
                 last_exc = exc
                 logger.debug("Fetch %s attempt %d failed: %s", url, attempt + 1, exc)
                 time.sleep(2**attempt)
-        raise RuntimeError(f"Failed to fetch {url} after 3 attempts") from last_exc
+        msg = f"Failed to fetch {url} after 3 attempts"
+        raise RuntimeError(msg) from last_exc
 
     def get_package_info(self, name: str) -> dict[str, dict[str, Any]]:
         """Fetch and cache the simple index page for *name*.
@@ -759,10 +766,11 @@ class Resolver:
                         f"constraint {constraints.get(norm, '')}"
                     )
                 else:
-                    raise RuntimeError(
+                    msg = (
                         f"Constraint conflict for {norm}: resolved {current_ver} "
                         f"does not satisfy {constraints.get(norm, '')}"
                     )
+                    raise RuntimeError(msg)
 
             constraint = constraints.get(norm, "")
 
@@ -776,10 +784,11 @@ class Resolver:
             else:
                 pypi_result = self.pypi.find_best(norm, constraint)
                 if pypi_result is None:
-                    raise RuntimeError(
+                    msg = (
                         f"Cannot resolve {norm} with constraint "
                         f"{constraint!r}: not found on RHOAI or PyPI"
                     )
+                    raise RuntimeError(msg)
                 if norm not in self.fallback_reasons:
                     if self.rhoai.has_package(norm):
                         self.fallback_reasons[norm] = (
@@ -890,7 +899,7 @@ def write_hashed_requirements(
 
         # RHOAI packages store hashes per platform
         if "platforms" in info:
-            for (_, sha) in info["platforms"].values():
+            for _, sha in info["platforms"].values():
                 if sha:
                     hashes.add(sha)
 
@@ -905,9 +914,10 @@ def write_hashed_requirements(
 
         sorted_hashes = sorted(hashes)
         if not sorted_hashes:
-            raise RuntimeError(
+            msg = (
                 f"No hashes collected for {name}=={version} while writing {output_path}"
             )
+            raise RuntimeError(msg)
         lines.append(f"{name}=={version} \\\n")
         hash_lines = [f"    --hash=sha256:{h}" for h in sorted_hashes]
         lines.append(" \\\n".join(hash_lines) + "\n")
@@ -955,10 +965,11 @@ def load_config(profiles_path: str, profile_name: str) -> dict[str, Any]:
     profiles = data.get("profiles", {})
 
     if profile_name not in profiles:
-        raise KeyError(
+        msg = (
             f"Profile {profile_name!r} not found in {profiles_path}. "
             f"Available: {', '.join(profiles)}"
         )
+        raise KeyError(msg)
 
     merged = {**common, **profiles[profile_name]}
     return merged
