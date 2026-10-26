@@ -485,7 +485,7 @@ class OgxResponsesModel(OpenAIResponsesModel):
                 responses.ResponseStreamEvent, _FilteredResponseStream
             ] = PeekableAsyncStream(filtered_stream)
 
-            with _map_api_errors(self.model_name):
+            with _map_api_errors(self.model_name, self._provider.model_id_namespace):
                 first_chunk = await peekable.peek()
 
             if isinstance(first_chunk, Unset):
@@ -507,6 +507,7 @@ class OgxResponsesModel(OpenAIResponsesModel):
                 _model_settings=model_settings_cast,
                 _response=peekable,  # type: ignore[arg-type]
                 _provider_name=self._provider.name,
+                _model_id_namespace=self._provider.model_id_namespace,
                 _provider_url=self._provider.base_url,
                 _provider_timestamp=(
                     number_to_datetime(first_chunk.response.created_at)
