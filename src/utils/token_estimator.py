@@ -23,7 +23,6 @@ from typing import Any, Optional
 import tiktoken
 
 from log import get_logger
-from models.config import InferenceConfiguration
 
 logger = get_logger(__name__)
 
@@ -151,25 +150,3 @@ def estimate_conversation_tokens(
         if text:
             total += len(encoding.encode(text))
     return total
-
-
-def get_context_window(
-    model: str, inference_config: InferenceConfiguration
-) -> Optional[int]:
-    """Return the configured context window size for *model* in tokens.
-
-    Looks up *model* in ``inference_config.context_windows``. Returns
-    ``None`` when the model is absent from the map. The caller decides
-    how to handle the absence — typically, skipping the token-based
-    compaction trigger.
-
-    Parameters:
-        model: Fully-qualified model identifier (e.g.,
-            ``"openai/gpt-4o-mini"``).
-        inference_config: The application's inference configuration.
-
-    Returns:
-        The context window size in tokens, or ``None`` when unset.
-
-    """
-    return inference_config.context_windows.get(model)

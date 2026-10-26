@@ -719,7 +719,8 @@ class AllowedModel(ConfigurationBase):
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         title="Model metadata",
-        description="Optional catalog metadata",
+        description="Optional catalog metadata. context_window: the model's "
+        "context window in tokens, used by conversation compaction.",
     )
 
     @model_validator(mode="before")
@@ -2057,13 +2058,12 @@ class InferenceConfiguration(ConfigurationBase):
 
     context_windows: dict[str, PositiveInt] = Field(
         default_factory=dict,
-        title="Per-model context window sizes (tokens)",
-        description="Map of fully-qualified model identifier (e.g., "
-        '"openai/gpt-5.6-luna") to context window size in tokens. Used by '
-        "the conversation compaction trigger to decide when older turns "
-        "must be summarized before the input exceeds the window. Models "
-        "absent from this map have no registered window — callers fall "
-        "back to their own default or skip the token-based trigger.",
+        title="Per-model context window sizes (tokens, deprecated)",
+        description="Deprecated: set metadata.context_window on the model's "
+        "inference.providers[].allowed_models entry instead. Map of "
+        'fully-qualified model identifier (e.g., "openai/gpt-5.6-luna") to '
+        "context window size in tokens, used by conversation compaction "
+        "when the model's catalog metadata has no context_window.",
     )
 
     providers: list[UnifiedInferenceProviderEntry] = Field(

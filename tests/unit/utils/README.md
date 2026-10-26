@@ -24,6 +24,10 @@ Unit tests for utils/compaction — partitioning, prompt, summarization.
 
 Unit tests for the connection decorator.
 
+## [test_context_window.py](test_context_window.py)
+
+Unit tests for utils/context_window.
+
 ## [test_conversation_compaction.py](test_conversation_compaction.py)
 
 Unit tests for runtime conversation compaction (LCORE-1572).
@@ -63,6 +67,10 @@ Unit tests for utility function to check OGX version.
 ## [test_otel_tracing.py](test_otel_tracing.py)
 
 Unit tests for utils/otel_tracing.py functions.
+
+## [test_pending_turn.py](test_pending_turn.py)
+
+Unit tests for the owner of the turns lightspeed-stack stores itself (LCORE-3908).
 
 ## [test_prompts.py](test_prompts.py)
 

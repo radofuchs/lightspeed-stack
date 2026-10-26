@@ -69,7 +69,7 @@ The `/v1/query` and `/v1/streaming_query` endpoints include a `context_status` f
 
 ## Configuration
 
-Compaction is disabled by default. To enable it, add a `compaction` section to your `lightspeed-stack.yaml` configuration file and register context window sizes for your models.
+Compaction is disabled by default. To enable it, add a `compaction` section to your `lightspeed-stack.yaml` configuration file. See [Context window](#context-window) for how the service finds the context window of each model.
 
 ### Minimal configuration
 
@@ -77,8 +77,13 @@ Compaction is disabled by default. To enable it, add a `compaction` section to y
 inference:
   default_provider: openai
   default_model: gpt-5.6-luna
-  context_windows:
-    openai/gpt-5.6-luna: 128000
+  providers:
+    - type: openai
+      api_key_env: OPENAI_API_KEY
+      allowed_models:
+        - provider_model_id: gpt-5.6-luna
+          metadata:
+            context_window: 128000
 
 compaction:
   enabled: true
@@ -90,9 +95,13 @@ compaction:
 inference:
   default_provider: openai
   default_model: gpt-5.6-luna
-  context_windows:
-    openai/gpt-5.6-luna: 128000
-    openai/gpt-5.6-luna: 128000
+  providers:
+    - type: openai
+      api_key_env: OPENAI_API_KEY
+      allowed_models:
+        - provider_model_id: gpt-5.6-luna
+          metadata:
+            context_window: 128000
 
 compaction:
   enabled: true
@@ -114,8 +123,39 @@ compaction:
 
 ### Prerequisites
 
-- **Context windows must be registered.** Add entries to `inference.context_windows` mapping each fully-qualified model identifier (e.g., `"openai/gpt-5.6-luna"`) to its context window size in tokens. Models absent from this map have no registered window and compaction will not trigger for them.
+- **Set the context window of models the service cannot look up.** Self-hosted models (vLLM, WatsonX and similar) get a default of 128,000 tokens unless their `allowed_models` entry sets `metadata.context_window`. See [Context window](#context-window).
 - **A conversation cache is recommended.** While compaction works without a cache (using marker-only mode), enabling a conversation cache (PostgreSQL, SQLite, or in-memory) improves performance by caching summaries across requests and enabling recursive fold-up of accumulated summaries.
+
+## Context window
+
+The compaction threshold and the recent-buffer budget are fractions of the model's context window. For the model a request uses, the service takes the first of:
+
+1. `metadata.context_window` on the model's entry in `inference.providers[].allowed_models`.
+2. The deprecated `inference.context_windows` map (see below).
+3. The window listed for the model in the model data bundled with the service (the `genai-prices` package). It covers hosted models of providers such as OpenAI, Azure OpenAI, Vertex AI and Bedrock, but not self-hosted backends such as vLLM or WatsonX.
+4. A default of 128,000 tokens.
+
+Set `metadata.context_window` for every model whose window is not listed and is not 128,000 tokens. A model with a smaller window can otherwise fail with HTTP 413 before compaction triggers. A configured value also takes precedence over the listed one, which helps when a deployment limits the window below the vendor's maximum.
+
+Requests identify the model as `<provider id>/<model name>`. The entry that matches has the provider `id` (which defaults to `type`) and the model `name` (which defaults to `provider_model_id`), or else that `provider_model_id`:
+
+```yaml
+inference:
+  providers:
+    - type: vllm
+      id: rhaiis
+      allowed_models:
+        - name: granite-3.3-8b-instruct
+          provider_model_id: granite-3.3-8b-instruct
+          metadata:
+            context_window: 131072
+```
+
+Before adding an `inference.providers` entry only to set a window, read [Migrating to v0.8.0](../migrations/v0.8.0.md#context-windows-for-conversation-compaction): in some deployments the entry changes the generated OGX configuration.
+
+### Deprecated: `inference.context_windows`
+
+The top-level `inference.context_windows` map is deprecated: it still applies to a model whose entry sets no `metadata.context_window`, and the service logs a warning at startup while it is set. [Migrating to v0.8.0](../migrations/v0.8.0.md#context-windows-for-conversation-compaction) says how to move its entries and when to keep them for now.
 
 ## Behavior details
 
@@ -124,9 +164,8 @@ compaction:
 Compaction triggers when **all** of the following are true:
 
 1. `compaction.enabled` is `true`
-2. The model has a registered context window in `inference.context_windows`
-3. The estimated token count of the conversation exceeds `threshold_ratio × context_window`
-4. The estimated token count is at least `token_floor`
+2. The estimated token count of the conversation exceeds `threshold_ratio × context_window` (see [Context window](#context-window))
+3. The estimated token count is at least `token_floor`
 
 ### Degrading guard
 
@@ -166,7 +205,7 @@ Yes. The summarization step requires an additional LLM call, which consumes toke
 
 **Can I use compaction with all LLM providers?**
 
-Compaction works with any provider supported by OGX, as long as the model's context window is registered in `inference.context_windows`.
+Compaction works with any provider supported by OGX. For a model whose context window the service cannot look up, set `metadata.context_window` on its `allowed_models` entry; see [Context window](#context-window).
 
 **How does compaction interact with RAG?**
 

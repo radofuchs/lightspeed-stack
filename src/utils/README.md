@@ -24,6 +24,10 @@ Conversation compaction — partitioning, summarization, additive fold-up.
 
 Decorator that makes sure the object is 'connected' according to it's connected predicate.
 
+## [context_window.py](context_window.py)
+
+Context window resolution for conversation compaction.
+
 ## [conversation_compaction.py](conversation_compaction.py)
 
 Runtime integration of conversation compaction into the request flow.
@@ -67,6 +71,10 @@ Check if the OGX version is supported by the LCS.
 ## [otel_tracing.py](otel_tracing.py)
 
 OpenTelemetry tracing utilities for Lightspeed Core Stack.
+
+## [pending_turn.py](pending_turn.py)
+
+The owner of the turns lightspeed-stack has to store itself (LCORE-3908).
 
 ## [prompts.py](prompts.py)
 

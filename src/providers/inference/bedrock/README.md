@@ -4,3 +4,11 @@
 
 Bedrock inference provider package.
 
+## [provider.py](provider.py)
+
+AWS Bedrock runtime inference provider backed by Pydantic AI.
+
+## [specs.py](specs.py)
+
+Wire models for Bedrock ListFoundationModels responses.
+

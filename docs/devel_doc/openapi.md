@@ -6589,7 +6589,7 @@ Inference configuration.
 |-------|------|-------------|
 | default_model |  | Identification of default model used when no other model is specified. |
 | default_provider |  | Identification of default provider used when no other model is specified. |
-| context_windows | object | Map of fully-qualified model identifier (e.g., "openai/gpt-5.6-luna") to context window size in tokens. Used by the conversation compaction trigger to decide when older turns must be summarized before the input exceeds the window. Models absent from this map have no registered window — callers fall back to their own default or skip the token-based trigger. |
+| context_windows | object | Deprecated: set metadata.context_window on the model's inference.providers[].allowed_models entry instead. Map of fully-qualified model identifier (e.g., "openai/gpt-5.6-luna") to context window size in tokens, used by conversation compaction when the model's catalog metadata has no context_window. |
 
 
 ## InfoResponse
