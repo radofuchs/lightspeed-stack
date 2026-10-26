@@ -2,7 +2,9 @@
 name: E2E Inference Provider Tests
 
 on: 
-  push
+  schedule:
+    - cron: "0 0 * * *"  # Runs once a day at midnight UTC
+  workflow_dispatch:
 
 jobs:
   # Own job so repository secrets are never sent to a runner unless this passes.
@@ -325,7 +327,6 @@ jobs:
           CURL_EC=1
           CONNECTIVITY_OK=0
 
-<<<<<<< HEAD
           models_contain_expected_llm() {
             echo "$MODEL_JSON" | jq -e --arg p "$EXPECTED_PROVIDER" --arg m "$EXPECTED_MODEL" --arg suffix "$MODEL_SUFFIX" \
               '.models | any(
@@ -372,24 +373,8 @@ jobs:
               curl -sS "http://localhost:8321/v1/models?model_type=llm" | head -c 4000 || true
               echo ""
               echo "=== OGX logs (vertex / credentials) ==="
-              show_logs 2>&1 | rg -i 'vertex|google-vertex|Failed to list provider|DefaultCredentials|gcp-key|Model refresh' | tail -50 || true
+              show_logs 2>&1 | grep -iE 'vertex|google-vertex|Failed to list provider|DefaultCredentials|gcp-key|Model refresh' | tail -50 || true
             fi
-=======
-          MODEL_SUFFIX="${EXPECTED_MODEL##*/}"
-          if ! echo "$MODEL_JSON" | jq -e --arg p "$EXPECTED_PROVIDER" --arg m "$EXPECTED_MODEL" --arg suffix "$MODEL_SUFFIX" \
-            '.models | any(
-              .provider_id == $p
-              and (
-                .provider_resource_id == $m
-                or (.provider_resource_id | endswith("/" + $suffix))
-                or .provider_resource_id == $suffix
-              )
-            )' >/dev/null
-          then
-            echo "❌ Expected LLM not listed by /v1/models (provider_id + provider_resource_id must match)"
-            echo "Registered LLM entries (provider_id, provider_resource_id, api_model_type):"
-            echo "$MODEL_JSON" | jq -r '.models[] | "\(.provider_id)\t\(.provider_resource_id)\t\(.api_model_type)"' || true
->>>>>>> upstream/main
             show_logs
             exit 1
           fi
