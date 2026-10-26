@@ -1540,7 +1540,8 @@ class TestResolveToolChoice:
             ],
         )
         prepared, choice = await resolve_tool_choice(tools, allowed, "token")
-        assert prepared is not None and len(prepared) == 1
+        assert prepared is not None
+        assert len(prepared) == 1
         assert isinstance(prepared[0], InputToolFunction)
         assert prepared[0].name == "keep_fn"
         assert choice == ToolChoiceMode.required
