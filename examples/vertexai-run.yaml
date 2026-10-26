@@ -20,6 +20,7 @@ providers:
       project: ${env.VERTEX_AI_PROJECT}
       location: ${env.VERTEX_AI_LOCATION:=global}
       allowed_models:
+      - google/gemini-3.5-flash-lite
       - publishers/google/models/gemini-3.5-flash-lite
       thought_signature_store:
         backend: kv_default
