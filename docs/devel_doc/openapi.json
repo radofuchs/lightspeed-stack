@@ -18728,7 +18728,8 @@
                     "namespace": {
                         "anyOf": [
                             {
-                                "type": "string"
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
                             },
                             {
                                 "type": "null"
