@@ -24,6 +24,7 @@ from pydantic import (
     PrivateAttr,
     SecretStr,
     StrictBool,
+    StringConstraints,
     field_validator,
     model_validator,
 )
@@ -227,7 +228,9 @@ class PostgreSQLDatabaseConfiguration(ConfigurationBase):
         description="Password used to authenticate",
     )
 
-    namespace: Optional[str] = Field(
+    namespace: Annotated[
+        Optional[str], StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
+    ] = Field(
         "public",
         title="Name space",
         description="Database namespace",
