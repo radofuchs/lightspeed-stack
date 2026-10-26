@@ -317,30 +317,55 @@ jobs:
           echo "Testing /v1/models and verifying expected LLM is registered..."
           echo "Expected: provider_id=${EXPECTED_PROVIDER} provider_resource_id=${EXPECTED_MODEL}"
 
-          CURL_EC=0
-          MODEL_JSON=$(curl -sS "http://localhost:8080/v1/models?model_type=llm") || CURL_EC=$?
-          echo "GET /v1/models?model_type=llm response:"
-          echo "$MODEL_JSON"
-          if [ "$CURL_EC" -ne 0 ]; then
-            echo "❌ GET /v1/models?model_type=llm failed (curl exit $CURL_EC)"
-            show_logs
-            exit 1
-          fi
-
+          MODELS_URL="http://localhost:8080/v1/models?model_type=llm"
           MODEL_SUFFIX="${EXPECTED_MODEL##*/}"
-          if ! echo "$MODEL_JSON" | jq -e --arg p "$EXPECTED_PROVIDER" --arg m "$EXPECTED_MODEL" --arg suffix "$MODEL_SUFFIX" \
-            '.models | any(
-              .provider_id == $p
-              and (
-                .provider_resource_id == $m
-                or (.provider_resource_id | endswith("/" + $suffix))
-                or .provider_resource_id == $suffix
-              )
-            )' >/dev/null
-          then
-            echo "❌ Expected LLM not listed by /v1/models (provider_id + provider_resource_id must match)"
-            echo "Registered LLM entries (provider_id, provider_resource_id, api_model_type):"
-            echo "$MODEL_JSON" | jq -r '.models[] | "\(.provider_id)\t\(.provider_resource_id)\t\(.api_model_type)"' || true
+          MAX_ATTEMPTS=12
+          SLEEP_SEC=5
+          MODEL_JSON=""
+          CURL_EC=1
+          CONNECTIVITY_OK=0
+
+          models_contain_expected_llm() {
+            echo "$MODEL_JSON" | jq -e --arg p "$EXPECTED_PROVIDER" --arg m "$EXPECTED_MODEL" --arg suffix "$MODEL_SUFFIX" \
+              '.models | any(
+                .provider_id == $p
+                and (
+                  .provider_resource_id == $m
+                  or (.provider_resource_id | endswith("/" + $suffix))
+                  or .provider_resource_id == $suffix
+                )
+              )' >/dev/null
+          }
+
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "GET ${MODELS_URL} (attempt ${attempt}/${MAX_ATTEMPTS})..."
+            CURL_EC=0
+            MODEL_JSON=$(curl -fsS --connect-timeout 10 --max-time 60 "${MODELS_URL}") || CURL_EC=$?
+            if [ "$CURL_EC" -eq 0 ] && models_contain_expected_llm; then
+              CONNECTIVITY_OK=1
+              break
+            fi
+            if [ "$CURL_EC" -ne 0 ]; then
+              echo "curl failed (exit ${CURL_EC}; 56 = CURLE_RECV_ERROR); retrying in ${SLEEP_SEC}s..."
+            else
+              echo "Expected LLM not in response yet; retrying in ${SLEEP_SEC}s..."
+              echo "Response snapshot:"
+              echo "$MODEL_JSON"
+            fi
+            sleep "$SLEEP_SEC"
+          done
+
+          echo "GET /v1/models?model_type=llm final response:"
+          echo "$MODEL_JSON"
+
+          if [ "$CONNECTIVITY_OK" -ne 1 ]; then
+            if [ "$CURL_EC" -ne 0 ]; then
+              echo "❌ GET /v1/models?model_type=llm failed after ${MAX_ATTEMPTS} attempts (last curl exit $CURL_EC)"
+            else
+              echo "❌ Expected LLM not listed by /v1/models after ${MAX_ATTEMPTS} attempts (provider_id + provider_resource_id must match)"
+              echo "Registered LLM entries (provider_id, provider_resource_id, api_model_type):"
+              echo "$MODEL_JSON" | jq -r '.models[] | "\(.provider_id)\t\(.provider_resource_id)\t\(.api_model_type)"' || true
+            fi
             if [ "${{ matrix.environment }}" = "vertexai" ]; then
               echo "=== OGX /v1/models?model_type=llm (direct) ==="
               curl -sS "http://localhost:8321/v1/models?model_type=llm" | head -c 4000 || true
