@@ -1193,12 +1193,12 @@ will be returned.
       "model_type": "embedding"
     },
     {
-      "identifier": "openai/gpt-4o-mini",
+      "identifier": "openai/gpt-5.6-luna",
       "metadata": {},
       "api_model_type": "llm",
       "provider_id": "openai",
       "type": "model",
-      "provider_resource_id": "gpt-4o-mini",
+      "provider_resource_id": "gpt-5.6-luna",
       "model_type": "llm"
     },
     {
