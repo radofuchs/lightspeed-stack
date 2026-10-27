@@ -87,6 +87,7 @@ from utils.query import (
 )
 from utils.quota import check_tokens_available, get_available_quotas
 from utils.responses import (
+    apply_gpt5_tool_call_reasoning_effort,
     build_tool_call_summary,
     build_turn_summary,
     check_model_configured,
@@ -470,6 +471,7 @@ async def responses_endpoint_handler(
         updated_request.max_tool_calls = configuration.inference.max_tool_calls
 
     api_params = ResponsesApiParams.model_validate(updated_request.model_dump())
+    api_params = apply_gpt5_tool_call_reasoning_effort(api_params)
 
     # Compact the conversation if it is approaching the context window limit.
     # /v1/responses is OpenAI-compatible, so compaction is silent (no custom SSE
@@ -492,7 +494,7 @@ async def responses_endpoint_handler(
             user_id=user_id,
             skip_user_id_check=skip_userid_check,
         )
-        api_params = compaction.params
+        api_params = apply_gpt5_tool_call_reasoning_effort(compaction.params)
         if compaction.compacted:
             compacted_original_input = compaction.original_input
 

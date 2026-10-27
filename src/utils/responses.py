@@ -70,6 +70,9 @@ from llama_stack_api.openai_responses import (
     OpenAIResponseOutputMessageWebSearchToolCall as WebSearchCall,
 )
 from llama_stack_api.openai_responses import (
+    OpenAIResponseReasoning as Reasoning,
+)
+from llama_stack_api.openai_responses import (
     OpenAIResponseUsage as ResponseUsage,
 )
 from llama_stack_api.openai_responses import (
@@ -297,6 +300,36 @@ async def prepare_tools(  # pylint: disable=too-many-arguments,too-many-position
     return toolgroups
 
 
+def apply_gpt5_tool_call_reasoning_effort(
+    params: ResponsesApiParams,
+) -> ResponsesApiParams:
+    """Set ``reasoning.effort`` to ``none`` for GPT-5 models when tools are present.
+
+    Llama Stack's agent loop issues OpenAI ``/v1/chat/completions`` calls with
+    function tools. Models such as ``gpt-5.6-luna`` reject non-``none``
+    ``reasoning_effort`` on that path unless the client uses ``/v1/responses``
+    with explicit configuration.
+
+    Parameters:
+        params: Prepared Responses API parameters.
+
+    Returns:
+        A copy of ``params`` with ``reasoning.effort='none'`` when the workaround
+        applies; otherwise the original instance unchanged.
+    """
+    if not params.tools:
+        return params
+    model_id = params.model.split("/", 1)[-1] if params.model else ""
+    if not model_id.startswith("gpt-5"):
+        return params
+    if params.reasoning is not None and params.reasoning.effort not in (
+        None,
+        "none",
+    ):
+        return params
+    return params.model_copy(update={"reasoning": Reasoning(effort="none")})
+
+
 def _build_provider_data_headers(
     tools: Optional[list[InputTool]],
 ) -> Optional[dict[str, str]]:
@@ -420,7 +453,7 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
     # Normalize Vertex AI model IDs to work around llama-stack 0.6.x bug
     normalized_model = normalize_vertex_ai_model_id(model)
 
-    return ResponsesApiParams(
+    params = ResponsesApiParams(
         input=input_text,
         model=normalized_model,
         instructions=system_prompt,
@@ -432,6 +465,7 @@ async def prepare_responses_params(  # pylint: disable=too-many-arguments,too-ma
         max_infer_iters=configuration.inference.max_infer_iters,
         max_tool_calls=configuration.inference.max_tool_calls,
     )
+    return apply_gpt5_tool_call_reasoning_effort(params)
 
 
 def extract_vector_store_ids_from_tools(
