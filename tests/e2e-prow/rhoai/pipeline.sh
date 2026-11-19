@@ -1,4 +1,7 @@
 #!/bin/bash
+# Prow RHOAI E2E: in-cluster vLLM + OGX server pods (default).
+# Konflux RHOAI library: set VLLM_URL (+ KONFLUX_BOOL), E2E_DEPLOYMENT_MODE=library,
+# LIGHTSPEED_STACK_IMAGE, LLAMA_STACK_CONFIG, LCS_CONFIG — skips DSC/bootstrap and OGX build.
 set -euo pipefail
 trap 'echo "❌ Pipeline failed at line $LINENO"; exit 1' ERR
 
@@ -8,10 +11,27 @@ export RUNNING_PROW=true
 #========================================
 # 1. GLOBAL CONFIG
 #========================================
-NAMESPACE="e2e-rhoai-dsc"
+NAMESPACE="${NAMESPACE:-e2e-rhoai-dsc}"
 export NAMESPACE
-MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
+MODEL_NAME="${VLLM_MODEL:-meta-llama/Llama-3.1-8B-Instruct}"
 PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$PIPELINE_DIR/../../.." && pwd)"
+
+LIBRARY_MODE=false
+if [[ "${E2E_DEPLOYMENT_MODE:-}" == "library" ]]; then
+  LIBRARY_MODE=true
+fi
+USE_EXTERNAL_VLLM=false
+if [[ -n "${VLLM_URL:-}" ]]; then
+  USE_EXTERNAL_VLLM=true
+  export E2E_KONFLUX_E2E=1
+fi
+if [[ "${KONFLUX_BOOL:-}" == "true" ]]; then
+  export E2E_KONFLUX_E2E=1
+fi
+
+LIGHTSPEED_STACK_IMAGE="${LIGHTSPEED_STACK_IMAGE:-quay.io/lightspeed-core/lightspeed-stack:dev-latest}"
+export LIGHTSPEED_STACK_IMAGE
 
 # RHOAI OGX image (unused when building from source via ogx-openai.yaml)
 # LLAMA_STACK_IMAGE="${LLAMA_STACK_IMAGE:-quay.io/rhoai/odh-llama-stack-core-rhel9:rhoai-3.4-ea.2}"
@@ -22,26 +42,103 @@ PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 2. ENVIRONMENT SETUP
 #========================================
 echo "===== Setting up environment variables ====="
-export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test || true)
-export VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test || true)
-export QUAY_ROBOT_NAME=$(cat /var/run/quay-aipcc-name/lcore-quay-name-lcore-test || true)
-export QUAY_ROBOT_PASSWORD=$(cat /var/run/quay-aipcc-password/lcore-quay-password-lcore-test || true)
+if [[ "${E2E_KONFLUX_E2E:-}" == "1" ]]; then
+  if [[ -z "${VLLM_API_KEY:-}" && -r /var/run/vllm/vllm-api-key-lcore-test ]]; then
+    export VLLM_API_KEY="$(cat /var/run/vllm/vllm-api-key-lcore-test)"
+  fi
+  if [[ -z "${OPENAI_API_KEY:-}" && -r /var/run/openai/openai-api-key ]]; then
+    export OPENAI_API_KEY="$(cat /var/run/openai/openai-api-key)"
+  fi
+  if [[ -z "${QUAY_ROBOT_NAME:-}" && -d /var/run/quay-aipcc-name ]]; then
+    shopt -s nullglob
+    for _f in /var/run/quay-aipcc-name/*; do
+      [[ -f "$_f" ]] && export QUAY_ROBOT_NAME="$(cat "$_f")" && break
+    done
+    shopt -u nullglob
+  fi
+  if [[ -z "${QUAY_ROBOT_PASSWORD:-}" && -d /var/run/quay-aipcc-password ]]; then
+    shopt -s nullglob
+    for _f in /var/run/quay-aipcc-password/*; do
+      [[ -f "$_f" ]] && export QUAY_ROBOT_PASSWORD="$(cat "$_f")" && break
+    done
+    shopt -u nullglob
+  fi
+  [[ -n "${VLLM_URL:-}" ]] && echo "✅ VLLM_URL is set: $VLLM_URL"
+  [[ -n "${VLLM_API_KEY:-}" ]] && echo "✅ VLLM_API_KEY is set" || {
+    if [[ -n "${VLLM_URL:-}" ]]; then
+      echo "❌ Missing VLLM_API_KEY (required for external vLLM)"
+      exit 1
+    fi
+  }
+else
+  export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test || true)
+  export VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test || true)
+  export QUAY_ROBOT_NAME=$(cat /var/run/quay-aipcc-name/lcore-quay-name-lcore-test || true)
+  export QUAY_ROBOT_PASSWORD=$(cat /var/run/quay-aipcc-password/lcore-quay-password-lcore-test || true)
+  [[ -n "$HUGGING_FACE_HUB_TOKEN" ]] && echo "✅ HUGGING_FACE_HUB_TOKEN is set" || { echo "❌ Missing HUGGING_FACE_HUB_TOKEN"; exit 1; }
+  [[ -n "$VLLM_API_KEY" ]] && echo "✅ VLLM_API_KEY is set" || { echo "❌ Missing VLLM_API_KEY"; exit 1; }
+fi
 
+[[ -n "${QUAY_ROBOT_NAME:-}" ]] && echo "✅ QUAY_ROBOT_NAME is set" || { echo "❌ Missing QUAY_ROBOT_NAME"; exit 1; }
+[[ -n "${QUAY_ROBOT_PASSWORD:-}" ]] && echo "✅ QUAY_ROBOT_PASSWORD is set" || { echo "❌ Missing QUAY_ROBOT_PASSWORD"; exit 1; }
 
-[[ -n "$HUGGING_FACE_HUB_TOKEN" ]] && echo "✅ HUGGING_FACE_HUB_TOKEN is set" || { echo "❌ Missing HUGGING_FACE_HUB_TOKEN"; exit 1; }
-[[ -n "$VLLM_API_KEY" ]] && echo "✅ VLLM_API_KEY is set" || { echo "❌ Missing VLLM_API_KEY"; exit 1; }
-[[ -n "$QUAY_ROBOT_NAME" ]] && echo "✅ QUAY_ROBOT_NAME is set" || { echo "❌ Missing QUAY_ROBOT_NAME"; exit 1; }
-[[ -n "$QUAY_ROBOT_PASSWORD" ]] && echo "✅ QUAY_ROBOT_PASSWORD is set" || { echo "❌ Missing QUAY_ROBOT_PASSWORD"; exit 1; }
+MODEL_NAME="${VLLM_MODEL:-$MODEL_NAME}"
+export MODEL_NAME
 
 # Basic info
 ls -A || true
 oc version
 oc whoami
 
-#========================================
-# 3. BOOTSTRAP OPERATORS & DSC (before namespace — DSC operator may delete it)
-#========================================
-echo "===== Bootstrapping operators ====="
+create_secret() {
+  local name=$1; shift
+  echo "Creating/updating secret $name..."
+  if [[ "${E2E_KONFLUX_E2E:-}" == "1" ]]; then
+    oc create secret generic "$name" "$@" -n "$NAMESPACE" --dry-run=client -o yaml | oc apply -f -
+  else
+    oc create secret generic "$name" "$@" -n "$NAMESPACE" 2>/dev/null || echo "Secret $name exists"
+  fi
+}
+
+if [[ "$USE_EXTERNAL_VLLM" == true ]]; then
+  echo "===== External vLLM (Konflux) — skipping in-cluster RHOAI bootstrap ====="
+  oc get ns "$NAMESPACE" >/dev/null 2>&1 || oc create namespace "$NAMESPACE"
+  create_secret vllm-url-secret --from-literal=key="$VLLM_URL"
+  create_secret vllm-api-key-secret --from-literal=key="${VLLM_API_KEY:-}"
+  create_secret vllm-model-secret --from-literal=key="$MODEL_NAME"
+  create_secret openai-api-key-secret --from-literal=key="${OPENAI_API_KEY:-}"
+  if [ -f "$REPO_ROOT/tests/e2e/secrets/mcp-token" ]; then
+    oc create secret generic mcp-file-auth-token -n "$NAMESPACE" \
+      --from-file=token="$REPO_ROOT/tests/e2e/secrets/mcp-token" \
+      --dry-run=client -o yaml | oc apply -f -
+    echo "✅ mcp-file-auth-token secret applied"
+  fi
+  if [ -f "$REPO_ROOT/tests/e2e/secrets/invalid-mcp-token" ]; then
+    oc create secret generic mcp-invalid-file-auth-token -n "$NAMESPACE" \
+      --from-file=token="$REPO_ROOT/tests/e2e/secrets/invalid-mcp-token" \
+      --dry-run=client -o yaml | oc apply -f -
+    echo "✅ mcp-invalid-file-auth-token secret applied"
+  fi
+  echo "Creating Quay pull secret..."
+  oc create secret docker-registry quay-lightspeed-pull-secret \
+    --docker-server=quay.io \
+    --docker-username="$QUAY_ROBOT_NAME" \
+    --docker-password="$QUAY_ROBOT_PASSWORD" \
+    -n "$NAMESPACE" 2>/dev/null && echo "✅ Quay pull secret created" || echo "⚠️  Secret exists or creation failed"
+  oc secrets link default quay-lightspeed-pull-secret --for=pull -n "$NAMESPACE" 2>/dev/null || true
+  if [[ -f /var/run/redhat-registry-pull-secret/.dockerconfigjson ]]; then
+    oc create secret generic redhat-registry-pull-secret \
+      --from-file=.dockerconfigjson=/var/run/redhat-registry-pull-secret/.dockerconfigjson \
+      --type=kubernetes.io/dockerconfigjson \
+      -n "$NAMESPACE" \
+      --dry-run=client -o yaml | oc apply -f -
+    oc secrets link default redhat-registry-pull-secret --for=pull -n "$NAMESPACE" 2>/dev/null || true
+  fi
+else
+  #========================================
+  # 3. BOOTSTRAP OPERATORS & DSC (before namespace — DSC operator may delete it)
+  #========================================
+  echo "===== Bootstrapping operators ====="
 # Create NFD and NVIDIA namespaces (needed by operator subscriptions)
 oc apply -f "$PIPELINE_DIR/manifests/namespaces/nfd.yaml"
 oc apply -f "$PIPELINE_DIR/manifests/namespaces/nvidia-operator.yaml"
@@ -49,78 +146,68 @@ oc apply -f "$PIPELINE_DIR/manifests/namespaces/nvidia-operator.yaml"
 # Install operators and apply DataScienceCluster (this may delete/recreate namespaces)
 "$PIPELINE_DIR/scripts/bootstrap.sh" "$PIPELINE_DIR"
 
-#========================================
-# 4. CREATE NAMESPACE & SECRETS (after DSC settles)
-#========================================
-echo "===== Creating namespace & secrets ====="
-oc get ns "$NAMESPACE" >/dev/null 2>&1 || oc create namespace "$NAMESPACE"
+  #========================================
+  # 4. CREATE NAMESPACE & SECRETS (after DSC settles)
+  #========================================
+  echo "===== Creating namespace & secrets ====="
+  oc get ns "$NAMESPACE" >/dev/null 2>&1 || oc create namespace "$NAMESPACE"
 
-create_secret() {
-    local name=$1; shift
-    echo "Creating secret $name..."
-    oc create secret generic "$name" "$@" -n "$NAMESPACE" 2>/dev/null || echo "Secret $name exists"
-}
+  create_secret hf-token-secret --from-literal=token="$HUGGING_FACE_HUB_TOKEN"
+  create_secret vllm-api-key-secret --from-literal=key="$VLLM_API_KEY"
+  create_secret openai-api-key-secret --from-literal=key=""
+  create_secret vllm-model-secret --from-literal=key="$MODEL_NAME"
 
-create_secret hf-token-secret --from-literal=token="$HUGGING_FACE_HUB_TOKEN"
-create_secret vllm-api-key-secret --from-literal=key="$VLLM_API_KEY"
-create_secret openai-api-key-secret --from-literal=key=""
-create_secret vllm-model-secret --from-literal=key="$MODEL_NAME"
-
-# MCP token secrets for lightspeed-stack
-REPO_ROOT="$(cd "$PIPELINE_DIR/../../.." && pwd)"
-if [ -f "$REPO_ROOT/tests/e2e/secrets/mcp-token" ]; then
+  # MCP token secrets for lightspeed-stack
+  if [ -f "$REPO_ROOT/tests/e2e/secrets/mcp-token" ]; then
   oc create secret generic mcp-file-auth-token -n "$NAMESPACE" \
     --from-file=token="$REPO_ROOT/tests/e2e/secrets/mcp-token" \
     --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
   echo "✅ mcp-file-auth-token secret applied"
-fi
-if [ -f "$REPO_ROOT/tests/e2e/secrets/invalid-mcp-token" ]; then
+  fi
+  if [ -f "$REPO_ROOT/tests/e2e/secrets/invalid-mcp-token" ]; then
   oc create secret generic mcp-invalid-file-auth-token -n "$NAMESPACE" \
     --from-file=token="$REPO_ROOT/tests/e2e/secrets/invalid-mcp-token" \
     --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
   echo "✅ mcp-invalid-file-auth-token secret applied"
-fi
+  fi
 
-# Create Quay pull secret for OGX images
-echo "Creating Quay pull secret..."
-oc create secret docker-registry quay-lightspeed-pull-secret \
+  # Create Quay pull secret for OGX images
+  echo "Creating Quay pull secret..."
+  oc create secret docker-registry quay-lightspeed-pull-secret \
   --docker-server=quay.io \
   --docker-username="$QUAY_ROBOT_NAME" \
   --docker-password="$QUAY_ROBOT_PASSWORD" \
   -n "$NAMESPACE" 2>/dev/null && echo "✅ Quay pull secret created" || echo "⚠️  Secret exists or creation failed"
 
 # Link the secret to default service account for image pulls
-oc secrets link default quay-lightspeed-pull-secret --for=pull -n "$NAMESPACE" 2>/dev/null || echo "⚠️  Secret already linked to default SA"
+  oc secrets link default quay-lightspeed-pull-secret --for=pull -n "$NAMESPACE" 2>/dev/null || echo "⚠️  Secret already linked to default SA"
 
-
-#========================================
-# 5. CONFIGMAPS
-#========================================
-echo "===== Setting up configmaps ====="
+  #========================================
+  # 5. CONFIGMAPS
+  #========================================
+  echo "===== Setting up configmaps ====="
 
 curl -sL -o tool_chat_template_llama3.1_json.jinja \
     https://raw.githubusercontent.com/vllm-project/vllm/main/examples/tool_chat_template_llama3.1_json.jinja \
     || { echo "❌ Failed to download jinja template"; exit 1; }
 
-oc create configmap vllm-chat-template -n "$NAMESPACE" \
-    --from-file=tool_chat_template_llama3.1_json.jinja --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
+  oc create configmap vllm-chat-template -n "$NAMESPACE" \
+      --from-file=tool_chat_template_llama3.1_json.jinja --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
 
-
-#========================================
-# 6. DEPLOY vLLM (GPU setup + deploy, bootstrap already done)
-#========================================
-echo "===== Deploying vLLM ====="
+  #========================================
+  # 6. DEPLOY vLLM (GPU setup + deploy, bootstrap already done)
+  #========================================
+  echo "===== Deploying vLLM ====="
 "$PIPELINE_DIR/scripts/gpu-setup.sh" "$PIPELINE_DIR"
 source "$PIPELINE_DIR/scripts/fetch-vllm-image.sh"
 "$PIPELINE_DIR/scripts/deploy-vllm.sh" "$PIPELINE_DIR"
 "$PIPELINE_DIR/scripts/get-vllm-pod-info.sh"
-oc get pods -n "$NAMESPACE"
+  oc get pods -n "$NAMESPACE"
 
-
-#========================================
-# 6. WAIT FOR POD & TEST API
-#========================================
-source pod.env
+  #========================================
+  # 6. WAIT FOR POD & TEST API
+  #========================================
+  source pod.env
 oc wait --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --timeout=600s
 
 echo "===== Testing vLLM endpoint ====="
@@ -173,17 +260,14 @@ while true; do
   sleep 20
 done
 
-# Cleanup test pod
-oc delete pod vllm-test-curl -n "$NAMESPACE" --ignore-not-found=true
-
+  # Cleanup test pod
+  oc delete pod vllm-test-curl -n "$NAMESPACE" --ignore-not-found=true
+fi
 
 #========================================
 # 7. DEPLOY MOCK SERVERS (JWKS & MCP)
 #========================================
 echo "===== Deploying Mock Servers ====="
-
-# Navigate to repo root to access server scripts
-REPO_ROOT="$(cd "$PIPELINE_DIR/../../.." && pwd)"
 
 # Create ConfigMaps from server scripts
 echo "Creating mock server ConfigMaps..."
@@ -216,47 +300,61 @@ oc wait pod/mock-jwks pod/mock-mcp \
 echo "✅ Mock servers deployed"
 
 #========================================
-# 8. BUILD OGX IMAGE
+# 8. BUILD OGX IMAGE (server mode only)
 #========================================
-echo "===== Building llama-stack image ====="
-LLAMA_STACK_IMAGE="image-registry.openshift-image-registry.svc:5000/${NAMESPACE}/llama-stack-e2e:latest"
-export LLAMA_STACK_IMAGE
+if [[ "$LIBRARY_MODE" == false ]]; then
+  echo "===== Building llama-stack image ====="
+  LLAMA_STACK_IMAGE="image-registry.openshift-image-registry.svc:5000/${NAMESPACE}/llama-stack-e2e:latest"
+  export LLAMA_STACK_IMAGE
 
-# Create BuildConfig (idempotent)
-oc new-build --name=llama-stack-e2e \
-  --binary \
-  --strategy=docker \
-  --to="llama-stack-e2e:latest" \
-  -n "$NAMESPACE" 2>/dev/null || echo "BuildConfig llama-stack-e2e already exists"
+  oc new-build --name=llama-stack-e2e \
+    --binary \
+    --strategy=docker \
+    --to="llama-stack-e2e:latest" \
+    -n "$NAMESPACE" 2>/dev/null || echo "BuildConfig llama-stack-e2e already exists"
 
-# Patch BuildConfig to use deploy/ogx/test.containerfile instead of Dockerfile
-oc patch bc llama-stack-e2e -n "$NAMESPACE" --type=json \
-  -p '[{"op":"replace","path":"/spec/strategy/dockerStrategy/dockerfilePath","value":"deploy/ogx/test.containerfile"}]' 2>/dev/null || true
+  oc patch bc llama-stack-e2e -n "$NAMESPACE" --type=json \
+    -p '[{"op":"replace","path":"/spec/strategy/dockerStrategy/dockerfilePath","value":"deploy/ogx/test.containerfile"}]' 2>/dev/null || true
 
-# Build from repo root
-oc start-build llama-stack-e2e \
-  --from-dir="$REPO_ROOT" \
-  --follow \
-  -n "$NAMESPACE" || { echo "❌ llama-stack image build failed"; exit 1; }
+  oc start-build llama-stack-e2e \
+    --from-dir="$REPO_ROOT" \
+    --follow \
+    -n "$NAMESPACE" || { echo "❌ llama-stack image build failed"; exit 1; }
 
-echo "✅ llama-stack image built: $LLAMA_STACK_IMAGE"
+  echo "✅ llama-stack image built: $LLAMA_STACK_IMAGE"
 
-# Allow default SA to pull from the internal registry
-oc policy add-role-to-user system:image-puller \
-  system:serviceaccount:${NAMESPACE}:default \
-  -n "$NAMESPACE" 2>/dev/null || true
+  oc policy add-role-to-user system:image-puller \
+    system:serviceaccount:${NAMESPACE}:default \
+    -n "$NAMESPACE" 2>/dev/null || true
+else
+  echo "===== Library mode — skipping OGX image build ====="
+fi
 
 #========================================
-# 9. DEPLOY LIGHTSPEED STACK AND OGX
+# 9. DEPLOY LIGHTSPEED STACK (and OGX pod in server mode)
 #========================================
 echo "===== Deploying Services ====="
 
-create_secret api-url-secret --from-literal=key="$KSVC_URL"
-# Llama run.yaml: vLLM layout (not under server-mode). Lightspeed: single source with GitHub E2E server-mode.
+if [[ "$LIBRARY_MODE" == true ]]; then
+  LLAMA_STACK_CONFIG="${LLAMA_STACK_CONFIG:-$REPO_ROOT/tests/e2e-prow/rhoai/configs/run-external-vllm.yaml}"
+  LCS_CONFIG="${LCS_CONFIG:-$REPO_ROOT/tests/e2e/configuration/library-mode/lightspeed-stack-rhoai.yaml}"
+  export E2E_DEPLOYMENT_MODE=library
+else
+  LLAMA_STACK_CONFIG="${LLAMA_STACK_CONFIG:-$REPO_ROOT/tests/e2e-prow/rhoai/configs/run.yaml}"
+  LCS_CONFIG="${LCS_CONFIG:-$REPO_ROOT/tests/e2e/configuration/server-mode/lightspeed-stack-rhoai.yaml}"
+fi
+echo "OGX run config: $LLAMA_STACK_CONFIG"
+echo "LCS config: $LCS_CONFIG"
+
+if [[ "$USE_EXTERNAL_VLLM" == false ]]; then
+  create_secret api-url-secret --from-literal=key="$KSVC_URL"
+fi
 oc create configmap llama-stack-config -n "$NAMESPACE" \
-  --from-file="$REPO_ROOT/tests/e2e-prow/rhoai/configs/run.yaml"
+  --from-file=run.yaml="$LLAMA_STACK_CONFIG" \
+  --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
 oc create configmap lightspeed-stack-config -n "$NAMESPACE" \
-  --from-file=lightspeed-stack.yaml="$REPO_ROOT/tests/e2e/configuration/server-mode/lightspeed-stack-rhoai.yaml"
+  --from-file=lightspeed-stack.yaml="$LCS_CONFIG" \
+  --dry-run=client -o yaml | oc apply -n "$NAMESPACE" -f -
 
 # Create RAG data ConfigMap from the e2e test RAG data
 echo "Creating RAG data ConfigMap..."
@@ -310,44 +408,63 @@ else
   echo "⚠️  No skills directory at $SKILLS_DIR — skills.feature will fail"
 fi
 
-./pipeline-services.sh
-
-echo "--> Final wait for both lightspeed-stack-service and llama-stack-service pods..."
-if ! oc wait pod/lightspeed-stack-service pod/llama-stack-service \
-    -n "$NAMESPACE" --for=condition=Ready --timeout=600s; then
-  echo ""
-  echo "❌ One or both service pods failed to become ready within timeout"
-  echo ""
-  echo "DEBUG: Pod status:"
-  oc get pods -n "$NAMESPACE" -o wide || true
-  echo ""
-  echo "DEBUG: lightspeed-stack-service description:"
-  oc describe pod lightspeed-stack-service -n "$NAMESPACE" || true
-  echo ""
-  echo "DEBUG: llama-stack-service description:"
-  oc describe pod llama-stack-service -n "$NAMESPACE" || true
-  echo ""
-  echo "DEBUG: lightspeed-stack-service logs:"
-  oc logs lightspeed-stack-service -n "$NAMESPACE" --tail=100 || true
-  echo ""
-  echo "DEBUG: llama-stack-service logs:"
-  oc logs llama-stack-service -n "$NAMESPACE" --tail=100 || true
-  echo ""
-  echo "DEBUG: Recent events in namespace:"
-  oc get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -20 || true
-  exit 1
+if [[ "$LIBRARY_MODE" == true ]]; then
+  chmod +x ./pipeline-services-library.sh
+  ./pipeline-services-library.sh
+else
+  ./pipeline-services.sh
 fi
-echo "✅ Both service pods are ready"
+
+if [[ "$LIBRARY_MODE" == true ]]; then
+  echo "--> Final wait for lightspeed-stack-service pod (library mode)..."
+  if ! oc wait pod/lightspeed-stack-service \
+      -n "$NAMESPACE" --for=condition=Ready --timeout=600s; then
+    echo "❌ lightspeed-stack-service failed to become ready within timeout"
+    oc get pods -n "$NAMESPACE" -o wide || true
+    oc describe pod lightspeed-stack-service -n "$NAMESPACE" || true
+    oc logs lightspeed-stack-service -n "$NAMESPACE" --tail=100 || true
+    exit 1
+  fi
+  echo "✅ lightspeed-stack-service is ready"
+else
+  echo "--> Final wait for both lightspeed-stack-service and llama-stack-service pods..."
+  if ! oc wait pod/lightspeed-stack-service pod/llama-stack-service \
+      -n "$NAMESPACE" --for=condition=Ready --timeout=600s; then
+    echo ""
+    echo "❌ One or both service pods failed to become ready within timeout"
+    echo ""
+    echo "DEBUG: Pod status:"
+    oc get pods -n "$NAMESPACE" -o wide || true
+    echo ""
+    echo "DEBUG: lightspeed-stack-service description:"
+    oc describe pod lightspeed-stack-service -n "$NAMESPACE" || true
+    echo ""
+    echo "DEBUG: llama-stack-service description:"
+    oc describe pod llama-stack-service -n "$NAMESPACE" || true
+    echo ""
+    echo "DEBUG: lightspeed-stack-service logs:"
+    oc logs lightspeed-stack-service -n "$NAMESPACE" --tail=100 || true
+    echo ""
+    echo "DEBUG: llama-stack-service logs:"
+    oc logs llama-stack-service -n "$NAMESPACE" --tail=100 || true
+    echo ""
+    echo "DEBUG: Recent events in namespace:"
+    oc get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -20 || true
+    exit 1
+  fi
+  echo "✅ Both service pods are ready"
+fi
 
 oc get pods -n "$NAMESPACE"
 
 echo "logs lightspeed"
 oc logs lightspeed-stack-service -n "$NAMESPACE" || true
-echo "logs llama"
-oc logs llama-stack-service -n "$NAMESPACE" || true
-
+if [[ "$LIBRARY_MODE" == false ]]; then
+  echo "logs llama"
+  oc logs llama-stack-service -n "$NAMESPACE" || true
+  oc describe pod llama-stack-service -n "$NAMESPACE" || true
+fi
 oc describe pod lightspeed-stack-service -n "$NAMESPACE" || true
-oc describe pod llama-stack-service -n "$NAMESPACE" || true
 
 
 #========================================
@@ -362,13 +479,15 @@ rm -f "$E2E_LSC_PORT_FORWARD_PID_FILE"
 rm -f "$E2E_OGX_PORT_FORWARD_PID_FILE"
 rm -f "$E2E_JWKS_PORT_FORWARD_PID_FILE"
 
-oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n $NAMESPACE
+if [[ "$LIBRARY_MODE" == false ]]; then
+  oc label pod lightspeed-stack-service pod=lightspeed-stack-service -n $NAMESPACE
 
-oc expose pod lightspeed-stack-service \
-  --name=lightspeed-stack-service-svc \
-  --port=8080 \
-  --type=ClusterIP \
-  -n $NAMESPACE
+  oc expose pod lightspeed-stack-service \
+    --name=lightspeed-stack-service-svc \
+    --port=8080 \
+    --type=ClusterIP \
+    -n $NAMESPACE
+fi
 
 # Kill any existing processes on ports 8080, 8000, and 8321 (lsof may be missing in minimal images)
 echo "Checking for existing processes on ports 8080, 8000, and 8321..."
@@ -394,12 +513,15 @@ oc port-forward svc/mock-jwks 8000:8000 -n $NAMESPACE &
 PF_JWKS_PID=$!
 echo "$PF_JWKS_PID" >"$E2E_JWKS_PORT_FORWARD_PID_FILE"
 
-# Behave steps that call OGX directly (MCP toolgroups, shields, disrupt/restore)
-# need localhost:8321. Without this forward those tests hit "Connection refused".
-echo "Starting port-forward for llama-stack..."
-oc port-forward svc/llama-stack-service-svc 8321:8321 -n $NAMESPACE &
-PF_OGX_PID=$!
-echo "$PF_OGX_PID" >"$E2E_OGX_PORT_FORWARD_PID_FILE"
+PF_OGX_PID=""
+if [[ "$LIBRARY_MODE" == false ]]; then
+  # Behave steps that call OGX directly (MCP toolgroups, shields, disrupt/restore)
+  # need localhost:8321. Without this forward those tests hit "Connection refused".
+  echo "Starting port-forward for llama-stack..."
+  oc port-forward svc/llama-stack-service-svc 8321:8321 -n $NAMESPACE &
+  PF_OGX_PID=$!
+  echo "$PF_OGX_PID" >"$E2E_OGX_PORT_FORWARD_PID_FILE"
+fi
 
 # Wait for port-forward to be usable (app may not be listening immediately; port-forward can drop)
 echo "Waiting for port-forward to lightspeed-stack to be ready..."
@@ -421,7 +543,7 @@ for i in $(seq 1 36); do
     oc get pods -n "$NAMESPACE" -o wide || true
     kill $PF_LCS_PID 2>/dev/null || true
     kill $PF_JWKS_PID 2>/dev/null || true
-    kill $PF_OGX_PID 2>/dev/null || true
+    [[ -n "$PF_OGX_PID" ]] && kill $PF_OGX_PID 2>/dev/null || true
     exit 1
   fi
   # If port-forward process died, restart it (e.g. "connection refused" / "lost connection to pod")
@@ -434,29 +556,30 @@ for i in $(seq 1 36); do
   sleep 5
 done
 
-# Wait for OGX port-forward to be usable
-echo "Waiting for OGX port-forward (localhost:8321 /v1/health)..."
-for i in $(seq 1 36); do
-  if curl -sf http://localhost:8321/v1/health > /dev/null 2>&1; then
-    echo "✅ OGX port-forward ready after $(( i * 5 ))s"
-    break
-  fi
-  if [ $i -eq 36 ]; then
-    echo "❌ Port-forward to llama-stack never became healthy (3 min)"
-    oc logs llama-stack-service -n "$NAMESPACE" --tail=100 || true
-    kill $PF_LCS_PID 2>/dev/null || true
-    kill $PF_JWKS_PID 2>/dev/null || true
-    kill $PF_OGX_PID 2>/dev/null || true
-    exit 1
-  fi
-  if ! kill -0 $PF_OGX_PID 2>/dev/null; then
-    echo "Llama port-forward died, restarting (attempt $i)..."
-    oc port-forward svc/llama-stack-service-svc 8321:8321 -n $NAMESPACE &
-    PF_OGX_PID=$!
-    echo "$PF_OGX_PID" >"$E2E_OGX_PORT_FORWARD_PID_FILE"
-  fi
-  sleep 5
-done
+if [[ "$LIBRARY_MODE" == false ]]; then
+  echo "Waiting for OGX port-forward (localhost:8321 /v1/health)..."
+  for i in $(seq 1 36); do
+    if curl -sf http://localhost:8321/v1/health > /dev/null 2>&1; then
+      echo "✅ OGX port-forward ready after $(( i * 5 ))s"
+      break
+    fi
+    if [ $i -eq 36 ]; then
+      echo "❌ Port-forward to llama-stack never became healthy (3 min)"
+      oc logs llama-stack-service -n "$NAMESPACE" --tail=100 || true
+      kill $PF_LCS_PID 2>/dev/null || true
+      kill $PF_JWKS_PID 2>/dev/null || true
+      kill $PF_OGX_PID 2>/dev/null || true
+      exit 1
+    fi
+    if ! kill -0 $PF_OGX_PID 2>/dev/null; then
+      echo "Llama port-forward died, restarting (attempt $i)..."
+      oc port-forward svc/llama-stack-service-svc 8321:8321 -n $NAMESPACE &
+      PF_OGX_PID=$!
+      echo "$PF_OGX_PID" >"$E2E_OGX_PORT_FORWARD_PID_FILE"
+    fi
+    sleep 5
+  done
+fi
 
 export E2E_LSC_HOSTNAME="localhost"
 export E2E_JWKS_HOSTNAME="localhost"
@@ -464,7 +587,11 @@ export E2E_DEFAULT_MODEL_OVERRIDE="$MODEL_NAME"
 export E2E_DEFAULT_PROVIDER_OVERRIDE="vllm"
 echo "LCS accessible at: http://$E2E_LSC_HOSTNAME:8080"
 echo "Mock JWKS accessible at: http://$E2E_JWKS_HOSTNAME:8000"
-echo "OGX accessible at: http://localhost:8321"
+if [[ "$LIBRARY_MODE" == false ]]; then
+  echo "OGX accessible at: http://localhost:8321"
+else
+  echo "OGX embedded in LCS pod (library mode)"
+fi
 
 
 
@@ -487,10 +614,10 @@ TEST_EXIT_CODE=$(cat "$E2E_EXIT_CODE_FILE" 2>/dev/null || echo 1)
 # Kill first so wait doesn't block (if a port-forward is still running, wait would hang)
 kill $PF_LCS_PID 2>/dev/null || true
 kill $PF_JWKS_PID 2>/dev/null || true
-kill $PF_OGX_PID 2>/dev/null || true
+[[ -n "$PF_OGX_PID" ]] && kill $PF_OGX_PID 2>/dev/null || true
 wait $PF_LCS_PID 2>/dev/null || true
 wait $PF_JWKS_PID 2>/dev/null || true
-wait $PF_OGX_PID 2>/dev/null || true
+[[ -n "$PF_OGX_PID" ]] && wait $PF_OGX_PID 2>/dev/null || true
 rm -f "$E2E_LSC_PORT_FORWARD_PID_FILE" "$E2E_OGX_PORT_FORWARD_PID_FILE" "$E2E_JWKS_PORT_FORWARD_PID_FILE"
 set -e
 trap 'echo "❌ Pipeline failed at line $LINENO"; exit 1' ERR

@@ -10,6 +10,15 @@ Standard e2e test pipeline using OpenAI as the inference provider.
 
 E2e test pipeline using a RHEL AI instance (vLLM) as the inference provider.
 
+### RHOAI library E2E (`lightspeed-stack-rhelai-library-test.yaml`)
+
+Same MAPT vLLM + HyperShift cluster as the RHEL AI Konflux pipeline, but the
+e2e harness is **RHOAI** (`tests/e2e-prow/rhoai/pipeline.sh` with
+`run-external-vllm.yaml` and `library-mode/lightspeed-stack-rhoai.yaml`).
+Tekton sets `E2E_DEPLOYMENT_MODE=library` (single LCS pod, embedded OGX).
+Register IntegrationTestScenario `lightspeed-stack-0-8-rhelai-library-tests`
+(or a RHOAI-specific name when you split scenarios).
+
 ## RHEL AI Pipeline — MAPT
 
 [MAPT](https://github.com/redhat-developer/mapt) (Multi-Architecture Provisioning Tool) provisions bare-metal-like cloud instances with GPU support. We use it to spin up RHEL AI instances on AWS with vLLM pre-configured, since the e2e tests need a real GPU-backed inference endpoint that OpenShift ephemeral clusters don't provide.

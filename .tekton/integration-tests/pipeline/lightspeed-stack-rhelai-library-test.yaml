@@ -1,0 +1,515 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: lightspeed-stack-0-8-rhelai-library-tests-pipeline
+spec:
+  description: |
+    MAPT external vLLM + HyperShift; RHOAI e2e via pipeline.sh in library mode
+    (run-external-vllm.yaml, lightspeed-stack-rhoai.yaml; no llama-stack pod).
+  params:
+    - name: SNAPSHOT
+      description: 'The JSON string representing the snapshot of the application under test.'
+      default: '{"components": [{"name":"lightspeed-stack-0-8", "containerImage": "quay.io/example/lightspeed-stack-0-8:latest"}]}'
+      type: string
+    - name: test-name
+      description: 'The name of the test corresponding to a defined Konflux integration test.'
+      default: 'lightspeed-stack-0-8-rhelai-library-tests'
+    - name: rhelai-version
+      description: 'RHEL AI version to provision.'
+      default: '3.4.0'
+      type: string
+    - name: instance-type
+      description: 'Comma-separated list of EC2 instance types for MAPT.'
+      default: 'g5.12xlarge,g6.12xlarge,g5.24xlarge,g6.24xlarge'
+      type: string
+    - name: spot
+      description: 'Use spot instances when true (retry, then fail; no on-demand fallback). If false, on-demand only with region fallback.'
+      default: 'true'
+      type: string
+    - name: model
+      description: 'HuggingFace model to serve on RHEL AI.'
+      default: 'RedHatAI/Qwen3.5-9B-quantized.w4a16'
+      type: string
+    - name: namespace
+      description: 'Namespace to run tests in'
+      default: 'lightspeed-stack'
+    - name: debug
+      description: 'Enable debug output.'
+      default: 'false'
+      type: string
+    - name: ocp-version
+      description: 'OpenShift minor version for the ephemeral HyperShift cluster.'
+      default: '4.19'
+      type: string
+    - name: compute-node-type
+      description: 'AWS instance type for the ephemeral HyperShift compute nodes.'
+      default: 'm5.xlarge'
+      type: string
+    - name: hosted-management-cluster
+      description: 'Hosted management cluster used to provision the ephemeral cluster.'
+      default: 'hosted-mgmt2'
+      type: string
+  tasks:
+    # ── RHEL AI provisioning (MAPT) ──
+    - name: provision-rhelai
+      description: Provision a RHEL AI instance with vLLM auto-started.
+      timeout: 2h
+      runAfter:
+        - provision-cluster
+      taskSpec:
+        params:
+          - name: rhelai-version
+          - name: instance-type
+          - name: model
+          - name: debug
+          - name: spot
+        results:
+          - name: host
+            description: "RHEL AI instance hostname or IP"
+          - name: username
+            description: "SSH username for the instance"
+          - name: vllm-api-key
+            description: "Random API key for vLLM authentication"
+        volumes:
+          - name: aws-credentials
+            secret:
+              secretName: aws-mapt-credentials
+          - name: host-info
+            emptyDir: {}
+          - name: oidc-token
+            projected:
+              sources:
+                - serviceAccountToken:
+                    audience: sts.amazonaws.com
+                    expirationSeconds: 3600
+                    path: token
+        steps:
+          - name: create-instance
+            image: quay.io/redhat-developer/mapt:v0.14.6
+            imagePullPolicy: Always
+            env:
+              - name: HOME
+                value: /opt/mapt/run
+              - name: AWS_WEB_IDENTITY_TOKEN_FILE
+                value: /var/run/secrets/oidc/token
+              - name: AWS_ROLE_ARN
+                valueFrom:
+                  secretKeyRef:
+                    name: aws-mapt-credentials
+                    key: AWS_ROLE_ARN
+            volumeMounts:
+              - name: aws-credentials
+                mountPath: /opt/aws-credentials
+                readOnly: true
+              - name: host-info
+                mountPath: /opt/host-info
+              - name: oidc-token
+                mountPath: /var/run/secrets/oidc
+                readOnly: true
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "1Gi"
+              limits:
+                cpu: "300m"
+                memory: "2Gi"
+            script: |
+              #!/usr/bin/env bash
+              set -uo pipefail
+
+              BUCKET=$(cat /opt/aws-credentials/S3_BUCKET)
+              RUN_ID="$(context.pipelineRun.name)"
+              HF_TOKEN=$(cat /opt/aws-credentials/HUGGING_FACE_HUB_TOKEN)
+              VLLM_API_KEY=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+
+              echo "[mapt] ========== Version Info =========="
+              echo "[mapt] RHEL AI AMI version: $(params.rhelai-version)"
+              echo "[mapt] Model: $(params.model)"
+              echo "[mapt] Run ID: ${RUN_ID}"
+              echo "[mapt] Spot: $(params.spot)"
+              echo "[mapt] =================================="
+
+              CREATED=0
+              # Spot: retry the same MAPT create block. No on-demand fallback.
+              SPOT_RETRIES=3
+              SPOT_RETRY_INTERVAL_SECONDS=300
+
+              if [[ "$(params.spot)" == "true" ]]; then
+                export AWS_DEFAULT_REGION="us-east-1"
+                echo "[mapt] Using spot instances (searching all regions, up to ${SPOT_RETRIES} attempts)..."
+                spot_attempt=1
+                while [ "${spot_attempt}" -le "${SPOT_RETRIES}" ]; do
+                  echo "[mapt] Spot attempt ${spot_attempt}/${SPOT_RETRIES}..."
+                  rm -f /opt/host-info/host /opt/host-info/username
+                  if mapt aws rhel-ai create \
+                      --project-name "mapt-rhel-ai-${RUN_ID}" \
+                      --backed-url "s3://${BUCKET}/mapt/rhel-ai/${RUN_ID}" \
+                      --conn-details-output /opt/host-info \
+                      --compute-sizes "$(params.instance-type)" \
+                      --version "$(params.rhelai-version)" \
+                      --spot --spot-eviction-tolerance highest \
+                      --auto-start \
+                      --model "$(params.model)" \
+                      --hf-token "${HF_TOKEN}" \
+                      --api-key "${VLLM_API_KEY}" \
+                      --expose-ports 8000 \
+                      --vllm-extra-args "--max-model-len 69632 --gpu-memory-utilization 0.90 --enable-auto-tool-choice --tool-call-parser qwen3_coder --reasoning-parser qwen3" \
+                      --tags "project=lightspeed-core,environment=konflux-ci" \
+                  && [ -s /opt/host-info/host ] && [ -s /opt/host-info/username ]; then
+                    CREATED=1
+                    break
+                  fi
+                  echo "[mapt] Spot attempt ${spot_attempt} failed or MAPT did not write conn details"
+                  mapt aws rhel-ai destroy \
+                      --project-name "mapt-rhel-ai-${RUN_ID}" \
+                      --backed-url "s3://${BUCKET}/mapt/rhel-ai/${RUN_ID}" \
+                      --force-destroy 2>/dev/null || true
+                  if [ "${spot_attempt}" -lt "${SPOT_RETRIES}" ]; then
+                    echo "[mapt] Waiting ${SPOT_RETRY_INTERVAL_SECONDS}s before next spot attempt..."
+                    sleep "${SPOT_RETRY_INTERVAL_SECONDS}"
+                  fi
+                  spot_attempt=$((spot_attempt + 1))
+                done
+                if [ "${CREATED}" -ne 1 ]; then
+                  echo "[mapt] ERROR: Spot instance was not fulfilled after ${SPOT_RETRIES} attempt(s). Not launching on-demand."
+                  exit 1
+                fi
+              fi
+
+              if [ "${CREATED}" -ne 1 ]; then
+                REGIONS="us-east-1 us-east-2 us-west-2 eu-west-1 eu-central-1 ap-northeast-1"
+                TIMEOUT=600
+
+                for REGION in $REGIONS; do
+                  echo "[mapt] Trying on-demand in ${REGION}..."
+                  export AWS_DEFAULT_REGION="${REGION}"
+                  rm -f /opt/host-info/host /opt/host-info/username
+
+                  if timeout "${TIMEOUT}" mapt aws rhel-ai create \
+                      --project-name "mapt-rhel-ai-${RUN_ID}" \
+                      --backed-url "s3://${BUCKET}/mapt/rhel-ai/${RUN_ID}" \
+                      --conn-details-output /opt/host-info \
+                      --compute-sizes "$(params.instance-type)" \
+                      --version "$(params.rhelai-version)" \
+                      --auto-start \
+                      --model "$(params.model)" \
+                      --hf-token "${HF_TOKEN}" \
+                      --api-key "${VLLM_API_KEY}" \
+                      --expose-ports 8000 \
+                      --vllm-extra-args "--max-model-len 69632 --gpu-memory-utilization 0.90 --enable-auto-tool-choice --tool-call-parser qwen3_coder --reasoning-parser qwen3" \
+                      --tags "project=lightspeed-core,environment=konflux-ci" \
+                  && [ -s /opt/host-info/host ] && [ -s /opt/host-info/username ]; then
+                    CREATED=1
+                    break
+                  fi
+
+                  echo "[mapt] Failed in ${REGION}, cleaning up and trying next..."
+                  mapt aws rhel-ai destroy \
+                      --project-name "mapt-rhel-ai-${RUN_ID}" \
+                      --backed-url "s3://${BUCKET}/mapt/rhel-ai/${RUN_ID}" \
+                      --force-destroy 2>/dev/null || true
+                done
+              fi
+
+              if [ "${CREATED}" -ne 1 ]; then
+                echo "[mapt] ERROR: Failed to create RHEL AI instance in any region"
+                exit 1
+              fi
+
+              if ! [ -s /opt/host-info/host ] || ! [ -s /opt/host-info/username ]; then
+                echo "[mapt] ERROR: MAPT did not write conn details under /opt/host-info; provisioning failed"
+                exit 1
+              fi
+
+              VLLM_HOST="$(cat /opt/host-info/host)"
+              # MAPT image has no curl; bash /dev/tcp polls GET /v1/models before OCP deploy + e2e.
+              VLLM_READINESS_TIMEOUT_SECONDS=1200
+              echo "[mapt] Provisioning OK (host=${VLLM_HOST}); waiting up to ${VLLM_READINESS_TIMEOUT_SECONDS}s for vLLM to list $(params.model)..."
+              VLLM_READINESS_DEADLINE=$((SECONDS + VLLM_READINESS_TIMEOUT_SECONDS))
+              n=0
+              while true; do
+                vllm_ready=0
+                if { exec 3<>"/dev/tcp/${VLLM_HOST}/8000"; } 2>/dev/null; then
+                  if printf 'GET /v1/models HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nConnection: close\r\n\r\n' \
+                      "${VLLM_HOST}" "${VLLM_API_KEY}" >&3 \
+                    && vllm_models_body="$(timeout 15 cat <&3)"; then
+                    case "${vllm_models_body}" in
+                      *"$(params.model)"*) vllm_ready=1 ;;
+                    esac
+                  fi
+                  exec 3<&-
+                  exec 3>&-
+                fi
+                if [ "${vllm_ready}" -eq 1 ]; then
+                  echo "[mapt] vLLM models API ready (poll ${n})"
+                  break
+                fi
+                if [ "${SECONDS}" -ge "${VLLM_READINESS_DEADLINE}" ]; then
+                  echo "[mapt] ERROR: vLLM did not list model after ${VLLM_READINESS_TIMEOUT_SECONDS}s (check instance logs / OOM / HF token)"
+                  exit 1
+                fi
+                n=$((n + 1))
+                sleep 10
+              done
+              echo -n "${VLLM_API_KEY}" > $(results.vllm-api-key.path)
+              echo -n "$(cat /opt/host-info/host)" > $(results.host.path)
+              echo -n "$(cat /opt/host-info/username)" > $(results.username.path)
+              echo "[mapt] Host: $(cat /opt/host-info/host)"
+              echo "[mapt] User: $(cat /opt/host-info/username)"
+      params:
+        - name: rhelai-version
+          value: "$(params.rhelai-version)"
+        - name: instance-type
+          value: "$(params.instance-type)"
+        - name: model
+          value: "$(params.model)"
+        - name: debug
+          value: "$(params.debug)"
+        - name: spot
+          value: "$(params.spot)"
+
+    # ── OpenShift CI HyperShift cluster provisioning ──
+    - name: provision-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/provision-ephemeral-cluster/0.1/provision-ephemeral-cluster.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+        - name: workflow
+          value: hypershift-hostedcluster-workflow
+        - name: clusterProfile
+          value: aws-konflux-prod
+        - name: timeout
+          value: 1h
+        - name: releases
+          value: >-
+            {"latest":{"release":{"channel":"stable","version":"$(params.ocp-version)","architecture":"multi"}}}
+        - name: env
+          value: '{"COMPUTE_NODE_TYPE":"$(params.compute-node-type)","HOSTED_MANAGEMENT_CLUSTER":"$(params.hosted-management-cluster)"}'
+
+    - name: get-stack-images
+      description: Extract lightspeed-stack image and commit from SNAPSHOT
+      runAfter:
+        - provision-cluster
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+      taskSpec:
+        results:
+          - name: lightspeed-stack-image
+            value: "$(steps.get-stack-images.results.lightspeed-stack-image)"
+          - name: commit
+            value: "$(steps.get-stack-images.results.commit)"
+        params:
+          - name: SNAPSHOT
+        steps:
+          - name: get-stack-images
+            image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+            env:
+              - name: SNAPSHOT
+                value: $(params.SNAPSHOT)
+            results:
+              - name: lightspeed-stack-image
+                type: string
+              - name: commit
+                type: string
+            script: |
+              dnf -y install jq
+              echo -n "$(jq -r --arg n "lightspeed-stack-0-8" '.components[] | select(.name == $n) | .containerImage // ""' <<< "$SNAPSHOT")" > $(step.results.lightspeed-stack-image.path)
+              echo -n "$(jq -r --arg n "lightspeed-stack-0-8" '.components[] | select(.name == $n) | .source.git.revision // "latest"' <<< "$SNAPSHOT")" > $(step.results.commit.path)
+
+    # ── Full E2E tests (runs after both RHEL AI and OpenShift are ready) ──
+    - name: rhelai-library-e2e-tests
+      description: Library-mode e2e with external RHEL AI vLLM (pipeline.sh)
+      timeout: 3h
+      runAfter:
+        - provision-rhelai
+        - get-stack-images
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: lightspeedstackimage
+          value: $(tasks.get-stack-images.results.lightspeed-stack-image)
+        - name: commit
+          value: $(tasks.get-stack-images.results.commit)
+        - name: namespace
+          value: "$(params.namespace)"
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+        - name: ocp-version
+          value: $(params.ocp-version)
+        - name: vllm-host
+          value: "$(tasks.provision-rhelai.results.host)"
+        - name: vllm-api-key
+          value: "$(tasks.provision-rhelai.results.vllm-api-key)"
+        - name: model
+          value: "$(params.model)"
+      taskSpec:
+        params:
+          - name: SNAPSHOT
+          - name: lightspeedstackimage
+          - name: commit
+          - name: namespace
+            type: string
+          - name: clusterCredentialsSecretRef
+            type: string
+          - name: ocp-version
+            type: string
+          - name: vllm-host
+            type: string
+          - name: vllm-api-key
+            type: string
+          - name: model
+            type: string
+        volumes:
+          - name: openai-api-key
+            secret:
+              secretName: openai-api-key
+          - name: quay-aipcc-name
+            secret:
+              secretName: quay-aipcc-name
+          - name: quay-aipcc-password
+            secret:
+              secretName: quay-aipcc-password
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+        steps:
+          - name: run-e2e-tests
+            resources:
+              requests:
+                cpu: '1'
+                memory: 1Gi
+              limits:
+                memory: 10Gi
+            volumeMounts:
+              - name: openai-api-key
+                mountPath: /var/run/openai
+              - name: quay-aipcc-name
+                mountPath: /var/run/quay-aipcc-name
+              - name: quay-aipcc-password
+                mountPath: /var/run/quay-aipcc-password
+              - name: credentials
+                mountPath: /credentials
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/kubeconfig"
+              - name: ARTIFACT_DIR
+                value: "/workspace/artifacts"
+              - name: KONFLUX_BOOL
+                value: "true"
+              - name: LIGHTSPEED_STACK_IMAGE
+                value: "$(params.lightspeedstackimage)"
+              - name: NAMESPACE
+                value: "$(params.namespace)"
+              - name: SNAPSHOT
+                value: $(params.SNAPSHOT)
+              - name: VLLM_URL
+                value: "http://$(params.vllm-host):8000"
+              - name: VLLM_API_KEY
+                value: "$(params.vllm-api-key)"
+              - name: VLLM_MODEL
+                value: "$(params.model)"
+              - name: OTEL_SDK_DISABLED
+                value: "true"
+              - name: OTEL_ANONYMIZATION_SECRET
+                value: "lightspeed-stack-otel-anonymization-dev-default"
+            image: registry.access.redhat.com/ubi9/ubi-minimal
+            script: |
+              set +e
+              echo "[e2e] 1/8 Starting RHOAI library-mode e2e tests (external vLLM)"
+              echo "[e2e] 2/8 Installing deps..."
+              microdnf -y install git tar jq curl-minimal python3 gettext
+              echo "[e2e] 3/8 Downloading oc client..."
+              curl -sL -o oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-$(params.ocp-version)/openshift-client-linux-amd64-rhel9.tar.gz
+              tar -xzf oc.tar.gz && chmod +x kubectl oc && mv oc kubectl /usr/local/bin/
+              echo "[e2e] 4/8 VLLM_URL=$VLLM_URL"
+              REPO_URL=$(jq -r '.components[] | select(.name == "lightspeed-stack-0-8") | .source.git.url // "https://github.com/lightspeed-core/lightspeed-stack.git"' <<< "$SNAPSHOT")
+              REPO_REV=$(jq -r '.components[] | select(.name == "lightspeed-stack-0-8") | .source.git.revision // "main"' <<< "$SNAPSHOT")
+              echo "[e2e] 5/8 Clone $REPO_URL @ $REPO_REV"
+              git clone -q "$REPO_URL" /workspace/lightspeed-stack
+              cd /workspace/lightspeed-stack && git fetch origin "$REPO_REV" && git checkout -q "$REPO_REV"
+              echo "[e2e] 6/8 Entering tests/e2e-prow/rhoai"
+              cd tests/e2e-prow/rhoai && chmod +x pipeline.sh pipeline-services-library.sh
+              echo "[e2e] 7/8 Running pipeline.sh (library mode + external vLLM)..."
+              export E2E_DEPLOYMENT_MODE=library
+              export LLAMA_STACK_CONFIG="$(cd ../../.. && pwd)/tests/e2e-prow/rhoai/configs/run-external-vllm.yaml"
+              export LCS_CONFIG="$(cd ../../.. && pwd)/tests/e2e/configuration/library-mode/lightspeed-stack-rhoai.yaml"
+              ./pipeline.sh
+              PIPELINE_EXIT=$?
+              echo "[e2e] 8/8 pipeline.sh exited with code $PIPELINE_EXIT"
+              exit $PIPELINE_EXIT
+
+  finally:
+    - name: destroy-rhelai
+      description: Tear down the RHEL AI instance regardless of pipeline outcome.
+      params:
+        - name: debug
+          value: "$(params.debug)"
+      taskSpec:
+        params:
+          - name: debug
+        volumes:
+          - name: aws-credentials
+            secret:
+              secretName: aws-mapt-credentials
+          - name: oidc-token
+            projected:
+              sources:
+                - serviceAccountToken:
+                    audience: sts.amazonaws.com
+                    expirationSeconds: 3600
+                    path: token
+        steps:
+          - name: destroy-instance
+            image: quay.io/redhat-developer/mapt:v0.14.6
+            imagePullPolicy: Always
+            env:
+              - name: HOME
+                value: /opt/mapt/run
+              - name: AWS_WEB_IDENTITY_TOKEN_FILE
+                value: /var/run/secrets/oidc/token
+              - name: AWS_ROLE_ARN
+                valueFrom:
+                  secretKeyRef:
+                    name: aws-mapt-credentials
+                    key: AWS_ROLE_ARN
+            volumeMounts:
+              - name: aws-credentials
+                mountPath: /opt/aws-credentials
+                readOnly: true
+              - name: oidc-token
+                mountPath: /var/run/secrets/oidc
+                readOnly: true
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "1Gi"
+              limits:
+                cpu: "300m"
+                memory: "2Gi"
+            script: |
+              #!/bin/sh
+              set -uo pipefail
+
+              export AWS_DEFAULT_REGION="us-east-1"
+              BUCKET=$(cat /opt/aws-credentials/S3_BUCKET)
+              RUN_ID="$(context.pipelineRun.name)"
+
+              echo "[mapt] Destroying RHEL AI instance (run: ${RUN_ID})..."
+              mapt aws rhel-ai destroy \
+                  --project-name "mapt-rhel-ai-${RUN_ID}" \
+                  --backed-url "s3://${BUCKET}/mapt/rhel-ai/${RUN_ID}" \
+                  --force-destroy \
+              && echo "[mapt] Destroy completed." \
+              || echo "[mapt] Destroy skipped or failed (no resources to clean up)."

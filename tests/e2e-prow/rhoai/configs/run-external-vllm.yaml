@@ -1,0 +1,111 @@
+# OGX run profile for RHOAI E2E with external vLLM (Konflux MAPT / VLLM_URL), library mode.
+version: 2
+distro_name: starter
+
+apis:
+- responses
+- batches
+- files
+- inference
+- tool_runtime
+- conversations
+- vector_io
+
+providers:
+  inference:
+  - provider_id: vllm
+    provider_type: remote::vllm
+    config:
+      base_url: ${env.VLLM_URL}/v1/
+      api_token: ${env.VLLM_API_KEY}
+      tls_verify: false
+      max_tokens: 512
+  - config: {}
+    provider_id: sentence-transformers
+    provider_type: inline::sentence-transformers
+  files:
+  - config:
+      metadata_store:
+        table_name: files_metadata
+        backend: sql_default
+      storage_dir: /opt/app-root/src/.llama/storage/files
+    provider_id: meta-reference-files
+    provider_type: inline::localfs
+  tool_runtime:
+  - config: {}
+    provider_id: file-search
+    provider_type: inline::file-search
+  - config: {}
+    provider_id: model-context-protocol
+    provider_type: remote::model-context-protocol
+  vector_io:
+  - config:
+      persistence:
+        namespace: vector_io::faiss
+        backend: kv_rag
+    provider_id: faiss
+    provider_type: inline::faiss
+  responses:
+  - config:
+      persistence:
+        responses:
+          table_name: agents_responses
+          backend: sql_default
+    provider_id: builtin
+    provider_type: inline::builtin
+  batches:
+  - config:
+      sqlstore:
+        table_name: batches
+        backend: sql_default
+    provider_id: reference
+    provider_type: inline::reference
+server:
+  port: 8321
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: ${env.KV_STORE_PATH:=/opt/app-root/src/.llama/storage/kv_store.db}
+    kv_rag:
+      type: kv_sqlite
+      db_path: ${env.KV_RAG_PATH:=/app-root/.e2e-rag-work/kv_store.db}
+    sql_default:
+      type: sql_sqlite
+      db_path: ${env.SQL_STORE_PATH:=/opt/app-root/src/.llama/storage/sql_store.db}
+  stores:
+    metadata:
+      namespace: registry
+      backend: kv_default
+    inference:
+      table_name: inference_store
+      backend: sql_default
+      max_write_queue_size: 10000
+      num_writers: 4
+    conversations:
+      table_name: openai_conversations
+      backend: sql_default
+    prompts:
+      table_name: prompts
+      backend: sql_default
+    connectors:
+      table_name: connectors
+      backend: sql_default
+registered_resources:
+  models:
+  - model_id: ${env.VLLM_MODEL}
+    provider_id: vllm
+    model_type: llm
+    provider_model_id: ${env.VLLM_MODEL}
+  - model_id: all-mpnet-base-v2
+    model_type: embedding
+    provider_id: sentence-transformers
+    provider_model_id: all-mpnet-base-v2
+    metadata:
+      embedding_dimension: 768
+  vector_stores: []
+vector_stores:
+  default_provider_id: faiss
+  default_embedding_model:
+    provider_id: sentence-transformers
+    model_id: all-mpnet-base-v2
